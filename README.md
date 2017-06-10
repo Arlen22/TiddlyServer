@@ -5,7 +5,7 @@ This is the first release of TiddlyServer 2.0 Lite.
  1. Download the files from master (Clone or download link at the top right)
  2. `npm install`
  3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 4. `npm start`
+ 4. `npm start` or `node server.js`
 
 # Benefits
   - Allows relative linking to external files.
