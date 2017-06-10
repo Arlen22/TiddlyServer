@@ -40,6 +40,8 @@ Tree is an object and its children may be either object or string. If a child va
 
 So `/alias2/alias2child/` would end up serving the folder named "relative folder path" in the current working directory, and `/alias` will load an absolute path on the file system.
 
+There are a few aliases which cannot be used directly under tree as they are reserved for other things on the server. Currently they are `favicon.ico`, `directory.css`, `icons`, and `admin`. If tree contains any of these they will simply be ignored. This only applies to the top level tree, not to sub trees.
+
 # Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this.
  - If you see a bug, please open an issue describing what is going on and I will try to answer it.
