@@ -1,0 +1,14 @@
+td.category {
+
+}
+td.folder{
+
+}
+td.htmlfile{
+
+}
+tr.other,
+tr.other a[href] {
+    color:#777;
+    text-decoration: none;
+}

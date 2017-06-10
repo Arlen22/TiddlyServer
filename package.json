@@ -1,0 +1,21 @@
+{
+  "name": "tiddlyserver",
+  "version": "2.0.0",
+  "description": "",
+  "bin": {
+    "tiddlyserver": "./server.js"
+  },
+  "dependencies": {
+    "rxjs": "^5.4.0",
+    "tiddlywiki": ">=5.1.14"
+  },
+  "devDependencies": {
+    "@types/node": ">=6.0.73 <7.0.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Arlen Beiler",
+  "license": "ISC"
+}

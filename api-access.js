@@ -1,0 +1,338 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const rx_1 = require("./lib/rx");
+const server_types_1 = require("./server-types");
+const fs = require("fs");
+const path = require("path");
+const crypto_1 = require("crypto");
+const tiddlywiki_1 = require("./tiddlywiki");
+const util_1 = require("util");
+const mime = require('./lib/mime');
+const obs_stat = (state) => rx_1.Observable.bindCallback(fs.stat, (err, stat) => [err, stat, state]);
+const obs_readdir = (state) => rx_1.Observable.bindCallback(fs.readdir, (err, files) => [err, files, state]);
+function parsePath(path, jsonFile) {
+    var regCheck = /${([^}])}/gi;
+    path.replace(regCheck, (str, pathVar) => {
+        switch (pathVar) {
+            case "execPath": return __dirname;
+            case "currDir": return process.cwd();
+            case "jsonDir": return jsonFile;
+            default: return "";
+        }
+    });
+    return path;
+}
+exports.parsePath = parsePath;
+var settings = {};
+const typeLookup = {};
+function init(eventer) {
+    eventer.on('settings', function (set) {
+        settings = set;
+        Object.keys(settings.types).forEach(type => {
+            settings.types[type].forEach(ext => {
+                if (!typeLookup[ext]) {
+                    typeLookup[ext] = type;
+                }
+                else {
+                    throw util_1.format('Multiple types for extension %s: %s', ext, typeLookup[ext], type);
+                }
+            });
+        });
+    });
+    tiddlywiki_1.init(eventer);
+}
+exports.init = init;
+function getTreeItem(reqpath) {
+    var item = settings.tree;
+    let i;
+    for (i = 0; i < reqpath.length; i++) {
+        if (typeof item !== 'string' && typeof item[reqpath[i]] !== 'undefined') {
+            item = item[reqpath[i]];
+        }
+        else {
+            break;
+        }
+    }
+    return [item, i];
+}
+//somewhere I have to recursively examine all the folders down filepath to make sure
+//none of them are data folders. I think perhaps I split list and access off too early.
+//Maybe I should combine them completely, or maybe I should just differentiate between 
+//the two based on whether there is a trailing slash or not. That could work, but I would
+//have to check whether that is standard or not. I could just ignore the trailing slash 
+//entirely. I don't need to differentiate between two since each item lists its children.
+function doAPIAccessRoute(obs) {
+    return obs.mergeMap((state) => {
+        var reqpath = decodeURI(state.path.slice().filter(a => a).join('/')).split('/').filter(a => a);
+        var [item, end] = getTreeItem(reqpath);
+        //if the reqpath is longer than end, but item is not a string, then the complete 
+        //path is not in the tree and we send a 404.
+        if (reqpath.length > end && typeof item !== 'string')
+            return state.throw(404);
+        //get the remainder of the path
+        let filepath = reqpath.slice(end).map(a => a.trim());
+        //check for invalid items (such as ..)
+        if (!filepath.every(a => a !== ".." && a !== "."))
+            return state.throw(403);
+        //if reqpath is longer than the tree list...we need to list files
+        return rx_1.Observable.of([typeof item === 'string' ? item : '', filepath, {
+                reqpath: reqpath.slice(0, end).join('/'),
+                filepath: filepath.join('/'), item, state
+            }]);
+    }).lift({
+        call: examineAccessPath
+    }).routeCase((res) => {
+        //the item is an object (a category) and examineAccessPath was skipped entirely
+        if (!res.type)
+            return 'folder';
+        else if (!res.isFullpath)
+            //this is either a datafolder or a file
+            if (typeof res.type === 'string')
+                return res.type;
+            else
+                return '';
+        else
+            return res.type;
+    }, { folder, datafolder: tiddlywiki_1.datafolder, file }, function error404(obs) {
+        return obs.mergeMap(({ tag }) => {
+            return tag.state.throw(404);
+        });
+    });
+}
+exports.doAPIAccessRoute = doAPIAccessRoute;
+/**
+ * recursively examines each level in the filepath and determines the
+ * state of the path. If the first argument is a zero-length string,
+ * it will skip checking and return only the third argument.
+ * @param subscriber
+ * @param input
+ */
+function examineAccessPath(subscriber, input) {
+    let loop = new rx_1.Subject();
+    let skip = new rx_1.Subject();
+    return input.map(([root, item, tag]) => {
+        return [root, Array.isArray(item) ? item : item.split('/'), tag];
+    }).mergeMap(([root, item, tag]) => {
+        if (root === '') {
+            skip.next({ tag });
+            return rx_1.Observable.empty();
+        }
+        let end = 0;
+        let folder = path.join.apply(path, [root].concat(item.slice(0, end)));
+        return obs_stat({ root, item, end, folder, tag })(folder);
+    }).merge(loop.mergeMap(({ root, item, end, folder, tag }) => {
+        end++;
+        folder = path.join.apply(path, [root].concat(item.slice(0, end)));
+        return obs_stat({ root, item, end, folder, tag })(folder);
+    })).mergeMap(([err, statItem, { root, item, end, folder, tag }]) => {
+        //if the directory does not exist or it is not a directory...
+        if (err || !statItem.isDirectory())
+            //isFullpath if it is the full path and actually exists
+            return [{ isFullpath: !err && (end === item.length), type: err || 'file', end, tag, statItem }];
+        else
+            return obs_stat({ root, item, end, folder, tag, statItem })(path.join(folder, "tiddlywiki.info"));
+    }).mergeMap((res) => {
+        if (!Array.isArray(res))
+            return [res];
+        let [err, statTW, { root, item, end, folder, tag, statItem }] = res;
+        if (end === item.length || !err) {
+            return [{ isFullpath: end === item.length, type: err ? 'folder' : 'datafolder', tag, end, statItem, statTW }];
+        }
+        else {
+            loop.next({ root, item, end, folder, tag });
+            return rx_1.Observable.empty();
+        }
+    }).merge(skip).subscribe(subscriber);
+}
+/// directory handler section =============================================
+//I have this in a JS file so I can edit it without recompiling
+const { generateDirectoryListing } = require('./generateDirectoryListing');
+function folder(obs) {
+    return obs.mergeMap((res) => {
+        if (!res.tag.state.url.pathname.endsWith("/")) {
+            res.tag.state.res.writeHead(302, {
+                'Location': res.tag.state.url.pathname + "/"
+            });
+            res.tag.state.res.end();
+            return rx_1.Observable.empty();
+        }
+        if (!res.type) {
+            const { state, item, reqpath, filepath } = res.tag;
+            if (["GET", "HEAD"].indexOf(state.req.method) < -1) {
+                return state.throw(405);
+            }
+            //Otherwise we will return the keys in the tree and continue
+            const folders = server_types_1.keys(item).map(a => {
+                return [
+                    {
+                        name: a,
+                        type: typeof item[a] === 'string' ? 'folder' : 'category',
+                        path: "/" + reqpath + "/" + a,
+                    },
+                    typeof item[a] === 'string' ? item[a] : false
+                ];
+            });
+            return rx_1.Observable.of([folders, res]);
+        }
+        else {
+            const { end, isFullpath, statItem, statTW, type, tag } = res;
+            const item = tag.item;
+            //filepath is relative to item
+            const { state, filepath, reqpath } = tag;
+            if (["GET", "HEAD"].indexOf(state.req.method) === -1) {
+                return state.throw(405);
+            }
+            const folder = path.join(item, filepath);
+            return obs_readdir({ folder, res })(folder).mergeMap(([err, files, { folder, res }]) => {
+                if (err) {
+                    return rx_1.Observable.of({ error: err });
+                }
+                const entries = files.map(a => {
+                    return [{
+                            name: a,
+                            type: 'folder',
+                            path: "/" + [reqpath, filepath.split('/').slice(0, end).join('/')].filter(a => !!a).join('/')
+                        }, path.join(folder, a)];
+                });
+                return rx_1.Observable.of([entries, res]);
+            });
+        }
+    }).mergeMap(statEntries).map(res2 => {
+        //unpack the data
+        let { entries, folder, res } = res2;
+        let { tag } = res;
+        let end = typeof res.end === 'number' ? res.end : '';
+        let { item, state, filepath, reqpath } = tag;
+        //set the path for each item
+        let prefix = [reqpath, end && filepath.split('/').slice(0, end).join('/')].filter(a => !!a).join('/');
+        entries.forEach(e => {
+            e.path = "/" + [prefix, e.name].filter(a => a).join('/');
+        });
+        // Send response
+        const type = typeof item === 'string' ? 'folder' : 'category';
+        state.res.writeHead(200, {
+            'x-api-access-type': type
+        });
+        if (state.req.method === 'GET') {
+            const directory = {
+                type,
+                entries,
+                path: (reqpath ? "/" + reqpath : "") + (filepath ? "/" + filepath : "") + "/"
+            };
+            state.res.write(generateDirectoryListing(directory));
+        }
+        state.res.end();
+        return state;
+    });
+}
+function statEntries([entries, res]) {
+    return rx_1.Observable.from(entries).mergeMap(([entry, itemPath]) => {
+        if (itemPath === false)
+            return rx_1.Observable.of([true, null, [entry, itemPath]]);
+        else
+            return obs_stat([entry, itemPath])(itemPath);
+    }).map(res2 => {
+        let [err, stat, [entry, itemPath]] = res2;
+        //set the size to a blank string by default
+        entry.size = "";
+        if (err === true) {
+            //category
+            return [entry, itemPath];
+        }
+        else if (err) {
+            //stat error on the item
+            entry.type = "error";
+        }
+        else if (stat.isDirectory()) {
+            //folder or datafolder
+            entry.type = 'folder';
+        }
+        else if (stat.isFile()) {
+            //a specified type or other
+            entry.type = typeLookup[entry.name.split('.').pop()] || 'other';
+            entry.size = stat.size + "B";
+        }
+        return [entry, itemPath];
+    }).mergeMap((res) => {
+        let [entry, itemPath] = res;
+        if (entry.type === 'folder')
+            return obs_stat(entry)(path.join(itemPath, 'tiddlywiki.info'));
+        else
+            return rx_1.Observable.of([true, null, entry]);
+    }).map((res) => {
+        let [err, files, entry] = res;
+        if (!err) {
+            entry.type = 'datafolder';
+            entry.icon = "application_xp_terminal.png";
+        }
+        return ([true, entry]);
+    }).reduce((n, [dud, entry]) => {
+        n.push(entry);
+        return n;
+    }, []).map(entries => {
+        return { entries, res };
+    });
+}
+/// file handler section =============================================
+function file(obs) {
+    return obs.mergeMap(res => {
+        //unpack the result from examineAccessPath
+        const { statItem, tag, isFullpath, end, type } = res;
+        const { state, item, reqpath: catpath, filepath: itempath } = tag;
+        //here we could balk if the file is found in the middle of the path
+        if (!isFullpath)
+            return state.throw(404);
+        //generate the file path and etag
+        const filepath = itempath.split('/').slice(0, end);
+        const fullpath = path.join(item, filepath.join('/'));
+        const hash = crypto_1.createHash('sha256').update(fullpath).digest('base64');
+        //const etag = [hash, statItem.mtime.toISOString()].join('/');
+        const mtime = Date.parse(statItem.mtime);
+        const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
+        //handle GET,HEAD,PUT,OPTIONS
+        if (["GET", "HEAD"].indexOf(state.req.method) > -1) {
+            return server_types_1.serveStatic(fullpath, state, statItem).map((res) => {
+                const [isError, result] = res;
+                //if (isError) state.req['skipLog'] = false;
+                if (isError)
+                    state.throw(result.status, result.message, result.headers);
+            }).ignoreElements();
+        }
+        else if (state.req.method === "PUT") {
+            if (state.req.headers['if-match'] && (state.req.headers['if-match'] !== etag)) {
+                return state.throw(412);
+            }
+            const stream = fs.createWriteStream(fullpath);
+            const write = state.req.pipe(stream);
+            const finish = rx_1.Observable.fromEvent(write, 'finish').take(1);
+            return rx_1.Observable.merge(finish, rx_1.Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err) => {
+                if (err) {
+                    return state.throw(500, "Error while writing the file to disk", [err.name, err.message, err.stack].join(': '));
+                }
+                else {
+                    return obs_stat(false)(fullpath);
+                }
+            }).map(([err, statNew]) => {
+                const etagNew = [hash, statNew.mtime.toISOString()].join('/');
+                state.res.writeHead(200, {
+                    'x-api-access-type': 'file',
+                    'ETag': etagNew
+                });
+                state.res.end();
+            });
+        }
+        else if (state.req.method === "OPTIONS") {
+            state.res.writeHead(200, {
+                'x-api-access-type': 'file',
+                'dav': 'tw5/put'
+            });
+            state.res.write("GET,HEAD,PUT,OPTIONS");
+            state.res.end();
+            return rx_1.Observable.of(state);
+        }
+        else {
+            return state.throw(405);
+        }
+    });
+}
+//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiYXBpLWFjY2Vzcy5qcyIsInNvdXJjZVJvb3QiOiIiLCJzb3VyY2VzIjpbImFwaS1hY2Nlc3MudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6Ijs7QUFBQSxpQ0FBOEY7QUFDOUYsaURBQTBKO0FBRTFKLHlCQUF5QjtBQUN6Qiw2QkFBNkI7QUFFN0IsbUNBQW9DO0FBTXBDLDZDQUFrRTtBQUNsRSwrQkFBOEI7QUFHOUIsTUFBTSxJQUFJLEdBQVMsT0FBTyxDQUFDLFlBQVksQ0FBQyxDQUFDO0FBRXpDLE1BQU0sUUFBUSxHQUFHLENBQUMsS0FBSyxLQUFLLGVBQVUsQ0FBQyxZQUFZLENBQUMsRUFBRSxDQUFDLElBQUksRUFBRSxDQUFDLEdBQUcsRUFBRSxJQUFJLEtBQUssQ0FBQyxHQUFHLEVBQUUsSUFBSSxFQUFFLEtBQUssQ0FBQyxDQUFDLENBQUM7QUFDaEcsTUFBTSxXQUFXLEdBQUcsQ0FBQyxLQUFLLEtBQUssZUFBVSxDQUFDLFlBQVksQ0FBQyxFQUFFLENBQUMsT0FBTyxFQUFFLENBQUMsR0FBRyxFQUFFLEtBQUssS0FBSyxDQUFDLEdBQUcsRUFBRSxLQUFLLEVBQUUsS0FBSyxDQUFDLENBQUMsQ0FBQztBQUV4RyxtQkFBMEIsSUFBWSxFQUFFLFFBQWdCO0lBQ3BELElBQUksUUFBUSxHQUFHLGFBQWEsQ0FBQztJQUM3QixJQUFJLENBQUMsT0FBTyxDQUFDLFFBQVEsRUFBRSxDQUFDLEdBQUcsRUFBRSxPQUFPO1FBQ2hDLE1BQU0sQ0FBQyxDQUFDLE9BQU8sQ0FBQyxDQUFDLENBQUM7WUFDZCxLQUFLLFVBQVUsRUFBRSxNQUFNLENBQUMsU0FBUyxDQUFDO1lBQ2xDLEtBQUssU0FBUyxFQUFFLE1BQU0sQ0FBQyxPQUFPLENBQUMsR0FBRyxFQUFFLENBQUM7WUFDckMsS0FBSyxTQUFTLEVBQUUsTUFBTSxDQUFDLFFBQVEsQ0FBQztZQUNoQyxTQUFTLE1BQU0sQ0FBQyxFQUFFLENBQUM7UUFDdkIsQ0FBQztJQUNMLENBQUMsQ0FBQyxDQUFBO0lBQ0YsTUFBTSxD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Q0FBQyxFQUFFLEdBQUcsQ0FBQyxDQUFDLENBQUMsQ0FBQztRQUN0RSxNQUFNLENBQUMsUUFBUSxDQUFDLEVBQUUsSUFBSSxFQUFFLElBQUksRUFBRSxHQUFHLEVBQUUsTUFBTSxFQUFFLEdBQUcsRUFBRSxDQUFDLENBQUMsTUFBTSxDQUFDLENBQUM7SUFDOUQsQ0FBQyxDQUFDLENBQUMsS0FBSyxDQUFDLElBQUksQ0FBQyxRQUFRLENBQUMsQ0FBQyxFQUFFLElBQUksRUFBRSxJQUFJLEVBQUUsR0FBRyxFQUFFLE1BQU0sRUFBRSxHQUFHLEVBQUU7UUFDcEQsR0FBRyxFQUFFLENBQUM7UUFDTixNQUFNLEdBQUcsSUFBSSxDQUFDLElBQUksQ0FBQyxLQUFLLENBQUMsSUFBSSxFQUFFLENBQUMsSUFBSSxDQUFDLENBQUMsTUFBTSxDQUFDLElBQUksQ0FBQyxLQUFLLENBQUMsQ0FBQyxFQUFFLEdBQUcsQ0FBQyxDQUFDLENBQUMsQ0FBQztRQUNsRSxNQUFNLENBQUMsUUFBUSxDQUFDLEVBQUUsSUFBSSxFQUFFLElBQUksRUFBRSxHQUFHLEVBQUUsTUFBTSxFQUFFLEdBQUcsRUFBRSxDQUFDLENBQUMsTUFBTSxDQUFDLENBQUM7SUFDOUQsQ0FBQyxDQUFDLENBQUMsQ0FBQyxRQUFRLENBQUMsQ0FBQyxDQUFDLEdBQUcsRUFBRSxRQUFRLEVBQUUsRUFBRSxJQUFJLEVBQUUsSUFBSSxFQUFFLEdBQUcsRUFBRSxNQUFNLEVBQUUsR0FBRyxFQUFFLENBQXVCO1FBQ2pGLDZEQUE2RDtRQUM3RCxFQUFFLENBQUMsQ0FBQyxHQUFHLElBQUksQ0FBQyxRQUFRLENBQUMsV0FBVyxFQUFFLENBQUM7WUFDL0IsdURBQXVEO1lBQ3ZELE1BQU0sQ0FBQyxDQUFDLEVBQUUsVUFBVSxFQUFFLENBQUMsR0FBRyxJQUFJLENBQUMsR0FBRyxLQUFLLElBQUksQ0FBQyxNQUFNLENBQUMsRUFBRSxJQUFJLEVBQUUsR0FBRyxJQUFJLE1BQU0sRUFBRSxHQUFHLEVBQUUsR0FBRyxFQUFFLFFBQVEsRUFBRSxDQUFRLENBQUM7UUFFM0csSUFBSTtZQUFDLE1BQU0sQ0FBQyxRQUFRLENBQUMsRUFBRSxJQUFJLEVBQUUsSUFBSSxFQUFFLEdBQUcsRUFBRSxNQUFNLEVBQUUsR0FBRyxFQUFFLFFBQVEsRUFBRSxDQUFDLENBQUMsSUFBSSxDQUFDLElBQUksQ0FBQyxNQUFNLEVBQUUsaUJBQWlCLENBQUMsQ0FBQyxDQUFDO0lBQzNHLENBQUMsQ0FBQyxDQUFDLFFBQVEsQ0FBQyxDQUFDLEdBQUc7UUFDWixFQUFFLENBQUMsQ0FBQyxDQUFDLEtBQUssQ0FBQyxPQUFPLENBQUMsR0FBRyxDQUFDLENBQUM7WUFBQyxNQUFNLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQztRQUN0QyxJQUFJLENBQUMsR0FBRyxFQUFFLE1BQU0sRUFBRSxFQUFFLElBQUksRUFBRSxJQUFJLEVBQUUsR0FBRyxFQUFFLE1BQU0sRUFBRSxHQUFHLEVBQUUsUUFBUSxFQUFFLENBQUMsR0FBRyxHQUFHLENBQUM7UUFDcEUsRUFBRSxDQUFDLENBQUMsR0FBRyxLQUFLLElBQUksQ0FBQyxNQUFNLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO1lBQzlCLE1BQU0sQ0FBQyxDQUFDLEVBQUUsVUFBVSxFQUFFLEdBQUcsS0FBSyxJQUFJLENBQUMsTUFBTSxFQUFFLElBQUksRUFBRSxHQUFHLEdBQUcsUUFBUSxHQUFHLFlBQVksRUFBRSxHQUFHLEVBQUUsR0FBRyxFQUFFLFFBQVEsRUFBRSxNQUFNLEVBQUUsQ0FBQyxDQUFDO1FBQ2xILENBQUM7UUFBQyxJQUFJLENBQUMsQ0FBQztZQUNKLElBQUksQ0FBQyxJQUFJLENBQUMsRUFBRSxJQUFJLEVBQUUsSUFBSSxFQUFFLEdBQUcsRUFBRSxNQUFNLEVBQUUsR0FBRyxFQUFFLENBQUMsQ0FBQztZQUM1QyxNQUFNLENBQUMsZUFBVSxDQUFDLEtBQUssRUFBRSxDQUFDO1FBQzlCLENBQUM7SUFDTCxDQUFDLENBQUMsQ0FBQyxLQUFLLENBQUMsSUFBSSxDQUFDLENBQUMsU0FBUyxDQUFDLFVBQVUsQ0FBQyxDQUFDO0FBQ3pDLENBQUM7QUFFRCwyRUFBMkU7QUFDM0UsK0RBQStEO0FBQy9ELE1BQU0sRUFBRSx3QkFBd0IsRUFBRSxHQUFHLE9BQU8sQ0FBQyw0QkFBNEIsQ0FBQyxDQUFDO0FBRTNFLGdCQUFnQixHQUFnRDtJQUM1RCxNQUFNLENBQUMsR0FBRyxDQUFDLFFBQVEsQ0FBQyxDQUFDLEdBQUc7UUFDcEIsRUFBRSxDQUFDLENBQUMsQ0FBQyxHQUFHLENBQUMsR0FBRyxDQUFDLEtBQUssQ0FBQyxHQUFHLENBQUMsUUFBUSxDQUFDLFFBQVEsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDLENBQUM7WUFDNUMsR0FBRyxDQUFDLEdBQUcsQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLFNBQVMsQ0FBQyxHQUFHLEVBQUU7Z0JBQzdCLFVBQVUsRUFBRSxHQUFHLENBQUMsR0FBRyxDQUFDLEtBQUssQ0FBQyxHQUFHLENBQUMsUUFBUSxHQUFHLEdBQUc7YUFDL0MsQ0FBQyxDQUFDO1lBQ0gsR0FBRyxDQUFDLEdBQUcsQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLEdBQUcsRUFBRSxDQUFDO1lBQ3hCLE1BQU0sQ0FBQyxlQUFVLENBQUMsS0FBSyxFQUFFLENBQUM7UUFDOUIsQ0FBQztRQUNELEVBQUUsQ0FBQyxDQUFDLENBQUMsR0FBRyxDQUFDLElBQUksQ0FBQyxDQUFDLENBQUM7WUFDWixNQUFNLEVBQUUsS0FBSyxFQUFFLElBQUksRUFBRSxPQUFPLEVBQUUsUUFBUSxFQUFFLEdBQUcsR0FBRyxDQUFDLEdBQUcsQ0FBQztZQUNuRCxFQUFFLENBQUMsQ0FBQyxDQUFDLEtBQUssRUFBRSxNQUFNLENBQUMsQ0FBQyxPQUFPLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxNQUFNLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUM7Z0JBQ2pELE1BQU0sQ0FBQyxLQUFLLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxDQUFDO1lBQzVCLENBQUM7WUFDRCw0REFBNEQ7WUFDNUQsTUFBTSxPQUFPLEdBQUcsbUJBQUksQ0FBQyxJQUFJLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQztnQkFDNUIsTUFBTSxDQUFDO29CQUNIO3dCQUNJLElBQUksRUFBRSxDQUFDO3dCQUNQLElBQUksRUFBRSxPQUFPLElBQUksQ0FBQyxDQUFDLENBQUMsS0FBSyxRQUFRLEdBQUcsUUFBUSxHQUFHLFVBQVU7d0JBQ3pELElBQUksRUFBRSxHQUFHLEdBQUcsT0FBTyxHQUFHLEdBQUcsR0FBRyxDQUFDO3FCQUNoQztvQkFDRCxPQUFPLElBQUksQ0FBQyxDQUFDLENBQUMsS0FBSyxRQUFRLEdBQUcsSUFBSSxDQUFDLENBQUMsQ0FBQyxHQUFHLEtBQUs7aUJBQ1osQ0FBQTtZQUN6QyxDQUFDLENBQUMsQ0FBQztZQUNILE1BQU0sQ0FBQyxlQUFVLENBQUMsRUFBRSxDQUFDLENBQUMsT0FBTyxFQUFFLEdBQUcsQ0FBQyxDQUFDLENBQUM7UUFDekMsQ0FBQztRQUFDLElBQUksQ0FBQyxDQUFDO1lBQ0osTUFBTSxFQUFFLEdBQUcsRUFBRSxVQUFVLEVBQUUsUUFBUSxFQUFFLE1BQU0sRUFBRSxJQUFJLEVBQUUsR0FBRyxFQUFFLEdBQUcsR0FBRyxDQUFDO1lBQzdELE1BQU0sSUFBSSxHQUFHLEdBQUcsQ0FBQyxJQUFjLENBQUM7WUFDaEMsOEJBQThCO1lBQzlCLE1BQU0sRUFBRSxLQUFLLEVBQUUsUUFBUSxFQUFFLE9BQU8sRUFBRSxHQUFHLEdBQUcsQ0FBQztZQUN6QyxFQUFFLENBQUMsQ0FBQyxDQUFDLEtBQUssRUFBRSxNQUFNLENBQUMsQ0FBQyxPQUFPLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxNQUFNLENBQUMsS0FBSyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUM7Z0JBQ25ELE1BQU0sQ0FBQyxLQUFLLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxDQUFDO1lBQzVCLENBQUM7WUFDRCxNQUFNLE1BQU0sR0FBRyxJQUFJLENBQUMsSUFBSSxDQUFDLElBQWMsRUFBRSxRQUFRLENBQUMsQ0FBQztZQUNuRCxNQUFNLENBQUMsV0FBVyxDQUFDLEVBQUUsTUFBTSxFQUFFLEdBQUcsRUFBRSxDQUFDLENBQUMsTUFBTSxDQUFDLENBQUMsUUFBUSxDQUFDLENBQUMsQ0FBQyxHQUFHLEVBQUUsS0FBSyxFQUFFLEVBQUUsTUFBTSxFQUFFLEdBQUcsRUFBRSxDQUFDO2dCQUMvRSxFQUFFLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO29CQUFDLE1BQU0sQ0FBQyxlQUFVLENBQUMsRUFBRSxDQUFDLEVBQUUsS0FBSyxFQUFFLEdBQUcsRUFBRSxDQUFRLENBQUM7Z0JBQUMsQ0FBQztnQkFFekQsTUFBTSxPQUFPLEdBQUcsS0FBSyxDQUFDLEdBQUcsQ0FBQyxDQUFDO29CQUN2QixNQUFNLENBQUMsQ0FBQzs0QkFDSixJQUFJLEVBQUUsQ0FBQzs0QkFDUCxJQUFJLEVBQUUsUUFBUTs0QkFDZCxJQUFJLEVBQUUsR0FBRyxHQUFHLENBQUMsT0FBTyxFQUFFLFFBQVEsQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLENBQUMsS0FBSyxDQUFDLENBQUMsRUFBRSxHQUFHLENBQUMsQ0FBQyxJQUFJLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxNQUFNLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFDLENBQUMsQ0FBQyxJQUFJLENBQUMsR0FBRyxDQUFDO3lCQUM5RSxFQUFFLElBQUksQ0FBQyxJQUFJLENBQUMsTUFBTSxFQUFFLENBQUMsQ0FBQyxDQUFDLENBQUE7Z0JBQzlDLENBQUMsQ0FBQyxDQUFBO2dCQUVGLE1BQU0sQ0FBQyxlQUFVLENBQUMsRUFBRSxDQUFDLENBQUMsT0FBTyxFQUFFLEdBQUcsQ0FBQyxDQUFDLENBQUM7WUFDekMsQ0FBQyxDQUFDLENBQUM7UUFDUCxDQUFDO0lBQ0wsQ0FBQyxDQUFDLENBQUMsUUFBUSxDQUFDLFdBQVcsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxJQUFJO1FBQzdCLGlCQUFpQjtRQUNqQixJQUFJLEVBQUUsT0FBTyxFQUFFLE1BQU0sRUFBRSxHQUFHLEVBQUUsR0FBRyxJQUEyRixDQUFDO1FBQzNILElBQUksRUFBRSxHQUFHLEVBQUUsR0FBRyxHQUFHLENBQUM7UUFDbEIsSUFBSSxHQUFHLEdBQWdCLE9BQU8sR0FBRyxDQUFDLEdBQUcsS0FBSyxRQUFRLEdBQUcsR0FBRyxDQUFDLEdBQUcsR0FBRyxFQUFFLENBQUM7UUFDbEUsSUFBSSxFQUFFLElBQUksRUFBRSxLQUFLLEVBQUUsUUFBUSxFQUFFLE9BQU8sRUFBRSxHQUFHLEdBQUcsQ0FBQztRQUU3Qyw0QkFBNEI7UUFDNUIsSUFBSSxNQUFNLEdBQUcsQ0FBQyxPQUFPLEVBQUUsR0FBRyxJQUFJLFFBQVEsQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLENBQUMsS0FBSyxDQUFDLENBQUMsRUFBRSxHQUFHLENBQUMsQ0FBQyxJQUFJLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxNQUFNLENBQUMsQ0FBQyxJQUFJLENBQUMsQ0FBQyxDQUFDLENBQUMsQ0FBQyxJQUFJLENBQUMsR0FBRyxDQUFDLENBQUM7UUFDdEcsT0FBTyxDQUFDLE9BQU8sQ0FBQyxDQUFDO1lBQ2IsQ0FBQyxDQUFDLElBQUksR0FBRyxHQUFHLEdBQUcsQ0FBQyxNQUFNLEVBQUUsQ0FBQyxDQUFDLElBQUksQ0FBQyxDQUFDLE1BQU0sQ0FBQyxDQUFDLElBQUksQ0FBQyxDQUFDLENBQUMsSUFBSSxDQUFDLEdBQUcsQ0FBQyxDQUFBO1FBQzVELENBQUMsQ0FBQyxDQUFDO1FBRUgsZ0JBQWdCO1FBQ2hCLE1BQU0sSUFBSSxHQUFHLE9BQU8sSUFBSSxLQUFLLFFBQVEsR0FBRyxRQUFRLEdBQUcsVUFBVSxDQUFDO1FBQzlELEtBQUssQ0FBQyxHQUFHLENBQUMsU0FBUyxDQUFDLEdBQUcsRUFBRTtZQUNyQixtQkFBbUIsRUFBRSxJQUFJO1NBQzVCLENBQUMsQ0FBQztRQUNILEVBQUUsQ0FBQyxDQUFDLEtBQUssQ0FBQyxHQUFHLENBQUMsTUFBTSxLQUFLLEtBQUssQ0FBQyxDQUFDLENBQUM7WUFDN0IsTUFBTSxTQUFTLEdBQUc7Z0JBQ2QsSUFBSTtnQkFDSixPQUFPO2dCQUNQLElBQUksRUFBRSxDQUFDLE9BQU8sR0FBRyxHQUFHLEdBQUcsT0FBTyxHQUFHLEVBQUUsQ0FBQyxHQUFHLENBQUMsUUFBUSxHQUFHLEdBQUcsR0FBRyxRQUFRLEdBQUcsRUFBRSxDQUFDLEdBQUcsR0FBRzthQUNoRixDQUFBO1lBQ0QsS0FBSyxDQUFDLEdBQUcsQ0FBQyxLQUFLLENBQUMsd0JBQXdCLENBQUMsU0FBUyxDQUFDLENBQUMsQ0FBQTtRQUN4RCxDQUFDO1FBQ0QsS0FBSyxDQUFDLEdBQUcsQ0FBQyxHQUFHLEVBQUUsQ0FBQztRQUNoQixNQUFNLENBQUMsS0FBSyxDQUFDO0lBQ2pCLENBQUMsQ0FBQyxDQUFBO0FBQ04sQ0FBQztBQUVELHFCQUFxQixDQUFDLE9BQU8sRUFBRSxHQUFHLENBQU07SUFDcEMsTUFBTSxDQUFDLGVBQVUsQ0FBQyxJQUFJLENBQUMsT0FBTyxDQUFDLENBQUMsUUFBUSxDQUFDLENBQUMsQ0FBQyxLQUFLLEVBQUUsUUFBUSxDQUFDO1FBQ3ZELEVBQUUsQ0FBQyxDQUFDLFFBQVEsS0FBSyxLQUFLLENBQUM7WUFBQyxNQUFNLENBQUMsZUFBVSxDQUFDLEVBQUUsQ0FBQyxDQUFDLElBQUksRUFBRSxJQUFJLEVBQUUsQ0FBQyxLQUFLLEVBQUUsUUFBUSxDQUFDLENBQUMsQ0FBQyxDQUFDO1FBQzlFLElBQUk7WUFBQyxNQUFNLENBQUMsUUFBUSxDQUFDLENBQUMsS0FBSyxFQUFFLFFBQVEsQ0FBQyxDQUFDLENBQUMsUUFBUSxDQUFDLENBQUM7SUFDdEQsQ0FBQyxDQUFDLENBQUMsR0FBRyxDQUFDLElBQUk7UUFDUCxJQUFJLENBQUMsR0FBRyxFQUFFLElBQUksRUFBRSxDQUFDLEtBQUssRUFBRSxRQUFRLENBQUMsQ0FBQyxHQUFHLElBQWlELENBQUM7UUFFdkYsMkNBQTJDO1FBQzNDLEtBQUssQ0FBQyxJQUFJLEdBQUcsRUFBRSxDQUFDO1FBQ2hCLEVBQUUsQ0FBQyxDQUFDLEdBQUcsS0FBSyxJQUFJLENBQUMsQ0FBQyxDQUFDO1lBQ2YsVUFBVTtZQUNWLE1BQU0sQ0FBQyxDQUFDLEtBQUssRUFBRSxRQUFRLENBQUMsQ0FBQztRQUM3QixDQUFDO1FBQUMsSUFBSSxDQUFDLEVBQUUsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUM7WUFDYix3QkFBd0I7WUFDeEIsS0FBSyxDQUFDLElBQUksR0FBRyxPQUFPLENBQUM7UUFDekIsQ0FBQztRQUFDLElBQUksQ0FBQyxFQUFFLENBQUMsQ0FBQyxJQUFJLENBQUMsV0FBVyxFQUFFLENBQUMsQ0FBQyxDQUFDO1lBQzVCLHNCQUFzQjtZQUN0QixLQUFLLENBQUMsSUFBSSxHQUFHLFFBQVEsQ0FBQztRQUMxQixDQUFDO1FBQUMsSUFBSSxDQUFDLEVBQUUsQ0FBQyxDQUFDLElBQUksQ0FBQyxNQUFNLEVBQUUsQ0FBQyxDQUFDLENBQUM7WUFDdkIsMkJBQTJCO1lBQzNCLEtBQUssQ0FBQyxJQUFJLEdBQUcsVUFBVSxDQUFDLEtBQUssQ0FBQyxJQUFJLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxDQUFDLEdBQUcsRUFBRSxDQUFDLElBQUksT0FBTyxDQUFDO1lBQ2hFLEtBQUssQ0FBQyxJQUFJLEdBQUcsSUFBSSxDQUFDLElBQUksR0FBRyxHQUFHLENBQUM7UUFDakMsQ0FBQztRQUVELE1BQU0sQ0FBQyxDQUFDLEtBQUssRUFBRSxRQUFRLENBQUMsQ0FBQztJQUM3QixDQUFDLENBQUMsQ0FBQyxRQUFRLENBQVcsQ0FBQyxHQUFHO1FBQ3RCLElBQUksQ0FBQyxLQUFLLEVBQUUsUUFBUSxDQUFDLEdBQUcsR0FBK0IsQ0FBQztRQUV4RCxFQUFFLENBQUMsQ0FBQyxLQUFLLENBQUMsSUFBSSxLQUFLLFFBQVEsQ0FBQztZQUN4QixNQUFNLENBQUMsUUFBUSxDQUFDLEtBQUssQ0FBQyxDQUFDLElBQUksQ0FBQyxJQUFJLENBQUMsUUFBUSxFQUFFLGlCQUFpQixDQUFDLENBQUMsQ0FBQztRQUVuRSxJQUFJO1lBQUMsTUFBTSxDQUFDLGVBQVUsQ0FBQyxFQUFFLENBQUMsQ0FBQyxJQUFJLEVBQUUsSUFBSSxFQUFFLEtBQUssQ0FBQyxDQUFDLENBQUM7SUFDbkQsQ0FBQyxDQUFDLENBQUMsR0FBRyxDQUFDLENBQUMsR0FBRztRQUNQLElBQUksQ0FBQyxHQUFHLEVBQUUsS0FBSyxFQUFFLEtBQUssQ0FBQyxHQUFHLEdBQXNDLENBQUM7UUFFakUsRUFBRSxDQUFDLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO1lBQ1AsS0FBSyxDQUFDLElBQUksR0FBRyxZQUFZLENBQUM7WUFDMUIsS0FBSyxDQUFDLElBQUksR0FBRyw2QkFBNkIsQ0FBQztRQUMvQyxDQUFDO1FBRUQsTUFBTSxDQUFDLENBQUMsQ0FBQyxJQUFJLEVBQUUsS0FBSyxDQUFDLENBQUMsQ0FBQztJQUMzQixDQUFDLENBQUMsQ0FBQyxNQUFNLENBQUMsQ0FBQyxDQUFDLEVBQUUsQ0FBQyxHQUFHLEVBQUUsS0FBSyxDQUFDO1FBQ3RCLENBQUMsQ0FBQyxJQUFJLENBQUMsS0FBSyxDQUFDLENBQUM7UUFDZCxNQUFNLENBQUMsQ0FBQyxDQUFDO0lBQ2IsQ0FBQyxFQUFFLEVBQUUsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxPQUFPO1FBQ2QsTUFBTSxDQUFDLEVBQUUsT0FBTyxFQUFFLEdBQUcsRUFBRSxDQUFDO0lBQzVCLENBQUMsQ0FBQyxDQUFBO0FBQ04sQ0FBQztBQUlELHNFQUFzRTtBQUV0RSxjQUFjLEdBQWdEO0lBRTFELE1BQU0sQ0FBQyxHQUFHLENBQUMsUUFBUSxDQUErQyxHQUFHO1FBQ2pFLDBDQUEwQztRQUMxQyxNQUFNLEVBQUUsUUFBUSxFQUFFLEdBQUcsRUFBRSxVQUFVLEVBQUUsR0FBRyxFQUFFLElBQUksRUFBRSxHQUFHLEdBQUcsQ0FBQztRQUNyRCxNQUFNLEVBQUUsS0FBSyxFQUFFLElBQUksRUFBRSxPQUFPLEVBQUUsT0FBTyxFQUFFLFFBQVEsRUFBRSxRQUFRLEVBQUUsR0FBRyxHQUFHLENBQUM7UUFFbEUsbUVBQW1FO1FBQ25FLEVBQUUsQ0FBQyxDQUFDLENBQUMsVUFBVSxDQUFDO1lBQUMsTUFBTSxDQUFDLEtBQUssQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLENBQUM7UUFFekMsaUNBQWlDO1FBQ2pDLE1BQU0sUUFBUSxHQUFHLFFBQVEsQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLENBQUMsS0FBSyxDQUFDLENBQUMsRUFBRSxHQUFHLENBQUMsQ0FBQztRQUNuRCxNQUFNLFFBQVEsR0FBRyxJQUFJLENBQUMsSUFBSSxDQUFDLElBQWMsRUFBRSxRQUFRLENBQUMsSUFBSSxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUM7UUFDL0QsTUFBTSxJQUFJLEdBQUcsbUJBQVUsQ0FBQyxRQUFRLENBQUMsQ0FBQyxNQUFNLENBQUMsUUFBUSxDQUFDLENBQUMsTUFBTSxDQUFDLFFBQVEsQ0FBQyxDQUFDO1FBQ3BFLDhEQUE4RDtRQUM5RCxNQUFNLEtBQUssR0FBRyxJQUFJLENBQUMsS0FBSyxDQUFDLFFBQVEsQ0FBQyxLQUFZLENBQUMsQ0FBQztRQUNoRCxNQUFNLElBQUksR0FBRyxJQUFJLENBQUMsU0FBUyxDQUFDLENBQUMsUUFBUSxDQUFDLEdBQUcsRUFBRSxRQUFRLENBQUMsSUFBSSxFQUFFLEtBQUssQ0FBQyxDQUFDLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO1FBQzVFLDZCQUE2QjtRQUM3QixFQUFFLENBQUMsQ0FBQyxDQUFDLEtBQUssRUFBRSxNQUFNLENBQUMsQ0FBQyxPQUFPLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxNQUFNLENBQUMsR0FBRyxDQUFDLENBQUMsQ0FBQyxDQUFDLENBQUM7WUFDakQsTUFBTSxDQUFDLDBCQUFXLENBQUMsUUFBUSxFQUFFLEtBQUssRUFBRSxRQUFRLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxHQUFHO2dCQUNsRCxNQUFNLENBQUMsT0FBTyxFQUFFLE1BQU0sQ0FBQyxHQUFHLEdBQW1FLENBQUM7Z0JBQzlGLDRDQUE0QztnQkFDNUMsRUFBRSxDQUFDLENBQUMsT0FBTyxDQUFDO29CQUFDLEtBQUssQ0FBQyxLQUFLLENBQUMsTUFBTSxDQUFDLE1BQU0sRUFBRSxNQUFNLENBQUMsT0FBTyxFQUFFLE1BQU0sQ0FBQyxPQUFPLENBQUMsQ0FBQztZQUM1RSxDQUFDLENBQUMsQ0FBQyxjQUFjLEVBQUUsQ0FBQTtRQUN2QixDQUFDO1FBQUMsSUFBSSxDQUFDLEVBQUUsQ0FBQyxDQUFDLEtBQUssQ0FBQyxHQUFHLENBQUMsTUFBTSxLQUFLLEtBQUssQ0FBQyxDQUFDLENBQUM7WUFDcEMsRUFBRSxDQUFDLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxPQUFPLENBQUMsVUFBVSxDQUFDLElBQUksQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLE9BQU8sQ0FBQyxVQUFVLENBQUMsS0FBSyxJQUFJLENBQUMsQ0FBQyxDQUFDLENBQUM7Z0JBQzVFLE1BQU0sQ0FBQyxLQUFLLENBQUMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxDQUFDO1lBQzVCLENBQUM7WUFDRCxNQUFNLE1BQU0sR0FBRyxFQUFFLENBQUMsaUJBQWlCLENBQUMsUUFBUSxDQUFDLENBQUM7WUFDOUMsTUFBTSxLQUFLLEdBQUcsS0FBSyxDQUFDLEdBQUcsQ0FBQyxJQUFJLENBQUMsTUFBTSxDQUFDLENBQUM7WUFDckMsTUFBTSxNQUFNLEdBQUcsZUFBVSxDQUFDLFNBQVMsQ0FBQyxLQUFLLEVBQUUsUUFBUSxDQUFDLENBQUMsSUFBSSxDQUFDLENBQUMsQ0FBQyxDQUFDO1lBQzdELE1BQU0sQ0FBQyxlQUFVLENBQUMsS0FBSyxDQUFDLE1BQU0sRUFBRSxlQUFVLENBQUMsU0FBUyxDQUFDLEtBQUssRUFBRSxPQUFPLENBQUMsQ0FBQyxTQUFTLENBQUMsTUFBTSxDQUFDLENBQUMsQ0FBQyxTQUFTLENBQUMsQ0FBQyxHQUFVO2dCQUN6RyxFQUFFLENBQUMsQ0FBQyxHQUFHLENBQUMsQ0FBQyxDQUFDO29CQUNOLE1BQU0sQ0FBQyxLQUFLLENBQUMsS0FBSyxDQUFDLEdBQUcsRUFBRSxzQ0FBc0MsRUFBRSxDQUFDLEdBQUcsQ0FBQyxJQUFJLEVBQUUsR0FBRyxDQUFDLE9BQU8sRUFBRSxHQUFHLENBQUMsS0FBSyxDQUFDLENBQUMsSUFBSSxDQUFDLElBQUksQ0FBQyxDQUFDLENBQUM7Z0JBQ25ILENBQUM7Z0JBQUMsSUFBSSxDQUFDLENBQUM7b0JBQ0osTUFBTSxDQUFDLFFBQVEsQ0FBQyxLQUFLLENBQUMsQ0FBQyxRQUFRLENBQVEsQ0FBQztnQkFDNUMsQ0FBQztZQUNMLENBQUMsQ0FBQyxDQUFDLEdBQUcsQ0FBQyxDQUFDLENBQUMsR0FBRyxFQUFFLE9BQU8sQ0FBQztnQkFDbEIsTUFBTSxPQUFPLEdBQUcsQ0FBQyxJQUFJLEVBQUUsT0FBTyxDQUFDLEtBQUssQ0FBQyxXQUFXLEVBQUUsQ0FBQyxDQUFDLElBQUksQ0FBQyxHQUFHLENBQUMsQ0FBQztnQkFDOUQsS0FBSyxDQUFDLEdBQUcsQ0FBQyxTQUFTLENBQUMsR0FBRyxFQUFFO29CQUNyQixtQkFBbUIsRUFBRSxNQUFNO29CQUMzQixNQUFNLEVBQUUsT0FBTztpQkFDbEIsQ0FBQyxDQUFBO2dCQUNGLEtBQUssQ0FBQyxHQUFHLENBQUMsR0FBRyxFQUFFLENBQUM7WUFDcEIsQ0FBQyxDQUFDLENBQUE7UUFDTixDQUFDO1FBQUMsSUFBSSxDQUFDLEVBQUUsQ0FBQyxDQUFDLEtBQUssQ0FBQyxHQUFHLENBQUMsTUFBTSxLQUFLLFNBQVMsQ0FBQyxDQUFDLENBQUM7WUFDeEMsS0FBSyxDQUFDLEdBQUcsQ0FBQyxTQUFTLENBQUMsR0FBRyxFQUFFO2dCQUNyQixtQkFBbUIsRUFBRSxNQUFNO2dCQUMzQixLQUFLLEVBQUUsU0FBUzthQUNuQixDQUFDLENBQUM7WUFDSCxLQUFLLENBQUMsR0FBRyxDQUFDLEtBQUssQ0FBQyxzQkFBc0IsQ0FBQyxDQUFDO1lBQ3hDLEtBQUssQ0FBQyxHQUFHLENBQUMsR0FBRyxFQUFFLENBQUM7WUFDaEIsTUFBTSxDQUFDLGVBQVUsQ0FBQyxFQUFFLENBQUMsS0FBSyxDQUFDLENBQUM7UUFDaEMsQ0FBQztRQUFDLElBQUksQ0FBQyxDQUFDO1lBQ0osTUFBTSxDQUFDLEtBQUssQ0FBQyxLQUFLLENBQUMsR0FBRyxDQUFDLENBQUM7UUFDNUIsQ0FBQztJQUNMLENBQUMsQ0FBNEIsQ0FBQztBQUNsQyxDQUFDIn0=
