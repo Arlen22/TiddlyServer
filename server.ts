@@ -106,11 +106,7 @@ const serverClose = Observable.fromEvent(server, 'close').take(1).multicast<Stat
         'favicon.ico': doFaviconRoute,
         'directory.css': doStylesheetRoute,
         'icons': doIconRoute,
-<<<<<<< HEAD
         'admin': StateObject.errorRoute(404, 'Reserved for future use')
-=======
-        'admin': obs => obs.mergeMap(state => state.throw(404, 'Reserved for future use'))
->>>>>>> bd089cba8fdb46de600533ced33407d73c4da7e1
     }, doAPIAccessRoute).subscribe((state: StateObject) => {
         if (!state) return console.log('blank item');
         if (!state.res.finished) {
