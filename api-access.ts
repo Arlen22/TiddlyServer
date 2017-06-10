@@ -1,5 +1,5 @@
 import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "./lib/rx";
-import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry, Directory, sortBySelector, serveStatic } from "./server-types";
+import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry, Directory, sortBySelector, serveStatic, obs_stat, obs_readdir, FolderEntryType } from "./server-types";
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,14 +10,10 @@ import { Mime } from './lib/mime';
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
 
-import { datafolder, init as initTiddlyWiki } from "./tiddlywiki";
+import { datafolder, init as initTiddlyWiki } from "./datafolder";
 import { format } from "util";
 
-
 const mime: Mime = require('./lib/mime');
-
-const obs_stat = (state) => Observable.bindCallback(fs.stat, (err, stat) => [err, stat, state]);
-const obs_readdir = (state) => Observable.bindCallback(fs.readdir, (err, files) => [err, files, state]);
 
 export function parsePath(path: string, jsonFile: string) {
     var regCheck = /${([^}])}/gi;
@@ -33,9 +29,9 @@ export function parsePath(path: string, jsonFile: string) {
 }
 
 var settings: ServerConfig = {} as any;
-const typeLookup = {};
+const typeLookup: { [k: string]: string } = {};
 export function init(eventer: EventEmitter) {
-    eventer.on('settings', function (set) {
+    eventer.on('settings', function (set: ServerConfig) {
         settings = set;
         Object.keys(settings.types).forEach(type => {
             settings.types[type].forEach(ext => {
@@ -52,7 +48,7 @@ export function init(eventer: EventEmitter) {
 
 type apiListRouteState = [[string, string], string | any, StateObject]
 
-function getTreeItem(reqpath) {
+function getTreeItem(reqpath: string[]) {
     var item: any = settings.tree;
     let i;
     for (i = 0; i < reqpath.length; i++) {
@@ -153,7 +149,7 @@ function examineAccessPath(
             loop.next({ root, item, end, folder, tag });
             return Observable.empty();
         }
-    }).merge(skip).subscribe(subscriber);
+    }).merge(skip).subscribe(subscriber as any);
 }
 
 /// directory handler section =============================================
@@ -171,7 +167,7 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
         }
         if (!res.type) {
             const { state, item, reqpath, filepath } = res.tag;
-            if (["GET", "HEAD"].indexOf(state.req.method) < -1) {
+            if (["GET", "HEAD"].indexOf(state.req.method as string) < -1) {
                 return state.throw(405);
             }
             //Otherwise we will return the keys in the tree and continue
@@ -191,7 +187,7 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
             const item = tag.item as string;
             //filepath is relative to item
             const { state, filepath, reqpath } = tag;
-            if (["GET", "HEAD"].indexOf(state.req.method) === -1) {
+            if (["GET", "HEAD"].indexOf(state.req.method as string) === -1) {
                 return state.throw(405);
             }
             const folder = path.join(item as string, filepath);
@@ -241,11 +237,13 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
 }
 
 function statEntries([entries, res]: any): any {
-    return Observable.from(entries).mergeMap(([entry, itemPath]) => {
+    type Type1 = [DirectoryEntry, string | false];
+    type Type2 = [any, fs.Stats, [DirectoryEntry, string | false]];
+    return Observable.from(entries).mergeMap<Type1, Type2>(([entry, itemPath]) => {
         if (itemPath === false) return Observable.of([true, null, [entry, itemPath]]);
         else return obs_stat([entry, itemPath])(itemPath);
     }).map(res2 => {
-        let [err, stat, [entry, itemPath]] = res2 as [any, fs.Stats, [DirectoryEntry, string]];
+        let [err, stat, [entry, itemPath]] = res2;
 
         //set the size to a blank string by default
         entry.size = "";
@@ -260,7 +258,7 @@ function statEntries([entries, res]: any): any {
             entry.type = 'folder';
         } else if (stat.isFile()) {
             //a specified type or other
-            entry.type = typeLookup[entry.name.split('.').pop()] || 'other';
+            entry.type = <FolderEntryType>typeLookup[entry.name.split('.').pop() as string] || 'other';
             entry.size = stat.size + "B";
         }
 
@@ -281,7 +279,7 @@ function statEntries([entries, res]: any): any {
         }
 
         return ([true, entry]);
-    }).reduce((n, [dud, entry]) => {
+    }).reduce<[boolean, DirectoryEntry], DirectoryEntry[]>((n, [dud, entry]) => {
         n.push(entry);
         return n;
     }, []).map(entries => {
@@ -311,7 +309,7 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
         const mtime = Date.parse(statItem.mtime as any);
         const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
         //handle GET,HEAD,PUT,OPTIONS
-        if (["GET", "HEAD"].indexOf(state.req.method) > -1) {
+        if (["GET", "HEAD"].indexOf(state.req.method as string) > -1) {
             return serveStatic(fullpath, state, statItem).map((res) => {
                 const [isError, result] = res as [boolean, { status: number, message: string, headers: any }];
                 //if (isError) state.req['skipLog'] = false;

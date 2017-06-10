@@ -1,7 +1,7 @@
 
 import { Observable, Subject, Subscription, BehaviorSubject, Subscriber } from './lib/rx';
 
-import { StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic } from "./server-types";
+import { StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic, obs_stat } from "./server-types";
 
 import * as http from 'http'
 import * as fs from 'fs';
@@ -57,8 +57,6 @@ const serveIcons = (function () {
 const favicon = path.resolve(__dirname, 'assets', 'favicon.ico');
 const stylesheet = path.resolve(__dirname, 'assets', 'directory.css');
 
-const obs_stat = (state) => Observable.bindCallback(fs.stat, (err, stat) => [err, stat, state]);
-const obs_readdir = (state) => Observable.bindCallback(fs.readdir, (err, files) => [err, files, state]);
 
 const server = http.createServer();
 
@@ -107,7 +105,12 @@ const serverClose = Observable.fromEvent(server, 'close').take(1).multicast<Stat
 }, {
         'favicon.ico': doFaviconRoute,
         'directory.css': doStylesheetRoute,
-        'icons': doIconRoute
+        'icons': doIconRoute,
+<<<<<<< HEAD
+        'admin': StateObject.errorRoute(404, 'Reserved for future use')
+=======
+        'admin': obs => obs.mergeMap(state => state.throw(404, 'Reserved for future use'))
+>>>>>>> bd089cba8fdb46de600533ced33407d73c4da7e1
     }, doAPIAccessRoute).subscribe((state: StateObject) => {
         if (!state) return console.log('blank item');
         if (!state.res.finished) {
@@ -118,7 +121,6 @@ const serverClose = Observable.fromEvent(server, 'close').take(1).multicast<Stat
             }, 60000);
             Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearTimeout(timeout));
         }
-
     }, err => {
         console.error('Uncaught error in the processing stack: ' + err.message);
         console.error(err.stack);
@@ -131,7 +133,7 @@ const serverClose = Observable.fromEvent(server, 'close').take(1).multicast<Stat
         console.log('finished processing for some reason');
     })
 
-function doFaviconRoute(obs) {
+function doFaviconRoute(obs: Observable<StateObject>) {
     return obs.mergeMap((state: StateObject) => {
         return obs_stat(state)(favicon).mergeMap(([err, stat]): any => {
             if (err) return state.throw(404);
@@ -141,9 +143,9 @@ function doFaviconRoute(obs) {
         })
     })
 }
-function doStylesheetRoute(obs) {
+function doStylesheetRoute(obs: Observable<StateObject>) {
     return obs.mergeMap(state => {
-        return obs_stat(state)(stylesheet).mergeMap(([err, stat]) => {
+        return obs_stat(state)(stylesheet).mergeMap(([err, stat]): any => {
             if (err) return state.throw(404);
             return serveStatic(stylesheet, state, stat).map(([isErr, res]) => {
                 if (isErr) state.throw(res.status, res.message, res.headers);
@@ -151,7 +153,7 @@ function doStylesheetRoute(obs) {
         })
     })
 }
-function doIconRoute(obs) {
+function doIconRoute(obs: Observable<StateObject>) {
     return obs.mergeMap(state => {
         return serveIcons(state.req, state.res).do(([err, res]: [{ status: number, message: string, headers: any }, any]) => {
             if (err) state.throw(err.status, err.message);
@@ -159,7 +161,7 @@ function doIconRoute(obs) {
     })
 }
 const PORT = 80;
-server.listen(PORT, function (err, res) {
+server.listen(PORT, function (err: any, res: any) {
     if (err) { console.error('error on app.listen', err); return; }
     console.log('Open you browswer (Chrome or Firefox) and type in one of the following:');
     //console.log('3000 on one of the following IP addresses.');
@@ -168,7 +170,7 @@ server.listen(PORT, function (err, res) {
     //console.log(ifaces);
     for (var dev in ifaces) {
         var alias = 0;
-        ifaces[dev].forEach(function (details) {
+        ifaces[dev].forEach(function (details: any) {
             if (details.family == 'IPv4' && details.internal === false) {
                 //dev+(alias?':'+alias:'')
                 console.log(details.address + (PORT !== 80 ? ':' + PORT : ''));
@@ -181,7 +183,7 @@ server.listen(PORT, function (err, res) {
  * to be used with concatMap, mergeMap, etc.
  * @param state 
  */
-export function recieveBody(state) {
+export function recieveBody(state: StateObject) {
     //get the data from the request
     return Observable.fromEvent(state.req, 'data')
         //only take one since we only need one. this will dispose the listener

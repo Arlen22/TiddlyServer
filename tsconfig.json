@@ -4,11 +4,12 @@
         "baseUrl": ".",
         "module": "commonjs",
         "target": "es6",
-        "noImplicitAny": false,
-        "strictNullChecks": false,
+        "noImplicitAny": true,
+        "strictNullChecks": true,
         //"sourceMap": true,
         "inlineSourceMap": true
         //"lib": [],
+        
     },
     "exclude": [
         "node_modules",

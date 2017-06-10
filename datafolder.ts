@@ -2,16 +2,26 @@ import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag } from
 import { Observable } from "./lib/rx";
 
 import * as path from 'path';
+import * as http from 'http';
+import { TiddlyWiki, $tw } from 'tiddlywiki';
+import { EventEmitter } from "events";
 
 var settings: ServerConfig = {} as any;
 
-export function init(eventer) {
-    eventer.on('settings', function (set) {
+export function init(eventer: EventEmitter) {
+    eventer.on('settings', function (set: ServerConfig) {
         settings = set;
     })
 }
 
-const loadedFolders = {};
+type FolderData = {
+    $tw: $tw.global,
+    prefix: string,
+    folder: string,
+    server: $tw.core.modules.commands.server.Server,
+    handler: (req: http.IncomingMessage, res: http.ServerResponse) => void;
+};
+const loadedFolders: { [k: string]: FolderData } = {};
 
 export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
     return obs.mergeMap(res => {
@@ -46,7 +56,7 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
     })
 }
 
-function loadTiddlyWiki(prefix, folder) {
+function loadTiddlyWiki(prefix: string, folder: string) {
     if (loadedFolders[prefix]) return Promise.resolve(loadedFolders[prefix].handler);
     else return new Promise(resolve => {
         const $tw = require("tiddlywiki/boot/boot.js").TiddlyWiki();

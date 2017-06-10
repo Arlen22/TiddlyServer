@@ -3,7 +3,7 @@ import * as url from 'url';
 import * as fs from 'fs';
 
 import { format } from "util";
-import { Observable } from './lib/rx';
+import { Observable, Subscriber } from './lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 
@@ -42,7 +42,7 @@ export function padLeft(str: any, pad: number | string, padStr?: string): string
     //pad: 000000 val: 6543210 => 654321
     return pad.substr(0, Math.max(pad.length - item.length, 0)) + item;
 }
-export function sortBySelector<T>(key: (e: T) => any) {
+export function sortBySelector<T extends { [k: string]: string }>(key: (e: T) => any) {
     return function (a: T, b: T) {
         var va = key(a);
         var vb = key(b);
@@ -59,7 +59,7 @@ export function sortBySelector<T>(key: (e: T) => any) {
 export function sortByKey(key: string) {
     return sortBySelector(e => e[key]);
 }
-export function DebugLogger(prefix) {
+export function DebugLogger(prefix: string) {
     return function (str: string, ...args: any[]) {
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
@@ -67,7 +67,7 @@ export function DebugLogger(prefix) {
         console.debug(['  ', prefix, date, format.apply(null, arguments)].join(' '));
     };
 }
-export function ErrorLogger(prefix) {
+export function ErrorLogger(prefix: string) {
     return function (str: string, ...args: any[]) {
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
@@ -75,7 +75,7 @@ export function ErrorLogger(prefix) {
         console.error([prefix, date, format.apply(null, arguments)].join(' '));
     };
 }
-export function sanitizeJSON(key, value) {
+export function sanitizeJSON(key: string, value: any) {
     // returning undefined omits the key from being serialized
     if (!key) { return value; } //This is the entire value to be serialized
     else if (key.substring(0, 1) === "$") return; //Remove angular tags
@@ -83,33 +83,34 @@ export function sanitizeJSON(key, value) {
     else return value;
 }
 
-export function handleProgrammersException(logger, err, message) {
+export function handleProgrammersException(logger: any, err: any, message: any) {
 
 }
 
-export const serveStatic: (path, state, stat: fs.Stats) => Observable<[
-    boolean,
-    {
-        status: number,
-        headers: {},
-        message: string
-    }
+export interface ServeStaticResult {
+    status: number,
+    headers: {},
+    message: string
+}
+
+export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => Observable<[
+    boolean, ServeStaticResult
 ]> = (function () {
     interface Server {
         serveFile(pathname: string, status: number, headers: {}, req: http.IncomingMessage, res: http.ServerResponse): EventEmitter
-        respond(...args): any;
-        finish(...args): any;
+        respond(...args: any[]): any;
+        finish(...args: any[]): any;
     }
     const staticServer = require('./lib/node-static');
     const serve = new staticServer.Server({ mount: '/' }) as Server;
     const promise = new EventEmitter();
-    return function (path, state, stat: fs.Stats) {
+    return function (path: string, state: StateObject, stat: fs.Stats) {
         const { req, res } = state;
-        return Observable.create(subs => {
+        return Observable.create((subs: Subscriber<[boolean, ServeStaticResult]>) => {
             serve.respond(null, 200, {
                 'x-api-access-type': 'file'
-            }, [path], stat, req, res, function (status, headers) {
-                serve.finish(status, headers, req, res, promise, (err, res) => {
+            }, [path], stat, req, res, function (status: number, headers: any) {
+                serve.finish(status, headers, req, res, promise, (err: ServeStaticResult, res: ServeStaticResult) => {
                     if (err) {
                         subs.next([true, err]);
                     } else {
@@ -123,24 +124,59 @@ export const serveStatic: (path, state, stat: fs.Stats) => Observable<[
 
 })();
 
+type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
+
+export const obs_stat = <T>(state: T) => Observable.bindCallback(
+    fs.stat, (err, stat): NodeCallback<fs.Stats, T> => [err, stat, state]);
+
+export const obs_readdir = <T>(state: T) => Observable.bindCallback(
+    fs.readdir, (err, files): NodeCallback<string[], T> => [err, files, state]);
+
+export const obs_readFile = <T>(state: T) => Observable.bindCallback(
+    fs.readFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state]);
+
 export class StateError extends Error {
     state: StateObject;
-    constructor(state, message) {
+    constructor(state: StateObject, message: string) {
         super(message);
         this.state = state;
     }
 }
 
+export type LoggerFunc = (str: string, ...args: any[]) => void;
+
 export class StateObject implements ThrowFunc<StateObject>{
-    req: http.IncomingMessage;
-    res: http.ServerResponse;
+
+    static errorRoute(status: number, reason?: string) {
+        return (obs: Observable<any>) => {
+            return obs.mergeMap((state: StateObject) => {
+                return state.throw(status, reason);
+            })
+        }
+    }
+
+    // req: http.IncomingMessage;
+    // res: http.ServerResponse;
     startTime: [number, number];
     timestamp: string;
 
     body: string;
     json: any | undefined;
 
-    url: url.Url;
+    url: {
+        href: string;
+        protocol: string;
+        auth?: string;
+        host: string;
+        hostname: string;
+        port?: string;
+        pathname: string;
+        path: string;
+        search?: string;
+        query?: string | any;
+        slashes?: boolean;
+        hash?: string;
+    };
     path: string[];
 
     maxid: number;
@@ -151,21 +187,29 @@ export class StateObject implements ThrowFunc<StateObject>{
 
     restrict: any;
 
-    expressNext: ((err?) => void) | false;
+    expressNext: ((err?: any) => void) | false;
 
-    private debugLog: (str: string, ...args: any[]) => void;
-    private errorLog: (str: string, ...args: any[]) => void;
 
-    constructor(req, res, debugLog, errorLog) {
-        this.req = req;
-        this.res = res;
-        this.debugLog = debugLog;
-        this.errorLog = errorLog;
+
+    // private debugLog: LoggerFunc;
+    // private errorLog: LoggerFunc;
+
+    constructor(
+        public req: http.IncomingMessage,
+        public res: http.ServerResponse,
+        private debugLog: LoggerFunc,
+        private errorLog: LoggerFunc
+    ) {
+        // this.req = req;
+        // this.res = res;
+        // this.debugLog = debugLog;
+        // this.errorLog = errorLog;
         this.startTime = process.hrtime();
-        //parse the url and store in state
-        this.url = url.parse(this.req.url, true)
+        //parse the url and store in state.
+        //a server request will definitely have the required fields in the object
+        this.url = url.parse(this.req.url as string, true) as any
         //parse the path for future use
-        this.path = (this.url.pathname).split('/')
+        this.path = (this.url.pathname as string).split('/')
 
         let t = new Date();
         this.timestamp = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
@@ -193,12 +237,13 @@ export class StateObject implements ThrowFunc<StateObject>{
             format.apply(null, arguments)
         );
     }
-    throw(statusCode: number, reason?, str?: string | {}, ...args: any[]): Observable<StateObject> {
+    throw<T>(statusCode: number, reason?: string, str?: string | {}, ...args: any[]): Observable<T>;
+    throw(statusCode: number, reason?: string, str?: string | {}, ...args: any[]): Observable<StateObject> {
         //throw<T>(statusCode: number, reason?, str?: string, ...args: any[]): Observable<T>
         //throw(statusCode: number, reason?, str?: string, ...args: any[]): Observable<any> {
         let headers = (typeof str === 'object') ? str : null;
         if (headers) str = args.shift();
-        this.errorThrown = new StateError(null, format.bind(null, str || reason || 'status code ' + statusCode).apply(null, args));
+        this.errorThrown = new StateError(this, format.bind(null, str || reason || 'status code ' + statusCode).apply(null, args));
         if (!this.res.headersSent) {
             this.res.writeHead(statusCode, reason && reason.toString(), headers);
             //don't write 204 reason
@@ -209,39 +254,15 @@ export class StateObject implements ThrowFunc<StateObject>{
         if (str || reason) this.error('state error ' + this.errorThrown.message);
         return Observable.empty<StateObject>();
     }
-    endJSON(data) {
+    endJSON(data: any) {
         this.res.write(JSON.stringify(data));
         this.res.end();
     }
 
 }
 
-export class StateObjectServer extends StateObject {
-    expressNext: false = false;
-}
-
-export class StateObjectExpress extends StateObject implements ThrowFunc<StateObjectExpress> {
-    expressNext: (err?) => void;
-
-    constructor(req, res, next, debugLog, errorLog) {
-        super(req, res, debugLog, errorLog);
-        this.expressNext = next;
-    }
-
-    throw(statusCode: number, reason?: any, str?: string, ...args: any[]): Observable<StateObjectExpress> {
-        this.errorThrown = new StateError(null, format.bind(null, str || reason || 'status code ' + statusCode).apply(null, args));
-        this.expressNext(this.errorThrown);
-        return Observable.empty<StateObject>();
-    }
-
-
-}
-
-
-
-
 export interface ThrowFunc<T> {
-    throw(statusCode: number, reason?, str?: string, ...args: any[]): Observable<T>;
+    throw(statusCode: number, reason?: string, str?: string, ...args: any[]): Observable<T>;
 }
 
 export interface ServerConfig {
@@ -302,7 +323,7 @@ export function getError(code: 'ROW_NOT_FOUND', table: string, id: string): any;
 export function getError(code: 'PROGRAMMER_EXCEPTION', message: string): any;
 export function getError(code: string, ...args: string[]): any;
 export function getError(...args: string[]) {
-    let code = args.shift();
+    let code = args.shift() as keyof typeof ERRORS;
     if (ERRORS[code]) args.unshift(ERRORS[code])
     //else args.unshift(code);
     return { code: code, message: format.apply(null, args) };
