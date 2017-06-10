@@ -1,7 +1,11 @@
 {
     "tree": {
         "dropbox": "C:\\Users\\Someone\\Dropbox\\TiddlyWiki",
-        "tiddlywiki": "C:\\TiddlyWiki5-5.1.14"
+        "tiddlywiki": "C:\\TiddlyWiki5-5.1.14",
+        "branch": {
+            "twig1": "C:/Some Folder",
+            "twig2": "C:/Some Other Folder"
+        }
     },
     "types":{
         "htmlfile": ["htm", "html"]
