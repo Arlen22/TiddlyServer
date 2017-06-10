@@ -15,10 +15,10 @@ export function init(eventer: EventEmitter) {
 }
 
 type FolderData = {
-    $tw: $tw.global,
+    $tw: any, //$tw.global,
     prefix: string,
     folder: string,
-    server: $tw.core.modules.commands.server.Server,
+    server: any, //$tw.core.modules.commands.server.Server,
     handler: (req: http.IncomingMessage, res: http.ServerResponse) => void;
 };
 const loadedFolders: { [k: string]: FolderData } = {};
