@@ -83,7 +83,8 @@ rx_1.Observable.fromEvent(server, 'request', (req, res) => {
 }, {
     'favicon.ico': doFaviconRoute,
     'directory.css': doStylesheetRoute,
-    'icons': doIconRoute
+    'icons': doIconRoute,
+    'admin': obs => obs.mergeMap(state => state.throw(404, 'Reserved for future use'))
 }, api_access_1.doAPIAccessRoute).subscribe((state) => {
     if (!state)
         return console.log('blank item');
