@@ -26,7 +26,9 @@ var settings: {
     tree: any,
     watch: string[],
     username?: string,
-    password?: string
+    password?: string,
+    host?: string,
+    port?: number | 8080
 } = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
 
 (function normalizeTree(item) {
@@ -36,6 +38,8 @@ var settings: {
         else throw 'Invalid item: ' + e + ': ' + item[e];
     })
 })(settings.tree)
+
+if(!settings.port) settings.port = 8080;
 
 //import and init api-access
 import { doAPIAccessRoute, init as initAPIAccess } from './api-access';
@@ -156,23 +160,24 @@ function doIconRoute(obs: Observable<StateObject>) {
         }).mapTo(state);
     })
 }
-const PORT = 80;
-server.listen(PORT, function (err: any, res: any) {
+
+server.listen(settings.port, settings.host, function (err: any, res: any) {
     if (err) { console.error('error on app.listen', err); return; }
-    console.log('Open you browswer (Chrome or Firefox) and type in one of the following:');
-    //console.log('3000 on one of the following IP addresses.');
-    var os = require('os');
-    var ifaces = os.networkInterfaces();
-    //console.log(ifaces);
-    for (var dev in ifaces) {
-        var alias = 0;
-        ifaces[dev].forEach(function (details: any) {
-            if (details.family == 'IPv4' && details.internal === false) {
-                //dev+(alias?':'+alias:'')
-                console.log(details.address + (PORT !== 80 ? ':' + PORT : ''));
-                ++alias;
-            }
-        });
+    console.log('Open you browswer and type in one of the following:');
+    if(settings.host && settings.host === '0.0.0.0'){
+        var os = require('os');
+        var ifaces = os.networkInterfaces();
+        for (var dev in ifaces) {
+            var alias = 0;
+            ifaces[dev].forEach(function (details: any) {
+                if (details.family == 'IPv4' && details.internal === false) {
+                    console.log(details.address + (settings.port !== 80 ? ':' + settings.port : ''));
+                    ++alias;
+                }
+            });
+        }
+    } else {
+        console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
     }
 });
 /**
