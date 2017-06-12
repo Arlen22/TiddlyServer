@@ -100,8 +100,8 @@ export function doAPIAccessRoute(obs: Observable<StateObject>) {
             else return '';
         else return res.type as 'datafolder' | 'file' | 'folder';
     }, { folder, datafolder, file }, function error404(obs) {
-        return obs.mergeMap(({ tag }) => {
-            return tag.state.throw(404);
+        return obs.mergeMap((res) => {
+            return res.tag.state.throw(404);
         })
     })
 }
@@ -329,10 +329,11 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
                     return obs_stat(false)(fullpath) as any;
                 }
             }).map(([err, statNew]) => {
-                const etagNew = [hash, statNew.mtime.toISOString()].join('/');
+                const mtimeNew = Date.parse(statNew.mtime as any);
+                const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
                 state.res.writeHead(200, {
                     'x-api-access-type': 'file',
-                    'ETag': etagNew
+                    'etag': etagNew
                 })
                 state.res.end();
             })
