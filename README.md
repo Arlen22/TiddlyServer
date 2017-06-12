@@ -1,4 +1,4 @@
-This is the first release of TiddlyServer 2.0 "Lite". 
+## TiddlyServer 2.0 "Lite". 
 
 # Installation
 
