@@ -164,7 +164,7 @@ function doIconRoute(obs: Observable<StateObject>) {
 server.listen(settings.port, settings.host, function (err: any, res: any) {
     if (err) { console.error('error on app.listen', err); return; }
     console.log('Open you browswer and type in one of the following:');
-    if(settings.host && settings.host === '0.0.0.0'){
+    if(!settings.host || settings.host === '0.0.0.0'){
         var os = require('os');
         var ifaces = os.networkInterfaces();
         for (var dev in ifaces) {
