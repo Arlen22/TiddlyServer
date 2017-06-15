@@ -1,4 +1,10 @@
 const { sortBySelector } = require('./server-types')
+const fixPutSaver = `javascript:((saver) => {
+if (typeof saver !== 'number' || saver < 0) return;
+$tw.saverHandler.savers[saver].__proto__.uri = function () { return decodeURI(encodeURI(document.location.toString().split('#')[0])); };
+$tw.saverHandler.savers[saver] = $tw.modules.types.saver['$:/core/modules/savers/put.js'].exports.create();
+})($tw.saverHandler.savers.findIndex(e => e.info.name === 'put'))`;
+
 exports.generateDirectoryListing = function (directory) {
     function listEntries(entries) {
         return entries.slice().sort(
@@ -8,7 +14,7 @@ exports.generateDirectoryListing = function (directory) {
             return `
 <tr class="row ${(index + 1) % 2 ? 'odd' : 'even'} ${entry.type}">
     <td><span class="icon"><img src="/icons/${(isFile ? 'files/' : '') + entry.type}.png"/></span></td>
-    <td><span class="name"><a href="${entry.path}">${entry.name}</a></span></td>
+    <td><span class="name"><a href="${encodeURI(entry.path)}">${entry.name}</a></span></td>
     <td><span class="type">${entry.type}</span></td>
     <td><span class="size">${entry.size}</span></td>
 </tr>`
@@ -27,6 +33,7 @@ exports.generateDirectoryListing = function (directory) {
 </head>
 <body>
 <p><a href="${parentPath}">Parent directory: ${parentPath}</a></p>
+<p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
 <h3>${name}</h3>
 <table style="min-width:400px;">
 <tr><th></th><th>Name</th><th>Type</th><th>Size</th></tr>

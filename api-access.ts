@@ -71,12 +71,14 @@ function getTreeItem(reqpath: string[]) {
 export function doAPIAccessRoute(obs: Observable<StateObject>) {
     return obs.mergeMap((state: StateObject) => {
         var reqpath = decodeURI(state.path.slice().filter(a => a).join('/')).split('/').filter(a => a);
-
         var [item, end] = getTreeItem(reqpath);
+
         //if the reqpath is longer than end, but item is not a string, then the complete 
         //path is not in the tree and we send a 404.
-        if (reqpath.length > end && typeof item !== 'string')
+        if (reqpath.length > end && typeof item !== 'string') {
             return state.throw(404) as any;
+        }
+
         //get the remainder of the path
         let filepath = reqpath.slice(end).map(a => a.trim());
         //check for invalid items (such as ..)
