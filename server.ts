@@ -22,6 +22,8 @@ const logger = require('./lib/morgan.js').handler;
 
 const settingsFile = path.resolve(process.argv[2] || 'settings.json');
 
+console.log("Settings file: %s", settingsFile);
+
 var settings: {
     tree: any,
     watch: string[],
