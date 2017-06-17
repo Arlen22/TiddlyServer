@@ -3,7 +3,7 @@ import { Observable } from "./lib/rx";
 
 import * as path from 'path';
 import * as http from 'http';
-import { TiddlyWiki, $tw } from 'tiddlywiki';
+//import { TiddlyWiki } from 'tiddlywiki';
 import { EventEmitter } from "events";
 
 var settings: ServerConfig = {} as any;
@@ -21,9 +21,15 @@ type FolderData = {
     server: any, //$tw.core.modules.commands.server.Server,
     handler: (req: http.IncomingMessage, res: http.ServerResponse) => void;
 };
-const loadedFolders: { [k: string]: FolderData } = {};
+const loadedFolders: { [k: string]: FolderData | ([http.IncomingMessage, http.ServerResponse])[] } = {};
+
+function quickArrayCheck(obj: any): obj is Array<any> {
+    return typeof obj.length === 'number';
+}
 
 export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
+    //warm the cache
+    require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
     return obs.mergeMap(res => {
         let { tag, type, statItem, statTW, end, isFullpath } = res;
         /**
@@ -48,52 +54,63 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
         let prefixURI = state.url.pathname.split('/').slice(0, prefix.length).join('/');
 
         let folder = path.join(item as string, suffix);
-        //console.log('%s %s', prefix, folder);
-        loadTiddlyWiki(prefixURI, folder).then(handler => {
-            handler(state.req, state.res);
-        });
+
+        if (!loadedFolders[prefixURI]) {
+            loadedFolders[prefixURI] = [];
+            loadTiddlyWiki(prefixURI, folder);
+        }
+        const load = loadedFolders[prefixURI];
+        if (quickArrayCheck(load)) {
+            load.push([state.req, state.res]);
+        } else {
+            load.handler(state.req, state.res);
+        }
+
         return Observable.empty<StateObject>();
     })
 }
 
 function loadTiddlyWiki(prefix: string, folder: string) {
-    if (loadedFolders[prefix]) return Promise.resolve(loadedFolders[prefix].handler);
-    else return new Promise(resolve => {
-        const $tw = require("tiddlywiki/boot/boot.js").TiddlyWiki();
-        $tw.boot.argv = [folder];
-        const execute = $tw.boot.executeNextStartupTask;
-        $tw.boot.executeNextStartupTask = function () {
-            const res = execute();
-            if (res === false) complete();
-        }
-        function complete() {
-            //we use $tw.modules.execute so that the module has its respective $tw variable.
-            var serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
-            var command = new serverCommand([], { wiki: $tw.wiki });
-            var server = command.server;
 
-            server.set({
-                rootTiddler: "$:/core/save/all",
-                renderType: "text/plain",
-                serveType: "text/html",
-                username: "",
-                password: "",
-                pathprefix: prefix
-            });
+    console.time('twboot');
+    const $tw = require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
+    $tw.boot.argv = [folder];
 
-            loadedFolders[prefix] = {
-                $tw,
-                prefix,
-                folder,
-                server,
-                handler: server.requestHandler.bind(server)
-            }
-            resolve(loadedFolders[prefix].handler);
-        }
-        $tw.boot.boot();
-        $tw.wiki.addTiddler({
-            "text": "$protocol$//$host$" + prefix + "/",
-            "title": "$:/config/tiddlyweb/host"
+    function complete() {
+        console.log('complete');
+        console.timeEnd('twboot');
+        //we use $tw.modules.execute so that the module has its respective $tw variable.
+        var serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
+        var command = new serverCommand([], { wiki: $tw.wiki });
+        var server = command.server;
+
+        server.set({
+            rootTiddler: "$:/core/save/all",
+            renderType: "text/plain",
+            serveType: "text/html",
+            username: "",
+            password: "",
+            pathprefix: prefix
         });
-    })
+        const requests = loadedFolders[prefix] as any[];
+        const handler = server.requestHandler.bind(server);
+        loadedFolders[prefix] = {
+            $tw,
+            prefix,
+            folder,
+            server,
+            handler
+        }
+        //send the requests to the handler
+        requests.forEach(e => {
+            handler(e[0], e[1]);
+        })
+        
+    }
+    $tw.boot.boot(complete);
+    $tw.wiki.addTiddler({
+        "text": "$protocol$//$host$" + prefix + "/",
+        "title": "$:/config/tiddlyweb/host"
+    });
+    // }
 };

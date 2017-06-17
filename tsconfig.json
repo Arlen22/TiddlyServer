@@ -7,7 +7,7 @@
         "noImplicitAny": true,
         "strictNullChecks": true,
         //"sourceMap": true,
-        "inlineSourceMap": true
+        "inlineSourceMap": false
         //"lib": [],
         
     },

@@ -1,3 +1,5 @@
 node_modules/
 /settings.json
 /archive/
+.vscode/launch.json
+.vscode/settings.json
