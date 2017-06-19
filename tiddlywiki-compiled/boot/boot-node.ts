@@ -1,4 +1,4 @@
-import { Observable } from 'rxjs/bundles/Rx.min';
+import { Observable } from 'rxjs';
 import * as path from 'path';
 import * as fs from 'fs';
 
