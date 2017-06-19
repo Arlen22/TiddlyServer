@@ -15,7 +15,7 @@ function quickArrayCheck(obj) {
 }
 function datafolder(obs) {
     //warm the cache
-    require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
+    //require("tiddlywiki/boot/boot.js").TiddlyWiki();
     return obs.mergeMap(res => {
         let { tag, type, statItem, statTW, end, isFullpath } = res;
         /**
@@ -53,7 +53,7 @@ function datafolder(obs) {
 exports.datafolder = datafolder;
 function loadTiddlyWiki(prefix, folder) {
     console.time('twboot');
-    const $tw = require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
+    const $tw = require("tiddlywiki").TiddlyWiki();
     $tw.boot.argv = [folder];
     function complete() {
         console.log('complete');

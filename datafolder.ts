@@ -29,7 +29,7 @@ function quickArrayCheck(obj: any): obj is Array<any> {
 
 export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
     //warm the cache
-    require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
+    //require("tiddlywiki/boot/boot.js").TiddlyWiki();
     return obs.mergeMap(res => {
         let { tag, type, statItem, statTW, end, isFullpath } = res;
         /**
@@ -73,7 +73,7 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
 function loadTiddlyWiki(prefix: string, folder: string) {
 
     console.time('twboot');
-    const $tw = require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
+    const $tw = require("tiddlywiki").TiddlyWiki();
     $tw.boot.argv = [folder];
 
     function complete() {
