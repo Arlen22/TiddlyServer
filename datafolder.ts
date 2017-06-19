@@ -40,27 +40,29 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
         let { state, item, filepath, reqpath } = tag;
 
         //TiddlyWiki requires a trailing slash for the root url
-        if (isFullpath && !state.url.pathname.endsWith("/")) {
+
+
+        let suffix = filepath.split('/').slice(0, end).join('/');
+        let prefix = ["", reqpath, suffix].join('/').split('/');
+        let prefixURI = state.url.pathname.split('/').slice(0, prefix.length).join('/');
+        let folder = path.join(item as string, suffix);
+
+        if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
+            loadedFolders[prefixURI] = [];
+            loadTiddlyWiki(prefixURI, folder);
+        }
+        //require a trailing slash for data folders, and redirect ?reload=true requests to the same,
+        //to prevent it being reloaded multiple times for the same page load.
+        if (isFullpath && !state.url.pathname.endsWith("/") || state.url.query.reload === "true") {
             state.res.writeHead(302, {
-                'Location': state.url.pathname + "/"
+                'Location': encodeURI(prefixURI) + "/"
             });
             state.res.end();
             return Observable.empty();
         }
 
-        let suffix = filepath.split('/').slice(0, end).join('/');
-
-        let prefix = ["", reqpath, suffix].join('/').split('/');
-        let prefixURI = state.url.pathname.split('/').slice(0, prefix.length).join('/');
-
-        let folder = path.join(item as string, suffix);
-
-        if (!loadedFolders[prefixURI]) {
-            loadedFolders[prefixURI] = [];
-            loadTiddlyWiki(prefixURI, folder);
-        }
         const load = loadedFolders[prefixURI];
-        if (quickArrayCheck(load)) {
+        if (Array.isArray(load)) {
             load.push([state.req, state.res]);
         } else {
             load.handler(state.req, state.res);
