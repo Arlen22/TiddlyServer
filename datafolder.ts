@@ -75,7 +75,12 @@ function loadTiddlyWiki(prefix: string, folder: string) {
     console.time('twboot');
     const $tw = require("tiddlywiki").TiddlyWiki();
     $tw.boot.argv = [folder];
-
+    const execute = $tw.boot.executeNextStartupTask;
+    $tw.boot.executeNextStartupTask = function(){
+        const res = execute();
+        if(!res) complete();
+        return true;
+    }
     function complete() {
         console.log('complete');
         console.timeEnd('twboot');
@@ -107,7 +112,7 @@ function loadTiddlyWiki(prefix: string, folder: string) {
         })
         
     }
-    $tw.boot.boot(complete);
+    $tw.boot.boot();
     $tw.wiki.addTiddler({
         "text": "$protocol$//$host$" + prefix + "/",
         "title": "$:/config/tiddlyweb/host"
