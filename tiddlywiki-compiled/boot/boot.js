@@ -2076,6 +2076,9 @@ $tw.boot.executeNextStartupTask = function(callback) {
 		}
 		taskIndex++;
 	}
+	if(typeof callback === "function"){
+		callback();
+	}
 	return false;
 };
 
@@ -2161,7 +2164,7 @@ $tw.hooks.invokeHook = function(hookName /*, value,... */) {
 
 /////////////////////////// Main boot function to decrypt tiddlers and then startup
 
-$tw.boot.boot = function() {
+$tw.boot.boot = function(callback) {
 	// Initialise crypto object
 	$tw.crypto = new $tw.utils.Crypto();
 	// Initialise password prompter
@@ -2171,7 +2174,7 @@ $tw.boot.boot = function() {
 	// Preload any encrypted tiddlers
 	$tw.boot.decryptEncryptedTiddlers(function() {
 		// Startup
-		$tw.boot.startup();
+		$tw.boot.startup({ callback: callback });
 	});
 };
 
