@@ -480,7 +480,7 @@ export function bootNode($tw) {
             pluginInfo.type = "application/json";
             // Set plugin text
             pluginInfo.text = JSON.stringify({ tiddlers: alltiddlers }, null, 4);
-            //delete pluginInfo.tiddlers;
+            delete pluginInfo.tiddlers;
             // Deserialise array fields (currently required for the dependents field)
             for (var field in pluginInfo) {
                 if ($tw.utils.isArray(pluginInfo[field])) {

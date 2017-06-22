@@ -41,7 +41,7 @@ function datafolder(obs) {
             loadTiddlyWiki(prefixURI, folder);
         }
         const load = loadedFolders[prefixURI];
-        if (quickArrayCheck(load)) {
+        if (Array.isArray(load)) {
             load.push([state.req, state.res]);
         }
         else {

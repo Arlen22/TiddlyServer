@@ -60,7 +60,7 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
             loadTiddlyWiki(prefixURI, folder);
         }
         const load = loadedFolders[prefixURI];
-        if (quickArrayCheck(load)) {
+        if (Array.isArray(load)) {
             load.push([state.req, state.res]);
         } else {
             load.handler(state.req, state.res);
