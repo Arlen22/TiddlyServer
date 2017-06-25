@@ -3,3 +3,4 @@ node_modules/
 /archive/
 .vscode/launch.json
 .vscode/settings.json
+*.map

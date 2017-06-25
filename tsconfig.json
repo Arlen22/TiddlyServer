@@ -6,8 +6,8 @@
         "target": "es6",
         "noImplicitAny": false,
         "strictNullChecks": true,
-        //"sourceMap": true,
-        "inlineSourceMap": false
+        "sourceMap": true
+        //"inlineSourceMap": false
         //"lib": [],
         
     },
