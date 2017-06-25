@@ -37,26 +37,29 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
          * item     is the folder string in the category tree that reqpath led to
          * filepath is the path relative to them
          */
-        let { state, item, filepath, reqpath } = tag;
+        let { state, item, filepath, treepath } = tag;
 
-        //TiddlyWiki requires a trailing slash for the root url
-
-
-        let suffix = filepath.split('/').slice(0, end).join('/');
-        let prefix = ["", reqpath, suffix].join('/').split('/');
-        let prefixURI = state.url.pathname.split('/').slice(0, prefix.length).join('/');
-        let folder = path.join(item as string, suffix);
-
+        //get the actual path to the folder from filepath
+        let filepathPrefix = filepath.split('/').slice(0, end).join('/');
+        //get the tree path, and add the file path if there is one
+        let fullPrefix = ["", treepath];
+        if (filepathPrefix) fullPrefix.push(filepathPrefix);
+        //join the parts and split into an array
+        fullPrefix = fullPrefix.join('/').split('/');
+        //use the unaltered path in the url as the tiddlywiki prefix
+        let prefixURI = state.url.pathname.split('/').slice(0, fullPrefix.length).join('/');
+        //get the full path to the folder as specified in the tree
+        let folder = path.join(item as string, filepathPrefix);
+        //initialize the tiddlywiki instance
         if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
             loadedFolders[prefixURI] = [];
             loadTiddlyWiki(prefixURI, folder);
         }
-        //require a trailing slash for data folders, and redirect ?reload=true requests to the same,
-        //to prevent it being reloaded multiple times for the same page load.
+        //Tiddlywiki requires a trailing slash for data folders, and
+        //redirect ?reload=true requests to the same,to prevent it being 
+        //reloaded multiple times for the same page load.
         if (isFullpath && !state.url.pathname.endsWith("/") || state.url.query.reload === "true") {
-            state.res.writeHead(302, {
-                'Location': encodeURI(prefixURI) + "/"
-            });
+            state.res.writeHead(302, { 'Location': encodeURI(prefixURI) + "/" });
             state.res.end();
             return Observable.empty();
         }
@@ -78,9 +81,9 @@ function loadTiddlyWiki(prefix: string, folder: string) {
     const $tw = require("tiddlywiki").TiddlyWiki();
     $tw.boot.argv = [folder];
     const execute = $tw.boot.executeNextStartupTask;
-    $tw.boot.executeNextStartupTask = function(){
+    $tw.boot.executeNextStartupTask = function () {
         const res = execute();
-        if(!res) complete();
+        if (!res) complete();
         return true;
     }
     function complete() {
@@ -112,7 +115,7 @@ function loadTiddlyWiki(prefix: string, folder: string) {
         requests.forEach(e => {
             handler(e[0], e[1]);
         })
-        
+
     }
     $tw.boot.boot();
     $tw.wiki.addTiddler({

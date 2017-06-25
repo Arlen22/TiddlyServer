@@ -86,7 +86,7 @@ export function doAPIAccessRoute(obs: Observable<StateObject>) {
             return state.throw(403);
         //if reqpath is longer than the tree list...we need to list files
         return Observable.of([typeof item === 'string' ? item : '', filepath, {
-            reqpath: reqpath.slice(0, end).join('/'),
+            treepath: reqpath.slice(0, end).join('/'),
             filepath: filepath.join('/'), item, state
         }]);
     }).lift({
@@ -168,7 +168,7 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
             return Observable.empty();
         }
         if (!res.type) {
-            const { state, item, reqpath, filepath } = res.tag;
+            const { state, item, treepath, filepath } = res.tag;
             if (["GET", "HEAD"].indexOf(state.req.method as string) < -1) {
                 return state.throw(405);
             }
@@ -178,7 +178,7 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
                     {
                         name: a,
                         type: typeof item[a] === 'string' ? 'folder' : 'category',
-                        path: "/" + reqpath + "/" + a,
+                        path: "/" + treepath + "/" + a,
                     },
                     typeof item[a] === 'string' ? item[a] : false
                 ] as [DirectoryEntry, string | false]
@@ -188,7 +188,7 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
             const { end, isFullpath, statItem, statTW, type, tag } = res;
             const item = tag.item as string;
             //filepath is relative to item
-            const { state, filepath, reqpath } = tag;
+            const { state, filepath, treepath } = tag;
             if (["GET", "HEAD"].indexOf(state.req.method as string) === -1) {
                 return state.throw(405);
             }
@@ -200,7 +200,7 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
                     return [{
                         name: a,
                         type: 'folder',
-                        path: "/" + [reqpath, filepath.split('/').slice(0, end).join('/')].filter(a => !!a).join('/')
+                        path: "/" + [treepath, filepath.split('/').slice(0, end).join('/')].filter(a => !!a).join('/')
                     } as DirectoryEntry, path.join(folder, a)]
                 })
 
@@ -212,10 +212,10 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
         let { entries, folder, res } = res2 as { entries: DirectoryEntry[], folder: string, res: AccessPathResult<AccessPathTag> };
         let { tag } = res;
         let end: '' | number = typeof res.end === 'number' ? res.end : '';
-        let { item, state, filepath, reqpath } = tag;
+        let { item, state, filepath, treepath } = tag;
 
         //set the path for each item
-        let prefix = [reqpath, end && filepath.split('/').slice(0, end).join('/')].filter(a => !!a).join('/');
+        let prefix = [treepath, end && filepath.split('/').slice(0, end).join('/')].filter(a => !!a).join('/');
         entries.forEach(e => {
             e.path = "/" + [prefix, e.name].filter(a => a).join('/')
         });
@@ -229,7 +229,7 @@ function folder(obs: Observable<AccessPathResult<AccessPathTag>>) {
             const directory = {
                 type,
                 entries,
-                path: (reqpath ? "/" + reqpath : "") + (filepath ? "/" + filepath : "") + "/"
+                path: (treepath ? "/" + treepath : "") + (filepath ? "/" + filepath : "") + "/"
             }
             state.res.write(generateDirectoryListing(directory))
         }
@@ -298,7 +298,7 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
     return obs.mergeMap<AccessPathResult<AccessPathTag>, StateObject>(res => {
         //unpack the result from examineAccessPath
         const { statItem, tag, isFullpath, end, type } = res;
-        const { state, item, reqpath: catpath, filepath: itempath } = tag;
+        const { state, item, treepath: catpath, filepath: itempath } = tag;
 
         //here we could balk if the file is found in the middle of the path
         if (!isFullpath) return state.throw(404);
