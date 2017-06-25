@@ -33,11 +33,12 @@ exports.generateDirectoryListing = function (directory) {
 </head>
 <body>
 <p><a href="${parentPath}">Parent directory: ${parentPath}</a></p>
-<p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
 <h3>${name}</h3>
 <table style="min-width:400px;">
 <tr><th></th><th>Name</th><th>Type</th><th>Size</th></tr>
 ${listEntries(directory.entries)}
+</table>
+<p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
 </body>
 </html>    
 `

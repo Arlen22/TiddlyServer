@@ -287,7 +287,7 @@ export interface AccessPathResult<T> {
 export interface AccessPathTag {
     state: StateObject,
     item: string | {},
-    reqpath: string,
+    treepath: string,
     filepath: string
 };
 

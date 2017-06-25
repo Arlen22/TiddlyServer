@@ -18,7 +18,7 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Server (skip libs)",
-            "program": "${workspaceRoot}/server.js",
+            "program": "${workspaceRoot}/server.ts",
             "smartStep": true,
             "outFiles": [
                 "${workspaceRoot}/**/*.js"
