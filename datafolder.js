@@ -62,7 +62,7 @@ function datafolder(obs) {
 exports.datafolder = datafolder;
 function loadTiddlyWiki(prefix, folder) {
     console.time('twboot');
-    const $tw = require("tiddlywiki").TiddlyWiki();
+    const $tw = require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
     $tw.boot.argv = [folder];
     const execute = $tw.boot.executeNextStartupTask;
     $tw.boot.executeNextStartupTask = function () {
