@@ -1,6 +1,6 @@
 node_modules/
 /settings.json
 /archive/
-tiddlywiki-compiled/
-
+.vscode/launch.json
+.vscode/settings.json
 *.map

@@ -108,3 +108,4 @@ function loadTiddlyWiki(prefix, folder) {
     // }
 }
 ;
+//# sourceMappingURL=datafolder.js.map
