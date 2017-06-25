@@ -440,7 +440,7 @@ function bootNode($tw) {
         }).defaultIfEmpty(null); //emit null if we don't emit anything else
     }
     ;
-    function loadTiddlersNode() {
+    function loadTiddlersNode(callback) {
         // Load the boot tiddlers
         return rxjs_1.Observable.merge(
         //load the boot tiddlers
@@ -457,7 +457,7 @@ function bootNode($tw) {
         //load the data folder, if we have one
         ($tw.boot.wikiPath ? loadWikiTiddlers($tw.boot.wikiPath).do(wikiInfo => {
             $tw.boot.wikiInfo = wikiInfo;
-        }) : rxjs_1.Observable.empty())).ignoreElements();
+        }) : rxjs_1.Observable.empty())).ignoreElements().subscribe({ complete: callback });
     }
     ;
     $tw.utils.extend($tw, {

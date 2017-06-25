@@ -83,12 +83,17 @@ function loadTiddlyWiki(prefix: string, folder: string) {
     const execute = $tw.boot.executeNextStartupTask;
     $tw.boot.executeNextStartupTask = function () {
         const res = execute();
-        if (!res) complete();
+        if (!res) 
+            complete();
         return true;
     }
     function complete() {
         console.log('complete');
         console.timeEnd('twboot');
+        $tw.wiki.addTiddler({
+            "text": "$protocol$//$host$" + prefix + "/",
+            "title": "$:/config/tiddlyweb/host"
+        });
         //we use $tw.modules.execute so that the module has its respective $tw variable.
         var serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
         var command = new serverCommand([], { wiki: $tw.wiki });
@@ -118,9 +123,6 @@ function loadTiddlyWiki(prefix: string, folder: string) {
 
     }
     $tw.boot.boot();
-    $tw.wiki.addTiddler({
-        "text": "$protocol$//$host$" + prefix + "/",
-        "title": "$:/config/tiddlyweb/host"
-    });
+
     // }
 };

@@ -666,7 +666,7 @@ export function bootNode($tw) {
     };
 
 
-    function loadTiddlersNode() {
+    function loadTiddlersNode(callback) {
         // Load the boot tiddlers
         return Observable.merge(
             //load the boot tiddlers
@@ -684,7 +684,7 @@ export function bootNode($tw) {
             ($tw.boot.wikiPath ? loadWikiTiddlers($tw.boot.wikiPath).do(wikiInfo => {
                 $tw.boot.wikiInfo = wikiInfo;
             }) : Observable.empty())
-        ).ignoreElements();
+        ).ignoreElements().subscribe({complete: callback});
     };
 
     $tw.utils.extend($tw, {
