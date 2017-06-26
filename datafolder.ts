@@ -1,4 +1,4 @@
-import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag } from "./server-types";
+import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger, ErrorLogger } from "./server-types";
 import { Observable } from "./lib/rx";
 
 import * as path from 'path';
@@ -7,6 +7,9 @@ import * as http from 'http';
 import { EventEmitter } from "events";
 
 var settings: ServerConfig = {} as any;
+
+const debug = DebugLogger('DAT');
+const error = ErrorLogger('DAT');
 
 export function init(eventer: EventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
@@ -89,6 +92,10 @@ function loadTiddlyWiki(prefix: string, folder: string) {
     function complete() {
         console.log('complete');
         console.timeEnd('twboot');
+        $tw.wiki.addTiddler({
+            "text": "$protocol$//$host$" + prefix + "/",
+            "title": "$:/config/tiddlyweb/host"
+        });
         //we use $tw.modules.execute so that the module has its respective $tw variable.
         var serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
         var command = new serverCommand([], { wiki: $tw.wiki });
@@ -117,10 +124,22 @@ function loadTiddlyWiki(prefix: string, folder: string) {
         })
 
     }
-    $tw.boot.boot();
-    $tw.wiki.addTiddler({
-        "text": "$protocol$//$host$" + prefix + "/",
-        "title": "$:/config/tiddlyweb/host"
-    });
-    // }
+    try {
+        $tw.boot.boot();
+    } catch (err) {
+        error('error starting %s at %s: %s', prefix, folder, err);
+        (loadedFolders[prefix] as any[]).forEach(([req, res]) => {
+            StateObject.prototype.throw.apply({
+                req, res, error
+            }, [500, "Error booting Tiddlywiki data folder"]);
+        })
+        loadedFolders[prefix] = {
+            handler: function (req, res) {
+                res.writeHead(500, "Tiddlywiki datafolder failed to load");
+                res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
+                    "after making any necessary corrections.");
+                res.end();
+            }
+        }
+    }
 };

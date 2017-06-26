@@ -1,8 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const server_types_1 = require("./server-types");
 const rx_1 = require("./lib/rx");
 const path = require("path");
 var settings = {};
+const debug = server_types_1.DebugLogger('DAT');
+const error = server_types_1.ErrorLogger('DAT');
 function init(eventer) {
     eventer.on('settings', function (set) {
         settings = set;
@@ -74,6 +77,10 @@ function loadTiddlyWiki(prefix, folder) {
     function complete() {
         console.log('complete');
         console.timeEnd('twboot');
+        $tw.wiki.addTiddler({
+            "text": "$protocol$//$host$" + prefix + "/",
+            "title": "$:/config/tiddlyweb/host"
+        });
         //we use $tw.modules.execute so that the module has its respective $tw variable.
         var serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
         var command = new serverCommand([], { wiki: $tw.wiki });
@@ -100,11 +107,24 @@ function loadTiddlyWiki(prefix, folder) {
             handler(e[0], e[1]);
         });
     }
-    $tw.boot.boot();
-    $tw.wiki.addTiddler({
-        "text": "$protocol$//$host$" + prefix + "/",
-        "title": "$:/config/tiddlyweb/host"
-    });
-    // }
+    try {
+        $tw.boot.boot();
+    }
+    catch (err) {
+        error('error starting %s at %s: %s', prefix, folder, err);
+        loadedFolders[prefix].forEach(([req, res]) => {
+            server_types_1.StateObject.prototype.throw.apply({
+                req, res, error
+            }, [500, "Error booting Tiddlywiki data folder"]);
+        });
+        loadedFolders[prefix] = {
+            handler: function (req, res) {
+                res.writeHead(500, "Tiddlywiki datafolder failed to load");
+                res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
+                    "after making any necessary corrections.");
+                res.end();
+            }
+        };
+    }
 }
 ;
