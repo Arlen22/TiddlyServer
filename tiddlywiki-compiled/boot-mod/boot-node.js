@@ -285,7 +285,7 @@ function bootNode($tw) {
             return obs_stat(pluginPath)(pluginPath);
         }).first(([err, stat, pluginPath]) => {
             return (!err && stat.isDirectory());
-        }, ([err, stat, pluginPath]) => pluginPath, null);
+        }, ([err, stat, pluginPath]) => pluginPath, "");
     }
     ;
     /**
@@ -293,7 +293,7 @@ function bootNode($tw) {
     paths: array of file paths to search for it
     */
     function loadPlugin(name, paths) {
-        return findLibraryItem(name, paths).switchMap(pluginPath => {
+        return findLibraryItem(name, paths).switchMap((pluginPath) => {
             if (pluginPath)
                 return loadPluginFolder(pluginPath);
             else

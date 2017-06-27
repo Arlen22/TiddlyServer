@@ -110,17 +110,17 @@ interface ContentTypeInfo {
     deserializerType: string;
 }
 
-export interface Tiddler {
+interface Tiddler {
     fields: TiddlerFields
 }
 
-export interface TiddlerFields {
+interface TiddlerFields {
     readonly text: string
     readonly type: string
     readonly title: string
 }
 
-export interface FileInfo {
+interface FileInfo {
     filepath?: string;
     type?: string;
     tiddlers: TiddlerFields[];
@@ -509,7 +509,7 @@ export function bootNode($tw) {
             return obs_stat(pluginPath)(pluginPath)
         }).first(([err, stat, pluginPath]) => {
             return (!err && stat.isDirectory())
-        }, ([err, stat, pluginPath]) => pluginPath, null)
+        }, ([err, stat, pluginPath]) => pluginPath, "")
     };
 
 
@@ -518,9 +518,9 @@ export function bootNode($tw) {
     paths: array of file paths to search for it
     */
     function loadPlugin(name, paths): Observable<never> {
-        return findLibraryItem(name, paths).switchMap(pluginPath => {
+        return findLibraryItem(name, paths).switchMap((pluginPath) => {
             if (pluginPath) return loadPluginFolder(pluginPath);
-            else return Observable.empty();
+            else return Observable.empty<any>();
         }).map((res) => {
             if (res) {
                 const [pluginInfo, pluginTiddlers] = res;
