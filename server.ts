@@ -77,8 +77,6 @@ const serverClose = Observable.fromEvent(server, 'close').take(1).multicast<Stat
     if (!req || !res) console.log('blank req or res');
     return new StateObject(req, res, debug, error);
 }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
-    state.error("this is a test");
-    state.debug("this is a test");
     return log(state.req, state.res).mapTo(state);
 }).map(state => {
     //check authentication and do sanity/security checks

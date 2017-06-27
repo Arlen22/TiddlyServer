@@ -52,8 +52,6 @@ rx_1.Observable.fromEvent(server, 'request', (req, res) => {
         console.log('blank req or res');
     return new server_types_1.StateObject(req, res, debug, error);
 }).takeUntil(serverClose).concatMap(state => {
-    state.error("this is a test");
-    state.debug("this is a test");
     return log(state.req, state.res).mapTo(state);
 }).map(state => {
     //check authentication and do sanity/security checks
