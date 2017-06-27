@@ -37,11 +37,37 @@ function sortByKey(key) {
     return sortBySelector(e => e[key]);
 }
 exports.sortByKey = sortByKey;
+var colors;
+(function (colors) {
+    colors.Reset = "\x1b[0m";
+    colors.Bright = "\x1b[1m";
+    colors.Dim = "\x1b[2m";
+    colors.Underscore = "\x1b[4m";
+    colors.Blink = "\x1b[5m";
+    colors.Reverse = "\x1b[7m";
+    colors.Hidden = "\x1b[8m";
+    colors.FgBlack = "\x1b[30m";
+    colors.FgRed = "\x1b[31m";
+    colors.FgGreen = "\x1b[32m";
+    colors.FgYellow = "\x1b[33m";
+    colors.FgBlue = "\x1b[34m";
+    colors.FgMagenta = "\x1b[35m";
+    colors.FgCyan = "\x1b[36m";
+    colors.FgWhite = "\x1b[37m";
+    colors.BgBlack = "\x1b[40m";
+    colors.BgRed = "\x1b[41m";
+    colors.BgGreen = "\x1b[42m";
+    colors.BgYellow = "\x1b[43m";
+    colors.BgBlue = "\x1b[44m";
+    colors.BgMagenta = "\x1b[45m";
+    colors.BgCyan = "\x1b[46m";
+    colors.BgWhite = "\x1b[47m";
+})(colors = exports.colors || (exports.colors = {}));
 function DebugLogger(prefix) {
     return function (str, ...args) {
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.debug(['  ', prefix, date, util_1.format.apply(null, arguments)].join(' '));
+        console.log(['  ', colors.FgCyan, prefix, colors.FgGreen, date, colors.Reset, util_1.format.apply(null, arguments)].join(' '));
     };
 }
 exports.DebugLogger = DebugLogger;
@@ -49,7 +75,7 @@ function ErrorLogger(prefix) {
     return function (str, ...args) {
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.error([prefix, date, util_1.format.apply(null, arguments)].join(' '));
+        console.error([colors.FgRed, prefix, colors.FgYellow, date, colors.Reset, util_1.format.apply(null, arguments)].join(' '));
     };
 }
 exports.ErrorLogger = ErrorLogger;

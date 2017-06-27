@@ -1,4 +1,4 @@
-import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag } from "./server-types";
+import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger, ErrorLogger } from "./server-types";
 import { Observable } from "./lib/rx";
 
 import * as path from 'path';
@@ -6,6 +6,8 @@ import * as http from 'http';
 //import { TiddlyWiki } from 'tiddlywiki';
 import { EventEmitter } from "events";
 
+const debug = DebugLogger('DAT');
+const error = ErrorLogger('DAT');
 var settings: ServerConfig = {} as any;
 
 export function init(eventer: EventEmitter) {
@@ -76,7 +78,7 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
 }
 
 function loadTiddlyWiki(prefix: string, folder: string) {
-
+    debug('boot');
     console.time('twboot');
     const $tw = require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
     $tw.boot.argv = [folder];
@@ -88,7 +90,7 @@ function loadTiddlyWiki(prefix: string, folder: string) {
         return true;
     }
     function complete() {
-        console.log('complete');
+        debug('complete');
         console.timeEnd('twboot');
         $tw.wiki.addTiddler({
             "text": "$protocol$//$host$" + prefix + "/",
@@ -122,7 +124,22 @@ function loadTiddlyWiki(prefix: string, folder: string) {
         })
 
     }
-    $tw.boot.boot();
-
-    // }
+    try {
+        $tw.boot.boot();
+    } catch (err) {
+        error('error starting %s at %s: %s', prefix, folder, err.stack);
+        (loadedFolders[prefix] as any[]).forEach(([req, res]) => {
+            StateObject.prototype.throw.apply({
+                req, res, error
+            }, [500, "Error booting Tiddlywiki data folder"]);
+        })
+        loadedFolders[prefix] = {
+            handler: function (req: http.IncomingMessage, res: http.ServerResponse) {
+                res.writeHead(500, "Tiddlywiki datafolder failed to load");
+                res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
+                    "after making any necessary corrections.");
+                res.end();
+            }
+        } as any;
+    }
 };
