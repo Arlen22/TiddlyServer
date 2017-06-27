@@ -48,7 +48,7 @@ function datafolder(obs) {
         //redirect ?reload=true requests to the same,to prevent it being 
         //reloaded multiple times for the same page load.
         if (isFullpath && !state.url.pathname.endsWith("/") || state.url.query.reload === "true") {
-            state.res.writeHead(302, { 'Location': encodeURI(prefixURI) + "/" });
+            state.res.writeHead(302, { 'Location': prefixURI + "/" });
             state.res.end();
             return rx_1.Observable.empty();
         }
@@ -111,7 +111,7 @@ function loadTiddlyWiki(prefix, folder) {
         $tw.boot.boot();
     }
     catch (err) {
-        error('error starting %s at %s: %s', prefix, folder, err);
+        error('error starting %s at %s: %s', prefix, folder, err.stack);
         loadedFolders[prefix].forEach(([req, res]) => {
             server_types_1.StateObject.prototype.throw.apply({
                 req, res, error

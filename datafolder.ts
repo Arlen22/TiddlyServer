@@ -62,7 +62,7 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
         //redirect ?reload=true requests to the same,to prevent it being 
         //reloaded multiple times for the same page load.
         if (isFullpath && !state.url.pathname.endsWith("/") || state.url.query.reload === "true") {
-            state.res.writeHead(302, { 'Location': encodeURI(prefixURI) + "/" });
+            state.res.writeHead(302, { 'Location': prefixURI + "/" });
             state.res.end();
             return Observable.empty();
         }
@@ -127,19 +127,19 @@ function loadTiddlyWiki(prefix: string, folder: string) {
     try {
         $tw.boot.boot();
     } catch (err) {
-        error('error starting %s at %s: %s', prefix, folder, err);
+        error('error starting %s at %s: %s', prefix, folder, err.stack);
         (loadedFolders[prefix] as any[]).forEach(([req, res]) => {
             StateObject.prototype.throw.apply({
                 req, res, error
             }, [500, "Error booting Tiddlywiki data folder"]);
         })
         loadedFolders[prefix] = {
-            handler: function (req, res) {
+            handler: function (req: http.IncomingMessage, res: http.ServerResponse) {
                 res.writeHead(500, "Tiddlywiki datafolder failed to load");
                 res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
                     "after making any necessary corrections.");
                 res.end();
             }
-        }
+        } as any;
     }
 };
