@@ -70,12 +70,12 @@ function loadTiddlyWiki(prefix, folder) {
     const execute = $tw.boot.executeNextStartupTask;
     $tw.boot.executeNextStartupTask = function () {
         const res = execute();
+        //call setImmediate to make sure we are out of the boot try...catch below
         if (!res)
-            complete();
+            setImmediate(complete);
         return true;
     };
     function complete() {
-        console.log('complete');
         console.timeEnd('twboot');
         $tw.wiki.addTiddler({
             "text": "$protocol$//$host$" + prefix + "/",
@@ -111,12 +111,9 @@ function loadTiddlyWiki(prefix, folder) {
         $tw.boot.boot();
     }
     catch (err) {
+        console.timeEnd('twboot');
         error('error starting %s at %s: %s', prefix, folder, err.stack);
-        loadedFolders[prefix].forEach(([req, res]) => {
-            server_types_1.StateObject.prototype.throw.apply({
-                req, res, error
-            }, [500, "Error booting Tiddlywiki data folder"]);
-        });
+        const requests = loadedFolders[prefix];
         loadedFolders[prefix] = {
             handler: function (req, res) {
                 res.writeHead(500, "Tiddlywiki datafolder failed to load");
@@ -125,6 +122,9 @@ function loadTiddlyWiki(prefix, folder) {
                 res.end();
             }
         };
+        requests.forEach(([req, res]) => {
+            loadedFolders[prefix].handler(req, res);
+        });
     }
 }
 ;
