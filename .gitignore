@@ -1,6 +1,5 @@
 node_modules/
 /settings.json
 /archive/
-tiddlywiki-compiled/
 
 *.map
