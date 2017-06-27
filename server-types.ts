@@ -56,11 +56,9 @@ export function sortBySelector<T extends { [k: string]: string }>(key: (e: T) =>
     }
 
 }
-
 export function sortByKey(key: string) {
     return sortBySelector(e => e[key]);
 }
-
 export namespace colors {
     export const Reset = "\x1b[0m"
     export const Bright = "\x1b[1m"
@@ -93,7 +91,7 @@ export function DebugLogger(prefix: string) {
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log(['  ', colors.FgCyan, prefix, colors.FgGreen, date, colors.Reset, format.apply(null, arguments)].join(' '));
+        console.log([colors.FgGreen + prefix, date + colors.Reset, format.apply(null, arguments)].join(' '));
     };
 }
 export function ErrorLogger(prefix: string) {
@@ -101,7 +99,7 @@ export function ErrorLogger(prefix: string) {
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.error([colors.FgRed, prefix, colors.FgYellow, date, colors.Reset, format.apply(null, arguments)].join(' '));
+        console.error([colors.FgRed + prefix, colors.FgYellow + date + colors.Reset, format.apply(null, arguments)].join(' '));
     };
 }
 export function sanitizeJSON(key: string, value: any) {
@@ -245,9 +243,9 @@ export class StateObject implements ThrowFunc<StateObject>{
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
     }
     debug(str: string, ...args: any[]) {
-        this.debugLog(' [' +
-            this.req.socket.remoteFamily + '-' +
-            this.req.socket.remoteAddress + '] ' +
+        this.debugLog('[' +
+            this.req.socket.remoteFamily + '-' +colors.FgMagenta +
+            this.req.socket.remoteAddress + colors.Reset + '] ' +
             format.apply(null, arguments)
         );
     }
@@ -260,9 +258,9 @@ export class StateObject implements ThrowFunc<StateObject>{
         );
     }*/
     error(str: string, ...args: any[]) {
-        this.errorLog(' [' +
-            this.req.socket.remoteFamily + '-' +
-            this.req.socket.remoteAddress + '] ' +
+        this.errorLog('[' +
+            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
+            this.req.socket.remoteAddress + colors.Reset + '] ' +
             format.apply(null, arguments)
         );
     }

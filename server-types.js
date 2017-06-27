@@ -67,7 +67,7 @@ function DebugLogger(prefix) {
     return function (str, ...args) {
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log(['  ', colors.FgCyan, prefix, colors.FgGreen, date, colors.Reset, util_1.format.apply(null, arguments)].join(' '));
+        console.log([colors.FgGreen + prefix, date + colors.Reset, util_1.format.apply(null, arguments)].join(' '));
     };
 }
 exports.DebugLogger = DebugLogger;
@@ -75,7 +75,7 @@ function ErrorLogger(prefix) {
     return function (str, ...args) {
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.error([colors.FgRed, prefix, colors.FgYellow, date, colors.Reset, util_1.format.apply(null, arguments)].join(' '));
+        console.error([colors.FgRed + prefix, colors.FgYellow + date + colors.Reset, util_1.format.apply(null, arguments)].join(' '));
     };
 }
 exports.ErrorLogger = ErrorLogger;
@@ -157,9 +157,9 @@ class StateObject {
         };
     }
     debug(str, ...args) {
-        this.debugLog(' [' +
-            this.req.socket.remoteFamily + '-' +
-            this.req.socket.remoteAddress + '] ' +
+        this.debugLog('[' +
+            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
+            this.req.socket.remoteAddress + colors.Reset + '] ' +
             util_1.format.apply(null, arguments));
     }
     /*log(str: string, ...args: any[]) {
@@ -170,9 +170,9 @@ class StateObject {
         );
     }*/
     error(str, ...args) {
-        this.errorLog(' [' +
-            this.req.socket.remoteFamily + '-' +
-            this.req.socket.remoteAddress + '] ' +
+        this.errorLog('[' +
+            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
+            this.req.socket.remoteAddress + colors.Reset + '] ' +
             util_1.format.apply(null, arguments));
     }
     throw(statusCode, reason, str, ...args) {
