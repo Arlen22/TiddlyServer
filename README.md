@@ -6,7 +6,7 @@ But the main point is that you can actually edit your files, not just look at th
 
 And, of course, you can edit data folder tiddlywikis just like you were running `node tiddlywiki.js data --server`, except that you run it on the path that you found it at (e.g. http://localhost/personal/notes/). You can have as many data folders open as you want, they don't conflict (though they will each take memory).
 
-#Major changes in master since last release
+# Major changes in master since last release
 
  - The host is now `127.0.0.1` by default. In order to access TiddlyServer over the network, set it to `0.0.0.0`. 
 
