@@ -42,9 +42,12 @@ And, of course, you can edit data folder tiddlywikis just like you were running 
         "htmlfile": ["htm", "html"]
     }, 
     "username": "",
-    "password": ""
+    "password": "",
+    "host": "127.0.0.1",
+    "port": 8080
 }
 ```
+If not specified, username and password are not set, and types, host and port are set to the values above. Tree must be specified.
 
 Tree is an object and its children may be either object or string. If a child value is a string, it refers to a path that will be loaded for that alias. If it is an object, it is a sub tree.
 
