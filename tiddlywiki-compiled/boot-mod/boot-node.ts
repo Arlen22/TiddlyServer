@@ -666,25 +666,28 @@ export function bootNode($tw) {
     };
 
 
-    function loadTiddlersNode(callback) {
+    function loadTiddlersNode() {
         // Load the boot tiddlers
-        return Observable.merge(
-            //load the boot tiddlers
-            loadTiddlersFromPath($tw.boot.bootPath).do(tiddlerFile => {
-                $tw.wiki.addTiddlers(tiddlerFile.tiddlers);
-            }).ignoreElements(),
-            //load the core plugin
-            loadPluginFolder($tw.boot.corePath).do(res => {
-                const [plugin, tiddlers] = res;
-                const tiddler = new $tw.Tiddler(plugin);
-                tiddler.cache.tiddlers = tiddlers;
-                $tw.wiki.addTiddler(tiddler);
-            }).ignoreElements(),
-            //load the data folder, if we have one
-            ($tw.boot.wikiPath ? loadWikiTiddlers($tw.boot.wikiPath).do(wikiInfo => {
-                $tw.boot.wikiInfo = wikiInfo;
-            }) : Observable.empty())
-        ).ignoreElements().subscribe({complete: callback});
+        return new Promise(resolve => {
+            Observable.merge(
+                //load the boot tiddlers
+                loadTiddlersFromPath($tw.boot.bootPath).do(tiddlerFile => {
+                    $tw.wiki.addTiddlers(tiddlerFile.tiddlers);
+                }).ignoreElements(),
+                //load the core plugin
+                loadPluginFolder($tw.boot.corePath).do(res => {
+                    const [plugin, tiddlers] = res;
+                    const tiddler = new $tw.Tiddler(plugin);
+                    tiddler.cache.tiddlers = tiddlers;
+                    $tw.wiki.addTiddler(tiddler);
+                }).ignoreElements(),
+                //load the data folder, if we have one
+                ($tw.boot.wikiPath ? loadWikiTiddlers($tw.boot.wikiPath).do(wikiInfo => {
+                    $tw.boot.wikiInfo = wikiInfo;
+                }) : Observable.empty())
+            ).subscribe({ complete: resolve });
+        })
+
     };
 
     $tw.utils.extend($tw, {

@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const server_types_1 = require("./server-types");
 const rx_1 = require("./lib/rx");
 const path = require("path");
+const boot_node_1 = require("./tiddlywiki-compiled/boot-mod/boot-node");
 const debug = server_types_1.DebugLogger('DAT');
 const error = server_types_1.ErrorLogger('DAT');
 var settings = {};
@@ -69,6 +70,7 @@ function loadTiddlyWiki(prefix, folder) {
     const $tw = require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
     $tw.boot.argv = [folder];
     const execute = $tw.boot.executeNextStartupTask;
+    boot_node_1.bootNode($tw);
     $tw.boot.executeNextStartupTask = function () {
         const res = execute();
         if (!res)

@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as http from 'http';
 //import { TiddlyWiki } from 'tiddlywiki';
 import { EventEmitter } from "events";
+import { bootNode } from "./tiddlywiki-compiled/boot-mod/boot-node";
 
 const debug = DebugLogger('DAT');
 const error = ErrorLogger('DAT');
@@ -83,6 +84,7 @@ function loadTiddlyWiki(prefix: string, folder: string) {
     const $tw = require("./tiddlywiki-compiled/boot/boot.js").TiddlyWiki();
     $tw.boot.argv = [folder];
     const execute = $tw.boot.executeNextStartupTask;
+    bootNode($tw);
     $tw.boot.executeNextStartupTask = function () {
         const res = execute();
         if (!res) 
