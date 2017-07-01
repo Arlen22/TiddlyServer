@@ -24,14 +24,9 @@ const settingsFile = path.resolve(process.argv[2] || 'settings.json');
 
 console.log("Settings file: %s", settingsFile);
 
-var settings: {
-    tree: any,
-    watch: string[], //not implemented
-    username?: string,
-    password?: string,
-    host?: string,
-    port?: number | 8080
-} = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
+var settings: ServerConfig = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
+
+if(!settings.tree) throw "tree is not specified in the settings file";
 
 (function normalizeTree(item) {
     keys(item).forEach(e => {
@@ -41,9 +36,11 @@ var settings: {
     })
 })(settings.tree)
 
-if(!settings.port) settings.port = 8080;
-if(!settings.host) settings.host = "127.0.0.1";
-
+if (!settings.port) settings.port = 8080;
+if (!settings.host) settings.host = "127.0.0.1";
+if (!settings.types) settings.types = {
+    "htmlfile": ["htm", "html"]
+}
 //import and init api-access
 import { doAPIAccessRoute, init as initAPIAccess } from './api-access';
 initAPIAccess(eventer);
@@ -167,7 +164,7 @@ function doIconRoute(obs: Observable<StateObject>) {
 server.listen(settings.port, settings.host, function (err: any, res: any) {
     if (err) { console.error('error on app.listen', err); return; }
     console.log('Open you browswer and type in one of the following:');
-    if(!settings.host || settings.host === '0.0.0.0'){
+    if (!settings.host || settings.host === '0.0.0.0') {
         var os = require('os');
         var ifaces = os.networkInterfaces();
         for (var dev in ifaces) {

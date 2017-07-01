@@ -244,7 +244,7 @@ export class StateObject implements ThrowFunc<StateObject>{
     }
     debug(str: string, ...args: any[]) {
         this.debugLog('[' +
-            this.req.socket.remoteFamily + '-' +colors.FgMagenta +
+            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
             this.req.socket.remoteAddress + colors.Reset + '] ' +
             format.apply(null, arguments)
         );
@@ -293,14 +293,16 @@ export interface ThrowFunc<T> {
 }
 
 export interface ServerConfig {
-    tree: any;
-    watch: string[];
-    types: { [K: string]: string[] }
-    //"devEnv": string;
-    //"staticPath": string;
-    "username": string;
-    "password": string;
-
+    tree: any,
+    //watch: string[], //not implemented
+    types: {
+        htmlfile: string[];
+        [K: string]: string[]
+    }
+    username?: string,
+    password?: string,
+    host?: string,
+    port?: number | 8080
 }
 
 export interface AccessPathResult<T> {

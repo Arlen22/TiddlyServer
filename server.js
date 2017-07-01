@@ -16,6 +16,8 @@ const logger = require('./lib/morgan.js').handler;
 const settingsFile = path.resolve(process.argv[2] || 'settings.json');
 console.log("Settings file: %s", settingsFile);
 var settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+if (!settings.tree)
+    throw "tree is not specified in the settings file";
 (function normalizeTree(item) {
     server_types_1.keys(item).forEach(e => {
         if (typeof item[e] === 'string')
@@ -30,6 +32,10 @@ if (!settings.port)
     settings.port = 8080;
 if (!settings.host)
     settings.host = "127.0.0.1";
+if (!settings.types)
+    settings.types = {
+        "htmlfile": ["htm", "html"]
+    };
 //import and init api-access
 const api_access_1 = require("./api-access");
 api_access_1.init(eventer);
