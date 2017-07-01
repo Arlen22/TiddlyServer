@@ -26,7 +26,7 @@ console.log("Settings file: %s", settingsFile);
 
 var settings: {
     tree: any,
-    watch: string[],
+    watch: string[], //not implemented
     username?: string,
     password?: string,
     host?: string,
@@ -42,6 +42,7 @@ var settings: {
 })(settings.tree)
 
 if(!settings.port) settings.port = 8080;
+if(!settings.host) settings.host = "127.0.0.1";
 
 //import and init api-access
 import { doAPIAccessRoute, init as initAPIAccess } from './api-access';

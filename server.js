@@ -28,6 +28,8 @@ var settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
 })(settings.tree);
 if (!settings.port)
     settings.port = 8080;
+if (!settings.host)
+    settings.host = "127.0.0.1";
 //import and init api-access
 const api_access_1 = require("./api-access");
 api_access_1.init(eventer);
