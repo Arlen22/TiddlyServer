@@ -7,10 +7,22 @@ import * as http from 'http'
 import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
-import { format } from 'util';
+import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 
 Error.stackTraceLimit = Infinity;
+
+//let uncaughtExceptionThrown = false;
+process.on('uncaughtException', err => {
+    console.error(inspect(err));
+    console.error("caught process uncaughtException");
+    fs.appendFileSync(
+        path.join(__dirname, 'uncaughtException.log'), 
+        new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n");
+    //uncaughtExceptionThrown = true;
+});
+
+//const globalInterval = setInterval(function () { }, 10000);
 
 console.debug = function () { }; //noop console debug;
 
@@ -26,7 +38,7 @@ console.log("Settings file: %s", settingsFile);
 
 var settings: ServerConfig = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
 
-if(!settings.tree) throw "tree is not specified in the settings file";
+if (!settings.tree) throw "tree is not specified in the settings file";
 
 (function normalizeTree(item) {
     keys(item).forEach(e => {
@@ -69,7 +81,9 @@ const pw = settings.password;
 
 const log = Observable.bindNodeCallback<http.IncomingMessage, http.ServerResponse, void>(logger);
 
-const serverClose = Observable.fromEvent(server, 'close').take(1).multicast<StateObject>(new Subject()).refCount();
+const serverClose = Observable.merge(
+    Observable.fromEvent(server, 'close').take(1)
+).multicast<StateObject>(new Subject()).refCount();
 
 (Observable.fromEvent(server, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
     if (!req || !res) console.log('blank req or res');
@@ -122,8 +136,9 @@ const serverClose = Observable.fromEvent(server, 'close').take(1).multicast<Stat
             Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearTimeout(timeout));
         }
     }, err => {
-        console.error('Uncaught error in the processing stack: ' + err.message);
+        console.error('Uncaught error in the server route: ' + err.message);
         console.error(err.stack);
+        console.error("the server will now close");
         server.close();
     }, () => {
         //theoretically we could rebind the listening port without restarting the process, 
@@ -163,7 +178,7 @@ function doIconRoute(obs: Observable<StateObject>) {
 
 server.listen(settings.port, settings.host, function (err: any, res: any) {
     if (err) { console.error('error on app.listen', err); return; }
-    console.log('Open you browswer and type in one of the following:');
+    console.log('Open your browswer and type in one of the following:');
     if (!settings.host || settings.host === '0.0.0.0') {
         var os = require('os');
         var ifaces = os.networkInterfaces();

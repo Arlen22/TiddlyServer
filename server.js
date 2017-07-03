@@ -5,8 +5,17 @@ const server_types_1 = require("./server-types");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const util_1 = require("util");
 const events_1 = require("events");
 Error.stackTraceLimit = Infinity;
+//let uncaughtExceptionThrown = false;
+process.on('uncaughtException', err => {
+    console.error(util_1.inspect(err));
+    console.error("caught process uncaughtException");
+    fs.appendFileSync(path.join(__dirname, 'uncaughtException.log'), new Date().toISOString() + "\r\n" + util_1.inspect(err) + "\r\n\r\n");
+    //uncaughtExceptionThrown = true;
+});
+//const globalInterval = setInterval(function () { }, 10000);
 console.debug = function () { }; //noop console debug;
 //setup global objects
 const eventer = new events_1.EventEmitter();
@@ -54,7 +63,7 @@ const server = http.createServer();
 const un = settings.username;
 const pw = settings.password;
 const log = rx_1.Observable.bindNodeCallback(logger);
-const serverClose = rx_1.Observable.fromEvent(server, 'close').take(1).multicast(new rx_1.Subject()).refCount();
+const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(server, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 rx_1.Observable.fromEvent(server, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
@@ -106,8 +115,9 @@ rx_1.Observable.fromEvent(server, 'request', (req, res) => {
         rx_1.Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearTimeout(timeout));
     }
 }, err => {
-    console.error('Uncaught error in the processing stack: ' + err.message);
+    console.error('Uncaught error in the server route: ' + err.message);
     console.error(err.stack);
+    console.error("the server will now close");
     server.close();
 }, () => {
     //theoretically we could rebind the listening port without restarting the process, 
@@ -153,7 +163,7 @@ server.listen(settings.port, settings.host, function (err, res) {
         console.error('error on app.listen', err);
         return;
     }
-    console.log('Open you browswer and type in one of the following:');
+    console.log('Open your browswer and type in one of the following:');
     if (!settings.host || settings.host === '0.0.0.0') {
         var os = require('os');
         var ifaces = os.networkInterfaces();
