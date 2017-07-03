@@ -12,7 +12,7 @@ Error.stackTraceLimit = Infinity;
 process.on('uncaughtException', err => {
     console.error(util_1.inspect(err));
     console.error("caught process uncaughtException");
-    fs.appendFileSync(path.join(__dirname, 'uncaughtException.log'), new Date().toISOString() + "\r\n" + util_1.inspect(err) + "\r\n\r\n");
+    fs.appendFile(path.join(__dirname, 'uncaughtException.log'), new Date().toISOString() + "\r\n" + util_1.inspect(err) + "\r\n\r\n");
     //uncaughtExceptionThrown = true;
 });
 //const globalInterval = setInterval(function () { }, 10000);

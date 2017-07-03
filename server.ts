@@ -16,8 +16,7 @@ Error.stackTraceLimit = Infinity;
 process.on('uncaughtException', err => {
     console.error(inspect(err));
     console.error("caught process uncaughtException");
-    fs.appendFileSync(
-        path.join(__dirname, 'uncaughtException.log'), 
+    fs.appendFile(path.join(__dirname, 'uncaughtException.log'),
         new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n");
     //uncaughtExceptionThrown = true;
 });
