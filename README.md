@@ -58,3 +58,7 @@ There are a few aliases which cannot be used directly under tree as they are res
 # Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.
  - If you see a bug, please open an issue describing what is going on and I will try to answer it.
+
+# A word to you
+
+If you want to help cover the cost of making this all happen, use https://www.paypal.me/Arlen22. Your help is appreciated and may help further development.
