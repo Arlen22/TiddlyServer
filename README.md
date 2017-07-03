@@ -8,7 +8,7 @@ And, of course, you can edit data folder tiddlywikis just like you were running 
 
 # Major changes in master since last release
 
- - The host is now `127.0.0.1` by default. In order to access TiddlyServer over the network, set it to `0.0.0.0`. 
+ - The host is now `127.0.0.1` by default. In order to access TiddlyServer over the network, set it to a specific IP address, or  `0.0.0.0` to listen on all IP addresses on the computer.
 
 # Installation
 
