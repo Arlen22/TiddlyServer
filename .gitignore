@@ -4,3 +4,4 @@ node_modules/
 .vscode/launch.json
 .vscode/settings.json
 *.map
+*.log
