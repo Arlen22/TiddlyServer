@@ -6,10 +6,10 @@
     "tiddlyserver": "./server.js"
   },
   "dependencies": {
-    "rxjs": "5.4.0",
-    "tiddlywiki": ">=5.1.14"
+    "tiddlywiki": "5.1.14"
   },
   "devDependencies": {
+    "rxjs": "5.4.0",
     "@types/node": ">=6.0.73 <7.0.0"
   },
   "scripts": {
