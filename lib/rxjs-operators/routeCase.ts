@@ -10,6 +10,7 @@ import { RouteCaseOperator } from "./routeCaseOperator";
 //    selector: (obj: T) => string,
 //    routes: { [selection: string]: ((obs: Observable<T>) => (Observable<T> | undefined)) },
 //    defaultRoute: (obs: Observable<T>) => void): Observable<T>;
+
 export function routeCase<T, R>(this: Observable<T>,
     selector: (obj: T) => string,
     routes: { [selection: string]: (obs: Observable<T>) => Observable<R> },
@@ -17,5 +18,3 @@ export function routeCase<T, R>(this: Observable<T>,
 ): Observable<R> {
     return this.lift(new RouteCaseOperator<T, R>(selector, routes, defaultRoute));
 }
-
-Observable.prototype.routeCase = routeCase;
