@@ -12,10 +12,18 @@ None so far.
 
 # Installation
 
+### Bundled version
+ 1. Download and install NodeJS from https://nodejs.org
+    - If you want to make a portable TiddlyServer, just download the binary file.
+ 2. Download the latest release of TiddlyServer from https://github.com/Arlen22/TiddlyServer/releases unzip the folder contained in the zip file to wherever you want it. __Put the binary in this folder if you want it to be portable.__
+ 3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
+ 4. `node server.js` or `node server.js /path/to/settings.json`
+
+### Source code version
  1. Download and unzip the source code from the latest release. https://github.com/Arlen22/TiddlyServer/releases
  2. `npm install`
  3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 4. `npm start` or `node server.js`
+ 4. `node server.js` (`npm start`) or `node server.js /path/to/settings.json`
 
 # Benefits
   - Allows relative linking to external files.
