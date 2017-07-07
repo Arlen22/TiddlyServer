@@ -27,16 +27,20 @@ console.log("Settings file: %s", settingsFile);
 var settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
 if (!settings.tree)
     throw "tree is not specified in the settings file";
+const settingsDir = path.dirname(settingsFile);
 (function normalizeTree(item) {
     server_types_1.keys(item).forEach(e => {
         if (typeof item[e] === 'string')
-            item[e] = path.resolve(__dirname, item[e]);
+            item[e] = path.resolve(settingsDir, item[e]);
         else if (typeof item[e] === 'object')
             normalizeTree(item[e]);
         else
             throw 'Invalid item: ' + e + ': ' + item[e];
     });
 })(settings.tree);
+if (settings.backupDirectory) {
+    settings.backupDirectory = path.resolve(settingsDir, settings.backupDirectory);
+}
 if (!settings.port)
     settings.port = 8080;
 if (!settings.host)

@@ -1,9 +1,14 @@
 import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "./lib/rx";
-import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry, Directory, sortBySelector, serveStatic, obs_stat, obs_readdir, FolderEntryType } from "./server-types";
+import {
+    StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
+    Directory, sortBySelector, serveStatic, obs_stat, obs_readdir, FolderEntryType, ErrorLogger
+} from "./server-types";
 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as http from 'http';
+import * as zlib from 'zlib';
+
 import { createHash } from 'crypto';
 import { Mime } from './lib/mime';
 
@@ -14,6 +19,8 @@ import { datafolder, init as initTiddlyWiki } from "./datafolder";
 import { format } from "util";
 
 const mime: Mime = require('./lib/mime');
+
+const error = ErrorLogger("SER-API");
 
 export function parsePath(path: string, jsonFile: string) {
     var regCheck = /${([^}])}/gi;
@@ -321,24 +328,43 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
             if (state.req.headers['if-match'] && (state.req.headers['if-match'] !== etag)) {
                 return state.throw(412);
             }
-            const stream = fs.createWriteStream(fullpath);
-            const write = state.req.pipe(stream);
-            const finish = Observable.fromEvent(write, 'finish').take(1);
-            return Observable.merge(finish, Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err: Error) => {
-                if (err) {
-                    return state.throw(500, "Error while writing the file to disk", [err.name, err.message, err.stack].join(': '));
+            return new Observable((subscriber) => {
+                if (settings.backupDirectory) {
+                    const backupFile = state.url.path.replace(/[\s\\\/<>*:?"|]/gi, "_");
+                    const ext = path.extname(backupFile);
+                    console.log(backupFile, state.url.path);
+                    const backupWrite = fs.createWriteStream(path.join(settings.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
+                    const fileRead = fs.createReadStream(fullpath);
+                    fileRead.pipe(zlib.createGzip()).pipe(backupWrite).on('error', (err) => {
+                        error('Error saving backup file for %s: %s', state.url.path, err.message);
+                    }).on('close', () => {
+                        subscriber.next();
+                        subscriber.complete();
+                    })
                 } else {
-                    return obs_stat(false)(fullpath) as any;
+                    subscriber.next();
+                    subscriber.complete();
                 }
-            }).map(([err, statNew]) => {
-                const mtimeNew = Date.parse(statNew.mtime as any);
-                const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
-                state.res.writeHead(200, {
-                    'x-api-access-type': 'file',
-                    'etag': etagNew
+            }).switchMap(() => {
+                const stream = fs.createWriteStream(fullpath);
+                const write = state.req.pipe(stream);
+                const finish = Observable.fromEvent(write, 'finish').take(1);
+                return Observable.merge(finish, Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err: Error) => {
+                    if (err) {
+                        return state.throw(500, "Error while writing the file to disk", [err.name, err.message, err.stack].join(': '));
+                    } else {
+                        return obs_stat(false)(fullpath) as any;
+                    }
+                }).map(([err, statNew]) => {
+                    const mtimeNew = Date.parse(statNew.mtime as any);
+                    const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
+                    state.res.writeHead(200, {
+                        'x-api-access-type': 'file',
+                        'etag': etagNew
+                    })
+                    state.res.end();
                 })
-                state.res.end();
-            })
+            });
         } else if (state.req.method === "OPTIONS") {
             state.res.writeHead(200, {
                 'x-api-access-type': 'file',

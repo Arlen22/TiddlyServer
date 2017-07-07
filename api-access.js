@@ -4,10 +4,12 @@ const rx_1 = require("./lib/rx");
 const server_types_1 = require("./server-types");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 const crypto_1 = require("crypto");
 const datafolder_1 = require("./datafolder");
 const util_1 = require("util");
 const mime = require('./lib/mime');
+const error = server_types_1.ErrorLogger("SER-API");
 function parsePath(path, jsonFile) {
     var regCheck = /${([^}])}/gi;
     path.replace(regCheck, (str, pathVar) => {
@@ -301,24 +303,44 @@ function file(obs) {
             if (state.req.headers['if-match'] && (state.req.headers['if-match'] !== etag)) {
                 return state.throw(412);
             }
-            const stream = fs.createWriteStream(fullpath);
-            const write = state.req.pipe(stream);
-            const finish = rx_1.Observable.fromEvent(write, 'finish').take(1);
-            return rx_1.Observable.merge(finish, rx_1.Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err) => {
-                if (err) {
-                    return state.throw(500, "Error while writing the file to disk", [err.name, err.message, err.stack].join(': '));
+            return new rx_1.Observable((subscriber) => {
+                if (settings.backupDirectory) {
+                    const backupFile = state.url.path.replace(/[\s\\\/<>*:?"|]/gi, "_");
+                    const ext = path.extname(backupFile);
+                    console.log(backupFile, state.url.path);
+                    const backupWrite = fs.createWriteStream(path.join(settings.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
+                    const fileRead = fs.createReadStream(fullpath);
+                    fileRead.pipe(zlib.createGzip()).pipe(backupWrite).on('error', (err) => {
+                        error('Error saving backup file for %s: %s', state.url.path, err.message);
+                    }).on('close', () => {
+                        subscriber.next();
+                        subscriber.complete();
+                    });
                 }
                 else {
-                    return server_types_1.obs_stat(false)(fullpath);
+                    subscriber.next();
+                    subscriber.complete();
                 }
-            }).map(([err, statNew]) => {
-                const mtimeNew = Date.parse(statNew.mtime);
-                const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
-                state.res.writeHead(200, {
-                    'x-api-access-type': 'file',
-                    'etag': etagNew
+            }).switchMap(() => {
+                const stream = fs.createWriteStream(fullpath);
+                const write = state.req.pipe(stream);
+                const finish = rx_1.Observable.fromEvent(write, 'finish').take(1);
+                return rx_1.Observable.merge(finish, rx_1.Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err) => {
+                    if (err) {
+                        return state.throw(500, "Error while writing the file to disk", [err.name, err.message, err.stack].join(': '));
+                    }
+                    else {
+                        return server_types_1.obs_stat(false)(fullpath);
+                    }
+                }).map(([err, statNew]) => {
+                    const mtimeNew = Date.parse(statNew.mtime);
+                    const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
+                    state.res.writeHead(200, {
+                        'x-api-access-type': 'file',
+                        'etag': etagNew
+                    });
+                    state.res.end();
                 });
-                state.res.end();
             });
         }
         else if (state.req.method === "OPTIONS") {

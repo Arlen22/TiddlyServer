@@ -162,6 +162,10 @@ export const obs_readdir = <T>(state: T) => Observable.bindCallback(
 export const obs_readFile = <T>(state: T) => Observable.bindCallback(
     fs.readFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state]);
 
+export const obs_writeFile = <T>(state: T) => Observable.bindCallback(
+    fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state]);
+
+
 export class StateError extends Error {
     state: StateObject;
     constructor(state: StateObject, message: string) {
@@ -302,7 +306,8 @@ export interface ServerConfig {
     username?: string,
     password?: string,
     host?: string,
-    port?: number | 8080
+    port?: number | 8080,
+    backupDirectory?: string
 }
 
 export interface AccessPathResult<T> {
