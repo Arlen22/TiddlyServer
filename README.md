@@ -35,6 +35,7 @@ None so far.
  - Serves any files found in the folder structure.
  - Saves individual files using the put saver.
  - Loads data folders using a certain core/boot version (currently whatever gets installed with `npm install`) then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder/`)
+ - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
 
 # settings.json
 
@@ -52,10 +53,13 @@ None so far.
     "username": "",
     "password": "",
     "host": "127.0.0.1",
-    "port": 8080
+    "port": 8080,
+    "backupDirectory": "backup"
 }
 ```
-If not specified, username and password are not set, and types, host and port are set to the values above. Tree must be specified.
+If not specified, backupDirectory, username and password are not set, and types, host and port are set to the values above. Tree must be specified.
+
+All relative folder paths in this file are resolved relative to the directory the file is in.
 
 Tree is an object and its children may be either object or string. If a child value is a string, it refers to a path that will be loaded for that alias. If it is an object, it is a sub tree.
 
