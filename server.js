@@ -167,7 +167,7 @@ server.listen(settings.port, settings.host, function (err, res) {
         console.error('error on app.listen', err);
         return;
     }
-    console.log('Open your browswer and type in one of the following:');
+    console.log('Open your browser and type in one of the following:');
     if (!settings.host || settings.host === '0.0.0.0') {
         var os = require('os');
         var ifaces = os.networkInterfaces();
