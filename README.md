@@ -59,7 +59,7 @@ If not specified, username and password are not set, and types, host and port ar
 
 Tree is an object and its children may be either object or string. If a child value is a string, it refers to a path that will be loaded for that alias. If it is an object, it is a sub tree.
 
-So `/alias2/alias2child/` would end up serving the folder named "relative folder path" in the current working directory, and `/alias` will load an absolute path on the file system.
+So `/alias2/alias2child/` would end up serving the folder named "relative folder path" next to the settings.json file, and `/alias` will load an absolute path on the file system.
 
 There are a few aliases which cannot be used directly under tree as they are reserved for other things on the server. Currently they are `favicon.ico`, `directory.css`, `icons`, and `admin`. If tree contains any of these they will simply be ignored. This only applies to the top level tree, not to sub trees.
 
