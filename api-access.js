@@ -310,7 +310,12 @@ function file(obs) {
                     console.log(backupFile, state.url.path);
                     const backupWrite = fs.createWriteStream(path.join(settings.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
                     const fileRead = fs.createReadStream(fullpath);
-                    fileRead.pipe(zlib.createGzip()).pipe(backupWrite).on('error', (err) => {
+                    const gzip = zlib.createGzip();
+                    fileRead.on('error', (err) => {
+                        gzip.end();
+                        error('Error saving backup file for %s: %s', state.url.path, err.message);
+                    });
+                    fileRead.pipe(gzip).pipe(backupWrite).on('error', (err) => {
                         error('Error saving backup file for %s: %s', state.url.path, err.message);
                     }).on('close', () => {
                         subscriber.next();
