@@ -2,6 +2,7 @@
     "tree": {
         "dropbox": "C:\\Users\\Someone\\Dropbox\\TiddlyWiki",
         "tiddlywiki": "C:\\TiddlyWiki5-5.1.14",
+        "relative": "../relative_to_settings_file",
         "branch": {
             "twig1": "C:/Some Folder",
             "twig2": "C:/Some Other Folder"
@@ -13,5 +14,6 @@
     "username": "",
     "password": "",
     "host": "127.0.0.1",
-    "port": 8080
+    "port": 8080,
+    "backupDirectory": "backup"
 }
