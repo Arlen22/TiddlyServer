@@ -5,6 +5,8 @@ $tw.saverHandler.savers[saver].__proto__.uri = function () { return decodeURI(en
 $tw.saverHandler.savers[saver] = $tw.modules.types.saver['$:/core/modules/savers/put.js'].exports.create();
 })($tw.saverHandler.savers.findIndex(e => e.info.name === 'put'))`;
 
+const info = require('./package.json');
+
 exports.generateDirectoryListing = function (directory) {
     function listEntries(entries) {
         return entries.slice().sort(
@@ -39,7 +41,8 @@ exports.generateDirectoryListing = function (directory) {
 ${listEntries(directory.entries)}
 </table>
 <p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
+<p style="color:grey; font-family:sans-serif; font-size:0.8em;">TiddlyServer v${info.version}</p>
 </body>
-</html>    
+</html>
 `
 }
