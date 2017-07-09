@@ -1,7 +1,7 @@
 
 import { Observable, Subject, Subscription, BehaviorSubject, Subscriber } from './lib/rx';
 
-import { StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic, obs_stat } from "./server-types";
+import { StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic, obs_stat, colors } from "./server-types";
 
 import * as http from 'http'
 import * as fs from 'fs';
@@ -35,7 +35,14 @@ const settingsFile = path.resolve(process.argv[2] || 'settings.json');
 
 console.log("Settings file: %s", settingsFile);
 
-var settings: ServerConfig = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
+var settings: ServerConfig;
+
+try{
+    settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
+} catch(e){
+    console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed correctly" + colors.Reset);
+    throw e;
+}
 
 if (!settings.tree) throw "tree is not specified in the settings file";
 

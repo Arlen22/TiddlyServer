@@ -24,7 +24,14 @@ const error = server_types_1.ErrorLogger('APP');
 const logger = require('./lib/morgan.js').handler;
 const settingsFile = path.resolve(process.argv[2] || 'settings.json');
 console.log("Settings file: %s", settingsFile);
-var settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+var settings;
+try {
+    settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+}
+catch (e) {
+    console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed correctly" + server_types_1.colors.Reset);
+    throw e;
+}
 if (!settings.tree)
     throw "tree is not specified in the settings file";
 const settingsDir = path.dirname(settingsFile);

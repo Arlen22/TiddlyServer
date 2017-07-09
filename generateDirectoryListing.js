@@ -15,7 +15,7 @@ exports.generateDirectoryListing = function (directory) {
             const isFile = ['category', 'folder', 'datafolder', 'error', 'other'].indexOf(entry.type) === -1;
             return `
 <tr class="row ${(index + 1) % 2 ? 'odd' : 'even'} ${entry.type}">
-    <td><span class="icon"><img src="/icons/${(isFile ? 'files/' : '') + entry.type}.png"/></span></td>
+    <td><span class="icon"><img style="width:16px;" src="/icons/${(isFile ? 'files/' : '') + entry.type}.png"/></span></td>
     <td><span class="name"><a href="${encodeURI(entry.path)}">${entry.name}</a></span></td>
     <td><span class="type">${entry.type}</span></td>
     <td><span class="size">${entry.size}</span></td>
