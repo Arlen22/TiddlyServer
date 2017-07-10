@@ -332,7 +332,7 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
                 if (settings.backupDirectory) {
                     const backupFile = state.url.path.replace(/[\s\\\/<>*:?"|]/gi, "_");
                     const ext = path.extname(backupFile);
-                    console.log(backupFile, state.url.path);
+                    //console.log(backupFile, state.url.path);
                     const backupWrite = fs.createWriteStream(path.join(settings.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
                     const fileRead = fs.createReadStream(fullpath);
                     const gzip = zlib.createGzip();
@@ -369,7 +369,7 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
                     })
                     state.res.end();
                 })
-            });
+            }).mapTo(state);
         } else if (state.req.method === "OPTIONS") {
             state.res.writeHead(200, {
                 'x-api-access-type': 'file',

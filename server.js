@@ -116,7 +116,7 @@ rx_1.Observable.fromEvent(server, 'request', (req, res) => {
     'admin': server_types_1.StateObject.errorRoute(404, 'Reserved for future use')
 }, api_access_1.doAPIAccessRoute).subscribe((state) => {
     if (!state)
-        return console.log('blank item');
+        return; // console.log('blank item');
     if (!state.res.finished) {
         const timeout = setTimeout(function () {
             state.error('RESPONSE FINISH TIMED OUT');

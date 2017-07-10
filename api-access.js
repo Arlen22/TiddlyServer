@@ -346,7 +346,7 @@ function file(obs) {
                     });
                     state.res.end();
                 });
-            });
+            }).mapTo(state);
         }
         else if (state.req.method === "OPTIONS") {
             state.res.writeHead(200, {

@@ -138,7 +138,7 @@ const serverClose = Observable.merge(
         'icons': doIconRoute,
         'admin': StateObject.errorRoute(404, 'Reserved for future use')
     }, doAPIAccessRoute).subscribe((state: StateObject) => {
-        if (!state) return console.log('blank item');
+        if (!state) return;// console.log('blank item');
         if (!state.res.finished) {
             const timeout = setTimeout(function () {
                 state.error('RESPONSE FINISH TIMED OUT');
