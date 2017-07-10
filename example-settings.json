@@ -1,4 +1,5 @@
 {
+    // all comments need to be removed from this file
     "tree": {
         "dropbox": "C:\\Users\\Someone\\Dropbox\\TiddlyWiki",
         "tiddlywiki": "C:\\TiddlyWiki5-5.1.14",
@@ -8,12 +9,17 @@
             "twig2": "C:/Some Other Folder"
         }
     },
+    //this is the default value if types is not specified
+    //this only applies to the directory listing
+    //specifies file extensions for each icon in the files folder
     "types":{
         "htmlfile": ["htm", "html"]
     },
     "username": "",
     "password": "",
+    //127.0.0.1 (the default) allows localhost access, 0.0.0.0 allows access from any network connection (assuming firewall, etc. allows it)
     "host": "127.0.0.1",
     "port": 8080,
+    //remove or set to an empty string to disable backups when saving single-file wikis
     "backupDirectory": "backup"
 }
