@@ -312,7 +312,7 @@ function file(obs) {
                     const fileRead = fs.createReadStream(fullpath);
                     const gzip = zlib.createGzip();
                     const pipeError = (err) => {
-                        error('Error saving backup file for %s: %s\r\n%s', state.url.path, err.message, "Please make sure the backup directory actually exists or make the " +
+                        error('Error saving backup file for %s: %s\r\n%s', state.url.path, err.message, "Please make sure the backup directory actually exists or else make the " +
                             "backupDirectory key falsy in your settings file (e.g. set it to a " +
                             "zero length string or false, or remove it completely)");
                         state.throw(500, "Server error", "Backup could not be saved, see server output");
