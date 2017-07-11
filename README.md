@@ -19,7 +19,7 @@ None so far.
  3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
  4. `node server.js` or `node server.js /path/to/settings.json`
  
-The editions folder is not included in the bundle due to the sheer number of files, as it only contains data folders and is not needed for TiddlyServer to operate. It is included separately in the release and is always the same version as the bundled file contains. The empty "server" edition is also included as a separate download for convenience as this is used as a data folder template.
+The editions folder is not included in the bundle due to the sheer number of files, as it only contains data folders and is not needed for TiddlyServer to operate. It is included separately in the release and is always from the same version of TiddlyWiki as the bundled file contains. The empty "server" edition is also included as a separate download for convenience as this is used as a data folder template.
 
 ### Source code version
  1. Download and unzip the source code from the latest release. https://github.com/Arlen22/TiddlyServer/releases
