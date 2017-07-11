@@ -9,3 +9,5 @@ None of these features are implemented.
   - https://github.com/sockjs/sockjs-node
 - Add an admin page to manage settings, engines, and files, and add new files and data folders.
 - Add authentication. Use the iron library to generate the cookie.
+- Add an upload button to the directory listing to upload any file to the current directory.
+- Add a create data folder button to create new data folders with any 
