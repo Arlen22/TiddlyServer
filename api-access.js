@@ -315,10 +315,10 @@ function file(obs) {
                         error('Error saving backup file for %s: %s\r\n%s', state.url.path, err.message, "Please make sure the backup directory actually exists or make the " +
                             "backupDirectory key falsy in your settings file (e.g. set it to a " +
                             "zero length string or false, or remove it completely)");
+                        state.throw(500, "Server error", "Backup could not be saved, see server output");
                         fileRead.close();
                         gzip.end();
                         backupWrite.end();
-                        state.throw(500, "Server error", "Backup could not be saved, see server output");
                         subscriber.complete();
                     };
                     fileRead.on('error', pipeError);
