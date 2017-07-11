@@ -305,19 +305,30 @@ function file(obs) {
             }
             return new rx_1.Observable((subscriber) => {
                 if (settings.backupDirectory) {
-                    const backupFile = state.url.path.replace(/[\s\\\/<>*:?"|]/gi, "_");
+                    const backupFile = state.url.path.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
                     const ext = path.extname(backupFile);
-                    console.log(backupFile, state.url.path);
+                    //console.log(backupFile, state.url.path);
                     const backupWrite = fs.createWriteStream(path.join(settings.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
                     const fileRead = fs.createReadStream(fullpath);
                     const gzip = zlib.createGzip();
-                    fileRead.on('error', (err) => {
+                    const pipeError = (err) => {
+                        error('Error saving backup file for %s: %s\r\n%s', state.url.path, err.message, "Please make sure the backup directory actually exists or make the " +
+                            "backupDirectory key falsy in your settings file (e.g. set it to a " +
+                            "zero length string or false, or remove it completely)");
+                        fileRead.close();
                         gzip.end();
-                        error('Error saving backup file for %s: %s', state.url.path, err.message);
-                    });
-                    fileRead.pipe(gzip).pipe(backupWrite).on('error', (err) => {
-                        error('Error saving backup file for %s: %s', state.url.path, err.message);
-                    }).on('close', () => {
+                        backupWrite.end();
+                        state.throw(500, "Server error", "Backup could not be saved, see server output");
+                        subscriber.complete();
+                    };
+                    fileRead.on('error', pipeError);
+                    gzip.on('error', pipeError);
+                    backupWrite.on('error', pipeError);
+                    // fileRead.on('error', (err) => {
+                    //     gzip.end();
+                    //     error('Error saving backup file for %s: %s', state.url.path, err.message);
+                    // })
+                    fileRead.pipe(gzip).pipe(backupWrite).on('close', () => {
                         subscriber.next();
                         subscriber.complete();
                     });
