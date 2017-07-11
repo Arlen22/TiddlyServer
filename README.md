@@ -17,7 +17,7 @@ None so far.
     - If you want to make a portable TiddlyServer, just download the binary file. The LTS version (the default) is fine. You will need to download the correct architecture. 32-bit is recommended for maximum portability on most desktops and laptops. If you are going to be using it on a linux or android device, you may need the ARM binaries as the ARM architecture is generally found in micro pc builds, mobile devices, and tablets.
  2. Download the latest `TiddlyServer-x.x.x-bundled.zip` from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. __Put the NodeJS binary (node.exe) in this folder if you want it to be portable.__
  3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 4. `node server.js` or `node server.js /path/to/settings.json`
+ 4. `node server.js` or `node server.js /path/to/settings.json` or run `start.cmd`.
  
 The editions folder is not included in the bundle due to the sheer number of files, as it only contains data folders and is not needed for TiddlyServer to operate. It is included separately in the release and is always from the same version of TiddlyWiki as the bundled file contains. The empty "server" edition is also included as a separate download for convenience as this is used as a data folder template.
 
