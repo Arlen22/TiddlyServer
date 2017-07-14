@@ -14,9 +14,9 @@ None so far.
 
 ### Bundled version
 
-The bundled version contains all the needed dependancies and therefore does not use the `npm install`. NodeJS still needs to be installed or copied into the folder, but the process is a lot simpler. Therefore, each release includes a `TiddlyServer-x.x.x-bundled.zip` file which contains the bundled version ready to extract and use (well, except for the Node executable for your platform).
+The bundled version contains all the npm dependancies for TiddlerServer, and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM) or just copied into the folder, but the process is a lot simpler. Therefore, each release includes a `TiddlyServer-x.x.x-bundled.zip` file which contains the bundled version ready to extract and use (well, except for the Node executable for your platform).
 
-The editions folder is not included in the bundled file because of the number of files it contains. Since it only contains data folders, it is not needed for TiddlyServer to operate. It is included in the release as a separate zip file and is always from the same version of TiddlyWiki as the bundled file contains. 
+The editions folder is not included in the bundled file because of the number of files it contains. Since it only contains data folders, it is not needed for TiddlyServer to operate. It is included in each release as a separate zip file and is always from the same version of TiddlyWiki as the bundled file contains. 
 
 For convenience, the "server" edition is also included as a separate download because this is used as a data folder template.
 
@@ -27,7 +27,7 @@ For convenience, the "server" edition is also included as a separate download be
  4. `node server.js` or `node server.js /path/to/settings.json` or run `start.cmd`.
 
 ### Source code version
- 1. Download and unzip the source code from the latest release. https://github.com/Arlen22/TiddlyServer/releases
+ 1. Download and unzip the source code from the latest release: https://github.com/Arlen22/TiddlyServer/releases
  2. `npm install`
  3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
  4. `node server.js` (`npm start`) or `node server.js /path/to/settings.json`
