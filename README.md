@@ -6,6 +6,10 @@ But the main point is that you can actually edit your files, not just look at th
 
 And, of course, you can edit data folder tiddlywikis just like you were running `node tiddlywiki.js data --server`, except that you run it on the path that you found it at (e.g. http://localhost/personal/notes/). You can have as many data folders open as you want, they don't conflict (though they will each take memory).
 
+## One thing that needs to be noted
+
+TiddlyWiki Five files currently use the put saver. The put saver URI encodes the document location, which is usually already encoded by the browser, resulting in a 404 error when saving. If the URL contains any characters that get converted to percent codes (such as %20), you will need to use the bookmarklet included in the directory pages to fix the saving. The bookmarklet needs to be clicked each time the affected wiki is opened, after which saving should work normally until the page is reloaded.
+
 ## Major changes in master since last release
 
 None so far.
