@@ -27,19 +27,31 @@ exports.generateDirectoryListing = function (directory) {
     const parentPath = parentJoin === '//' ? '/' : parentJoin;
     const name = pathArr.slice(pathArr.length - 1);
     return `
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html>
 <head>
 <title>${name}</title>
 <link rel="stylesheet" href="/directory.css" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-<p><a href="${parentPath}">Parent directory: ${parentPath}</a></p>
-<h3>${name}</h3>
-<table style="min-width:400px;">
-<tr><th></th><th>Name</th><th>Type</th><th>Size</th></tr>
+<p><a href="${parentPath}">Directory: ${parentPath}</a></p>
+
+<table>
+  <caption>${name}</caption>
+  <thead>
+    <tr>
+      <th scope="col"></th>
+      <th scope="col">Name</th>
+      <th scope="col">Type</th>
+      <th scope="col">Size</th>
+    </tr>
+  </thead>
+ <tbody>
 ${listEntries(directory.entries)}
+  </tbody>
 </table>
+
 <p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
 <p style="color:grey; font-family:sans-serif; font-size:0.8em;">TiddlyServer v${info.version}</p>
 </body>
