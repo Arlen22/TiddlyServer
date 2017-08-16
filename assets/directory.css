@@ -5,7 +5,7 @@ body {
 table {
   border: 1px solid #ccc;
   border-collapse:separate;
- empty-cells: hide;
+  empty-cells: hide;
   margin: 0;
   padding: 0;
   width: 100%;
@@ -23,12 +23,19 @@ table tr {
 table th,
 table td {
   padding: .625em;
-  text-align: center;
+  text-align: left;
 }
 table th {
   font-size: .85em;
   letter-spacing: .1em;
   text-transform: uppercase;
+}
+
+table .icon {
+  width: 16px;
+}
+table .icon img {
+  width: 16px;
 }
 @media screen and (max-width: 600px) {
   table {
