@@ -223,6 +223,10 @@ function createHashmapNumber(keys, values) {
     return obj;
 }
 exports.createHashmapNumber = createHashmapNumber;
+function obsTruthy(a) {
+    return !!a;
+}
+exports.obsTruthy = obsTruthy;
 const ERRORS = {
     'PROGRAMMER_EXCEPTION': 'A programmer exception occurred: %s'
 };

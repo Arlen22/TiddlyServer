@@ -75,6 +75,12 @@ const un = settings.username;
 const pw = settings.password;
 const log = rx_1.Observable.bindNodeCallback(logger);
 const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(server, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
+const routes = {
+    'favicon.ico': doFaviconRoute,
+    'directory.css': doStylesheetRoute,
+    'icons': doIconRoute,
+    'admin': server_types_1.StateObject.errorRoute(404, 'Reserved for future use')
+};
 rx_1.Observable.fromEvent(server, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
@@ -89,7 +95,7 @@ rx_1.Observable.fromEvent(server, 'request', (req, res) => {
         return state;
     if (!state.req.headers['authorization']) {
         debug('authorization required');
-        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Protocol App"', 'Content-Type': 'text/plain' });
+        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
         state.res.end();
         return;
     }
@@ -107,14 +113,9 @@ rx_1.Observable.fromEvent(server, 'request', (req, res) => {
     debug('authorization successful');
     // securityChecks =====================
     return state;
-}).filter(state => !!state).routeCase(state => {
+}).filter(server_types_1.obsTruthy).routeCase(state => {
     return state.path[1];
-}, {
-    'favicon.ico': doFaviconRoute,
-    'directory.css': doStylesheetRoute,
-    'icons': doIconRoute,
-    'admin': server_types_1.StateObject.errorRoute(404, 'Reserved for future use')
-}, api_access_1.doAPIAccessRoute).subscribe((state) => {
+}, routes, api_access_1.doAPIAccessRoute).subscribe((state) => {
     if (!state)
         return; // console.log('blank item');
     if (!state.res.finished) {
