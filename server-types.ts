@@ -179,7 +179,7 @@ export type LoggerFunc = (str: string, ...args: any[]) => void;
 export class StateObject implements ThrowFunc<StateObject>{
 
     static errorRoute(status: number, reason?: string) {
-        return (obs: Observable<any>) => {
+        return (obs: Observable<any>): any => {
             return obs.mergeMap((state: StateObject) => {
                 return state.throw(status, reason);
             })
@@ -344,7 +344,9 @@ export function createHashmapNumber<T>(keys: number[], values: T[]): { [id: numb
     return obj;
 }
 
-
+export function obsTruthy<T>(a: T | undefined | null | false | "" | 0): a is T {
+    return !!a;
+}
 
 const ERRORS = {
     'PROGRAMMER_EXCEPTION': 'A programmer exception occurred: %s'

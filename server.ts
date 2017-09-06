@@ -1,7 +1,10 @@
 
 import { Observable, Subject, Subscription, BehaviorSubject, Subscriber } from './lib/rx';
 
-import { StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic, obs_stat, colors } from "./server-types";
+import {
+    StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
+    obs_stat, colors, obsTruthy
+} from "./server-types";
 
 import * as http from 'http'
 import * as fs from 'fs';
@@ -37,9 +40,9 @@ console.log("Settings file: %s", settingsFile);
 
 var settings: ServerConfig;
 
-try{
+try {
     settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
-} catch(e){
+} catch (e) {
     console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed correctly" + colors.Reset);
     throw e;
 }
@@ -56,7 +59,7 @@ const settingsDir = path.dirname(settingsFile);
     })
 })(settings.tree)
 
-if(settings.backupDirectory){
+if (settings.backupDirectory) {
     settings.backupDirectory = path.resolve(settingsDir, settings.backupDirectory);
 }
 
@@ -95,7 +98,14 @@ const log = Observable.bindNodeCallback<http.IncomingMessage, http.ServerRespons
 
 const serverClose = Observable.merge(
     Observable.fromEvent(server, 'close').take(1)
-).multicast<StateObject>(new Subject()).refCount();
+).multicast(new Subject()).refCount();
+
+const routes = {
+    'favicon.ico': doFaviconRoute,
+    'directory.css': doStylesheetRoute,
+    'icons': doIconRoute,
+    'admin': StateObject.errorRoute(404, 'Reserved for future use')
+};
 
 (Observable.fromEvent(server, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
     if (!req || !res) console.log('blank req or res');
@@ -110,7 +120,7 @@ const serverClose = Observable.merge(
 
     if (!state.req.headers['authorization']) {
         debug('authorization required');
-        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Protocol App"', 'Content-Type': 'text/plain' });
+        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
         state.res.end();
         return;
     }
@@ -130,37 +140,32 @@ const serverClose = Observable.merge(
     // securityChecks =====================
 
     return state;
-}).filter(state => !!state).routeCase<StateObject>(state => {
+}).filter(obsTruthy).routeCase<StateObject>(state => {
     return state.path[1];
-}, {
-        'favicon.ico': doFaviconRoute,
-        'directory.css': doStylesheetRoute,
-        'icons': doIconRoute,
-        'admin': StateObject.errorRoute(404, 'Reserved for future use')
-    }, doAPIAccessRoute).subscribe((state: StateObject) => {
-        if (!state) return;// console.log('blank item');
-        if (!state.res.finished) {
-            const timeout = setTimeout(function () {
-                state.error('RESPONSE FINISH TIMED OUT');
-                state.error('%s %s ', state.req.method, state.req.url)
-                state.throw(500, "Response timed out");
-            }, 60000);
-            Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearTimeout(timeout));
-        }
-    }, err => {
-        console.error('Uncaught error in the server route: ' + err.message);
-        console.error(err.stack);
-        console.error("the server will now close");
-        server.close();
-    }, () => {
-        //theoretically we could rebind the listening port without restarting the process, 
-        //but I don't know what would be the point of that. If this actually happens, 
-        //there will be no more listeners so the process will probably exit.
-        //In practice, the only reason this should happen is if the server close event fires.
-        console.log('finished processing for some reason');
-    })
+}, routes, doAPIAccessRoute).subscribe((state: StateObject) => {
+    if (!state) return;// console.log('blank item');
+    if (!state.res.finished) {
+        const timeout = setTimeout(function () {
+            state.error('RESPONSE FINISH TIMED OUT');
+            state.error('%s %s ', state.req.method, state.req.url)
+            state.throw(500, "Response timed out");
+        }, 60000);
+        Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearTimeout(timeout));
+    }
+}, err => {
+    console.error('Uncaught error in the server route: ' + err.message);
+    console.error(err.stack);
+    console.error("the server will now close");
+    server.close();
+}, () => {
+    //theoretically we could rebind the listening port without restarting the process, 
+    //but I don't know what would be the point of that. If this actually happens, 
+    //there will be no more listeners so the process will probably exit.
+    //In practice, the only reason this should happen is if the server close event fires.
+    console.log('finished processing for some reason');
+})
 
-function doFaviconRoute(obs: Observable<StateObject>) {
+function doFaviconRoute(obs: Observable<StateObject>): any {
     return obs.mergeMap((state: StateObject) => {
         return obs_stat(state)(favicon).mergeMap(([err, stat]): any => {
             if (err) return state.throw(404);
@@ -170,17 +175,17 @@ function doFaviconRoute(obs: Observable<StateObject>) {
         })
     })
 }
-function doStylesheetRoute(obs: Observable<StateObject>) {
+function doStylesheetRoute(obs: Observable<StateObject>): any {
     return obs.mergeMap(state => {
         return obs_stat(state)(stylesheet).mergeMap(([err, stat]): any => {
             if (err) return state.throw(404);
             return serveStatic(stylesheet, state, stat).map(([isErr, res]) => {
                 if (isErr) state.throw(res.status, res.message, res.headers);
             }).ignoreElements();
-        })
+        });
     })
 }
-function doIconRoute(obs: Observable<StateObject>) {
+function doIconRoute(obs: Observable<StateObject>): any {
     return obs.mergeMap(state => {
         return serveIcons(state.req, state.res).do(([err, res]: [{ status: number, message: string, headers: any }, any]) => {
             if (err) state.throw(err.status, err.message);
@@ -213,7 +218,7 @@ server.listen(settings.port, settings.host, function (err: any, res: any) {
  */
 export function recieveBody(state: StateObject) {
     //get the data from the request
-    return Observable.fromEvent(state.req, 'data')
+    return Observable.fromEvent<Buffer>(state.req, 'data')
         //only take one since we only need one. this will dispose the listener
         .takeUntil(Observable.fromEvent(state.req, 'end').take(1))
         //accumulate all the chunks until it completes
