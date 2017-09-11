@@ -84,4 +84,4 @@ There are a few aliases which cannot be used directly under tree as they are res
 
 ## A word to you
 
-If you want to help cover the cost of making this all happen, use https://www.paypal.me/Arlen22. Your help is appreciated and may help further development.
+If you want to help cover the cost of making this all happen, use https://www.paypal.me/Arlen22. Your help is appreciated and will increase the likelihood of future improvements.
