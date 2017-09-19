@@ -53,20 +53,20 @@ For convenience, the "server" edition is also included as a separate download be
 ```json
 // these comments need to be removed for settings.json to parse correctly
 {
-    "tree": { //the files and folders to serve
+    "tree": { 
         "alias": "C:/my folder path",
         "alias2": {
             "alias2child": "relative folder path"
         }
     },
-    "types":{  //this is for the directory listing, and does not affect actual operation
+    "types":{  
         "htmlfile": ["htm", "html"] 
     }, 
-    "username": "",  //if set, requests basic auth
-    "password": "",  //if set, requests basic auth
-    "host": "127.0.0.1",  //ip address to listen on, use localhost(127.0.0.1) to only accept connections from local computer
+    "username": "",  
+    "password": "",  
+    "host": "127.0.0.1",  
     "port": 8080,                
-    "backupDirectory": "backup"  //only applies to single file tiddlywikis
+    "backupDirectory": "backup" 
 }
 ```
 If not specified, backupDirectory, username and password are not set, and types, host and port are set to the values above. Tree must be specified.
