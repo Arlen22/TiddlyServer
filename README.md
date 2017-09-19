@@ -78,6 +78,8 @@ So `/alias2/alias2child/` would end up serving the folder named "relative folder
 
 There are a few aliases which cannot be used directly under tree as they are reserved for other things on the server. Currently they are `favicon.ico`, `directory.css`, `icons`, and `admin`. If tree contains any of these they will simply be ignored. This only applies to the top level tree, not to sub trees.
 
+If the backupDirectory is specified, it must exist, otherwise saving will fail for all single-file wikis. TiddlyWiki Folders are not backed up and therefore will still save as usual even if the directory does not exist.
+
 ## Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.
  - If you see a bug, please open an issue describing what is going on and I will try to answer it.
