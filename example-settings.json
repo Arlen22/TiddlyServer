@@ -21,5 +21,5 @@
     "host": "127.0.0.1",
     "port": 8080,
     //remove or set to an empty string to disable backups when saving single-file wikis
-    "backupDirectory": "backup"
+    "backupDirectory": ""
 }

@@ -6,9 +6,25 @@ But the main point is that you can actually edit your files, not just look at th
 
 And, of course, you can edit data folder tiddlywikis just like you were running `node tiddlywiki.js data --server`, except that you run it on the path that you found it at (e.g. http://localhost/personal/notes/). You can have as many data folders open as you want, they don't conflict (though they will each take memory).
 
+### Benefits
+  - Allows relative linking to external files.
+    - All files found in the folder structure can be served. Relative and path urls work fine. You can even link to the folder, if you like.
+  - Easy access to data folders and files from any computer on the network and any browser. Saving on localhost is as fast as TiddlyFox (no benchmarks, but localhost never goes across the network, making it instant).
+
+### Features
+ - Uses a folder structure specified in settings.json allowing you serve any folders on the filesystem in whatever tree structure you like.
+ - Serves any files found in the folder structure.
+ - Saves individual files using the put saver.
+ - Loads data folders using a certain core/boot version (currently whatever gets installed with `npm install` or the bundled version if you use that) then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder/`)
+ - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
+
 ## One thing that needs to be noted
 
-TiddlyWiki Five files currently use the put saver. The put saver URI encodes the document location, which is usually already encoded by the browser, resulting in a 404 error when saving, if the URL contains any characters that get converted to percent codes (such as %20). You will need to use the bookmarklet included in the directory pages to fix the saving. The bookmarklet needs to be clicked each time the affected wiki is opened, after which saving should work normally until the page is reloaded. This does not apply to data folders.
+TiddlyWiki Five files currently use the put saver. The put saver URI encodes the document location, which is usually already encoded by the browser, resulting in a 404 error when saving, if the URL contains any characters that get converted to percent codes (such as %20). 
+
+You will need to use the bookmarklet included in the directory pages to fix the saving. The bookmarklet needs to be clicked each time the affected wiki is opened, after which saving should work normally until the page is reloaded. This does not apply to data folders.
+
+This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
 ## Major changes in master since last release
 
@@ -22,7 +38,7 @@ https://www.didaxy.com/introduction-to-tiddlyserver
 
 ### Bundled version
 
-The bundled version contains all the npm dependancies for TiddlerServer, and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM) or copied into the folder, but the process is a lot simpler. Therefore, each release includes a `TiddlyServer-x.x.x-bundled.zip` file which contains the bundled version.
+The bundled version contains all the npm dependancies for TiddlerServer, and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM) or copied into the folder, but the prodedure is a lot simpler. The bundled file is named `TiddlyServer-x.x.x-bundled.zip`.
 
 The editions folder is not included in the bundled version because of the number of files it contains. Since it only contains data folders, it is not needed for TiddlyServer to operate. It is included in each release as a separate zip file and is always from the same version of TiddlyWiki as the bundled file contains. 
 
@@ -30,27 +46,15 @@ For convenience, the "server" edition is also included as a separate download be
 
  1. Download and install NodeJS from https://nodejs.org
     - If you want to make a portable TiddlyServer, just download the binary file. The LTS version (the default) is fine. You will need to download the correct architecture. 32-bit is recommended for maximum portability on most desktops and laptops. If you are going to be using it on a linux or android device, you may need the ARM binaries as the ARM architecture is generally found in micro pc builds, mobile devices, and tablets.
- 2. Download the latest `TiddlyServer-x.x.x-bundled.zip` from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. __Put the NodeJS binary (node.exe) in this folder if you want it to be portable.__
+ 2. Download the latest `TiddlyServer-x.x.x-bundled.zip` from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. __Put the NodeJS binary (node.exe) in this folder if you want it to be portable.__ None of the other NodeJS files are needed for a portable install.  
  3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 4. `node server.js` or `node server.js /path/to/settings.json` or run `start.cmd`.
+ 4. Open your terminal or command prompt and run `node server.js` or `node server.js /path/to/settings.json` or run `start.cmd`.
 
 ### Source code version
  1. Download and unzip the source code from the latest release: https://github.com/Arlen22/TiddlyServer/releases
  2. `npm install`
  3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
  4. `node server.js` (`npm start`) or `node server.js /path/to/settings.json`
-
-## Benefits
-  - Allows relative linking to external files.
-    - All files found in the folder structure can be served. Relative and path urls work fine. You can even link to the folder, if you like.
-  - Easy access to data folders and files from any computer on the network and any browser. Saving on localhost is as fast as TiddlyFox (no benchmarks, but localhost never goes across the network, making it instant).
-
-## Features
- - Uses a folder structure specified in settings.json allowing you serve any folders on the filesystem in whatever tree structure you like.
- - Serves any files found in the folder structure.
- - Saves individual files using the put saver.
- - Loads data folders using a certain core/boot version (currently whatever gets installed with `npm install`) then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder/`)
- - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
 
 ## settings.json
 
@@ -70,7 +74,7 @@ For convenience, the "server" edition is also included as a separate download be
     "password": "",  
     "host": "127.0.0.1",  
     "port": 8080,                
-    "backupDirectory": "backup" 
+    "backupDirectory": "" 
 }
 ```
 If not specified, backupDirectory, username and password are not set, and types, host and port are set to the values above. Tree must be specified.
