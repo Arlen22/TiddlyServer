@@ -21,7 +21,7 @@ process.on('uncaughtException', err => {
     console.error("caught process uncaughtException");
     fs.appendFile(path.join(__dirname, 'uncaughtException.log'),
         new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n");
-    //uncaughtExceptionThrown = true;
+    process.exitCode = 1;
 });
 
 //const globalInterval = setInterval(function () { }, 10000);
