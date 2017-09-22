@@ -16,6 +16,10 @@ None so far.
 
 ## Installation
 
+Another TiddlyWiki user has written an install guide. It uses the source code version,  but once you follow the instructions below for the bundled version, you can still use his guide for settings.json. For now, check it out if these instructions are not clear enough.
+
+https://www.didaxy.com/introduction-to-tiddlyserver
+
 ### Bundled version
 
 The bundled version contains all the npm dependancies for TiddlerServer, and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM) or copied into the folder, but the process is a lot simpler. Therefore, each release includes a `TiddlyServer-x.x.x-bundled.zip` file which contains the bundled version.
