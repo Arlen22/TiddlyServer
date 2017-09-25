@@ -79,7 +79,7 @@ For convenience, the "server" edition is also included as a separate download be
 ```
 If not specified, backupDirectory, username and password are not set, and types, host and port are set to the values above. Tree must be specified.
 
-All relative folder paths in this file are resolved relative to the directory the file is in.
+All relative folder paths in settings.json are resolved relative to the settings.json file itself.
 
 Tree is an object and its children may be either object or string. If a child value is a string, it refers to a path that will be loaded for that alias. If it is an object, it is a sub tree.
 
