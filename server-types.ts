@@ -220,21 +220,12 @@ export class StateObject implements ThrowFunc<StateObject>{
 
     expressNext: ((err?: any) => void) | false;
 
-
-
-    // private debugLog: LoggerFunc;
-    // private errorLog: LoggerFunc;
-
     constructor(
         public req: http.IncomingMessage,
         public res: http.ServerResponse,
         private debugLog: LoggerFunc,
-        private errorLog: LoggerFunc
+        private readonly isLocalHost: boolean = false
     ) {
-        // this.req = req;
-        // this.res = res;
-        // this.debugLog = debugLog;
-        // this.errorLog = errorLog;
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
@@ -245,6 +236,10 @@ export class StateObject implements ThrowFunc<StateObject>{
         let t = new Date();
         this.timestamp = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+
+        // this.isLocalHost = () => {
+        //     return islocalhost;
+        // }
     }
     debug(str: string, ...args: any[]) {
         this.debugLog('[' +
@@ -254,15 +249,15 @@ export class StateObject implements ThrowFunc<StateObject>{
         );
     }
 
-    /*log(str: string, ...args: any[]) {
-        console.log(this.timestamp + ' [' +
-            this.req.socket.remoteFamily + '-' +
-            this.req.socket.remoteAddress + '] ' +
-            format.apply(null, arguments)
-        );
-    }*/
+    // log(str: string, ...args: any[]) {
+    //     console.log(this.timestamp + ' [' +
+    //         this.req.socket.remoteFamily + '-' +
+    //         this.req.socket.remoteAddress + '] ' +
+    //         format.apply(null, arguments)
+    //     );
+    // }
     error(str: string, ...args: any[]) {
-        this.errorLog('[' +
+        this.debugLog('[' +
             this.req.socket.remoteFamily + '-' + colors.FgMagenta +
             this.req.socket.remoteAddress + colors.Reset + '] ' +
             format.apply(null, arguments)
@@ -305,8 +300,8 @@ export interface ServerConfig {
     }
     username?: string,
     password?: string,
-    host?: string,
-    port?: number | 8080,
+    host: string,
+    port: number | 8080,
     backupDirectory?: string
 }
 

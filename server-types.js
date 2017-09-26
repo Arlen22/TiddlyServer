@@ -130,17 +130,11 @@ class StateError extends Error {
 }
 exports.StateError = StateError;
 class StateObject {
-    // private debugLog: LoggerFunc;
-    // private errorLog: LoggerFunc;
-    constructor(req, res, debugLog, errorLog) {
+    constructor(req, res, debugLog, isLocalHost = false) {
         this.req = req;
         this.res = res;
         this.debugLog = debugLog;
-        this.errorLog = errorLog;
-        // this.req = req;
-        // this.res = res;
-        // this.debugLog = debugLog;
-        // this.errorLog = errorLog;
+        this.isLocalHost = isLocalHost;
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
@@ -149,6 +143,9 @@ class StateObject {
         this.path = this.url.pathname.split('/');
         let t = new Date();
         this.timestamp = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+        // this.isLocalHost = () => {
+        //     return islocalhost;
+        // }
     }
     static errorRoute(status, reason) {
         return (obs) => {
@@ -163,15 +160,15 @@ class StateObject {
             this.req.socket.remoteAddress + colors.Reset + '] ' +
             util_1.format.apply(null, arguments));
     }
-    /*log(str: string, ...args: any[]) {
-        console.log(this.timestamp + ' [' +
-            this.req.socket.remoteFamily + '-' +
-            this.req.socket.remoteAddress + '] ' +
-            format.apply(null, arguments)
-        );
-    }*/
+    // log(str: string, ...args: any[]) {
+    //     console.log(this.timestamp + ' [' +
+    //         this.req.socket.remoteFamily + '-' +
+    //         this.req.socket.remoteAddress + '] ' +
+    //         format.apply(null, arguments)
+    //     );
+    // }
     error(str, ...args) {
-        this.errorLog('[' +
+        this.debugLog('[' +
             this.req.socket.remoteFamily + '-' + colors.FgMagenta +
             this.req.socket.remoteAddress + colors.Reset + '] ' +
             util_1.format.apply(null, arguments));

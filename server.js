@@ -13,7 +13,7 @@ process.on('uncaughtException', err => {
     console.error(util_1.inspect(err));
     console.error("caught process uncaughtException");
     fs.appendFile(path.join(__dirname, 'uncaughtException.log'), new Date().toISOString() + "\r\n" + util_1.inspect(err) + "\r\n\r\n");
-    //uncaughtExceptionThrown = true;
+    process.exitCode = 1;
 });
 //const globalInterval = setInterval(function () { }, 10000);
 console.debug = function () { }; //noop console debug;
@@ -70,24 +70,31 @@ const serveIcons = (function () {
 })();
 const favicon = path.resolve(__dirname, 'assets', 'favicon.ico');
 const stylesheet = path.resolve(__dirname, 'assets', 'directory.css');
-const server = http.createServer();
+const serverLocalHost = http.createServer();
+const serverNetwork = http.createServer();
 const un = settings.username;
 const pw = settings.password;
 const log = rx_1.Observable.bindNodeCallback(logger);
-const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(server, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
+const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 const routes = {
     'favicon.ico': doFaviconRoute,
     'directory.css': doStylesheetRoute,
     'icons': doIconRoute,
-    'admin': server_types_1.StateObject.errorRoute(404, 'Reserved for future use')
+    'admin': doAdminRoute
 };
-rx_1.Observable.fromEvent(server, 'request', (req, res) => {
+rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
-    return new server_types_1.StateObject(req, res, debug, error);
+    return new server_types_1.StateObject(req, res, debug, true);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
-}).map(state => {
+}), rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
+    if (!req || !res)
+        console.log('blank req or res');
+    return new server_types_1.StateObject(req, res, debug, false);
+}).takeUntil(serverClose).concatMap(state => {
+    return log(state.req, state.res).mapTo(state);
+})).map(state => {
     //check authentication and do sanity/security checks
     //https://github.com/hueniverse/iron
     //auth headers =====================
@@ -130,7 +137,8 @@ rx_1.Observable.fromEvent(server, 'request', (req, res) => {
     console.error('Uncaught error in the server route: ' + err.message);
     console.error(err.stack);
     console.error("the server will now close");
-    server.close();
+    serverNetwork.close();
+    serverLocalHost.close();
 }, () => {
     //theoretically we could rebind the listening port without restarting the process, 
     //but I don't know what would be the point of that. If this actually happens, 
@@ -170,7 +178,14 @@ function doIconRoute(obs) {
         }).mapTo(state);
     });
 }
-server.listen(settings.port, settings.host, function (err, res) {
+function doAdminRoute(obs) {
+    return obs.mergeMap(state => {
+        if (!state.isLocalHost)
+            return state.throw(403, "Admin is only accessible from localhost");
+        return state.throw(404, "Reserved for future use");
+    });
+}
+function serverListenCB(err, res) {
     if (err) {
         console.error('error on app.listen', err);
         return;
@@ -192,6 +207,12 @@ server.listen(settings.port, settings.host, function (err, res) {
     else {
         console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
     }
+}
+serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
+    if (settings.host !== "127.0.0.1")
+        serverNetwork.listen(settings.port, settings.host, serverListenCB);
+    else
+        serverListenCB(err, res);
 });
 /**
  * to be used with concatMap, mergeMap, etc.

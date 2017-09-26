@@ -1,9 +1,13 @@
 {
     // all comments need to be removed from this file
+    // all relative paths are resolved relative to the location
+    // of this file, whether specified on the command line or 
+    // using the default location
     "tree": {
         "dropbox": "C:\\Users\\Someone\\Dropbox\\TiddlyWiki",
         "tiddlywiki": "C:\\TiddlyWiki5-5.1.14",
         "relative": "../relative_to_settings_file",
+        "linux": "/home/ubuntu/",
         "branch": {
             "twig1": "C:/Some Folder",
             "twig2": "C:/Some Other Folder"

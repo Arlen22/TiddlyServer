@@ -89,7 +89,8 @@ const favicon = path.resolve(__dirname, 'assets', 'favicon.ico');
 const stylesheet = path.resolve(__dirname, 'assets', 'directory.css');
 
 
-const server = http.createServer();
+const serverLocalHost = http.createServer();
+const serverNetwork = http.createServer();
 
 const un = settings.username;
 const pw = settings.password;
@@ -97,22 +98,30 @@ const pw = settings.password;
 const log = Observable.bindNodeCallback<http.IncomingMessage, http.ServerResponse, void>(logger);
 
 const serverClose = Observable.merge(
-    Observable.fromEvent(server, 'close').take(1)
+    Observable.fromEvent(serverLocalHost, 'close').take(1),
+    Observable.fromEvent(serverNetwork, 'close').take(1)
 ).multicast(new Subject()).refCount();
 
 const routes = {
     'favicon.ico': doFaviconRoute,
     'directory.css': doStylesheetRoute,
     'icons': doIconRoute,
-    'admin': StateObject.errorRoute(404, 'Reserved for future use')
+    'admin': doAdminRoute
 };
-
-(Observable.fromEvent(server, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
-    if (!req || !res) console.log('blank req or res');
-    return new StateObject(req, res, debug, error);
-}) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
-    return log(state.req, state.res).mapTo(state);
-}).map(state => {
+Observable.merge(
+    (Observable.fromEvent(serverLocalHost, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
+        if (!req || !res) console.log('blank req or res');
+        return new StateObject(req, res, debug, true);
+    }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
+        return log(state.req, state.res).mapTo(state);
+    }),
+    (Observable.fromEvent(serverNetwork, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
+        if (!req || !res) console.log('blank req or res');
+        return new StateObject(req, res, debug, false);
+    }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
+        return log(state.req, state.res).mapTo(state);
+    })
+).map(state => {
     //check authentication and do sanity/security checks
     //https://github.com/hueniverse/iron
     //auth headers =====================
@@ -156,7 +165,8 @@ const routes = {
     console.error('Uncaught error in the server route: ' + err.message);
     console.error(err.stack);
     console.error("the server will now close");
-    server.close();
+    serverNetwork.close();
+    serverLocalHost.close();
 }, () => {
     //theoretically we could rebind the listening port without restarting the process, 
     //but I don't know what would be the point of that. If this actually happens, 
@@ -193,7 +203,16 @@ function doIconRoute(obs: Observable<StateObject>): any {
     })
 }
 
-server.listen(settings.port, settings.host, function (err: any, res: any) {
+function doAdminRoute(obs: Observable<StateObject>): any {
+    return obs.mergeMap(state => {
+        if(!state.isLocalHost) 
+            return state.throw(403, "Admin is only accessible from localhost");
+
+        return state.throw(404, "Reserved for future use");
+    })
+}
+
+function serverListenCB(err: any, res: any) {
     if (err) { console.error('error on app.listen', err); return; }
     console.log('Open your browser and type in one of the following:');
     if (!settings.host || settings.host === '0.0.0.0') {
@@ -211,7 +230,16 @@ server.listen(settings.port, settings.host, function (err: any, res: any) {
     } else {
         console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
     }
+}
+
+serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
+    if (settings.host !== "127.0.0.1")
+        serverNetwork.listen(settings.port, settings.host, serverListenCB);
+    else
+        serverListenCB(err, res);
 });
+
+
 /**
  * to be used with concatMap, mergeMap, etc.
  * @param state 
