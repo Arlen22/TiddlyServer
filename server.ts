@@ -20,7 +20,9 @@ process.on('uncaughtException', err => {
     console.error(inspect(err));
     console.error("caught process uncaughtException");
     fs.appendFile(path.join(__dirname, 'uncaughtException.log'),
-        new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n");
+        new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n", (err) => {
+            console.log('Could not write to uncaughtException.log');
+        });
     process.exitCode = 1;
 });
 

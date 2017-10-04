@@ -12,7 +12,9 @@ Error.stackTraceLimit = Infinity;
 process.on('uncaughtException', err => {
     console.error(util_1.inspect(err));
     console.error("caught process uncaughtException");
-    fs.appendFile(path.join(__dirname, 'uncaughtException.log'), new Date().toISOString() + "\r\n" + util_1.inspect(err) + "\r\n\r\n");
+    fs.appendFile(path.join(__dirname, 'uncaughtException.log'), new Date().toISOString() + "\r\n" + util_1.inspect(err) + "\r\n\r\n", (err) => {
+        console.log('Could not write to uncaughtException.log');
+    });
     process.exitCode = 1;
 });
 //const globalInterval = setInterval(function () { }, 10000);
