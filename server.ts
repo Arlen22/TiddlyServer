@@ -12,6 +12,7 @@ import * as path from 'path';
 import * as url from 'url';
 import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
+import { parse as jsonParse } from 'jsonlint';
 
 Error.stackTraceLimit = Infinity;
 
@@ -43,7 +44,7 @@ console.log("Settings file: %s", settingsFile);
 var settings: ServerConfig;
 
 try {
-    settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
+    settings = jsonParse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
 } catch (e) {
     console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed correctly" + colors.Reset);
     throw e;

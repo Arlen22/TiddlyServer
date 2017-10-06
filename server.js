@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const util_1 = require("util");
 const events_1 = require("events");
+const jsonlint_1 = require("jsonlint");
 Error.stackTraceLimit = Infinity;
 //let uncaughtExceptionThrown = false;
 process.on('uncaughtException', err => {
@@ -28,7 +29,7 @@ const settingsFile = path.resolve(process.argv[2] || 'settings.json');
 console.log("Settings file: %s", settingsFile);
 var settings;
 try {
-    settings = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+    settings = jsonlint_1.parse(fs.readFileSync(settingsFile, 'utf8'));
 }
 catch (e) {
     console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed correctly" + server_types_1.colors.Reset);
