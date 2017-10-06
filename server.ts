@@ -16,18 +16,17 @@ import { parse as jsonParse } from 'jsonlint';
 
 Error.stackTraceLimit = Infinity;
 
-//let uncaughtExceptionThrown = false;
 process.on('uncaughtException', err => {
     console.error(inspect(err));
     console.error("caught process uncaughtException");
     fs.appendFile(path.join(__dirname, 'uncaughtException.log'),
         new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n", (err) => {
-            console.log('Could not write to uncaughtException.log');
+            if(err) console.log('Could not write to uncaughtException.log');
         });
-    process.exitCode = 1;
+    if(process.argv[2] !== "--close-on-error" && process.argv[3] !== "--close-on-error")
+        setInterval(function(){}, 1000); //hold it open because all other listeners should close
 });
 
-//const globalInterval = setInterval(function () { }, 10000);
 
 console.debug = function () { }; //noop console debug;
 
@@ -42,14 +41,36 @@ const settingsFile = path.resolve(process.argv[2] || 'settings.json');
 console.log("Settings file: %s", settingsFile);
 
 var settings: ServerConfig;
+{
+    function findJSONError(message: string, json: string) {
 
-try {
-    settings = jsonParse(fs.readFileSync(settingsFile, 'utf8')) as ServerConfig;
-} catch (e) {
-    console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed correctly" + colors.Reset);
-    throw e;
+        const match = /position (\d+)/gi.exec(message);
+        if (!match) return;
+        const position = +match[1];
+        const lines = json.split('\n');
+        let current = 1;
+        let i = 0;
+        for(; i < lines.length; i++){
+            current += lines[i].length + 1; //add one for the new line
+            console.log(lines[i]);
+            if(current > position) break;
+        }
+        const linePos = lines[i].length - (current - position) - 1; //take the new line off again
+        //not sure why I need the +4 but it seems to hold out.
+        console.log(new Array(linePos + 4).join('-') + '^  ' + message);
+        for(i++; i < lines.length; i++){
+            console.log(lines[i]);
+        }
+    }
+    const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
+    try {
+        settings = JSON.parse(settingsString) as ServerConfig;
+    } catch (e) {
+        console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.message);
+        findJSONError(e.message, settingsString);
+        throw "The settings file could not be parsed: Invalid JSON";
+    }
 }
-
 if (!settings.tree) throw "tree is not specified in the settings file";
 
 const settingsDir = path.dirname(settingsFile);
@@ -94,6 +115,12 @@ const stylesheet = path.resolve(__dirname, 'assets', 'directory.css');
 
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
+
+process.on('uncaughtException', () => {
+    serverNetwork.close();
+    serverLocalHost.close();
+    console.log('closing server');
+})
 
 const un = settings.username;
 const pw = settings.password;
@@ -208,7 +235,7 @@ function doIconRoute(obs: Observable<StateObject>): any {
 
 function doAdminRoute(obs: Observable<StateObject>): any {
     return obs.mergeMap(state => {
-        if(!state.isLocalHost) 
+        if (!state.isLocalHost)
             return state.throw(403, "Admin is only accessible from localhost");
 
         return state.throw(404, "Reserved for future use");
