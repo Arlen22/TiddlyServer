@@ -58,6 +58,8 @@ For convenience, the "server" edition is also included as a separate download be
 
 ## settings.json
 
+Some users find the exact requirements of JSON to be somewhat difficult. If you get the error `The settings file could not be parsed correctly`, it means the settings file contains invalid JSON and could not be parsed. **It does not mean the settings are incorrect, rather that it cannot read them.** You can use a service like https://jsonlint.com/ to show you where the problem is in your JSON file -- just paste in your settings file and click Validate.
+
 ```json
 // these comments need to be removed for settings.json to parse correctly
 {
