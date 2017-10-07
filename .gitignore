@@ -5,3 +5,5 @@ node_modules/
 *.map
 uncaughtException.log
 /build/cache/*
+/.nexe/*
+/nexetest

@@ -81,6 +81,7 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
 function loadTiddlyWiki(prefix: string, folder: string) {
 
     console.time('twboot');
+    // const dynreq = "tiddlywiki";
     const $tw = require("tiddlywiki").TiddlyWiki();
     $tw.boot.argv = [folder];
     const execute = $tw.boot.executeNextStartupTask;
