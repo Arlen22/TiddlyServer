@@ -2,6 +2,10 @@
 
 The root folder is the repository folder.
 
+### Bundle
+
+The TiddlyWiki bundle contains all the parts required to run as a dependancy. The `editions` folder is not required and so is not included. The core is actually a plugin, and so is bundled the same as all the other plugins. `tiddlywiki.js` is optional.
+
 ### Mac OS X
 
 1. Download the latest node v6 binary from nodejs.org and put in root folder.
