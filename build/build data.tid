@@ -1,0 +1,5 @@
+; Mac OS X
+: 1. Download the latest node v6 binary from nodejs.org and put in root folder.
+: 2. Rename the root folder Contents and drop into a folder named Tiddlyserver.app.
+; Windows 
+: Build a launcher using nexe with a custom icon. 

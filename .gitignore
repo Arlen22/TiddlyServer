@@ -4,3 +4,4 @@ node_modules/
 /backup/
 *.map
 uncaughtException.log
+/build/cache/*

@@ -1,6 +1,6 @@
 #!/bin/bash
 read -d '' EXECUTE <<DACODE
-cd $(dirname "$0")/../../..
+cd $(dirname "$0")/..
 node server
 DACODE
 osascript -e "tell application \"Terminal\" to do script \"$EXECUTE\""
