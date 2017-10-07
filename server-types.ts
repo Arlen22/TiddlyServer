@@ -224,7 +224,7 @@ export class StateObject implements ThrowFunc<StateObject>{
         public req: http.IncomingMessage,
         public res: http.ServerResponse,
         private debugLog: LoggerFunc,
-        private readonly isLocalHost: boolean = false
+        public readonly isLocalHost: boolean = false
     ) {
         this.startTime = process.hrtime();
         //parse the url and store in state.
