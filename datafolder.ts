@@ -98,7 +98,13 @@ function loadTiddlyWiki(prefix: string, folder: string) {
     function complete() {
         console.timeEnd('twboot');
         //we use $tw.modules.execute so that the module has its respective $tw variable.
-        var serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
+        var serverCommand;
+        try {
+            serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
+        } catch (e) {
+            doError(prefix, folder, e);
+            return;
+        }
         var command = new serverCommand([], { wiki: $tw.wiki });
         var server = command.server;
 
@@ -129,18 +135,23 @@ function loadTiddlyWiki(prefix: string, folder: string) {
         $tw.boot.boot();
     } catch (err) {
         console.timeEnd('twboot');
-        error('error starting %s at %s: %s', prefix, folder, err.stack);
-        const requests = loadedFolders[prefix] as any[];
-        loadedFolders[prefix] = {
-            handler: function (req: http.IncomingMessage, res: http.ServerResponse) {
-                res.writeHead(500, "Tiddlywiki datafolder failed to load");
-                res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
-                    "after making any necessary corrections.");
-                res.end();
-            }
-        } as any;
-        requests.forEach(([req, res]) => {
-            (loadedFolders[prefix] as { handler: any }).handler(req, res);
-        })
+        doError(prefix, folder, err)
     }
 };
+
+function doError(prefix, folder, err){
+    error('error starting %s at %s: %s', prefix, folder, err.stack);
+    const requests = loadedFolders[prefix] as any[];
+    loadedFolders[prefix] = {
+        handler: function (req: http.IncomingMessage, res: http.ServerResponse) {
+            res.writeHead(500, "Tiddlywiki datafolder failed to load");
+            res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
+                "after making any necessary corrections.");
+            res.end();
+        }
+    } as any;
+    requests.forEach(([req, res]) => {
+        (loadedFolders[prefix] as { handler: any }).handler(req, res);
+    })
+
+}
