@@ -1,4 +1,4 @@
-## TiddlyServer 2.0 "Lite". 
+## TiddlyServer 2.0 "Lite"
 
 TiddlyServer 2.0 takes the server command of TiddlyWiki on NodeJS and adds it to a static file server. This means you can load and serve any TiddlyWiki data folder in the same way you can serve a single file TiddlyWiki. 
 
@@ -32,13 +32,15 @@ This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
 ## Major changes in master since last release
 
-None so far.
+`npm install` is no longer used. The user may still download TiddlyWiki and copy it into the repo under the `tiddlywiki` folder. This folder is ignored in `.gitignore`. Future releases will always include the bundled version.
 
 ## Installation
 
-Another TiddlyWiki user has written an install guide. It uses the source code version,  but once you follow the instructions below for the bundled version, you can still use his guide for settings.json. For now, check it out if these instructions are not clear enough.
+Another TiddlyWiki user has written an install guide. It is clear and concise, and will be useful for the average user.
 
 https://www.didaxy.com/introduction-to-tiddlyserver
+
+The instructions below are intended to be detailed and thorough, so read on if you're interested. 
 
 ### Bundled version
 
@@ -55,9 +57,11 @@ For convenience, the "server" edition is also included as a separate download be
  4. Open your terminal or command prompt and run `node server.js` or `node server.js /path/to/settings.json` or run `start.cmd`.
 
 ### Source code version
- 1. Download and unzip the source code from the latest release: https://github.com/Arlen22/TiddlyServer/releases
- 2. `npm install`
- 3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
+ 1. Download and unzip the source code from the latest release of TiddlyServer: https://github.com/Arlen22/TiddlyServer/releases
+ 2. Download and unzip the source code from the latest release of TiddlyWiki5 into the TiddlyServer folder: https://github.com/Jermolene/TiddlyWiki5/releases
+ 3. Rename the `TiddlyWiki5-x.x.x` folder to just `tiddlywiki`.
+ 3. Copy `example-settings.json` and rename it `settings.json`.
+ 4. Configure your tree with the actual folders you want to serve. See below for details on settings.json.
  4. `node server.js` (`npm start`) or `node server.js /path/to/settings.json`
 
 ## settings.json
