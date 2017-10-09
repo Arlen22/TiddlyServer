@@ -30,9 +30,10 @@ You will need to use the bookmarklet included in the directory pages to fix the 
 
 This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
-## Major changes in master since last release
+## Major changes since 2.0.6
 
-`npm install` is no longer used. The user may still download TiddlyWiki and copy it into the repo under the `tiddlywiki` folder. This folder is ignored in `.gitignore`. Future releases will always include the bundled version.
+* `npm install` is no longer used. The user may still download TiddlyWiki and copy it into the repo under the `tiddlywiki` folder. This folder is ignored in `.gitignore`. Future releases will always include the bundled version.
+* If `settings.json` fails to parse, a custom error message is now printed indicating which line the error indicates. This should enable users to track down problems in their `settings.json` file quicker.
 
 ## Installation
 
@@ -58,23 +59,23 @@ For convenience, the "server" edition is also included as a separate download be
 
 ### Source code version
  1. Download and unzip the source code from the latest release of TiddlyServer: https://github.com/Arlen22/TiddlyServer/releases
- 2. Download and unzip the source code from the latest release of TiddlyWiki5 into the TiddlyServer folder: https://github.com/Jermolene/TiddlyWiki5/releases
- 3. Rename the `TiddlyWiki5-x.x.x` folder to just `tiddlywiki`.
- 3. Copy `example-settings.json` and rename it `settings.json`.
- 4. Configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 4. `node server.js` (`npm start`) or `node server.js /path/to/settings.json`
+ 1. Download and unzip the source code from the latest release of TiddlyWiki5 into the TiddlyServer folder: https://github.com/Jermolene/TiddlyWiki5/releases
+ 1. Rename the `TiddlyWiki5-x.x.x` folder to just `tiddlywiki`.
+ 1. Copy `example-settings.json` and rename it `settings.json`.
+ 1. Configure your tree with the actual folders you want to serve. See below for details on settings.json.
+ 1. `node server.js` (`npm start`) or `node server.js /path/to/settings.json`
 
 ## settings.json
 
 Some users find the exact requirements of JSON to be somewhat difficult. If you get the error `The settings file could not be parsed correctly`, it means the settings file contains invalid JSON and could not be parsed. **It does not mean the settings are incorrect, rather that it cannot read them.** You can use a service like https://jsonlint.com/ to show you where the problem is in your JSON file -- just paste in your settings file and click Validate.
 
 ```json
-// these comments need to be removed for settings.json to parse correctly
+// all comments need to be removed for settings.json to parse correctly
 {
     "tree": { 
         "alias": "C:/my folder path",
         "alias2": {
-            "alias2child": "relative folder path"
+            "alias2child": "folder relative to settings file"
         }
     },
     "types":{  
@@ -87,13 +88,14 @@ Some users find the exact requirements of JSON to be somewhat difficult. If you 
     "backupDirectory": "" 
 }
 ```
-If not specified, backupDirectory, username and password are not set, and types, host and port are set to the values above. Tree must be specified.
+
+These are the default values, except for `tree`, which has no default value and must be specified in settings.json.
 
 All relative folder paths in settings.json are resolved relative to the settings.json file itself.
 
 Tree is an object and its children may be either object or string. If a child value is a string, it refers to a path that will be loaded for that alias. If it is an object, it is a sub tree.
 
-So `/alias2/alias2child/` would end up serving the folder named "relative folder path" next to the settings.json file, and `/alias` will load an absolute path on the file system.
+So `/alias2/alias2child/` would end up serving the folder named "folder relative to settings file" next to the settings.json file, and `/alias` will load an absolute path on the file system.
 
 There are a few aliases which cannot be used directly under tree as they are reserved for other things on the server. Currently they are `favicon.ico`, `directory.css`, `icons`, and `admin`. If tree contains any of these they will simply be ignored. This only applies to the top level tree, not to sub trees.
 
