@@ -64,11 +64,11 @@ function datafolder(obs) {
 }
 exports.datafolder = datafolder;
 function loadTiddlyWiki(prefix, folder) {
-    console.time('twboot');
+    console.time('twboot-' + folder);
     // const dynreq = "tiddlywiki";
     require("./boot-datafolder.js").DataFolder(prefix, folder, complete);
     function complete(err, $tw) {
-        console.timeEnd('twboot');
+        console.timeEnd('twboot-' + folder);
         if (err) {
             return doError(prefix, folder, err);
         }
@@ -112,9 +112,9 @@ function doError(prefix, folder, err) {
     const requests = loadedFolders[prefix];
     loadedFolders[prefix] = {
         handler: function (req, res) {
-            res.writeHead(500, "Tiddlywiki datafolder failed to load");
-            res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
-                "after making any necessary corrections.");
+            res.writeHead(500, "TW5 data folder failed");
+            res.write("The Tiddlywiki data folder failed to load. The error has been logged to the terminal. " +
+                " To try again, use ?reload=true after making any necessary corrections.");
             res.end();
         }
     };

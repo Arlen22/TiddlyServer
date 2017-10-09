@@ -80,13 +80,13 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
 
 function loadTiddlyWiki(prefix: string, folder: string) {
 
-    console.time('twboot');
+    console.time('twboot-' + folder);
     // const dynreq = "tiddlywiki";
     require("./boot-datafolder.js").DataFolder(prefix, folder, complete);
 
     function complete(err, $tw) {
-        console.timeEnd('twboot');
-		if (err) {
+        console.timeEnd('twboot-' + folder);
+        if (err) {
             return doError(prefix, folder, err);
         }
 
@@ -127,14 +127,14 @@ function loadTiddlyWiki(prefix: string, folder: string) {
 
 };
 
-function doError(prefix, folder, err){
+function doError(prefix, folder, err) {
     error('error starting %s at %s: %s', prefix, folder, err.stack);
     const requests = loadedFolders[prefix] as any[];
     loadedFolders[prefix] = {
         handler: function (req: http.IncomingMessage, res: http.ServerResponse) {
-            res.writeHead(500, "Tiddlywiki datafolder failed to load");
-            res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
-                "after making any necessary corrections.");
+            res.writeHead(500, "TW5 data folder failed");
+            res.write("The Tiddlywiki data folder failed to load. The error has been logged to the terminal. " +
+                " To try again, use ?reload=true after making any necessary corrections.");
             res.end();
         }
     } as any;
