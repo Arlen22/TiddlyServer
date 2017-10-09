@@ -1,22 +1,36 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-const server_types_1 = require("./server-types");
-const rx_1 = require("./lib/rx");
-const path = require("path");
-var settings = {};
-const debug = server_types_1.DebugLogger('DAT');
-const error = server_types_1.ErrorLogger('DAT');
-function init(eventer) {
-    eventer.on('settings', function (set) {
+import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger, ErrorLogger } from "./server-types";
+import { Observable } from "../lib/rx";
+
+import * as path from 'path';
+import * as http from 'http';
+//import { TiddlyWiki } from 'tiddlywiki';
+import { EventEmitter } from "events";
+
+var settings: ServerConfig = {} as any;
+
+const debug = DebugLogger('DAT');
+const error = ErrorLogger('DAT');
+
+export function init(eventer: EventEmitter) {
+    eventer.on('settings', function (set: ServerConfig) {
         settings = set;
-    });
+    })
 }
-exports.init = init;
-const loadedFolders = {};
-function quickArrayCheck(obj) {
+
+type FolderData = {
+    $tw: any, //$tw.global,
+    prefix: string,
+    folder: string,
+    server: any, //$tw.core.modules.commands.server.Server,
+    handler: (req: http.IncomingMessage, res: http.ServerResponse) => void;
+};
+const loadedFolders: { [k: string]: FolderData | ([http.IncomingMessage, http.ServerResponse])[] } = {};
+
+function quickArrayCheck(obj: any): obj is Array<any> {
     return typeof obj.length === 'number';
 }
-function datafolder(obs) {
+
+export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
     //warm the cache
     //require("tiddlywiki/boot/boot.js").TiddlyWiki();
     return obs.mergeMap(res => {
@@ -27,18 +41,18 @@ function datafolder(obs) {
          * filepath is the path relative to them
          */
         let { state, item, filepath, treepath } = tag;
+
         //get the actual path to the folder from filepath
         let filepathPrefix = filepath.split('/').slice(0, end).join('/');
         //get the tree path, and add the file path if there is one
         let fullPrefix = ["", treepath];
-        if (filepathPrefix)
-            fullPrefix.push(filepathPrefix);
+        if (filepathPrefix) fullPrefix.push(filepathPrefix);
         //join the parts and split into an array
         fullPrefix = fullPrefix.join('/').split('/');
         //use the unaltered path in the url as the tiddlywiki prefix
         let prefixURI = state.url.pathname.split('/').slice(0, fullPrefix.length).join('/');
         //get the full path to the folder as specified in the tree
-        let folder = path.join(item, filepathPrefix);
+        let folder = path.join(item as string, filepathPrefix);
         //initialize the tiddlywiki instance
         if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
             loadedFolders[prefixURI] = [];
@@ -50,20 +64,22 @@ function datafolder(obs) {
         if (isFullpath && !state.url.pathname.endsWith("/") || state.url.query.reload === "true") {
             state.res.writeHead(302, { 'Location': prefixURI + "/" });
             state.res.end();
-            return rx_1.Observable.empty();
+            return Observable.empty();
         }
+
         const load = loadedFolders[prefixURI];
         if (Array.isArray(load)) {
             load.push([state.req, state.res]);
-        }
-        else {
+        } else {
             load.handler(state.req, state.res);
         }
-        return rx_1.Observable.empty();
-    });
+
+        return Observable.empty<StateObject>();
+    })
 }
-exports.datafolder = datafolder;
-function loadTiddlyWiki(prefix, folder) {
+
+function loadTiddlyWiki(prefix: string, folder: string) {
+
     console.time('twboot');
     // const dynreq = "tiddlywiki";
     const $tw = require("tiddlywiki").TiddlyWiki();
@@ -72,10 +88,9 @@ function loadTiddlyWiki(prefix, folder) {
     $tw.boot.executeNextStartupTask = function () {
         const res = execute();
         //call setImmediate to make sure we are out of the boot try...catch below
-        if (!res)
-            setImmediate(complete);
+        if (!res) setImmediate(complete);
         return true;
-    };
+    }
     $tw.preloadTiddler({
         "text": "$protocol$//$host$" + prefix + "/",
         "title": "$:/config/tiddlyweb/host"
@@ -86,13 +101,13 @@ function loadTiddlyWiki(prefix, folder) {
         var serverCommand;
         try {
             serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
-        }
-        catch (e) {
+        } catch (e) {
             doError(prefix, folder, e);
             return;
         }
         var command = new serverCommand([], { wiki: $tw.wiki });
         var server = command.server;
+
         server.set({
             rootTiddler: "$:/core/save/all",
             renderType: "text/plain",
@@ -101,7 +116,7 @@ function loadTiddlyWiki(prefix, folder) {
             password: "",
             pathprefix: prefix
         });
-        const requests = loadedFolders[prefix];
+        const requests = loadedFolders[prefix] as any[];
         const handler = server.requestHandler.bind(server);
         loadedFolders[prefix] = {
             $tw,
@@ -109,33 +124,34 @@ function loadTiddlyWiki(prefix, folder) {
             folder,
             server,
             handler
-        };
+        }
         //send the requests to the handler
         requests.forEach(e => {
             handler(e[0], e[1]);
-        });
+        })
     }
+
     try {
         $tw.boot.boot();
-    }
-    catch (err) {
+    } catch (err) {
         console.timeEnd('twboot');
-        doError(prefix, folder, err);
+        doError(prefix, folder, err)
     }
-}
-;
-function doError(prefix, folder, err) {
+};
+
+function doError(prefix, folder, err){
     error('error starting %s at %s: %s', prefix, folder, err.stack);
-    const requests = loadedFolders[prefix];
+    const requests = loadedFolders[prefix] as any[];
     loadedFolders[prefix] = {
-        handler: function (req, res) {
+        handler: function (req: http.IncomingMessage, res: http.ServerResponse) {
             res.writeHead(500, "Tiddlywiki datafolder failed to load");
             res.write("The Tiddlywiki data folder failed to load. To try again, use ?reload=true " +
                 "after making any necessary corrections.");
             res.end();
         }
-    };
+    } as any;
     requests.forEach(([req, res]) => {
-        loadedFolders[prefix].handler(req, res);
-    });
+        (loadedFolders[prefix] as { handler: any }).handler(req, res);
+    })
+
 }

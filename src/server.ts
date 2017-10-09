@@ -1,5 +1,5 @@
 
-import { Observable, Subject, Subscription, BehaviorSubject, Subscriber } from './lib/rx';
+import { Observable, Subject, Subscription, BehaviorSubject, Subscriber } from '../lib/rx';
 
 import {
     StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
@@ -14,6 +14,9 @@ import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 import { parse as jsonParse } from 'jsonlint';
 
+__dirname = path.dirname(module.filename || process.execPath);
+console.log(__dirname);
+
 Error.stackTraceLimit = Infinity;
 
 process.on('uncaughtException', err => {
@@ -21,10 +24,10 @@ process.on('uncaughtException', err => {
     console.error("caught process uncaughtException");
     fs.appendFile(path.join(__dirname, 'uncaughtException.log'),
         new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n", (err) => {
-            if(err) console.log('Could not write to uncaughtException.log');
+            if (err) console.log('Could not write to uncaughtException.log');
         });
-    if(process.argv[2] !== "--close-on-error" && process.argv[3] !== "--close-on-error")
-        setInterval(function(){}, 1000); //hold it open because all other listeners should close
+    if (process.argv[2] !== "--close-on-error" && process.argv[3] !== "--close-on-error")
+        setInterval(function () { }, 1000); //hold it open because all other listeners should close
 });
 
 
@@ -34,9 +37,11 @@ console.debug = function () { }; //noop console debug;
 const eventer = new EventEmitter();
 const debug = DebugLogger('APP');
 const error = ErrorLogger('APP');
-const logger = require('./lib/morgan.js').handler;
+const logger = require('../lib/morgan.js').handler;
 
-const settingsFile = path.resolve(process.argv[2] || 'settings.json');
+const settingsFile = path.normalize(process.argv[2]
+    ? path.resolve(process.argv[2])
+    : path.join(__dirname, '../settings.json'));
 
 console.log("Settings file: %s", settingsFile);
 
@@ -50,15 +55,15 @@ var settings: ServerConfig;
         const lines = json.split('\n');
         let current = 1;
         let i = 0;
-        for(; i < lines.length; i++){
+        for (; i < lines.length; i++) {
             current += lines[i].length + 1; //add one for the new line
             console.log(lines[i]);
-            if(current > position) break;
+            if (current > position) break;
         }
         const linePos = lines[i].length - (current - position) - 1; //take the new line off again
         //not sure why I need the +4 but it seems to hold out.
         console.log(new Array(linePos + 4).join('-') + '^  ' + message);
-        for(i++; i < lines.length; i++){
+        for (i++; i < lines.length; i++) {
             console.log(lines[i]);
         }
     }
@@ -100,8 +105,8 @@ initAPIAccess(eventer);
 eventer.emit('settings', settings);
 
 const serveIcons = (function () {
-    const nodeStatic = require('./lib/node-static');
-    var serve = new nodeStatic.Server(path.join(__dirname, 'icons'), { mount: '/icons' });
+    const nodeStatic = require('../lib/node-static');
+    var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
     return Observable.bindCallback<http.IncomingMessage, http.ServerResponse, any>(
         function () {
             return serve.serve.apply(serve, arguments);
@@ -109,9 +114,10 @@ const serveIcons = (function () {
     );
 })();
 
-const favicon = path.resolve(__dirname, 'assets', 'favicon.ico');
-const stylesheet = path.resolve(__dirname, 'assets', 'directory.css');
+const favicon = path.resolve(__dirname, '../assets/favicon.ico');
+const stylesheet = path.resolve(__dirname, '../assets/directory.css');
 
+console.log(__dirname, favicon, stylesheet);
 
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
