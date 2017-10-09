@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const rx_1 = require("./lib/rx");
+const rx_1 = require("../lib/rx");
 const server_types_1 = require("./server-types");
 const fs = require("fs");
 const path = require("path");
@@ -8,7 +8,7 @@ const zlib = require("zlib");
 const crypto_1 = require("crypto");
 const datafolder_1 = require("./datafolder");
 const util_1 = require("util");
-const mime = require('./lib/mime');
+const mime = require('../lib/mime');
 const error = server_types_1.ErrorLogger("SER-API");
 function parsePath(path, jsonFile) {
     var regCheck = /${([^}])}/gi;

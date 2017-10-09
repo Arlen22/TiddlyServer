@@ -1,4 +1,4 @@
-import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "./lib/rx";
+import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
 import {
     StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
     Directory, sortBySelector, serveStatic, obs_stat, obs_readdir, FolderEntryType, ErrorLogger
@@ -10,7 +10,7 @@ import * as http from 'http';
 import * as zlib from 'zlib';
 
 import { createHash } from 'crypto';
-import { Mime } from './lib/mime';
+import { Mime } from '../lib/mime';
 
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
@@ -18,7 +18,7 @@ import { EventEmitter } from "events";
 import { datafolder, init as initTiddlyWiki } from "./datafolder";
 import { format } from "util";
 
-const mime: Mime = require('./lib/mime');
+const mime: Mime = require('../lib/mime');
 
 const error = ErrorLogger("SER-API");
 

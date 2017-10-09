@@ -1,5 +1,5 @@
 import { StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger, ErrorLogger } from "./server-types";
-import { Observable } from "./lib/rx";
+import { Observable } from "../lib/rx";
 
 import * as path from 'path';
 import * as http from 'http';

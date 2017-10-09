@@ -3,7 +3,7 @@ import * as url from 'url';
 import * as fs from 'fs';
 
 import { format } from "util";
-import { Observable, Subscriber } from './lib/rx';
+import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 
@@ -128,7 +128,7 @@ export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => 
         respond(...args: any[]): any;
         finish(...args: any[]): any;
     }
-    const staticServer = require('./lib/node-static');
+    const staticServer = require('../lib/node-static');
     const serve = new staticServer.Server({ mount: '/' }) as Server;
     const promise = new EventEmitter();
     return function (path: string, state: StateObject, stat: fs.Stats) {

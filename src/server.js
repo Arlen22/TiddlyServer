@@ -1,12 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const rx_1 = require("./lib/rx");
+const rx_1 = require("../lib/rx");
 const server_types_1 = require("./server-types");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const util_1 = require("util");
 const events_1 = require("events");
+__dirname = path.dirname(module.filename || process.execPath);
+console.log(__dirname);
 Error.stackTraceLimit = Infinity;
 process.on('uncaughtException', err => {
     console.error(util_1.inspect(err));
@@ -23,8 +25,10 @@ console.debug = function () { }; //noop console debug;
 const eventer = new events_1.EventEmitter();
 const debug = server_types_1.DebugLogger('APP');
 const error = server_types_1.ErrorLogger('APP');
-const logger = require('./lib/morgan.js').handler;
-const settingsFile = path.resolve(process.argv[2] || 'settings.json');
+const logger = require('../lib/morgan.js').handler;
+const settingsFile = path.normalize(process.argv[2]
+    ? path.resolve(process.argv[2])
+    : path.join(__dirname, '../settings.json'));
 console.log("Settings file: %s", settingsFile);
 var settings;
 {
@@ -89,14 +93,15 @@ api_access_1.init(eventer);
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
 const serveIcons = (function () {
-    const nodeStatic = require('./lib/node-static');
-    var serve = new nodeStatic.Server(path.join(__dirname, 'icons'), { mount: '/icons' });
+    const nodeStatic = require('../lib/node-static');
+    var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
     return rx_1.Observable.bindCallback(function () {
         return serve.serve.apply(serve, arguments);
     }, (err, res) => [err, res]);
 })();
-const favicon = path.resolve(__dirname, 'assets', 'favicon.ico');
-const stylesheet = path.resolve(__dirname, 'assets', 'directory.css');
+const favicon = path.resolve(__dirname, '../assets/favicon.ico');
+const stylesheet = path.resolve(__dirname, '../assets/directory.css');
+console.log(__dirname, favicon, stylesheet);
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
 process.on('uncaughtException', () => {

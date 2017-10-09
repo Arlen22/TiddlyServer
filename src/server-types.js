@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const url = require("url");
 const fs = require("fs");
 const util_1 = require("util");
-const rx_1 = require("./lib/rx");
+const rx_1 = require("../lib/rx");
 const events_1 = require("events");
 function keys(o) {
     return Object.keys(o);
@@ -96,7 +96,7 @@ function handleProgrammersException(logger, err, message) {
 }
 exports.handleProgrammersException = handleProgrammersException;
 exports.serveStatic = (function () {
-    const staticServer = require('./lib/node-static');
+    const staticServer = require('../lib/node-static');
     const serve = new staticServer.Server({ mount: '/' });
     const promise = new events_1.EventEmitter();
     return function (path, state, stat) {

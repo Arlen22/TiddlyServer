@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const server_types_1 = require("./server-types");
-const rx_1 = require("./lib/rx");
+const rx_1 = require("../lib/rx");
 const path = require("path");
 var settings = {};
 const debug = server_types_1.DebugLogger('DAT');

@@ -5,7 +5,7 @@ $tw.saverHandler.savers[saver].__proto__.uri = function () { return decodeURI(en
 $tw.saverHandler.savers[saver] = $tw.modules.types.saver['$:/core/modules/savers/put.js'].exports.create();
 })($tw.saverHandler.savers.findIndex(e => e.info.name === 'put'))`;
 
-const info = require('./package.json');
+const info = require('../package.json');
 
 exports.generateDirectoryListing = function (directory) {
     function listEntries(entries) {
