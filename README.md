@@ -59,6 +59,7 @@ For convenience, the "server" edition is also included as a separate download be
 ### Source code version
  1. Download and unzip the source code from the latest release of TiddlyServer: https://github.com/Arlen22/TiddlyServer/releases
  1. Download and unzip the source code from the latest release of TiddlyWiki5 into the TiddlyServer folder: https://github.com/Jermolene/TiddlyWiki5/releases
+    * Or run `npm install`, then move the tiddlywiki folder from *inside* the node_modules folder to *beside* it. After that you may delete the node_modules folder.
  1. Rename the `TiddlyWiki5-x.x.x` folder to just `tiddlywiki`.
  1. Copy `example-settings.json` and rename it `settings.json`.
  1. Configure your tree with the actual folders you want to serve. See below for details on settings.json.
