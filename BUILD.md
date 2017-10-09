@@ -8,6 +8,8 @@ The TiddlyWiki bundle contains all the parts required to run as a dependancy. Th
 
 ### Mac OS X
 
+We're still working on this one.
+
 1. Download the latest node v6 binary from nodejs.org and put in root folder.
 2. Rename the root folder `Contents` and drop into a folder named Tiddlyserver.app.
 
