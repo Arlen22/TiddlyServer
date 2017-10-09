@@ -30,10 +30,9 @@ You will need to use the bookmarklet included in the directory pages to fix the 
 
 This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
-## Major changes since 2.0.6
+## Major changes since 2.0.7
 
-* `npm install` is no longer used. The user may still download TiddlyWiki and copy it into the repo under the `tiddlywiki` folder. This folder is ignored in `.gitignore`. Future releases will always include the bundled version.
-* If `settings.json` fails to parse, a custom error message is now printed indicating which line the error indicates. This should enable users to track down problems in their `settings.json` file quicker.
+None so far.
 
 ## Installation
 
