@@ -82,7 +82,9 @@ function loadTiddlyWiki(prefix: string, folder: string) {
 
     console.time('twboot');
     // const dynreq = "tiddlywiki";
-    const $tw = require("tiddlywiki").TiddlyWiki();
+    const $tw = require("tiddlywiki").TiddlyWiki({
+        packageInfo: require('./tiddlywiki-package.json')
+    });
     $tw.boot.argv = [folder];
     const execute = $tw.boot.executeNextStartupTask;
     $tw.boot.executeNextStartupTask = function () {
