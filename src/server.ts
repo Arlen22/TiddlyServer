@@ -1,5 +1,6 @@
-
-import { Observable, Subject, Subscription, BehaviorSubject, Subscriber } from '../lib/rx';
+import { 
+    Observable, Subject, Subscription, BehaviorSubject, Subscriber 
+} from '../lib/rx';
 
 import {
     StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
@@ -15,7 +16,6 @@ import { EventEmitter } from 'events';
 import { parse as jsonParse } from 'jsonlint';
 
 __dirname = path.dirname(module.filename || process.execPath);
-console.log(__dirname);
 
 Error.stackTraceLimit = Infinity;
 
@@ -116,8 +116,6 @@ const serveIcons = (function () {
 
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
-
-console.log(__dirname, favicon, stylesheet);
 
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();

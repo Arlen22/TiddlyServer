@@ -8,7 +8,6 @@ const path = require("path");
 const util_1 = require("util");
 const events_1 = require("events");
 __dirname = path.dirname(module.filename || process.execPath);
-console.log(__dirname);
 Error.stackTraceLimit = Infinity;
 process.on('uncaughtException', err => {
     console.error(util_1.inspect(err));
@@ -101,7 +100,6 @@ const serveIcons = (function () {
 })();
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
-console.log(__dirname, favicon, stylesheet);
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
 process.on('uncaughtException', () => {
