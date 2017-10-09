@@ -10,6 +10,7 @@ const datafolder_1 = require("./datafolder");
 const util_1 = require("util");
 const mime = require('../lib/mime');
 const error = server_types_1.ErrorLogger("SER-API");
+__dirname = path.dirname(module.filename || process.execPath);
 function parsePath(path, jsonFile) {
     var regCheck = /${([^}])}/gi;
     path.replace(regCheck, (str, pathVar) => {

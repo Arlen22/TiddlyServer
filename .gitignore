@@ -7,3 +7,5 @@ uncaughtException.log
 /build/cache/*
 /.nexe/*
 /nexetest
+/tiddlywiki
+*.exe

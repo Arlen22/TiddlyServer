@@ -21,6 +21,7 @@ import { format } from "util";
 const mime: Mime = require('../lib/mime');
 
 const error = ErrorLogger("SER-API");
+__dirname = path.dirname(module.filename || process.execPath);
 
 export function parsePath(path: string, jsonFile: string) {
     var regCheck = /${([^}])}/gi;

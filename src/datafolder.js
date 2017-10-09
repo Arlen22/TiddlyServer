@@ -66,22 +66,12 @@ exports.datafolder = datafolder;
 function loadTiddlyWiki(prefix, folder) {
     console.time('twboot');
     // const dynreq = "tiddlywiki";
-    const $tw = require("tiddlywiki").TiddlyWiki();
-    $tw.boot.argv = [folder];
-    const execute = $tw.boot.executeNextStartupTask;
-    $tw.boot.executeNextStartupTask = function () {
-        const res = execute();
-        //call setImmediate to make sure we are out of the boot try...catch below
-        if (!res)
-            setImmediate(complete);
-        return true;
-    };
-    $tw.preloadTiddler({
-        "text": "$protocol$//$host$" + prefix + "/",
-        "title": "$:/config/tiddlyweb/host"
-    });
-    function complete() {
+    require("./boot-datafolder.js").DataFolder(prefix, folder, complete);
+    function complete(err, $tw) {
         console.timeEnd('twboot');
+        if (err) {
+            return doError(prefix, folder, err);
+        }
         //we use $tw.modules.execute so that the module has its respective $tw variable.
         var serverCommand;
         try {
@@ -114,13 +104,6 @@ function loadTiddlyWiki(prefix, folder) {
         requests.forEach(e => {
             handler(e[0], e[1]);
         });
-    }
-    try {
-        $tw.boot.boot();
-    }
-    catch (err) {
-        console.timeEnd('twboot');
-        doError(prefix, folder, err);
     }
 }
 ;
