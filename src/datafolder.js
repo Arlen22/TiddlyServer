@@ -87,7 +87,7 @@ function loadTiddlyWiki(prefix, folder) {
             rootTiddler: "$:/core/save/all",
             renderType: "text/plain",
             serveType: "text/html",
-            username: "",
+            username: settings.username,
             password: "",
             pathprefix: prefix
         });
