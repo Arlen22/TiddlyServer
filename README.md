@@ -32,7 +32,7 @@ This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
 ## Major changes since 2.0.7
 
-None so far.
+* TiddlyServer now correctly uses the username specified in `settings.json` for signing edits in data folders.
 
 ## Installation
 
