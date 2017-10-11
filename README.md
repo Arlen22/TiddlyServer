@@ -36,6 +36,8 @@ This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
 ## Installation
 
+If upgrading from a previous release of TiddlyServer, do not copy the new files into the old distribution. Unzip the new folder and only copy `settings.json` into it from the old folder. 
+
 Another TiddlyWiki user has written an install guide. It is clear and concise, and will be useful for the average user.
 
 https://www.didaxy.com/introduction-to-tiddlyserver
