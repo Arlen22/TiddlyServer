@@ -155,7 +155,9 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     debug('authorization successful');
     // securityChecks =====================
     return state;
-}).filter(server_types_1.obsTruthy).routeCase(state => {
+}).filter(server_types_1.obsTruthy).map(state => {
+    return state;
+}).routeCase(state => {
     return state.path[1];
 }, routes, api_access_1.doAPIAccessRoute).subscribe((state) => {
     if (!state)

@@ -129,7 +129,11 @@ export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => 
         finish(...args: any[]): any;
     }
     const staticServer = require('../lib/node-static');
-    const serve = new staticServer.Server({ mount: '/' }) as Server;
+    const serve = new staticServer.Server({ 
+        mount: '/'
+        // gzipTransfer: true, 
+        // gzip:/^(text\/html|application\/javascript|text\/css|application\/json)$/gi 
+    }) as Server;
     const promise = new EventEmitter();
     return function (path: string, state: StateObject, stat: fs.Stats) {
         const { req, res } = state;
@@ -237,9 +241,6 @@ export class StateObject implements ThrowFunc<StateObject>{
         this.timestamp = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
 
-        // this.isLocalHost = () => {
-        //     return islocalhost;
-        // }
     }
     debug(str: string, ...args: any[]) {
         this.debugLog('[' +

@@ -1,5 +1,5 @@
-import { 
-    Observable, Subject, Subscription, BehaviorSubject, Subscriber 
+import {
+    Observable, Subject, Subscription, BehaviorSubject, Subscriber
 } from '../lib/rx';
 
 import {
@@ -183,7 +183,9 @@ Observable.merge(
     // securityChecks =====================
 
     return state;
-}).filter(obsTruthy).routeCase<StateObject>(state => {
+}).filter(obsTruthy).map(state => {
+    return state;
+}).routeCase<StateObject>(state => {
     return state.path[1];
 }, routes, doAPIAccessRoute).subscribe((state: StateObject) => {
     if (!state) return;// console.log('blank item');

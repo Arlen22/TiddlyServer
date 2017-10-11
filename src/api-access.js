@@ -339,7 +339,18 @@ function file(obs) {
                     subscriber.complete();
                 }
             }).switchMap(() => {
-                const stream = fs.createWriteStream(fullpath);
+                let stream = fs.createWriteStream(fullpath);
+                if (state.req.headers["content-encoding"]) {
+                    const encoding = state.req.headers["content-encoding"].split(', ');
+                    encoding.forEach(e => {
+                        if (e.trim() === "gzip") {
+                            stream = stream.pipe(zlib.createGzip());
+                        }
+                        else {
+                            state.throw(415, "Only gzip is supported by this server");
+                        }
+                    });
+                }
                 const write = state.req.pipe(stream);
                 const finish = rx_1.Observable.fromEvent(write, 'finish').take(1);
                 return rx_1.Observable.merge(finish, rx_1.Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err) => {

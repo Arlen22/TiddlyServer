@@ -17,6 +17,7 @@ import { EventEmitter } from "events";
 
 import { datafolder, init as initTiddlyWiki } from "./datafolder";
 import { format } from "util";
+import { Stream, Writable } from "stream";
 
 const mime: Mime = require('../lib/mime');
 
@@ -365,8 +366,18 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
                     subscriber.complete();
                 }
             }).switchMap(() => {
-                const stream = fs.createWriteStream(fullpath);
-                const write = state.req.pipe(stream);
+                let stream: Stream = state.req;
+                // if (state.req.headers["content-encoding"]) {
+                //     const encoding: (string)[] = state.req.headers["content-encoding"].split(', ');
+                //     encoding.forEach(e => {
+                //         if (e.trim() === "gzip") {
+                //             stream = stream.pipe(zlib.createGunzip());
+                //         } else {
+                //             state.throw(415, "Only gzip is supported by this server");
+                //         }
+                //     })
+                // }
+                const write = stream.pipe(fs.createWriteStream(fullpath));
                 const finish = Observable.fromEvent(write, 'finish').take(1);
                 return Observable.merge(finish, Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err: Error) => {
                     if (err) {

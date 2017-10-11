@@ -97,7 +97,11 @@ function handleProgrammersException(logger, err, message) {
 exports.handleProgrammersException = handleProgrammersException;
 exports.serveStatic = (function () {
     const staticServer = require('../lib/node-static');
-    const serve = new staticServer.Server({ mount: '/' });
+    const serve = new staticServer.Server({
+        mount: '/',
+        // gzipTransfer: true, 
+        gzip: /^(text\/html|application\/javascript|text\/css|application\/json)$/gi
+    });
     const promise = new events_1.EventEmitter();
     return function (path, state, stat) {
         const { req, res } = state;
@@ -143,9 +147,6 @@ class StateObject {
         this.path = this.url.pathname.split('/');
         let t = new Date();
         this.timestamp = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        // this.isLocalHost = () => {
-        //     return islocalhost;
-        // }
     }
     static errorRoute(status, reason) {
         return (obs) => {
