@@ -97,6 +97,7 @@ if (!settings.host) settings.host = "127.0.0.1";
 if (!settings.types) settings.types = {
     "htmlfile": ["htm", "html"]
 }
+if (!settings.requireEtag) settings.requireEtag = false;
 //import and init api-access
 import { doAPIAccessRoute, init as initAPIAccess } from './api-access';
 initAPIAccess(eventer);

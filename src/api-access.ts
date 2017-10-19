@@ -327,7 +327,14 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
                 if (isError) state.throw(result.status, result.message, result.headers);
             }).ignoreElements()
         } else if (state.req.method === "PUT") {
-            if (state.req.headers['if-match'] && (state.req.headers['if-match'] !== etag)) {
+            if ((state.req.headers['if-match'] || settings.requireEtag) && (state.req.headers['if-match'] !== etag)) {
+                const ifmatch = state.req.headers['if-match'].split('-');
+                const _etag = etag.split('-');
+                console.log('412 ifmatch %s', state.req.headers['if-match']);
+                console.log('412 etag %s', etag);
+                ifmatch.forEach((e,i) => {
+                    if(_etag[i] !== e) console.log("412 caused by difference in %s", ['inode', 'size', 'modified'][i])
+                })
                 return state.throw(412);
             }
             return new Observable((subscriber) => {

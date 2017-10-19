@@ -303,7 +303,8 @@ export interface ServerConfig {
     password?: string,
     host: string,
     port: number | 8080,
-    backupDirectory?: string
+    backupDirectory?: string,
+    requireEtag?: boolean
 }
 
 export interface AccessPathResult<T> {

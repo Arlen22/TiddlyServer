@@ -301,7 +301,15 @@ function file(obs) {
             }).ignoreElements();
         }
         else if (state.req.method === "PUT") {
-            if (state.req.headers['if-match'] && (state.req.headers['if-match'] !== etag)) {
+            if ((state.req.headers['if-match'] || settings.requireEtag) && (state.req.headers['if-match'] !== etag)) {
+                const ifmatch = state.req.headers['if-match'].split('-');
+                const _etag = etag.split('-');
+                console.log('412 ifmatch %s', state.req.headers['if-match']);
+                console.log('412 etag %s', etag);
+                ifmatch.forEach((e, i) => {
+                    if (_etag[i] !== e)
+                        console.log("412 caused by difference in %s", ['inode', 'size', 'modified'][i]);
+                });
                 return state.throw(412);
             }
             return new rx_1.Observable((subscriber) => {
@@ -339,19 +347,18 @@ function file(obs) {
                     subscriber.complete();
                 }
             }).switchMap(() => {
-                let stream = fs.createWriteStream(fullpath);
-                if (state.req.headers["content-encoding"]) {
-                    const encoding = state.req.headers["content-encoding"].split(', ');
-                    encoding.forEach(e => {
-                        if (e.trim() === "gzip") {
-                            stream = stream.pipe(zlib.createGzip());
-                        }
-                        else {
-                            state.throw(415, "Only gzip is supported by this server");
-                        }
-                    });
-                }
-                const write = state.req.pipe(stream);
+                let stream = state.req;
+                // if (state.req.headers["content-encoding"]) {
+                //     const encoding: (string)[] = state.req.headers["content-encoding"].split(', ');
+                //     encoding.forEach(e => {
+                //         if (e.trim() === "gzip") {
+                //             stream = stream.pipe(zlib.createGunzip());
+                //         } else {
+                //             state.throw(415, "Only gzip is supported by this server");
+                //         }
+                //     })
+                // }
+                const write = stream.pipe(fs.createWriteStream(fullpath));
                 const finish = rx_1.Observable.fromEvent(write, 'finish').take(1);
                 return rx_1.Observable.merge(finish, rx_1.Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err) => {
                     if (err) {

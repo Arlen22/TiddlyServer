@@ -98,9 +98,9 @@ exports.handleProgrammersException = handleProgrammersException;
 exports.serveStatic = (function () {
     const staticServer = require('../lib/node-static');
     const serve = new staticServer.Server({
-        mount: '/',
+        mount: '/'
         // gzipTransfer: true, 
-        gzip: /^(text\/html|application\/javascript|text\/css|application\/json)$/gi
+        // gzip:/^(text\/html|application\/javascript|text\/css|application\/json)$/gi 
     });
     const promise = new events_1.EventEmitter();
     return function (path, state, stat) {

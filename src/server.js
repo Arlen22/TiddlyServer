@@ -86,6 +86,8 @@ if (!settings.types)
     settings.types = {
         "htmlfile": ["htm", "html"]
     };
+if (!settings.requireEtag)
+    settings.requireEtag = false;
 //import and init api-access
 const api_access_1 = require("./api-access");
 api_access_1.init(eventer);
