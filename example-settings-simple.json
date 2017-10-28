@@ -1,0 +1,10 @@
+{
+	"tree": {
+		"data": "data"
+	},
+	"username": "",
+	"password": "",
+	"host": "127.0.0.1",
+	"port": 8080,
+	"backupDirectory": "backup"
+}

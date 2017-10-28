@@ -304,7 +304,8 @@ export interface ServerConfig {
     host: string,
     port: number | 8080,
     backupDirectory?: string,
-    requireEtag?: boolean
+    etag?: "required" | "disabled", //otherwise if present
+    etagWindow: number
 }
 
 export interface AccessPathResult<T> {

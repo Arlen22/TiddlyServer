@@ -301,7 +301,7 @@ function file(obs) {
             }).ignoreElements();
         }
         else if (state.req.method === "PUT") {
-            if ((state.req.headers['if-match'] || settings.requireEtag) && (state.req.headers['if-match'] !== etag)) {
+            if (settings.etag !== "disabled" && (state.req.headers['if-match'] || settings.etag === "required") && (state.req.headers['if-match'] !== etag)) {
                 const ifmatch = state.req.headers['if-match'].split('-');
                 const _etag = etag.split('-');
                 console.log('412 ifmatch %s', state.req.headers['if-match']);
@@ -310,7 +310,11 @@ function file(obs) {
                     if (_etag[i] !== e)
                         console.log("412 caused by difference in %s", ['inode', 'size', 'modified'][i]);
                 });
-                return state.throw(412);
+                let headTime = +ifmatch[2];
+                let diskTime = mtime;
+                if (!settings.etagWindow || diskTime - (settings.etagWindow * 1000) > headTime)
+                    return state.throw(412);
+                console.log('412 prevented by etagWindow of %s seconds', settings.etagWindow);
             }
             return new rx_1.Observable((subscriber) => {
                 if (settings.backupDirectory) {
