@@ -86,6 +86,8 @@ if (!settings.types)
     settings.types = {
         "htmlfile": ["htm", "html"]
     };
+if (!settings.etag)
+    settings.etag = "";
 if (!settings.etagWindow)
     settings.etagWindow = 0;
 if (settings.etag === "disabled" && !settings.backupDirectory)

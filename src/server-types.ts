@@ -304,7 +304,7 @@ export interface ServerConfig {
     host: string,
     port: number | 8080,
     backupDirectory?: string,
-    etag?: "required" | "disabled", //otherwise if present
+    etag: "required" | "disabled" | "", //otherwise if present
     etagWindow: number
 }
 
