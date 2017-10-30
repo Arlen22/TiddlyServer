@@ -91,12 +91,12 @@ if (!settings.etag)
 if (!settings.etagWindow)
     settings.etagWindow = 0;
 if (settings.etag === "disabled" && !settings.backupDirectory)
-    console.log('Etag checking is disabled, but a backup folder is not set. \
-    Changes made in multiple tabs/windows/browsers/computers can overwrite each \
-    other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED \
-    BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can \
-    also set the etagWindow setting to allow files to be modified if not newer than \
-    so many seconds from the copy being saved.');
+    console.log("Etag checking is disabled, but a backup folder is not set. "
+        + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
+        + "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
+        + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
+        + "also set the etagWindow setting to allow files to be modified if not newer than "
+        + "so many seconds from the copy being saved.");
 //import and init api-access
 const api_access_1 = require("./api-access");
 api_access_1.init(eventer);
