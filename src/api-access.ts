@@ -317,7 +317,7 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
         const fullpath = path.join(item as string, filepath.join('/'));
         const hash = createHash('sha256').update(fullpath).digest('base64');
         //const etag = [hash, statItem.mtime.toISOString()].join('/');
-        const mtime = Date.parse(statItem.mtime as any);
+        const mtime = statItem.mtime.getTime();// Date.parse(statItem.mtime as any);
         const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
         //handle GET,HEAD,PUT,OPTIONS
         if (["GET", "HEAD"].indexOf(state.req.method as string) > -1) {
@@ -328,8 +328,8 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
             }).ignoreElements()
         } else if (state.req.method === "PUT") {
             if (settings.etag !== "disabled" && (state.req.headers['if-match'] || settings.etag === "required") && (state.req.headers['if-match'] !== etag)) {
-                const ifmatch = state.req.headers['if-match'].split('-');
-                const _etag = etag.split('-');
+                const ifmatch = JSON.parse(state.req.headers['if-match']).split('-');
+                const _etag = JSON.parse(etag).split('-');
                 console.log('412 ifmatch %s', state.req.headers['if-match']);
                 console.log('412 etag %s', etag);
                 ifmatch.forEach((e, i) => {
@@ -337,6 +337,7 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
                 })
                 let headTime = +ifmatch[2];
                 let diskTime = mtime;
+                // console.log(settings.etagWindow, diskTime, headTime);
                 if (!settings.etagWindow || diskTime - (settings.etagWindow * 1000) > headTime)
                     return state.throw(412);
                 console.log('412 prevented by etagWindow of %s seconds', settings.etagWindow);
