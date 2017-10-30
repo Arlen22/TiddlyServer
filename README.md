@@ -139,12 +139,21 @@ On every save for all single-file TiddlyWikis, TiddlyServer will gzip the old ve
 
 If the backupDirectory is specified, it must exist, otherwise saving will fail for all single-file wikis. TiddlyWiki Folders are not backed up and therefore will still save as usual even if the directory does not exist.
 
+If not specified, backup is disabled.
+
 ### etag
 
+Either `required` or `disabled`. If not specified then only checks etag if the client provides one.
 
 ### etagWindow
 
+If the etag gets checked and does not match, allow it to save if the file on disk was not modified more than this many seconds later than the modified time in the etag. 
 
+The rationale behind this is that if you have two copies of the same wiki open in two different browser windows, and spend hours working and saving in one, you won't be purposely saving changes to a 3 hour old copy of your wiki for any reason whatsoever. 
+
+But if the file on disk is only 3 seconds newer than the copy in the browser, you probably aren't going to have that much substantial work being saved. If this is your work flow and you want to disable etag altogether, that is possible by setting `etag` to `disabled` (see above).
+
+If nothing is specified, then the etag must match exactly if checked.
 
 ## Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.
