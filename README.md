@@ -32,9 +32,9 @@ You will need to use the bookmarklet included in the directory pages to fix the 
 
 This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
-## Major changes since 2.0.7
+## Change log
 
-* TiddlyServer now correctly uses the username specified in `settings.json` for signing edits in data folders.
+The change log is at CHANGELOG.md
 
 ## Installation
 
@@ -162,3 +162,4 @@ If nothing is specified, then the etag must match exactly if checked.
 ## A final thought
 
 If you want to help cover the cost of making this all happen, use https://www.paypal.me/Arlen22. Your help is appreciated and will increase the likelihood of future improvements.
+
