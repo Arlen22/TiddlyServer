@@ -32,9 +32,7 @@ You will need to use the bookmarklet included in the directory pages to fix the 
 
 This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
-## Change log
-
-The change log is at CHANGELOG.md
+## [Change log](CHANGELOG.md)
 
 ## Installation
 
