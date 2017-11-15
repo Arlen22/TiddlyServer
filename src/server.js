@@ -90,6 +90,8 @@ if (!settings.etag)
     settings.etag = "";
 if (!settings.etagWindow)
     settings.etagWindow = 0;
+if (!settings.useTW5path)
+    settings.useTW5path = false;
 if (settings.etag === "disabled" && !settings.backupDirectory)
     console.log("Etag checking is disabled, but a backup folder is not set. "
         + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "

@@ -8,7 +8,7 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Server",
-            "program": "${workspaceRoot}/server.ts",
+            "program": "${workspaceRoot}/src/server.ts",
             "outFiles": [
                 "${workspaceRoot}/**/*.js"
             ],
@@ -18,7 +18,7 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Server (skip libs)",
-            "program": "${workspaceRoot}/server.ts",
+            "program": "${workspaceRoot}/src/server.ts",
             "smartStep": true,
             "outFiles": [
                 "${workspaceRoot}/**/*.js"

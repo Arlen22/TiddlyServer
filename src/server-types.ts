@@ -305,7 +305,8 @@ export interface ServerConfig {
     port: number | 8080,
     backupDirectory?: string,
     etag: "required" | "disabled" | "", //otherwise if present
-    etagWindow: number
+    etagWindow: number,
+    useTW5path: boolean
 }
 
 export interface AccessPathResult<T> {

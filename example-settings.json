@@ -27,5 +27,6 @@
     //remove or set to an empty string to disable backups when saving single-file wikis
     "backupDirectory": "", 
     "etagWindow": 0,
-    "etag": ""
+    "etag": "",
+    "useTW5path" : false
 }

@@ -44,20 +44,28 @@ function datafolder(obs) {
             loadedFolders[prefixURI] = [];
             loadTiddlyWiki(prefixURI, folder);
         }
-        //Tiddlywiki requires a trailing slash for data folders, and
+        //
         //redirect ?reload=true requests to the same,to prevent it being 
         //reloaded multiple times for the same page load.
-        if (isFullpath && !state.url.pathname.endsWith("/") || state.url.query.reload === "true") {
-            state.res.writeHead(302, { 'Location': prefixURI + "/" });
+        if (isFullpath && !settings.useTW5path !== !state.url.pathname.endsWith("/")
+            || state.url.query.reload === "true") {
+            let redirect = prefixURI + (settings.useTW5path ? "/" : "");
+            state.res.writeHead(302, {
+                'Location': redirect
+            });
             state.res.end();
             return rx_1.Observable.empty();
         }
+        //pretend to the handler like the path really has a trailing slash
+        let req = new Object(state.req);
+        req.url += ((isFullpath && !settings.useTW5path) ? "/" : "");
+        console.log(req.url);
         const load = loadedFolders[prefixURI];
         if (Array.isArray(load)) {
-            load.push([state.req, state.res]);
+            load.push([req, state.res]);
         }
         else {
-            load.handler(state.req, state.res);
+            load.handler(req, state.res);
         }
         return rx_1.Observable.empty();
     });
