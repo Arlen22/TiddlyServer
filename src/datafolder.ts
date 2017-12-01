@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as http from 'http';
 //import { TiddlyWiki } from 'tiddlywiki';
 import { EventEmitter } from "events";
+import { parse } from "url";
 
 var settings: ServerConfig = {} as any;
 
@@ -19,12 +20,13 @@ export function init(eventer: EventEmitter) {
         settings = set;
     })
     eventer.on('websocket-connection', function (client: WebSocket, request: http.IncomingMessage) {
-        let reqURL = new URL(request.url as string);
-        let datafolder = loadedFolders[reqURL.pathname] as FolderData;
+        let reqURL = parse(request.url as string);// new URL(request.url as string);
+        let datafolder = loadedFolders[reqURL.pathname as string] as FolderData;
+        debug([reqURL.pathname as string, !!datafolder].join(' '));
         if (!datafolder) {
-            if (!otherSocketPaths[reqURL.pathname])
-                otherSocketPaths[reqURL.pathname] = [];
-            let other = otherSocketPaths[reqURL.pathname]
+            if (!otherSocketPaths[reqURL.pathname as string])
+                otherSocketPaths[reqURL.pathname as string] = [];
+            let other = otherSocketPaths[reqURL.pathname as string]
             other.push(client);
             client.addEventListener('message', event => {
                 other.forEach(e => {

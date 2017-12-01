@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const server_types_1 = require("./server-types");
 const rx_1 = require("../lib/rx");
 const path = require("path");
+const url_1 = require("url");
 var settings = {};
 const debug = server_types_1.DebugLogger('DAT');
 const error = server_types_1.ErrorLogger('DAT');
@@ -13,8 +14,9 @@ function init(eventer) {
         settings = set;
     });
     eventer.on('websocket-connection', function (client, request) {
-        let reqURL = new URL(request.url);
+        let reqURL = url_1.parse(request.url); // new URL(request.url as string);
         let datafolder = loadedFolders[reqURL.pathname];
+        debug([reqURL.pathname, !!datafolder].join(' '));
         if (!datafolder) {
             if (!otherSocketPaths[reqURL.pathname])
                 otherSocketPaths[reqURL.pathname] = [];
