@@ -1,0 +1,101 @@
+{
+  "_args": [
+    [
+      {
+        "raw": "tiddlywiki",
+        "scope": null,
+        "escapedName": "tiddlywiki",
+        "name": "tiddlywiki",
+        "rawSpec": "",
+        "spec": "latest",
+        "type": "tag"
+      },
+      "C:\\ArlenStuff\\Tiddlywiki5"
+    ]
+  ],
+  "_from": "tiddlywiki@latest",
+  "_id": "tiddlywiki@5.1.14",
+  "_inCache": true,
+  "_location": "/tiddlywiki",
+  "_nodeVersion": "6.9.2",
+  "_npmOperationalInternal": {
+    "host": "packages-18-east.internal.npmjs.com",
+    "tmp": "tmp/tiddlywiki-5.1.14.tgz_1493222654004_0.9539838444907218"
+  },
+  "_npmUser": {
+    "name": "jermolene",
+    "email": "jeremy.ruston@gmail.com"
+  },
+  "_npmVersion": "3.10.9",
+  "_phantomChildren": {},
+  "_requested": {
+    "raw": "tiddlywiki",
+    "scope": null,
+    "escapedName": "tiddlywiki",
+    "name": "tiddlywiki",
+    "rawSpec": "",
+    "spec": "latest",
+    "type": "tag"
+  },
+  "_requiredBy": [
+    "#USER"
+  ],
+  "_resolved": "https://registry.npmjs.org/tiddlywiki/-/tiddlywiki-5.1.14.tgz",
+  "_shasum": "e41bf2bc3a385b01499f3b97a5081880d6001221",
+  "_shrinkwrap": null,
+  "_spec": "tiddlywiki",
+  "_where": "C:\\ArlenStuff\\Tiddlywiki5",
+  "author": {
+    "name": "Jeremy Ruston",
+    "email": "jeremy@jermolene.com"
+  },
+  "bin": {
+    "tiddlywiki": "./tiddlywiki.js"
+  },
+  "bugs": {
+    "url": "https://github.com/Jermolene/TiddlyWiki5/issues"
+  },
+  "bundleDependencies": [],
+  "contributors": [
+    {
+      "name": "Jeremy Ruston",
+      "email": "jeremy@jermolene.com"
+    }
+  ],
+  "dependencies": {},
+  "description": "a non-linear personal web notebook",
+  "devDependencies": {},
+  "directories": {},
+  "dist": {
+    "shasum": "e41bf2bc3a385b01499f3b97a5081880d6001221",
+    "tarball": "https://registry.npmjs.org/tiddlywiki/-/tiddlywiki-5.1.14.tgz"
+  },
+  "engines": {
+    "node": ">=0.8.2"
+  },
+  "gitHead": "384e5b7b6381dddf4631e9a4df86cf3c109a414d",
+  "homepage": "https://github.com/Jermolene/TiddlyWiki5#readme",
+  "keywords": [
+    "tiddlywiki",
+    "tiddlywiki5",
+    "wiki"
+  ],
+  "license": "BSD",
+  "main": "./boot/boot.js",
+  "maintainers": [
+    {
+      "name": "jermolene",
+      "email": "jeremy.ruston@gmail.com"
+    }
+  ],
+  "name": "tiddlywiki",
+  "optionalDependencies": {},
+  "preferGlobal": "true",
+  "readme": "ERROR: No README data found!",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jermolene/TiddlyWiki5.git"
+  },
+  "scripts": {},
+  "version": "5.1.14"
+}

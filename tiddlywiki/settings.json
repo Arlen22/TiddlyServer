@@ -1,0 +1,23 @@
+{
+    "tree": {
+        "ArlenNotes": "C:\\Users\\Arlen\\Dropbox\\ArlenNotes",
+        "dropbox": "C:\\Users\\Arlen\\Dropbox\\TiddlyWiki",
+        "tw5-angular2": "..\\tw5-angular",
+        "tiddlywiki": "C:\\ArlenStuff\\TiddlyWiki5-5.1.14",
+        "tesol": "C:\\Users\\Arlen\\Dropbox\\TESOL",
+        "wavenet": "C:\\Users\\Arlen\\Dropbox\\Projects\\WaveNet",
+		"fol": "C:\\Users\\Arlen\\Dropbox\\FOL\\tw5-notes",
+        "lambda-client": "C:\\ArlenProjects\\aws-tiddlyweb\\lambda-client",
+        "tw5-dropbox": "C:\\ArlenStuff\\tw5-dropbox",
+        "twcloud-dropbox": "C:\\ArlenStuff\\twcloud\\dropbox"
+    },
+    "types": {
+        "htmlfile": [
+            "htm",
+            "html"
+        ]
+    },
+    "port": 80,
+    "host": "0.0.0.0",
+    "backupDirectory": "backup"
+}
