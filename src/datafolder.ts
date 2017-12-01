@@ -12,14 +12,37 @@ const debug = DebugLogger('DAT');
 const error = ErrorLogger('DAT');
 
 const loadedFolders: { [k: string]: FolderData | ([http.IncomingMessage, http.ServerResponse])[] } = {};
+const otherSocketPaths: { [k: string]: WebSocket[] } = {};
 
 export function init(eventer: EventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
         settings = set;
     })
-    eventer.on('connection', function (client: WebSocket, request: http.IncomingMessage) {
+    eventer.on('websocket-connection', function (client: WebSocket, request: http.IncomingMessage) {
         let reqURL = new URL(request.url as string);
         let datafolder = loadedFolders[reqURL.pathname] as FolderData;
+        if (!datafolder) {
+            if (!otherSocketPaths[reqURL.pathname])
+                otherSocketPaths[reqURL.pathname] = [];
+            let other = otherSocketPaths[reqURL.pathname]
+            other.push(client);
+            client.addEventListener('message', event => {
+                other.forEach(e => {
+                    if (e === client) return;
+                    e.send(event.data);
+                })
+            });
+            client.addEventListener('error', (event) => {
+                debug('WS-ERROR %s %s', reqURL.pathname, event.type)
+                other.splice(other.indexOf(client), 1);
+                client.close();
+            });
+            client.addEventListener('close', (event) => {
+                debug('WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
+                other.splice(other.indexOf(client), 1);
+            });
+            return;
+        }
         datafolder.sockets.push(client);
 
         client.addEventListener('message', (event) => {

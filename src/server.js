@@ -7,6 +7,7 @@ const fs = require("fs");
 const path = require("path");
 const util_1 = require("util");
 const events_1 = require("events");
+const WS_1 = require("../lib/websocket-server/WS");
 __dirname = path.dirname(module.filename || process.execPath);
 Error.stackTraceLimit = Infinity;
 process.on('uncaughtException', err => {
@@ -236,10 +237,22 @@ function doAdminRoute(obs) {
     });
 }
 function serverListenCB(err, res) {
+    function connection(client, request) {
+        eventer.emit('websocket-connection', client, request);
+    }
+    function error(error) {
+        debug('WS-ERROR %s', util_1.inspect(error));
+    }
     if (err) {
         console.error('error on app.listen', err);
         return;
     }
+    const wssl = new WS_1.Server({ server: serverLocalHost });
+    wssl.on('connection', connection);
+    wssl.on('error', error);
+    const wssn = new WS_1.Server({ server: serverNetwork });
+    wssn.on('connection', connection);
+    wssn.on('error', error);
     console.log('Open your browser and type in one of the following:');
     if (!settings.host || settings.host === '0.0.0.0') {
         var os = require('os');

@@ -7,13 +7,37 @@ var settings = {};
 const debug = server_types_1.DebugLogger('DAT');
 const error = server_types_1.ErrorLogger('DAT');
 const loadedFolders = {};
+const otherSocketPaths = {};
 function init(eventer) {
     eventer.on('settings', function (set) {
         settings = set;
     });
-    eventer.on('connection', function (client, request) {
+    eventer.on('websocket-connection', function (client, request) {
         let reqURL = new URL(request.url);
         let datafolder = loadedFolders[reqURL.pathname];
+        if (!datafolder) {
+            if (!otherSocketPaths[reqURL.pathname])
+                otherSocketPaths[reqURL.pathname] = [];
+            let other = otherSocketPaths[reqURL.pathname];
+            other.push(client);
+            client.addEventListener('message', event => {
+                other.forEach(e => {
+                    if (e === client)
+                        return;
+                    e.send(event.data);
+                });
+            });
+            client.addEventListener('error', (event) => {
+                debug('WS-ERROR %s %s', reqURL.pathname, event.type);
+                other.splice(other.indexOf(client), 1);
+                client.close();
+            });
+            client.addEventListener('close', (event) => {
+                debug('WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
+                other.splice(other.indexOf(client), 1);
+            });
+            return;
+        }
         datafolder.sockets.push(client);
         client.addEventListener('message', (event) => {
             datafolder.$tw.hooks.invokeHook('th-websocket-message', event.data, client);

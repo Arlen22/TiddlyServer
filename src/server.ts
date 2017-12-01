@@ -15,6 +15,8 @@ import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 import { parse as jsonParse } from 'jsonlint';
 
+import { Server as WebSocketServer } from '../lib/websocket-server/WS';
+
 __dirname = path.dirname(module.filename || process.execPath);
 
 Error.stackTraceLimit = Infinity;
@@ -260,8 +262,25 @@ function doAdminRoute(obs: Observable<StateObject>): any {
 }
 
 function serverListenCB(err: any, res: any) {
+    function connection(client: WebSocket, request: http.IncomingMessage) {
+        eventer.emit('websocket-connection', client, request);
+    }
+    function error(error) {
+        debug('WS-ERROR %s', inspect(error));
+    }
+
     if (err) { console.error('error on app.listen', err); return; }
+
+    const wssl = new WebSocketServer({ server: serverLocalHost });
+    wssl.on('connection', connection);
+    wssl.on('error', error);
+
+    const wssn = new WebSocketServer({ server: serverNetwork });
+    wssn.on('connection', connection);
+    wssn.on('error', error);
+
     console.log('Open your browser and type in one of the following:');
+
     if (!settings.host || settings.host === '0.0.0.0') {
         var os = require('os');
         var ifaces = os.networkInterfaces();
