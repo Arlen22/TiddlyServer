@@ -9,3 +9,4 @@ uncaughtException.log
 /nexetest
 /tiddlywiki-*
 *.exe
+/test*
