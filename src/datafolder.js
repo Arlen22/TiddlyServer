@@ -6,13 +6,30 @@ const path = require("path");
 var settings = {};
 const debug = server_types_1.DebugLogger('DAT');
 const error = server_types_1.ErrorLogger('DAT');
+const loadedFolders = {};
 function init(eventer) {
     eventer.on('settings', function (set) {
         settings = set;
     });
+    eventer.on('connection', function (client, request) {
+        let reqURL = new URL(request.url);
+        let datafolder = loadedFolders[reqURL.pathname];
+        datafolder.sockets.push(client);
+        client.addEventListener('message', (event) => {
+            datafolder.$tw.hooks.invokeHook('th-websocket-message', event.data, client);
+        });
+        client.addEventListener('error', (event) => {
+            debug('WS-ERROR %s %s', reqURL.pathname, event.type);
+            datafolder.sockets.splice(datafolder.sockets.indexOf(client), 1);
+            client.close();
+        });
+        client.addEventListener('close', (event) => {
+            debug('WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
+            datafolder.sockets.splice(datafolder.sockets.indexOf(client), 1);
+        });
+    });
 }
 exports.init = init;
-const loadedFolders = {};
 function quickArrayCheck(obj) {
     return typeof obj.length === 'number';
 }
@@ -99,6 +116,8 @@ function loadTiddlyWiki(prefix, folder) {
             password: "",
             pathprefix: prefix
         });
+        //websocket requests coming in here will need to be handled 
+        //with $tw.hooks.invokeHook('th-websocket-message', event);
         const requests = loadedFolders[prefix];
         const handler = server.requestHandler.bind(server);
         loadedFolders[prefix] = {
@@ -106,8 +125,21 @@ function loadTiddlyWiki(prefix, folder) {
             prefix,
             folder,
             server,
-            handler
+            handler,
+            sockets: []
         };
+        $tw.hooks.addHook('th-websocket-broadcast', function (message, ignore) {
+            let folder = loadedFolders[prefix];
+            if (typeof message === 'object')
+                message = JSON.stringify(message);
+            else if (typeof message !== "string")
+                message = message.toString();
+            folder.sockets.forEach(client => {
+                if (ignore.indexOf(client) > -1)
+                    return;
+                client.send(message);
+            });
+        });
         //send the requests to the handler
         requests.forEach(e => {
             handler(e[0], e[1]);

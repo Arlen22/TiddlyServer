@@ -11,9 +11,29 @@ var settings: ServerConfig = {} as any;
 const debug = DebugLogger('DAT');
 const error = ErrorLogger('DAT');
 
+const loadedFolders: { [k: string]: FolderData | ([http.IncomingMessage, http.ServerResponse])[] } = {};
+
 export function init(eventer: EventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
         settings = set;
+    })
+    eventer.on('connection', function (client: WebSocket, request: http.IncomingMessage) {
+        let reqURL = new URL(request.url as string);
+        let datafolder = loadedFolders[reqURL.pathname] as FolderData;
+        datafolder.sockets.push(client);
+
+        client.addEventListener('message', (event) => {
+            datafolder.$tw.hooks.invokeHook('th-websocket-message', event.data, client);
+        })
+        client.addEventListener('error', (event) => {
+            debug('WS-ERROR %s %s', reqURL.pathname, event.type)
+            datafolder.sockets.splice(datafolder.sockets.indexOf(client), 1);
+            client.close();
+        })
+        client.addEventListener('close', (event) => {
+            debug('WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
+            datafolder.sockets.splice(datafolder.sockets.indexOf(client), 1);
+        })
     })
 }
 
@@ -23,8 +43,8 @@ type FolderData = {
     folder: string,
     server: any, //$tw.core.modules.commands.server.Server,
     handler: (req: http.IncomingMessage, res: http.ServerResponse) => void;
+    sockets: WebSocket[];
 };
-const loadedFolders: { [k: string]: FolderData | ([http.IncomingMessage, http.ServerResponse])[] } = {};
 
 function quickArrayCheck(obj: any): obj is Array<any> {
     return typeof obj.length === 'number';
@@ -117,6 +137,9 @@ function loadTiddlyWiki(prefix: string, folder: string) {
             password: "",
             pathprefix: prefix
         });
+        //websocket requests coming in here will need to be handled 
+        //with $tw.hooks.invokeHook('th-websocket-message', event);
+
         const requests = loadedFolders[prefix] as any[];
         const handler = server.requestHandler.bind(server);
         loadedFolders[prefix] = {
@@ -124,8 +147,18 @@ function loadTiddlyWiki(prefix: string, folder: string) {
             prefix,
             folder,
             server,
-            handler
+            handler,
+            sockets: []
         }
+        $tw.hooks.addHook('th-websocket-broadcast', function (message, ignore) {
+            let folder = loadedFolders[prefix] as FolderData;
+            if (typeof message === 'object') message = JSON.stringify(message);
+            else if (typeof message !== "string") message = message.toString();
+            folder.sockets.forEach(client => {
+                if (ignore.indexOf(client) > -1) return;
+                client.send(message);
+            })
+        });
         //send the requests to the handler
         requests.forEach(e => {
             handler(e[0], e[1]);
