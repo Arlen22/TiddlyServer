@@ -3,6 +3,9 @@
 * Add the `etag` and `etagWindow` options to partially or completely disable etag checking. 
 * Remove the trailing slash from data folders in order to allow relative links in tiddlers imported from single file wikis to continue to work without changing the folder structure. 
   * Data folders are opaque and appear to the user to be identical to a single file TiddlyWiki, therefore the relative links should also work the same.
+* Move the TiddlyWiki bundle into the repository since changes have been made to the boot code. 
+* Add a websocket server to TiddlyServer and add hooks to the data folders.
+* Point to the actual TiddlyWiki package.json file in the bundle instead of having a copy in the src folder. 
 
 ### 2.0.8
 
