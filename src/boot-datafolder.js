@@ -6,7 +6,7 @@ exports.DataFolder = function (prefix, folder, callback) {
 
 	const $tw = require("./boot.js").TiddlyWiki(
 		require("./bootprefix.js").bootprefix({
-			packageInfo: require('./tiddlywiki-package.json')
+			packageInfo: require('../tiddlywiki/package.json')
 		})
 	);
 	$tw.boot.argv = [folder];
