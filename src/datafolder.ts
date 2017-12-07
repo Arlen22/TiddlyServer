@@ -120,7 +120,7 @@ export function datafolder(obs: Observable<AccessPathResult<AccessPathTag>>) {
 
         let req = new Object(state.req) as http.IncomingMessage;
         req.url += ((isFullpath && !settings.useTW5path) ? "/" : "");
-        console.log(req.url);
+        // console.log(req.url);
         const load = loadedFolders[prefixURI];
         if (Array.isArray(load)) {
             load.push([req, state.res]);

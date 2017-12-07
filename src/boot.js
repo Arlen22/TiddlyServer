@@ -2,8 +2,7 @@
 title: $:/boot/boot.js
 type: application/javascript
 
-The main boot kernel for TiddlyWiki. This single file creates a barebones TW environment that is just sufficient to 
-bootstrap the modules containing the main logic of the application.
+The main boot kernel for TiddlyWiki. This single file creates a barebones TW environment that is just sufficient to bootstrap the modules containing the main logic of the application.
 
 On the server this file is executed directly to boot TiddlyWiki. In the browser, this file is packed into a single HTML file.
 
@@ -596,8 +595,8 @@ var _boot = (function ($tw) {
 	}
 
 	/*
-	Crypto helper object for encrypted content. It maintains the password text in a closure, 
-	and provides methods to change the password, and to encrypt/decrypt a block of text
+	Crypto helper object for encrypted content. It maintains the password text in a closure, and provides methods to change
+	the password, and to encrypt/decrypt a block of text
 	*/
 	$tw.utils.Crypto = function () {
 		var sjcl = $tw.node ? (global.sjcl || require("./sjcl.js")) : window.sjcl,
@@ -1203,7 +1202,7 @@ var _boot = (function ($tw) {
 		// Assemble a report tiddler
 		var titleReportTiddler = "TiddlyWiki Safe Mode",
 			report = [];
-		report.push("TiddlyWiki has been started in [[safe mode|http://tiddlywiki.com/static/SafeMode.html]]. All plugins are temporarily disabled. Most customisations have been disabled by renaming the following tiddlers:")
+		report.push("TiddlyWiki has been started in [[safe mode|https://tiddlywiki.com/static/SafeMode.html]]. All plugins are temporarily disabled. Most customisations have been disabled by renaming the following tiddlers:")
 		// Delete the overrides
 		overrides.forEach(function (title) {
 			var tiddler = self.getTiddler(title),
@@ -1221,10 +1220,14 @@ var _boot = (function ($tw) {
 	/*
 	Extracts tiddlers from a typed block of text, specifying default field values
 	*/
-	$tw.Wiki.prototype.deserializeTiddlers = function (type, text, srcFields) {
+	$tw.Wiki.prototype.deserializeTiddlers = function (type, text, srcFields, options) {
 		srcFields = srcFields || Object.create(null);
-		var deserializer = $tw.Wiki.tiddlerDeserializerModules[type],
+		options = options || {};
+		var deserializer = $tw.Wiki.tiddlerDeserializerModules[options.deserializer],
 			fields = Object.create(null);
+		if (!deserializer) {
+			deserializer = $tw.Wiki.tiddlerDeserializerModules[type];
+		}
 		if (!deserializer && $tw.utils.getFileExtensionInfo(type)) {
 			// If we didn't find the serializer, try converting it from an extension to a content type
 			type = $tw.utils.getFileExtensionInfo(type).type;
@@ -1331,8 +1334,7 @@ var _boot = (function ($tw) {
 	if ($tw.browser && !$tw.node) {
 
 		/*
-		Decrypt any tiddlers stored within the element with the ID "encryptedArea". 
-		The function is asynchronous to allow the user to be prompted for a password
+		Decrypt any tiddlers stored within the element with the ID "encryptedArea". The function is asynchronous to allow the user to be prompted for a password
 			callback: function to be called the decryption is complete
 		*/
 		$tw.boot.decryptEncryptedTiddlers = function (callback) {
@@ -1525,7 +1527,7 @@ var _boot = (function ($tw) {
 						});
 					}
 				} else if (stat.isFile()) {
-					tiddlers.push($tw.loadTiddlersFromFile(filepath));
+					tiddlers.push($tw.loadTiddlersFromFile(filepath, { title: filepath }));
 				}
 			}
 			return tiddlers;
@@ -1636,9 +1638,14 @@ var _boot = (function ($tw) {
 		*/
 		$tw.loadPluginFolder = function (filepath, excludeRegExp) {
 			excludeRegExp = excludeRegExp || $tw.boot.excludeRegExp;
+			var infoPath = filepath + path.sep + "plugin.info";
 			if (fs.existsSync(filepath) && fs.statSync(filepath).isDirectory()) {
 				// Read the plugin information
-				var pluginInfo = JSON.parse(fs.readFileSync(filepath + path.sep + "plugin.info", "utf8"));
+				if (!fs.existsSync(infoPath) || !fs.statSync(infoPath).isFile()) {
+					console.log("Warning: missing plugin.info file in " + filepath);
+					return null;
+				}
+				var pluginInfo = JSON.parse(fs.readFileSync(infoPath, "utf8"));
 				// Read the plugin files
 				var pluginFiles = $tw.loadTiddlersFromPath(filepath, excludeRegExp);
 				// Save the plugin tiddlers into the plugin info
@@ -2019,7 +2026,7 @@ var _boot = (function ($tw) {
 		$tw.boot.executedStartupModules = Object.create(null);
 		$tw.boot.disabledStartupModules = $tw.boot.disabledStartupModules || [];
 		// Repeatedly execute the next eligible task
-		$tw.boot.executeNextStartupTask();
+		$tw.boot.executeNextStartupTask(options.callback);
 	};
 
 	/*
@@ -2034,14 +2041,14 @@ var _boot = (function ($tw) {
 	/*
 	Execute the remaining eligible startup tasks
 	*/
-	$tw.boot.executeNextStartupTask = function () {
+	$tw.boot.executeNextStartupTask = function (callback) {
 		// Find the next eligible task
 		var taskIndex = 0, task,
 			asyncTaskCallback = function () {
 				if (task.name) {
 					$tw.boot.executedStartupModules[task.name] = true;
 				}
-				return $tw.boot.executeNextStartupTask();
+				return $tw.boot.executeNextStartupTask(callback);
 			};
 		while (taskIndex < $tw.boot.remainingStartupModules.length) {
 			task = $tw.boot.remainingStartupModules[taskIndex];
@@ -2066,13 +2073,16 @@ var _boot = (function ($tw) {
 					if (task.name) {
 						$tw.boot.executedStartupModules[task.name] = true;
 					}
-					return $tw.boot.executeNextStartupTask();
+					return $tw.boot.executeNextStartupTask(callback);
 				} else {
 					task.startup(asyncTaskCallback);
 					return true;
 				}
 			}
 			taskIndex++;
+		}
+		if (typeof callback === 'function') {
+			callback();
 		}
 		return false;
 	};
@@ -2159,7 +2169,7 @@ var _boot = (function ($tw) {
 
 	/////////////////////////// Main boot function to decrypt tiddlers and then startup
 
-	$tw.boot.boot = function () {
+	$tw.boot.boot = function (callback) {
 		// Initialise crypto object
 		$tw.crypto = new $tw.utils.Crypto();
 		// Initialise password prompter
@@ -2169,7 +2179,7 @@ var _boot = (function ($tw) {
 		// Preload any encrypted tiddlers
 		$tw.boot.decryptEncryptedTiddlers(function () {
 			// Startup
-			$tw.boot.startup();
+			$tw.boot.startup({ callback: callback });
 		});
 	};
 

@@ -102,7 +102,7 @@ function datafolder(obs) {
         //pretend to the handler like the path really has a trailing slash
         let req = new Object(state.req);
         req.url += ((isFullpath && !settings.useTW5path) ? "/" : "");
-        console.log(req.url);
+        // console.log(req.url);
         const load = loadedFolders[prefixURI];
         if (Array.isArray(load)) {
             load.push([req, state.res]);
