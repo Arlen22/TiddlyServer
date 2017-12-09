@@ -19,5 +19,5 @@
     "start": "node server.js"
   },
   "author": "Arlen Beiler",
-  "license": "ISC"
+  "license": "MIT"
 }
