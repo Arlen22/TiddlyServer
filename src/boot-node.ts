@@ -20,6 +20,7 @@ export interface Boot {
         trapErrors: boolean;
     };
 }
+
 interface Utils {
     hop<T>(object: T, property: keyof T): T[keyof T] | false;
     isArray(value: any): value is Array<any>;
