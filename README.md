@@ -85,7 +85,7 @@ Some users find the exact requirements of JSON to be somewhat difficult. If you 
 }
 ```
 
-All relative folder paths in settings.json are resolved relative to the settings.json file itself.
+All relative folder paths in settings.json are resolved relative to the `settings.json` file itself.
 
 ### tree
 
