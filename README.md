@@ -52,11 +52,12 @@ The editions folder from TiddlyWiki is not included because of the number of fil
 
 For convenience, the "server" edition is also included as a separate download because this is used as a data folder template.
 
- 1. Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. 
+If you want to make TiddlyServer portable, just download the binary file instead of the installer. The LTS version (the default) is fine. You will need to download the correct architecture. 32-bit is recommended for maximum portability on most desktops and laptops. If you are going to be using it on a linux or android device, you may need the ARM binaries as the ARM architecture is generally found in micro pc builds, mobile devices, and tablets. __Put the NodeJS binary (node.exe) in the TiddlyServer folder.__ None of the other NodeJS files are needed for a portable install.
+
  1. Download and install NodeJS from https://nodejs.org
-    - If you want to make TiddlyServer portable, just download the binary file. The LTS version (the default) is fine. You will need to download the correct architecture. 32-bit is recommended for maximum portability on most desktops and laptops. If you are going to be using it on a linux or android device, you may need the ARM binaries as the ARM architecture is generally found in micro pc builds, mobile devices, and tablets. __Put the NodeJS binary (node.exe) in the TiddlyServer folder.__ None of the other NodeJS files are needed for a portable install.  
+ 1. Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. 
  1. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 1. Open your terminal or command prompt and run `node server.js` (or `npm start`) or `node server.js /path/to/settings.json` or run `start.cmd`.
+ 1. Open your terminal or command prompt and run `node server.js` (or `npm start`) or `node server.js /path/to/settings.json` OR run `start.cmd`.
 
 ## settings.json
 
