@@ -79,7 +79,9 @@ Some users find the exact requirements of JSON to be somewhat difficult. If you 
     "password": "",  
     "host": "127.0.0.1",  
     "port": 8080,                
-    "backupDirectory": "" 
+    "backupDirectory": "",
+    "etag": "",
+    "etagWindow": 0
 }
 ```
 
