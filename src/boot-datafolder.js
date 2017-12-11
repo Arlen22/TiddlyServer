@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 
 __dirname = path.dirname(module.filename || process.execPath);
 
@@ -6,7 +7,7 @@ exports.DataFolder = function (prefix, folder, callback) {
 
 	const $tw = require("./boot.js").TiddlyWiki(
 		require("./bootprefix.js").bootprefix({
-			packageInfo: require('../tiddlywiki/package.json')
+			packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, '../tiddlywiki/package.json'), 'utf8'))
 		})
 	);
 	$tw.boot.argv = [folder];
