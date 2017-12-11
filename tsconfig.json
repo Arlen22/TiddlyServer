@@ -13,7 +13,6 @@
     },
     "exclude": [
         "node_modules",
-        //"rxjs",
         "new-server",
         "archive"
     ]
