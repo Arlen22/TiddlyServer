@@ -44,7 +44,7 @@ https://www.didaxy.com/introduction-to-tiddlyserver
 
 The instructions below are intended to be detailed and thorough, so read on if you're interested. 
 
-### Bundled version
+### The Bundled and Source Code versions are now the same
 
 TiddlyServer contains all its dependancies directly in the repository and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM), or can be copied into the folder for a portable install.
 
@@ -53,17 +53,10 @@ The editions folder from TiddlyWiki is not included because of the number of fil
 For convenience, the "server" edition is also included as a separate download because this is used as a data folder template.
 
  1. Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. 
- 2. Download and install NodeJS from https://nodejs.org
+ 1. Download and install NodeJS from https://nodejs.org
     - If you want to make TiddlyServer portable, just download the binary file. The LTS version (the default) is fine. You will need to download the correct architecture. 32-bit is recommended for maximum portability on most desktops and laptops. If you are going to be using it on a linux or android device, you may need the ARM binaries as the ARM architecture is generally found in micro pc builds, mobile devices, and tablets. __Put the NodeJS binary (node.exe) in the TiddlyServer folder.__ None of the other NodeJS files are needed for a portable install.  
- 3. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 4. Open your terminal or command prompt and run `node server.js` or `node server.js /path/to/settings.json` or run `start.cmd`.
-
-### Source code version
- 1. Download and unzip the source code from the latest release of TiddlyServer: https://github.com/Arlen22/TiddlyServer/releases
- 1. The target version of TiddlyWiki is now included in the repository to ease the maintenance burden of each release and because TiddlyServer includes the boot code in the src folder already so it does not need to be installed separately anymore.
- 1. Copy `example-settings.json` and rename it `settings.json`.
- 1. Configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 1. `node server.js` (`npm start`) or `node server.js /path/to/settings.json`
+ 1. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
+ 1. Open your terminal or command prompt and run `node server.js` (or `npm start`) or `node server.js /path/to/settings.json` or run `start.cmd`.
 
 ## settings.json
 
