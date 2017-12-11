@@ -5,10 +5,7 @@
   "bin": {
     "tiddlyserver": "./server.js"
   },
-  "dependencies": {
-    "tiddlywiki": "5.1.14",
-    "jsonlint": "~1.6.2"
-  },
+  "dependencies": {},
   "devDependencies": {
     "rxjs": "5.4.3",
     "@types/node": ">=6.0.73 <7.0.0"
