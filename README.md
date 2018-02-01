@@ -34,30 +34,18 @@ This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
 
 ## [Change log](CHANGELOG.md)
 
-## Installation
+## Quick Upgrade
 
-If upgrading from a previous release of TiddlyServer, do not copy the new files into the old distribution. Unzip the new folder and only copy `settings.json` into it from the old folder. 
+Just follow the installation instructions, and copy the `settings.json` file from the old installation to the new one. Any breaking changes in `settings.json` after 2.0.10 will be noted here.
 
-Another TiddlyWiki user has written an install guide. It is clear and concise, and will be useful for the average user.
+## Quick Install 
 
-https://www.didaxy.com/introduction-to-tiddlyserver
+* Download and install NodeJS from https://nodejs.org
+  * **ProTip:** TiddlyServer only requires `node.exe`, allowing a portable install.
+* Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the TiddlyServer folder contained in the zip file to wherever you want it. 
+* Copy `example-settings.json` and rename it `settings.json`, then edit it as desired. This process will be simplified in the future.
+* Open command prompt, `cd` to the TiddlyServer folder and run `/path/to/node server.js`.
 
-The instructions below are intended to be detailed and thorough, so read on if you're interested. 
-
-### The Bundled and Source Code versions are now the same
-
-TiddlyServer contains all its dependancies directly in the repository and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM), or can be copied into the folder for a portable install.
-
-The editions folder from TiddlyWiki is not included because of the number of files it contains. Since it only contains data folders, it is not needed for TiddlyServer to operate. It is included in each release as a separate zip file and is always from the same version of TiddlyWiki as is used in that release.
-
-For convenience, the "server" edition is also included as a separate download because this is used as a data folder template.
-
-If you want to make TiddlyServer portable, just download the binary file instead of the installer. The LTS version (the default) is fine. You will need to download the correct architecture. 32-bit is recommended for maximum portability on most desktops and laptops. If you are going to be using it on a linux or android device, you may need the ARM binaries as the ARM architecture is generally found in micro pc builds, mobile devices, and tablets. __Put the NodeJS binary (node.exe) in the TiddlyServer folder.__ None of the other NodeJS files are needed for a portable install.
-
- 1. Download and install NodeJS from https://nodejs.org
- 1. Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. 
- 1. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
- 1. Open your terminal or command prompt and run `node server.js` (or `npm start`) or `node server.js /path/to/settings.json` OR run `start.cmd`.
 
 ## settings.json
 
@@ -147,6 +135,30 @@ But if the file on disk is only 3 seconds newer than the copy in the browser, yo
 
 If nothing is specified, then the etag must match exactly if checked.
 
+## Detailed Installation Instructions
+
+If upgrading from a previous release of TiddlyServer, do not copy the new files into the old distribution. Unzip the new folder and only copy `settings.json` into it from the old folder. 
+
+Another TiddlyWiki user has written an install guide. It is clear and concise, and will be useful for the average user.
+
+https://www.didaxy.com/introduction-to-tiddlyserver
+
+The instructions below are intended to be detailed and thorough, so read on if you're interested. 
+
+### The Bundled and Source Code versions are now the same
+
+TiddlyServer contains all its dependancies directly in the repository and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM), or can be copied into the folder for a portable install.
+
+The editions folder from TiddlyWiki is not included because of the number of files it contains. Since it only contains data folders, it is not needed for TiddlyServer to operate. It is included in each release as a separate zip file and is always from the same version of TiddlyWiki as is used in that release.
+
+For convenience, the "server" edition is also included as a separate download because this is used as a data folder template.
+
+If you want to make TiddlyServer portable, just download the binary file instead of the installer. The LTS version (the default) is fine. You will need to download the correct architecture. 32-bit is recommended for maximum portability on most desktops and laptops. If you are going to be using it on a linux or android device, you may need the ARM binaries as the ARM architecture is generally found in micro pc builds, mobile devices, and tablets. __Put the NodeJS binary (node.exe) in the TiddlyServer folder.__ None of the other NodeJS files are needed for a portable install.
+
+ 1. Download and install NodeJS from https://nodejs.org
+ 1. Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the folder contained in the zip file to wherever you want it. 
+ 1. Rename `example-settings.json` to just `settings.json` and configure your tree with the actual folders you want to serve. See below for details on settings.json.
+ 1. Open your terminal or command prompt and run `node server.js` (or `npm start`) or `node server.js /path/to/settings.json` OR run `start.cmd`.
 
 ## Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.
