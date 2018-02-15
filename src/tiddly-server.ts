@@ -19,6 +19,7 @@ import { datafolder, init as initTiddlyWiki } from "./datafolder";
 import { format } from "util";
 import { Stream, Writable } from "stream";
 
+import send = require('../lib/send-lib');
 const mime: Mime = require('../lib/mime');
 
 const error = ErrorLogger("SER-API");
@@ -77,7 +78,7 @@ function getTreeItem(reqpath: string[]) {
 //have to check whether that is standard or not. I could just ignore the trailing slash 
 //entirely. I don't need to differentiate between two since each item lists its children.
 
-export function doAPIAccessRoute(obs: Observable<StateObject>) {
+export function doTiddlyServerRoute(obs: Observable<StateObject>) {
     return obs.mergeMap((state: StateObject) => {
         var reqpath = decodeURI(state.path.slice().filter(a => a).join('/')).split('/').filter(a => a);
         var [item, end] = getTreeItem(reqpath);
@@ -312,6 +313,9 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
         //here we could balk if the file is found in the middle of the path
         if (!isFullpath) return state.throw(404);
 
+
+
+
         //generate the file path and etag
         const filepath = itempath.split('/').slice(0, end);
         const fullpath = path.join(item as string, filepath.join('/'));
@@ -321,11 +325,19 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
         const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
         //handle GET,HEAD,PUT,OPTIONS
         if (["GET", "HEAD"].indexOf(state.req.method as string) > -1) {
-            return serveStatic(fullpath, state, statItem).map((res) => {
-                const [isError, result] = res as [boolean, { status: number, message: string, headers: any }];
-                //if (isError) state.req['skipLog'] = false;
-                if (isError) state.throw(result.status, result.message, result.headers);
-            }).ignoreElements()
+            send(state.req, filepath.join('/'), { root: item as string })
+                .on('error', (err: { status: number, message: string }) => {
+                    state.throw(err.status, err.message)
+                })
+                .on('headers', (res: http.ServerResponse, filepath, stat) => {
+                    res.setHeader('Etag', etag);
+                }).pipe(state.res);
+            return Observable.empty();
+            // return serveStatic(fullpath, state, statItem).map((res) => {
+            //     const [isError, result] = res as [boolean, { status: number, message: string, headers: any }];
+            //     //if (isError) state.req['skipLog'] = false;
+            //     if (isError) state.throw(result.status, result.message, result.headers);
+            // }).ignoreElements()
         } else if (state.req.method === "PUT") {
             if (settings.etag !== "disabled" && (state.req.headers['if-match'] || settings.etag === "required") && (state.req.headers['if-match'] !== etag)) {
                 const ifmatch = JSON.parse(state.req.headers['if-match']).split('-');

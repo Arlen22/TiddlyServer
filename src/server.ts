@@ -15,6 +15,11 @@ import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 import { parse as jsonParse } from 'jsonlint';
 
+const servestatic = require('../lib/serve-static-lib');
+
+import send = require('../lib/send-lib');
+const sendOptions = {};
+
 import { Server as WebSocketServer } from '../lib/websocket-server/WS';
 
 __dirname = path.dirname(module.filename || process.execPath);
@@ -111,20 +116,40 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
 //import and init api-access
-import { doAPIAccessRoute, init as initAPIAccess } from './api-access';
+import { doTiddlyServerRoute, init as initAPIAccess } from './tiddly-server';
 initAPIAccess(eventer);
 
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
 
 const serveIcons = (function () {
-    const nodeStatic = require('../lib/node-static');
-    var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
-    return Observable.bindCallback<http.IncomingMessage, http.ServerResponse, any>(
-        function () {
-            return serve.serve.apply(serve, arguments);
-        }, (err, res) => [err, res]
-    );
+    const mount = "/icons";
+    const root = path.join(__dirname, "../assets/icons");
+    return function (req: http.IncomingMessage, res: http.ServerResponse) {
+        return new Observable(subs => {
+            const pathname = url.parse(req.url as string).pathname || "";
+            if (pathname.slice(0, mount.length) !== mount) {
+                subs.next([{ status: 403, message: "No directory listing" }]);
+                subs.complete();
+            } else send(req, pathname.slice(mount.length), { root })
+                .on('error', (err: { status: number, message: string }) => {
+                    subs.next([err]);
+                    subs.complete();
+                })
+                .on('end', () => {
+                    subs.next([null, { status: res.statusCode, message: res.statusMessage }]);
+                    subs.complete();
+                })
+                .pipe(res);
+        })
+    }
+    // const nodeStatic = require('../lib/node-static');
+    // var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
+    // return Observable.bindCallback<http.IncomingMessage, http.ServerResponse, any>(
+    //     function () {
+    //         return serve.serve.apply(serve, arguments);
+    //     }, (err, res) => [err, res]
+    // );
 })();
 
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
@@ -200,7 +225,7 @@ Observable.merge(
     return state;
 }).routeCase<StateObject>(state => {
     return state.path[1];
-}, routes, doAPIAccessRoute).subscribe((state: StateObject) => {
+}, routes, doTiddlyServerRoute).subscribe((state: StateObject) => {
     if (!state) return;// console.log('blank item');
     if (!state.res.finished) {
         const timeout = setTimeout(function () {
