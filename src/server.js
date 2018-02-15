@@ -5,8 +5,12 @@ const server_types_1 = require("./server-types");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const url = require("url");
 const util_1 = require("util");
 const events_1 = require("events");
+const servestatic = require('../lib/serve-static-lib');
+const send = require("../lib/send-lib");
+const sendOptions = {};
 const WS_1 = require("../lib/websocket-server/WS");
 __dirname = path.dirname(module.filename || process.execPath);
 Error.stackTraceLimit = Infinity;
@@ -101,16 +105,40 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
 //import and init api-access
-const api_access_1 = require("./api-access");
-api_access_1.init(eventer);
+const tiddly_server_1 = require("./tiddly-server");
+tiddly_server_1.init(eventer);
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
 const serveIcons = (function () {
-    const nodeStatic = require('../lib/node-static');
-    var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
-    return rx_1.Observable.bindCallback(function () {
-        return serve.serve.apply(serve, arguments);
-    }, (err, res) => [err, res]);
+    const mount = "/icons";
+    const root = path.join(__dirname, "../assets/icons");
+    return function (req, res) {
+        return new rx_1.Observable(subs => {
+            const pathname = url.parse(req.url).pathname || "";
+            if (pathname.slice(0, mount.length) !== mount) {
+                subs.next([{ status: 403, message: "No directory listing" }]);
+                subs.complete();
+            }
+            else
+                send(req, pathname.slice(mount.length), { root })
+                    .on('error', (err) => {
+                    subs.next([err]);
+                    subs.complete();
+                })
+                    .on('end', () => {
+                    subs.next([null, { status: res.statusCode, message: res.statusMessage }]);
+                    subs.complete();
+                })
+                    .pipe(res);
+        });
+    };
+    // const nodeStatic = require('../lib/node-static');
+    // var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
+    // return Observable.bindCallback<http.IncomingMessage, http.ServerResponse, any>(
+    //     function () {
+    //         return serve.serve.apply(serve, arguments);
+    //     }, (err, res) => [err, res]
+    // );
 })();
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
@@ -173,7 +201,7 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     return state;
 }).routeCase(state => {
     return state.path[1];
-}, routes, api_access_1.doAPIAccessRoute).subscribe((state) => {
+}, routes, tiddly_server_1.doTiddlyServerRoute).subscribe((state) => {
     if (!state)
         return; // console.log('blank item');
     if (!state.res.finished) {
