@@ -1,15 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const rx_1 = require("../lib/rx");
-const new_server_types_1 = require("./new-server-types");
+const server_types_1 = require("./server-types");
 const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
-const new_datafolder_1 = require("./new-datafolder");
+const datafolder_1 = require("./datafolder");
 const util_1 = require("util");
 const send = require("../lib/send-lib");
 const mime = require('../lib/mime');
-const debug = new_server_types_1.DebugLogger("SER-API");
+const debug = server_types_1.DebugLogger("SER-API");
 __dirname = path.dirname(module.filename || process.execPath);
 function tuple(a, b, c, d, e, f) {
     return [a, b, c, d, e, f];
@@ -43,22 +43,9 @@ function init(eventer) {
             });
         });
     });
-    new_datafolder_1.init(eventer);
+    datafolder_1.init(eventer);
 }
 exports.init = init;
-function getTreeItem(reqpath) {
-    var item = settings.tree;
-    let i;
-    for (i = 0; i < reqpath.length; i++) {
-        if (typeof item !== 'string' && typeof item[reqpath[i]] !== 'undefined') {
-            item = item[reqpath[i]];
-        }
-        else {
-            break;
-        }
-    }
-    return [item, i];
-}
 //somewhere I have to recursively examine all the folders down filepath to make sure
 //none of them are data folders. I think perhaps I split list and access off too early.
 //Maybe I should combine them completely, or maybe I should just differentiate between 
@@ -95,7 +82,7 @@ function doTiddlyServerRoute(input) {
                 sendDirectoryIndex(result);
         }
         else if (state.statPath.itemtype === "datafolder") {
-            new_datafolder_1.datafolder(result);
+            datafolder_1.datafolder(result);
         }
         else if (state.statPath.itemtype === "file") {
             if (['HEAD', 'GET'].indexOf(state.req.method) > -1) {
@@ -208,7 +195,7 @@ function handlePUTrequest(state) {
                     .error().throw(500);
             }
             else {
-                return new_server_types_1.obs_stat(false)(fullpath);
+                return server_types_1.obs_stat(false)(fullpath);
             }
         }).map(([err, statNew]) => {
             const mtimeNew = Date.parse(statNew.mtime);
@@ -254,20 +241,20 @@ function statPath(s) {
         endStat = false;
     return new Promise(resolve => {
         // What I wish I could write (so I did)
-        new_server_types_1.obs_stat(fs.stat)(statpath).chainMap(([err, stat]) => {
+        server_types_1.obs_stat(fs.stat)(statpath).chainMap(([err, stat]) => {
             if (err || stat.isFile())
                 endStat = true;
             if (!err && stat.isDirectory())
-                return new_server_types_1.obs_stat(stat)(path.join(statpath, "tiddlywiki.info"));
+                return server_types_1.obs_stat(stat)(path.join(statpath, "tiddlywiki.info"));
             else
-                resolve({ stat, statpath, index, endStat });
+                resolve({ stat, statpath, index, endStat, itemtype: '' });
         }).concatAll().subscribe(([err2, infostat, stat]) => {
             if (!err2 && infostat.isFile()) {
                 endStat = true;
-                resolve({ stat, statpath, infostat, index, endStat });
+                resolve({ stat, statpath, infostat, index, endStat, itemtype: '' });
             }
             else
-                resolve({ stat, statpath, index, endStat });
+                resolve({ stat, statpath, index, endStat, itemtype: '' });
         });
     }).then(res => {
         res.itemtype = getItemType(res.stat, res.infostat);
@@ -347,7 +334,7 @@ function sendDirectoryIndex(_r) {
             return rx_1.Observable.of({ keys, paths, result });
         }
         else {
-            return new_server_types_1.obs_readdir()(result.fullfilepath).map(([err, keys]) => {
+            return server_types_1.obs_readdir()(result.fullfilepath).map(([err, keys]) => {
                 if (err) {
                     result.state.log(2, 'Error calling readdir on folder: %s', err.message);
                     result.state.throw(500);
@@ -369,7 +356,7 @@ function sendDirectoryIndex(_r) {
             let a = result.treepathPortion.join('/'), b = result.filepathPortion.join('/'), linkpath = [a, b, e.key].filter(e => e).join('/');
             n.push({
                 name: e.key,
-                path: e.key,
+                path: e.key + (!e.stat || e.stat.itemtype === "folder") ? "/" : "",
                 type: (!e.stat ? "category" : (e.stat.itemtype === "file"
                     ? typeLookup[e.key.split('.').pop()] || 'other'
                     : e.stat.itemtype)),

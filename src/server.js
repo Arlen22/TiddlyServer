@@ -2,7 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 require("../lib/source-map-support-lib");
 const rx_1 = require("../lib/rx");
-const new_server_types_1 = require("./new-server-types");
+const server_types_1 = require("./server-types");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -28,7 +28,7 @@ process.on('uncaughtException', err => {
 console.debug = function () { }; //noop console debug;
 //setup global objects
 const eventer = new events_1.EventEmitter();
-const debug = new_server_types_1.DebugLogger('APP');
+const debug = server_types_1.DebugLogger('APP');
 const logger = require('../lib/morgan.js').handler;
 const settingsFile = path.normalize(process.argv[2]
     ? path.resolve(process.argv[2])
@@ -62,7 +62,7 @@ var settings;
         settings = JSON.parse(settingsString);
     }
     catch (e) {
-        console.error(/*colors.BgWhite + */ new_server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + new_server_types_1.colors.Reset, e.message);
+        console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + server_types_1.colors.Reset, e.message);
         findJSONError(e.message, settingsString);
         throw "The settings file could not be parsed: Invalid JSON";
     }
@@ -72,7 +72,7 @@ if (!settings.tree)
 const settingsDir = path.dirname(settingsFile);
 if (typeof settings.tree === "object")
     (function normalizeTree(item) {
-        new_server_types_1.keys(item).forEach(e => {
+        server_types_1.keys(item).forEach(e => {
             if (typeof item[e] === 'string')
                 item[e] = path.resolve(settingsDir, item[e]);
             else if (typeof item[e] === 'object')
@@ -107,9 +107,16 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
+var ENV;
+(function (ENV) {
+    ENV.disableLocalHost = false;
+})(ENV || (ENV = {}));
+;
+if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
+    ENV.disableLocalHost = true;
 //import and init api-access
-const new_tiddly_server_1 = require("./new-tiddly-server");
-new_tiddly_server_1.init(eventer);
+const tiddlyserver_1 = require("./tiddlyserver");
+tiddlyserver_1.init(eventer);
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
 const serveIcons = (function () {
@@ -158,13 +165,13 @@ const routes = {
 rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
-    return new new_server_types_1.StateObject(req, res, debug, true);
+    return new server_types_1.StateObject(req, res, debug, true);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
 }), rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
-    return new new_server_types_1.StateObject(req, res, debug, false);
+    return new server_types_1.StateObject(req, res, debug, false);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
 })).map(state => {
@@ -193,11 +200,11 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     debug('authorization successful');
     // securityChecks =====================
     return state;
-}).filter(new_server_types_1.obsTruthy).map(state => {
+}).filter(server_types_1.obsTruthy).map(state => {
     return state;
 }).routeCase(state => {
     return state.path[1];
-}, routes, new_tiddly_server_1.doTiddlyServerRoute).subscribe((state) => {
+}, routes, tiddlyserver_1.doTiddlyServerRoute).subscribe((state) => {
     if (!state)
         return; // console.log('blank item');
     if (!state.res.finished) {
@@ -222,10 +229,10 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
 });
 function doFaviconRoute(obs) {
     return obs.mergeMap((state) => {
-        return new_server_types_1.obs_stat(state)(favicon).mergeMap(([err, stat]) => {
+        return server_types_1.obs_stat(state)(favicon).mergeMap(([err, stat]) => {
             if (err)
                 return state.throw(404);
-            return new_server_types_1.serveStatic(favicon, state, stat).map(([isErr, res]) => {
+            return server_types_1.serveStatic(favicon, state, stat).map(([isErr, res]) => {
                 if (isErr)
                     state.throw(res.status, res.message, res.headers);
             }).ignoreElements();
@@ -234,10 +241,10 @@ function doFaviconRoute(obs) {
 }
 function doStylesheetRoute(obs) {
     return obs.mergeMap(state => {
-        return new_server_types_1.obs_stat(state)(stylesheet).mergeMap(([err, stat]) => {
+        return server_types_1.obs_stat(state)(stylesheet).mergeMap(([err, stat]) => {
             if (err)
                 return state.throw(404);
-            return new_server_types_1.serveStatic(stylesheet, state, stat).map(([isErr, res]) => {
+            return server_types_1.serveStatic(stylesheet, state, stat).map(([isErr, res]) => {
                 if (isErr)
                     state.throw(res.status, res.message, res.headers);
             }).ignoreElements();
@@ -294,12 +301,19 @@ function serverListenCB(err, res) {
         console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
     }
 }
-serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
-    if (settings.host !== "127.0.0.1")
-        serverNetwork.listen(settings.port, settings.host, serverListenCB);
-    else
-        serverListenCB(err, res);
-});
+if (ENV.disableLocalHost) {
+    serverNetwork.listen(settings.port, settings.host, serverListenCB);
+}
+else {
+    serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
+        if (settings.host !== "127.0.0.1") {
+            serverNetwork.listen(settings.port, settings.host, serverListenCB);
+        }
+        else {
+            serverListenCB(err, res);
+        }
+    });
+}
 /**
  * to be used with concatMap, mergeMap, etc.
  * @param state

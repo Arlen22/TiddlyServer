@@ -3,7 +3,7 @@ import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, serveStatic, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult
-} from "./new-server-types";
+} from "./server-types";
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -16,7 +16,7 @@ import { Mime } from '../lib/mime';
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
 
-import { datafolder, init as initTiddlyWiki } from "./new-datafolder";
+import { datafolder, init as initTiddlyWiki } from "./datafolder";
 import { format } from "util";
 import { Stream, Writable } from "stream";
 import { Subscribable } from "rxjs/Observable";
@@ -67,19 +67,6 @@ export function init(eventer: EventEmitter) {
 }
 
 type apiListRouteState = [[string, string], string | any, StateObject]
-
-function getTreeItem(reqpath: string[]) {
-	var item: any = settings.tree;
-	let i;
-	for (i = 0; i < reqpath.length; i++) {
-		if (typeof item !== 'string' && typeof item[reqpath[i]] !== 'undefined') {
-			item = item[reqpath[i]];
-		} else {
-			break;
-		}
-	}
-	return [item, i];
-}
 
 //somewhere I have to recursively examine all the folders down filepath to make sure
 //none of them are data folders. I think perhaps I split list and access off too early.
@@ -272,13 +259,13 @@ function statPath(s: { statpath: string, index: number, endStat: boolean } | str
 			if (err || stat.isFile()) endStat = true;
 			if (!err && stat.isDirectory())
 				return obs_stat(stat)(path.join(statpath, "tiddlywiki.info"));
-			else resolve({ stat, statpath, index, endStat })
+			else resolve({ stat, statpath, index, endStat, itemtype: '' })
 		}).concatAll().subscribe(([err2, infostat, stat]) => {
 			if (!err2 && infostat.isFile()) {
 				endStat = true;
-				resolve({ stat, statpath, infostat, index, endStat })
+				resolve({ stat, statpath, infostat, index, endStat, itemtype: '' })
 			} else
-				resolve({ stat, statpath, index, endStat });
+				resolve({ stat, statpath, index, endStat, itemtype: '' });
 		});
 	}).then(res => {
 		res.itemtype = getItemType(res.stat, res.infostat)
@@ -327,6 +314,7 @@ export function resolvePath(state: StateObject, tree: TreeObject): PathResolverR
 		}
 		return { item, end, folderPathFound } as TreePathResult;
 	})();
+
 	if (reqpath.length > result.end && !result.folderPathFound) return;
 
 	//get the remainder of the path
@@ -382,7 +370,7 @@ function sendDirectoryIndex(_r: PathResolverResult) {
 				linkpath = [a, b, e.key].filter(e => e).join('/');
 			n.push({
 				name: e.key,
-				path: e.key,
+				path: e.key + (!e.stat || e.stat.itemtype === "folder") ? "/" : "",
 				type: (!e.stat ? "category" : (e.stat.itemtype === "file"
 					? typeLookup[e.key.split('.').pop() as string] || 'other'
 					: e.stat.itemtype as string)),

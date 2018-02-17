@@ -1,12 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const server_types_1 = require("./server-types");
-const rx_1 = require("../lib/rx");
 const path = require("path");
+const fs = require("fs");
 const url_1 = require("url");
 var settings = {};
 const debug = server_types_1.DebugLogger('DAT');
-const error = server_types_1.ErrorLogger('DAT');
 const loadedFolders = {};
 const otherSocketPaths = {};
 function init(eventer) {
@@ -59,65 +58,65 @@ exports.init = init;
 function quickArrayCheck(obj) {
     return typeof obj.length === 'number';
 }
-function datafolder(obs) {
+function datafolder(result) {
     //warm the cache
     //require("tiddlywiki/boot/boot.js").TiddlyWiki();
-    return obs.mergeMap(res => {
-        let { tag, type, statItem, statTW, end, isFullpath } = res;
-        /**
-         * reqpath  is the prefix for the folder in the folder tree
-         * item     is the folder string in the category tree that reqpath led to
-         * filepath is the path relative to them
-         */
-        let { state, item, filepath, treepath } = tag;
-        //get the actual path to the folder from filepath
-        let filepathPrefix = filepath.split('/').slice(0, end).join('/');
-        //get the tree path, and add the file path if there is one
-        let fullPrefix = ["", treepath];
-        if (filepathPrefix)
-            fullPrefix.push(filepathPrefix);
-        //join the parts and split into an array
-        fullPrefix = fullPrefix.join('/').split('/');
-        //use the unaltered path in the url as the tiddlywiki prefix
-        let prefixURI = state.url.pathname.split('/').slice(0, fullPrefix.length).join('/');
-        //get the full path to the folder as specified in the tree
-        let folder = path.join(item, filepathPrefix);
-        //initialize the tiddlywiki instance
-        if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
-            loadedFolders[prefixURI] = [];
-            loadTiddlyWiki(prefixURI, folder);
-        }
-        //
-        //redirect ?reload=true requests to the same,to prevent it being 
-        //reloaded multiple times for the same page load.
-        if (isFullpath && !settings.useTW5path !== !state.url.pathname.endsWith("/")
-            || state.url.query.reload === "true") {
-            let redirect = prefixURI + (settings.useTW5path ? "/" : "");
-            state.res.writeHead(302, {
-                'Location': redirect
-            });
-            state.res.end();
-            return rx_1.Observable.empty();
-        }
-        //pretend to the handler like the path really has a trailing slash
-        let req = new Object(state.req);
-        req.url += ((isFullpath && !settings.useTW5path) ? "/" : "");
-        // console.log(req.url);
-        const load = loadedFolders[prefixURI];
-        if (Array.isArray(load)) {
-            load.push([req, state.res]);
-        }
-        else {
-            load.handler(req, state.res);
-        }
-        return rx_1.Observable.empty();
-    });
+    // Observable.of(result).mergeMap(res => {
+    /**
+     * reqpath  is the prefix for the folder in the folder tree
+     * item     is the folder string in the category tree that reqpath led to
+     * filepath is the path relative to them
+     */
+    let { state } = result;
+    //get the actual path to the folder from filepath
+    let filepathPrefix = result.filepathPortion.slice(0, state.statPath.index).join('/');
+    //get the tree path, and add the file path (none if the tree path is a datafolder)
+    let fullPrefix = ["", result.treepathPortion.join('/')];
+    if (state.statPath.index > 0)
+        fullPrefix.push(filepathPrefix);
+    //join the parts and split into an array
+    fullPrefix = fullPrefix.join('/').split('/');
+    //use the unaltered path in the url as the tiddlywiki prefix
+    let prefixURI = state.url.pathname.split('/').slice(0, fullPrefix.length).join('/');
+    //get the full path to the folder as specified in the tree
+    let folder = state.statPath.statpath;
+    //initialize the tiddlywiki instance
+    if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
+        loadedFolders[prefixURI] = [];
+        loadTiddlyWiki(prefixURI, folder);
+    }
+    const isFullpath = result.filepathPortion.length === state.statPath.index;
+    //set the trailing slash correctly if this is the actual page load
+    //redirect ?reload=true requests to the same, to prevent it being 
+    //reloaded multiple times for the same page load.
+    if (isFullpath && !settings.useTW5path !== !state.url.pathname.endsWith("/")
+        || state.url.query.reload === "true") {
+        let redirect = prefixURI + (settings.useTW5path ? "/" : "");
+        state.res.writeHead(302, {
+            'Location': redirect
+        });
+        state.res.end();
+        // return Observable.empty();
+    }
+    //pretend to the handler like the path really has a trailing slash
+    let req = new Object(state.req);
+    req.url += ((isFullpath && !state.url.path.endsWith("/")) ? "/" : "");
+    // console.log(req.url);
+    const load = loadedFolders[prefixURI];
+    if (Array.isArray(load)) {
+        load.push([req, state.res]);
+    }
+    else {
+        load.handler(req, state.res);
+    }
+    // return Observable.empty<never>();
+    // }).subscribe();
 }
 exports.datafolder = datafolder;
 function loadTiddlyWiki(prefix, folder) {
     console.time('twboot-' + folder);
     // const dynreq = "tiddlywiki";
-    require("./boot-datafolder.js").DataFolder(prefix, folder, complete);
+    DataFolder(prefix, folder, complete);
     function complete(err, $tw) {
         console.timeEnd('twboot-' + folder);
         if (err) {
@@ -174,7 +173,7 @@ function loadTiddlyWiki(prefix, folder) {
 }
 ;
 function doError(prefix, folder, err) {
-    error('error starting %s at %s: %s', prefix, folder, err.stack);
+    debug(2, 'error starting %s at %s: %s', prefix, folder, err.stack);
     const requests = loadedFolders[prefix];
     loadedFolders[prefix] = {
         handler: function (req, res) {
@@ -187,4 +186,28 @@ function doError(prefix, folder, err) {
     requests.forEach(([req, res]) => {
         loadedFolders[prefix].handler(req, res);
     });
+}
+function DataFolder(prefix, folder, callback) {
+    const $tw = require("../tiddlywiki/boot/boot.js").TiddlyWiki(require("../tiddlywiki/boot/bootprefix.js").bootprefix({
+        packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, '../tiddlywiki/package.json'), 'utf8'))
+    }));
+    $tw.boot.argv = [folder];
+    $tw.preloadTiddler({
+        "text": "$protocol$//$host$" + prefix + "/",
+        "title": "$:/config/tiddlyweb/host"
+    });
+    /**
+     * Specify the boot folder of the tiddlywiki instance to load. This is the actual path to the tiddlers that will be loaded
+     * into wiki as tiddlers. Therefore this is the path that will be served to the browser. It will not actually run on the server
+     * since we load the server files from here. We only need to make sure that we use boot.js from the same version as included in
+     * the bundle.
+    **/
+    try {
+        $tw.boot.boot(() => {
+            callback(null, $tw);
+        });
+    }
+    catch (err) {
+        callback(err);
+    }
 }

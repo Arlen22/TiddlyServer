@@ -6,8 +6,8 @@ import {
 
 import {
     StateObject, DebugLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
-    obs_stat, colors, obsTruthy
-} from "./new-server-types";
+    obs_stat, colors, obsTruthy, Hashmap
+} from "./server-types";
 
 import * as http from 'http'
 import * as fs from 'fs';
@@ -118,8 +118,16 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
+
+namespace ENV {
+    export let disableLocalHost: boolean = false;
+};
+
+if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
+    ENV.disableLocalHost = true;
+
 //import and init api-access
-import { doTiddlyServerRoute, init as initAPIAccess } from './new-tiddly-server';
+import { doTiddlyServerRoute, init as initAPIAccess } from './tiddlyserver';
 initAPIAccess(eventer);
 
 //emit settings to everyone (I know, this could be an observable)
@@ -298,7 +306,6 @@ function serverListenCB(err: any, res: any) {
     const wssn = new WebSocketServer({ server: serverNetwork });
     wssn.on('connection', connection);
     wssn.on('error', error);
-
     console.log('Open your browser and type in one of the following:');
 
     if (!settings.host || settings.host === '0.0.0.0') {
@@ -318,12 +325,18 @@ function serverListenCB(err: any, res: any) {
     }
 }
 
-serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
-    if (settings.host !== "127.0.0.1")
-        serverNetwork.listen(settings.port, settings.host, serverListenCB);
-    else
-        serverListenCB(err, res);
-});
+if (ENV.disableLocalHost) {
+    serverNetwork.listen(settings.port, settings.host, serverListenCB);
+} else {
+    serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
+        if (settings.host !== "127.0.0.1") {
+            serverNetwork.listen(settings.port, settings.host, serverListenCB);
+        } else {
+            serverListenCB(err, res);
+        }
+    });
+}
+
 
 
 /**
