@@ -333,11 +333,6 @@ function file(obs: Observable<AccessPathResult<AccessPathTag>>) {
                     res.setHeader('Etag', etag);
                 }).pipe(state.res);
             return Observable.empty();
-            // return serveStatic(fullpath, state, statItem).map((res) => {
-            //     const [isError, result] = res as [boolean, { status: number, message: string, headers: any }];
-            //     //if (isError) state.req['skipLog'] = false;
-            //     if (isError) state.throw(result.status, result.message, result.headers);
-            // }).ignoreElements()
         } else if (state.req.method === "PUT") {
             if (settings.etag !== "disabled" && (state.req.headers['if-match'] || settings.etag === "required") && (state.req.headers['if-match'] !== etag)) {
                 const ifmatch = JSON.parse(state.req.headers['if-match']).split('-');

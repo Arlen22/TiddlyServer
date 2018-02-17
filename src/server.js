@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+require("../lib/source-map-support-lib");
 const rx_1 = require("../lib/rx");
-const server_types_1 = require("./server-types");
+const new_server_types_1 = require("./new-server-types");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
@@ -27,8 +28,7 @@ process.on('uncaughtException', err => {
 console.debug = function () { }; //noop console debug;
 //setup global objects
 const eventer = new events_1.EventEmitter();
-const debug = server_types_1.DebugLogger('APP');
-const error = server_types_1.ErrorLogger('APP');
+const debug = new_server_types_1.DebugLogger('APP');
 const logger = require('../lib/morgan.js').handler;
 const settingsFile = path.normalize(process.argv[2]
     ? path.resolve(process.argv[2])
@@ -62,7 +62,7 @@ var settings;
         settings = JSON.parse(settingsString);
     }
     catch (e) {
-        console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + server_types_1.colors.Reset, e.message);
+        console.error(/*colors.BgWhite + */ new_server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + new_server_types_1.colors.Reset, e.message);
         findJSONError(e.message, settingsString);
         throw "The settings file could not be parsed: Invalid JSON";
     }
@@ -70,16 +70,19 @@ var settings;
 if (!settings.tree)
     throw "tree is not specified in the settings file";
 const settingsDir = path.dirname(settingsFile);
-(function normalizeTree(item) {
-    server_types_1.keys(item).forEach(e => {
-        if (typeof item[e] === 'string')
-            item[e] = path.resolve(settingsDir, item[e]);
-        else if (typeof item[e] === 'object')
-            normalizeTree(item[e]);
-        else
-            throw 'Invalid item: ' + e + ': ' + item[e];
-    });
-})(settings.tree);
+if (typeof settings.tree === "object")
+    (function normalizeTree(item) {
+        new_server_types_1.keys(item).forEach(e => {
+            if (typeof item[e] === 'string')
+                item[e] = path.resolve(settingsDir, item[e]);
+            else if (typeof item[e] === 'object')
+                normalizeTree(item[e]);
+            else
+                throw 'Invalid item: ' + e + ': ' + item[e];
+        });
+    })(settings.tree);
+else
+    settings.tree = path.resolve(settingsDir, settings.tree);
 if (settings.backupDirectory) {
     settings.backupDirectory = path.resolve(settingsDir, settings.backupDirectory);
 }
@@ -105,8 +108,8 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
 //import and init api-access
-const tiddly_server_1 = require("./tiddly-server");
-tiddly_server_1.init(eventer);
+const new_tiddly_server_1 = require("./new-tiddly-server");
+new_tiddly_server_1.init(eventer);
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
 const serveIcons = (function () {
@@ -132,13 +135,6 @@ const serveIcons = (function () {
                     .pipe(res);
         });
     };
-    // const nodeStatic = require('../lib/node-static');
-    // var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
-    // return Observable.bindCallback<http.IncomingMessage, http.ServerResponse, any>(
-    //     function () {
-    //         return serve.serve.apply(serve, arguments);
-    //     }, (err, res) => [err, res]
-    // );
 })();
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
@@ -162,13 +158,13 @@ const routes = {
 rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
-    return new server_types_1.StateObject(req, res, debug, true);
+    return new new_server_types_1.StateObject(req, res, debug, true);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
 }), rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
-    return new server_types_1.StateObject(req, res, debug, false);
+    return new new_server_types_1.StateObject(req, res, debug, false);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
 })).map(state => {
@@ -197,25 +193,24 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     debug('authorization successful');
     // securityChecks =====================
     return state;
-}).filter(server_types_1.obsTruthy).map(state => {
+}).filter(new_server_types_1.obsTruthy).map(state => {
     return state;
 }).routeCase(state => {
     return state.path[1];
-}, routes, tiddly_server_1.doTiddlyServerRoute).subscribe((state) => {
+}, routes, new_tiddly_server_1.doTiddlyServerRoute).subscribe((state) => {
     if (!state)
         return; // console.log('blank item');
     if (!state.res.finished) {
-        const timeout = setTimeout(function () {
-            state.error('RESPONSE FINISH TIMED OUT');
-            state.error('%s %s ', state.req.method, state.req.url);
-            state.throw(500, "Response timed out");
+        const interval = setInterval(function () {
+            state.log(-2, 'LONG RUNNING RESPONSE');
+            state.log(-2, '%s %s ', state.req.method, state.req.url);
         }, 60000);
-        rx_1.Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearTimeout(timeout));
+        rx_1.Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearInterval(interval));
     }
 }, err => {
-    console.error('Uncaught error in the server route: ' + err.message);
-    console.error(err.stack);
-    console.error("the server will now close");
+    debug(4, 'Uncaught error in the server route: ' + err.message);
+    debug(4, err.stack);
+    debug(4, "the server will now close");
     serverNetwork.close();
     serverLocalHost.close();
 }, () => {
@@ -227,10 +222,10 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
 });
 function doFaviconRoute(obs) {
     return obs.mergeMap((state) => {
-        return server_types_1.obs_stat(state)(favicon).mergeMap(([err, stat]) => {
+        return new_server_types_1.obs_stat(state)(favicon).mergeMap(([err, stat]) => {
             if (err)
                 return state.throw(404);
-            return server_types_1.serveStatic(favicon, state, stat).map(([isErr, res]) => {
+            return new_server_types_1.serveStatic(favicon, state, stat).map(([isErr, res]) => {
                 if (isErr)
                     state.throw(res.status, res.message, res.headers);
             }).ignoreElements();
@@ -239,10 +234,10 @@ function doFaviconRoute(obs) {
 }
 function doStylesheetRoute(obs) {
     return obs.mergeMap(state => {
-        return server_types_1.obs_stat(state)(stylesheet).mergeMap(([err, stat]) => {
+        return new_server_types_1.obs_stat(state)(stylesheet).mergeMap(([err, stat]) => {
             if (err)
                 return state.throw(404);
-            return server_types_1.serveStatic(stylesheet, state, stat).map(([isErr, res]) => {
+            return new_server_types_1.serveStatic(stylesheet, state, stat).map(([isErr, res]) => {
                 if (isErr)
                     state.throw(res.status, res.message, res.headers);
             }).ignoreElements();

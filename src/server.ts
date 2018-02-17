@@ -1,11 +1,13 @@
+require("../lib/source-map-support-lib");
+
 import {
     Observable, Subject, Subscription, BehaviorSubject, Subscriber
 } from '../lib/rx';
 
 import {
-    StateObject, DebugLogger, ErrorLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
+    StateObject, DebugLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
     obs_stat, colors, obsTruthy
-} from "./server-types";
+} from "./new-server-types";
 
 import * as http from 'http'
 import * as fs from 'fs';
@@ -43,7 +45,6 @@ console.debug = function () { }; //noop console debug;
 //setup global objects
 const eventer = new EventEmitter();
 const debug = DebugLogger('APP');
-const error = ErrorLogger('APP');
 const logger = require('../lib/morgan.js').handler;
 
 const settingsFile = path.normalize(process.argv[2]
@@ -87,13 +88,15 @@ if (!settings.tree) throw "tree is not specified in the settings file";
 
 const settingsDir = path.dirname(settingsFile);
 
-(function normalizeTree(item) {
-    keys(item).forEach(e => {
-        if (typeof item[e] === 'string') item[e] = path.resolve(settingsDir, item[e]);
-        else if (typeof item[e] === 'object') normalizeTree(item[e]);
-        else throw 'Invalid item: ' + e + ': ' + item[e];
-    })
-})(settings.tree)
+if (typeof settings.tree === "object")
+    (function normalizeTree(item) {
+        keys(item).forEach(e => {
+            if (typeof item[e] === 'string') item[e] = path.resolve(settingsDir, item[e]);
+            else if (typeof item[e] === 'object') normalizeTree(item[e]);
+            else throw 'Invalid item: ' + e + ': ' + item[e];
+        })
+    })(settings.tree);
+else settings.tree = path.resolve(settingsDir, settings.tree);
 
 if (settings.backupDirectory) {
     settings.backupDirectory = path.resolve(settingsDir, settings.backupDirectory);
@@ -116,7 +119,7 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
 //import and init api-access
-import { doTiddlyServerRoute, init as initAPIAccess } from './tiddly-server';
+import { doTiddlyServerRoute, init as initAPIAccess } from './new-tiddly-server';
 initAPIAccess(eventer);
 
 //emit settings to everyone (I know, this could be an observable)
@@ -143,13 +146,6 @@ const serveIcons = (function () {
                 .pipe(res);
         })
     }
-    // const nodeStatic = require('../lib/node-static');
-    // var serve = new nodeStatic.Server(path.join(__dirname, '../assets/icons'), { mount: '/icons' });
-    // return Observable.bindCallback<http.IncomingMessage, http.ServerResponse, any>(
-    //     function () {
-    //         return serve.serve.apply(serve, arguments);
-    //     }, (err, res) => [err, res]
-    // );
 })();
 
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
@@ -228,17 +224,16 @@ Observable.merge(
 }, routes, doTiddlyServerRoute).subscribe((state: StateObject) => {
     if (!state) return;// console.log('blank item');
     if (!state.res.finished) {
-        const timeout = setTimeout(function () {
-            state.error('RESPONSE FINISH TIMED OUT');
-            state.error('%s %s ', state.req.method, state.req.url)
-            state.throw(500, "Response timed out");
+        const interval = setInterval(function () {
+            state.log(-2, 'LONG RUNNING RESPONSE');
+            state.log(-2, '%s %s ', state.req.method, state.req.url)
         }, 60000);
-        Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearTimeout(timeout));
+        Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearInterval(interval));
     }
 }, err => {
-    console.error('Uncaught error in the server route: ' + err.message);
-    console.error(err.stack);
-    console.error("the server will now close");
+    debug(4, 'Uncaught error in the server route: ' + err.message);
+    debug(4, err.stack);
+    debug(4, "the server will now close");
     serverNetwork.close();
     serverLocalHost.close();
 }, () => {

@@ -5,12 +5,16 @@
   "bin": {
     "tiddlyserver": "./server.js"
   },
-  "dependencies": {},
+  "dependencies": {
+    "source-map-support": "^0.5.3"
+  },
   "devDependencies": {
     "rxjs": "5.4.3",
     "@types/node": ">=6.0.73 <7.0.0"
   },
-  "engines": { "node" : "^6.11.4" },
+  "engines": {
+    "node": "^6.11.4"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node server.js"
