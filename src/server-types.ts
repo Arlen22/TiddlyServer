@@ -7,20 +7,15 @@ import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 
-export interface test {
-
-}
+export type Hashmap<T> = { [K: string]: T };
 
 export type FolderEntryType = 'folder' | 'datafolder' | 'htmlfile' | 'other' | 'error';
 
 export interface DirectoryEntry {
     name: string,
-    type: FolderEntryType,
+    type: string,
     path: string,
-    mime?: string,
-    icon?: string,
-    size?: string
-    //folder?: string,
+    size: string
 }
 
 export interface Directory {
@@ -86,32 +81,54 @@ export namespace colors {
     export const BgCyan = "\x1b[46m"
     export const BgWhite = "\x1b[47m"
 }
-export function DebugLogger(prefix: string) {
-    return function (str: string, ...args: any[]) {
+
+const DEBUGLEVEL = -1;
+/**
+ *  4 - Errors that require the process to exit for restart
+ *  3 - Major errors that are handled and do not require a server restart
+ *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+ *  1 - Info - Most startup messages
+ *  0 - Normal debug messages and all software and request-side error messages
+ * -1 - Detailed debug messages from high level apis
+ * -2 - Response status messages and error response data
+ * -3 - Request and response data for all messages (verbose)
+ * -4 - Protocol details and full data dump (such as encryption steps and keys)
+ */
+declare function DebugLog(level: number, str: string, ...args: any[]);
+declare function DebugLog(str: string, ...args: any[]);
+
+export function DebugLogger(prefix: string): typeof DebugLog {
+    //if(prefix.startsWith("V:")) return function(){};
+    return function (...args: any[]) {
+        //this sets the default log level for the message
+        var msgLevel = 0;
+        if (typeof args[0] === "number") {
+            if (DEBUGLEVEL > args[0]) return;
+            else msgLevel = args.shift();
+        } else {
+            if (DEBUGLEVEL > msgLevel) return;
+        }
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log([colors.FgGreen + prefix, date + colors.Reset, format.apply(null, arguments)].join(' '));
-    };
+        console.log([' ', (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix,
+            colors.FgCyan, date, colors.Reset, format.apply(null, args)].join(' ').split('\n').map((e, i) => {
+                if (i > 0) {
+                    return new Array(28 + prefix.length).join(' ') + e;
+                } else {
+                    return e;
+                }
+            }).join('\n'));
+
+    } as typeof DebugLog;
 }
-export function ErrorLogger(prefix: string) {
-    return function (str: string, ...args: any[]) {
-        let t = new Date();
-        let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
-            padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.error([colors.FgRed + prefix, colors.FgYellow + date + colors.Reset, format.apply(null, arguments)].join(' '));
-    };
-}
+
 export function sanitizeJSON(key: string, value: any) {
     // returning undefined omits the key from being serialized
     if (!key) { return value; } //This is the entire value to be serialized
     else if (key.substring(0, 1) === "$") return; //Remove angular tags
-    else if (key.substring(0, 1) === "_") return; //Remove NoSQL tags, including _id
+    else if (key.substring(0, 1) === "_") return; //Remove NoSQL tags
     else return value;
-}
-
-export function handleProgrammersException(logger: any, err: any, message: any) {
-
 }
 
 export interface ServeStaticResult {
@@ -129,7 +146,7 @@ export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => 
         finish(...args: any[]): any;
     }
     const staticServer = require('../lib/node-static');
-    const serve = new staticServer.Server({ 
+    const serve = new staticServer.Server({
         mount: '/'
         // gzipTransfer: true, 
         // gzip:/^(text\/html|application\/javascript|text\/css|application\/json)$/gi 
@@ -157,17 +174,22 @@ export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => 
 
 type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 
-export const obs_stat = <T>(state: T) => Observable.bindCallback(
-    fs.stat, (err, stat): NodeCallback<fs.Stats, T> => [err, stat, state]);
 
-export const obs_readdir = <T>(state: T) => Observable.bindCallback(
-    fs.readdir, (err, files): NodeCallback<string[], T> => [err, files, state]);
+// export function obs<S>(state?: S) {
+//     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
+// }
 
-export const obs_readFile = <T>(state: T) => Observable.bindCallback(
-    fs.readFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state]);
+export const obs_stat = <T>(state?: T) => Observable.bindCallback(
+    fs.stat, (err, stat): NodeCallback<fs.Stats, T> => [err, stat, state] as any);
 
-export const obs_writeFile = <T>(state: T) => Observable.bindCallback(
-    fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state]);
+export const obs_readdir = <T>(state?: T) => Observable.bindCallback(
+    fs.readdir, (err, files): NodeCallback<string[], T> => [err, files, state] as any);
+
+export const obs_readFile = <T>(state?: T) => Observable.bindCallback(
+    fs.readFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
+
+export const obs_writeFile = <T>(state?: T) => Observable.bindCallback(
+    fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
 
 
 export class StateError extends Error {
@@ -177,10 +199,28 @@ export class StateError extends Error {
         this.state = state;
     }
 }
+export type StatPathResult = {
+    stat: fs.Stats,
+    statpath: string,
+    infostat?: fs.Stats,
+    index: number,
+    /**
+     * error, folder, datafolder, file
+     * 
+     * @type {string}
+     */
+    itemtype: string,
+    /**
+     * either the path does not exist or it is a data folder
+     * 
+     * @type {boolean}
+     */
+    endStat: boolean
+}
 
 export type LoggerFunc = (str: string, ...args: any[]) => void;
 
-export class StateObject implements ThrowFunc<StateObject>{
+export class StateObject {
 
     static errorRoute(status: number, reason?: string) {
         return (obs: Observable<any>): any => {
@@ -197,6 +237,8 @@ export class StateObject implements ThrowFunc<StateObject>{
 
     body: string;
     json: any | undefined;
+
+    statPath: StatPathResult;
 
     url: {
         href: string;
@@ -257,35 +299,54 @@ export class StateObject implements ThrowFunc<StateObject>{
     //         format.apply(null, arguments)
     //     );
     // }
-    error(str: string, ...args: any[]) {
-        this.debugLog('[' +
-            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-            this.req.socket.remoteAddress + colors.Reset + '] ' +
-            format.apply(null, arguments)
-        );
+    // error(str: string, ...args: any[]) {
+    //     this.debugLog('[' +
+    //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
+    //         this.req.socket.remoteAddress + colors.Reset + '] ' +
+    //         format.apply(null, arguments)
+    //     );
+    // }
+    loglevel: number = DEBUGLEVEL;
+    doneMessage: string[];
+    /**
+     *  4 - Errors that require the process to exit for restart
+     *  3 - Major errors that are handled and do not require a server restart
+     *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+     *  1 - Info - Most startup messages
+     *  0 - Normal debug messages and all software and request-side error messages
+     * -1 - Detailed debug messages from high level apis
+     * -2 - Response status messages and error response data
+     * -3 - Request and response data for all messages (verbose)
+     * -4 - Protocol details and full data dump (such as encryption steps and keys)
+     */
+    log(level: number, ...args: any[]) {
+        if (level < this.loglevel) return this;
+        this.doneMessage.push(format.apply(null, args));
+        return this;
     }
-    throw<T>(statusCode: number, reason?: string, str?: string | {}, ...args: any[]): Observable<T>;
-    throw(statusCode: number, reason?: string, str?: string | {}, ...args: any[]): Observable<StateObject> {
-        //throw<T>(statusCode: number, reason?, str?: string, ...args: any[]): Observable<T>
-        //throw(statusCode: number, reason?, str?: string, ...args: any[]): Observable<any> {
-        let headers = (typeof str === 'object') ? str : null;
-        if (headers) str = args.shift();
-        this.errorThrown = new StateError(this, format.bind(null, str || reason || 'status code ' + statusCode).apply(null, args));
+    error() {
+        this.errorThrown = new Error(this.doneMessage.join('\n'));
+        return this;
+    }
+    throw<T = StateObject>(statusCode: number, reason?: string, headers?: Hashmap<string>): Observable<T> {
         if (!this.res.headersSent) {
             this.res.writeHead(statusCode, reason && reason.toString(), headers);
             //don't write 204 reason
             if (statusCode !== 204 && reason) this.res.write(reason.toString());
         }
         this.res.end();
-        //don't log anything if we only have a status code
-        if (str || reason) this.error('state error ' + this.errorThrown.message);
-        return Observable.empty<StateObject>();
+        return Observable.empty<never>();
     }
     endJSON(data: any) {
         this.res.write(JSON.stringify(data));
         this.res.end();
     }
-
+    redirect(redirect: string){
+        this.res.writeHead(302, {
+            'Location': redirect
+        });
+        this.res.end();
+    }
 }
 
 export interface ThrowFunc<T> {
@@ -293,8 +354,8 @@ export interface ThrowFunc<T> {
 }
 
 export interface ServerConfig {
+    _disableLocalHost: boolean;
     tree: any,
-    //watch: string[], //not implemented
     types: {
         htmlfile: string[];
         [K: string]: string[]
@@ -323,7 +384,25 @@ export interface AccessPathTag {
     treepath: string,
     filepath: string
 };
-
+export interface PathResolverResult {
+    //the tree string returned from the path resolver
+    item: string | TreeObject;
+    // client request url path
+    reqpath: string[];
+    // tree part of request url
+    treepathPortion: string[];
+    // file part of request url
+    filepathPortion: string[];
+    // item + filepath if item is a string
+    fullfilepath: string;
+    state: StateObject;
+}
+export type TreeObject = { [K: string]: string | TreeObject };
+export type TreePathResultObject<T, U, V> = { item: T, end: U, folderPathFound: V }
+export type TreePathResult =
+	TreePathResultObject<TreeObject, number, false>
+	| TreePathResultObject<string, number, false>
+	| TreePathResultObject<string, number, true>;
 export function createHashmapString<T>(keys: string[], values: T[]): { [id: string]: T } {
     if (keys.length !== values.length)
         throw 'keys and values must be the same length';
@@ -343,7 +422,7 @@ export function createHashmapNumber<T>(keys: number[], values: T[]): { [id: numb
     return obj;
 }
 
-export function obsTruthy<T>(a: T | undefined | null | false | "" | 0): a is T {
+export function obsTruthy<T>(a: T | undefined | null | false | "" | 0 | void): a is T {
     return !!a;
 }
 
@@ -363,5 +442,4 @@ export function getError(...args: string[]) {
     //else args.unshift(code);
     return { code: code, message: format.apply(null, args) };
 }
-
 

@@ -63,22 +63,36 @@ var colors;
     colors.BgCyan = "\x1b[46m";
     colors.BgWhite = "\x1b[47m";
 })(colors = exports.colors || (exports.colors = {}));
+const DEBUGLEVEL = -1;
 function DebugLogger(prefix) {
-    return function (str, ...args) {
+    //if(prefix.startsWith("V:")) return function(){};
+    return function (...args) {
+        //this sets the default log level for the message
+        var msgLevel = 0;
+        if (typeof args[0] === "number") {
+            if (DEBUGLEVEL > args[0])
+                return;
+            else
+                msgLevel = args.shift();
+        }
+        else {
+            if (DEBUGLEVEL > msgLevel)
+                return;
+        }
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log([colors.FgGreen + prefix, date + colors.Reset, util_1.format.apply(null, arguments)].join(' '));
+        console.log([' ', (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix,
+            colors.FgCyan, date, colors.Reset, util_1.format.apply(null, args)].join(' ').split('\n').map((e, i) => {
+            if (i > 0) {
+                return new Array(28 + prefix.length).join(' ') + e;
+            }
+            else {
+                return e;
+            }
+        }).join('\n'));
     };
 }
 exports.DebugLogger = DebugLogger;
-function ErrorLogger(prefix) {
-    return function (str, ...args) {
-        let t = new Date();
-        let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.error([colors.FgRed + prefix, colors.FgYellow + date + colors.Reset, util_1.format.apply(null, arguments)].join(' '));
-    };
-}
-exports.ErrorLogger = ErrorLogger;
 function sanitizeJSON(key, value) {
     // returning undefined omits the key from being serialized
     if (!key) {
@@ -87,14 +101,11 @@ function sanitizeJSON(key, value) {
     else if (key.substring(0, 1) === "$")
         return; //Remove angular tags
     else if (key.substring(0, 1) === "_")
-        return; //Remove NoSQL tags, including _id
+        return; //Remove NoSQL tags
     else
         return value;
 }
 exports.sanitizeJSON = sanitizeJSON;
-function handleProgrammersException(logger, err, message) {
-}
-exports.handleProgrammersException = handleProgrammersException;
 exports.serveStatic = (function () {
     const staticServer = require('../lib/node-static');
     const serve = new staticServer.Server({
@@ -122,6 +133,9 @@ exports.serveStatic = (function () {
         });
     };
 })();
+// export function obs<S>(state?: S) {
+//     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
+// }
 exports.obs_stat = (state) => rx_1.Observable.bindCallback(fs.stat, (err, stat) => [err, stat, state]);
 exports.obs_readdir = (state) => rx_1.Observable.bindCallback(fs.readdir, (err, files) => [err, files, state]);
 exports.obs_readFile = (state) => rx_1.Observable.bindCallback(fs.readFile, (err, data) => [err, data, state]);
@@ -139,6 +153,21 @@ class StateObject {
         this.res = res;
         this.debugLog = debugLog;
         this.isLocalHost = isLocalHost;
+        // log(str: string, ...args: any[]) {
+        //     console.log(this.timestamp + ' [' +
+        //         this.req.socket.remoteFamily + '-' +
+        //         this.req.socket.remoteAddress + '] ' +
+        //         format.apply(null, arguments)
+        //     );
+        // }
+        // error(str: string, ...args: any[]) {
+        //     this.debugLog('[' +
+        //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
+        //         this.req.socket.remoteAddress + colors.Reset + '] ' +
+        //         format.apply(null, arguments)
+        //     );
+        // }
+        this.loglevel = DEBUGLEVEL;
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
@@ -161,26 +190,28 @@ class StateObject {
             this.req.socket.remoteAddress + colors.Reset + '] ' +
             util_1.format.apply(null, arguments));
     }
-    // log(str: string, ...args: any[]) {
-    //     console.log(this.timestamp + ' [' +
-    //         this.req.socket.remoteFamily + '-' +
-    //         this.req.socket.remoteAddress + '] ' +
-    //         format.apply(null, arguments)
-    //     );
-    // }
-    error(str, ...args) {
-        this.debugLog('[' +
-            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-            this.req.socket.remoteAddress + colors.Reset + '] ' +
-            util_1.format.apply(null, arguments));
+    /**
+     *  4 - Errors that require the process to exit for restart
+     *  3 - Major errors that are handled and do not require a server restart
+     *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+     *  1 - Info - Most startup messages
+     *  0 - Normal debug messages and all software and request-side error messages
+     * -1 - Detailed debug messages from high level apis
+     * -2 - Response status messages and error response data
+     * -3 - Request and response data for all messages (verbose)
+     * -4 - Protocol details and full data dump (such as encryption steps and keys)
+     */
+    log(level, ...args) {
+        if (level < this.loglevel)
+            return this;
+        this.doneMessage.push(util_1.format.apply(null, args));
+        return this;
     }
-    throw(statusCode, reason, str, ...args) {
-        //throw<T>(statusCode: number, reason?, str?: string, ...args: any[]): Observable<T>
-        //throw(statusCode: number, reason?, str?: string, ...args: any[]): Observable<any> {
-        let headers = (typeof str === 'object') ? str : null;
-        if (headers)
-            str = args.shift();
-        this.errorThrown = new StateError(this, util_1.format.bind(null, str || reason || 'status code ' + statusCode).apply(null, args));
+    error() {
+        this.errorThrown = new Error(this.doneMessage.join('\n'));
+        return this;
+    }
+    throw(statusCode, reason, headers) {
         if (!this.res.headersSent) {
             this.res.writeHead(statusCode, reason && reason.toString(), headers);
             //don't write 204 reason
@@ -188,13 +219,16 @@ class StateObject {
                 this.res.write(reason.toString());
         }
         this.res.end();
-        //don't log anything if we only have a status code
-        if (str || reason)
-            this.error('state error ' + this.errorThrown.message);
         return rx_1.Observable.empty();
     }
     endJSON(data) {
         this.res.write(JSON.stringify(data));
+        this.res.end();
+    }
+    redirect(redirect) {
+        this.res.writeHead(302, {
+            'Location': redirect
+        });
         this.res.end();
     }
 }
