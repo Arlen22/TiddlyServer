@@ -1,11 +1,13 @@
 import * as http from 'http';
 import * as url from 'url';
 import * as fs from 'fs';
+import * as path from 'path';
 
 import { format } from "util";
 import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
+import send = require('../lib/send-lib');
 
 export type Hashmap<T> = { [K: string]: T };
 
@@ -22,6 +24,14 @@ export interface Directory {
     path: string,
     entries: DirectoryEntry[]
     type: string
+}
+
+export function tryParseJSON(str: string, errObj: { error?: any } = {}) {
+    try {
+        return JSON.parse(str);
+    } catch (e) {
+        errObj.error = e;
+    }
 }
 
 export function keys<T>(o: T): (keyof T)[] {
@@ -172,6 +182,65 @@ export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => 
 
 })();
 
+
+export function serveFile(obs: Observable<StateObject>, file: string, root: string) {
+    return obs.mergeMap(state => {
+        return obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]): any => {
+            if (err) return state.throw<StateObject>(404);
+            send(state.req, file, { root })
+                .on('error', err => {
+                    state.log(2, '%s %s', err.status, err.message).error().throw(500);
+                }).pipe(state.res);
+            return Observable.empty<StateObject>();
+        }) as Observable<StateObject>;
+    }).ignoreElements();
+}
+export function serveFolder(obs: Observable<StateObject>, mount: string, root: string, serveIndex?: Function) {
+    return obs.do(state => {
+        const pathname = state.url.pathname;
+        if (state.url.pathname.slice(0, mount.length) !== mount) {
+            state.log(2, 'URL is different than the mount point %s', mount).throw(500);
+        } else {
+            send(state.req, pathname.slice(mount.length), { root })
+                .on('error', (err) => {
+                    state.log(-1, '%s %s', err.status, err.message).error().throw(404);
+                })
+                .on('directory', (res, fp) => {
+                    if (serveIndex) {
+                        serveIndex(state, res, fp);
+                    } else {
+                        state.throw(403);
+                    }
+                })
+                .pipe(state.res);
+        }
+    }).ignoreElements();
+}
+export function serveFolderIndex(options: { type: string }) {
+    function readFolder(folder: string) {
+        return obs_readdir()(folder).mergeMap(([err, files]) => {
+            return Observable.from(files)
+        }).mergeMap(file => {
+            return obs_stat(file)(path.join(folder, file));
+        }).map(([err, stat, key]) => {
+            let itemtype = stat.isDirectory() ? 'directory' : (stat.isFile() ? 'file' : 'other');
+            return { key, itemtype };
+        }).reduce((n, e) => {
+            n[e.itemtype].push(e.key);
+            return n;
+        }, { "directory": [], "file": [] });
+    }
+    if (options.type === "json") {
+        return function (state: StateObject, res: http.ServerResponse, folder: string) {
+            readFolder(folder).subscribe(item => {
+                res.writeHead(200);
+                res.write(JSON.stringify(item));
+                res.end();
+            })
+        }
+    }
+}
+
 type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 
 
@@ -185,8 +254,25 @@ export const obs_stat = <T>(state?: T) => Observable.bindCallback(
 export const obs_readdir = <T>(state?: T) => Observable.bindCallback(
     fs.readdir, (err, files): NodeCallback<string[], T> => [err, files, state] as any);
 
-export const obs_readFile = <T>(state?: T) => Observable.bindCallback(
-    fs.readFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
+export const obs_readFile = <T>(tag: T = undefined as any): typeof obs_readFile_inner =>
+    (filepath: string, encoding?: string) =>
+        new Observable(subs => {
+            if (encoding) fs.readFile(filepath, encoding, (err, data) => {
+                subs.next([err, data, tag]);
+                subs.complete();
+            });
+            else fs.readFile(filepath, (err, data) => {
+                subs.next([err, data, tag]);
+                subs.complete();
+            })
+        }) as any;
+
+declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T]>;
+declare function obs_readFile_inner<T>(filepath: string, encoding: string): Observable<[NodeJS.ErrnoException, string, T]>;
+
+// Observable.bindCallback(fs.readFile,
+//     (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any
+// );
 
 export const obs_writeFile = <T>(state?: T) => Observable.bindCallback(
     fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
@@ -284,8 +370,8 @@ export class StateObject {
         this.timestamp = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
         this.res.on('finish', () => {
-            if(this.hasCriticalLogs) this.error();
-            if(this.errorThrown) this.eventer.emit('stateError', this);
+            if (this.hasCriticalLogs) this.error();
+            if (this.errorThrown) this.eventer.emit('stateError', this);
         })
 
     }
@@ -298,7 +384,7 @@ export class StateObject {
     }
 
     loglevel: number = DEBUGLEVEL;
-    doneMessage: string[];
+    doneMessage: string[] = [];
     hasCriticalLogs: boolean = false;
     /**
      *  4 - Errors that require the process to exit for restart
@@ -313,7 +399,7 @@ export class StateObject {
      */
     log(level: number, ...args: any[]) {
         if (level < this.loglevel) return this;
-        if(level > 1) this.hasCriticalLogs = true;
+        if (level > 1) this.hasCriticalLogs = true;
         this.doneMessage.push(format.apply(null, args));
         return this;
     }
@@ -334,7 +420,7 @@ export class StateObject {
         this.res.write(JSON.stringify(data));
         this.res.end();
     }
-    redirect(redirect: string){
+    redirect(redirect: string) {
         this.res.writeHead(302, {
             'Location': redirect
         });
@@ -393,9 +479,9 @@ export interface PathResolverResult {
 export type TreeObject = { [K: string]: string | TreeObject };
 export type TreePathResultObject<T, U, V> = { item: T, end: U, folderPathFound: V }
 export type TreePathResult =
-	TreePathResultObject<TreeObject, number, false>
-	| TreePathResultObject<string, number, false>
-	| TreePathResultObject<string, number, true>;
+    TreePathResultObject<TreeObject, number, false>
+    | TreePathResultObject<string, number, false>
+    | TreePathResultObject<string, number, true>;
 export function createHashmapString<T>(keys: string[], values: T[]): { [id: string]: T } {
     if (keys.length !== values.length)
         throw 'keys and values must be the same length';

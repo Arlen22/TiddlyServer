@@ -108,7 +108,7 @@ export function datafolder(result: PathResolverResult) {
     //initialize the tiddlywiki instance
 
     tsloader(state, prefixURI, folder);
-    
+
     if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
         loadedFolders[prefixURI] = [];
         loadTiddlyWiki(prefixURI, folder);
