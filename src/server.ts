@@ -187,13 +187,13 @@ const routes = {
 Observable.merge(
     (Observable.fromEvent(serverLocalHost, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
         if (!req || !res) console.log('blank req or res');
-        return new StateObject(req, res, debug, true);
+        return new StateObject(req, res, debug, eventer, true);
     }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
         return log(state.req, state.res).mapTo(state);
     }),
     (Observable.fromEvent(serverNetwork, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
         if (!req || !res) console.log('blank req or res');
-        return new StateObject(req, res, debug, false);
+        return new StateObject(req, res, debug, eventer, false);
     }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
         return log(state.req, state.res).mapTo(state);
     })
