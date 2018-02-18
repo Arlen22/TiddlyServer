@@ -356,7 +356,7 @@ function sendDirectoryIndex(_r) {
             let a = result.treepathPortion.join('/'), b = result.filepathPortion.join('/'), linkpath = [a, b, e.key].filter(e => e).join('/');
             n.push({
                 name: e.key,
-                path: e.key + (!e.stat || e.stat.itemtype === "folder") ? "/" : "",
+                path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
                 type: (!e.stat ? "category" : (e.stat.itemtype === "file"
                     ? typeLookup[e.key.split('.').pop()] || 'other'
                     : e.stat.itemtype)),

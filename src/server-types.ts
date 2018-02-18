@@ -270,6 +270,7 @@ export class StateObject {
         public req: http.IncomingMessage,
         public res: http.ServerResponse,
         private debugLog: LoggerFunc,
+        private eventer: EventEmitter,
         public readonly isLocalHost: boolean = false
     ) {
         this.startTime = process.hrtime();
@@ -282,6 +283,10 @@ export class StateObject {
         let t = new Date();
         this.timestamp = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+        this.res.on('finish', () => {
+            if(this.hasCriticalLogs) this.error();
+            if(this.errorThrown) this.eventer.emit('stateError', this);
+        })
 
     }
     debug(str: string, ...args: any[]) {
@@ -292,22 +297,9 @@ export class StateObject {
         );
     }
 
-    // log(str: string, ...args: any[]) {
-    //     console.log(this.timestamp + ' [' +
-    //         this.req.socket.remoteFamily + '-' +
-    //         this.req.socket.remoteAddress + '] ' +
-    //         format.apply(null, arguments)
-    //     );
-    // }
-    // error(str: string, ...args: any[]) {
-    //     this.debugLog('[' +
-    //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-    //         this.req.socket.remoteAddress + colors.Reset + '] ' +
-    //         format.apply(null, arguments)
-    //     );
-    // }
     loglevel: number = DEBUGLEVEL;
     doneMessage: string[];
+    hasCriticalLogs: boolean = false;
     /**
      *  4 - Errors that require the process to exit for restart
      *  3 - Major errors that are handled and do not require a server restart
@@ -321,6 +313,7 @@ export class StateObject {
      */
     log(level: number, ...args: any[]) {
         if (level < this.loglevel) return this;
+        if(level > 1) this.hasCriticalLogs = true;
         this.doneMessage.push(format.apply(null, args));
         return this;
     }

@@ -165,13 +165,13 @@ const routes = {
 rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
-    return new server_types_1.StateObject(req, res, debug, true);
+    return new server_types_1.StateObject(req, res, debug, eventer, true);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
 }), rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
-    return new server_types_1.StateObject(req, res, debug, false);
+    return new server_types_1.StateObject(req, res, debug, eventer, false);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
 })).map(state => {

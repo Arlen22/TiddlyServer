@@ -8,6 +8,7 @@ var settings = {};
 const debug = server_types_1.DebugLogger('DAT');
 const loadedFolders = {};
 const otherSocketPaths = {};
+const tsloader_1 = require("./tsloader");
 function init(eventer) {
     eventer.on('settings', function (set) {
         settings = set;
@@ -41,7 +42,9 @@ function init(eventer) {
         }
         datafolder.sockets.push(client);
         client.addEventListener('message', (event) => {
-            datafolder.$tw.hooks.invokeHook('th-websocket-message', event.data, client);
+            // const message = new WebSocketMessageEvent(event, client);
+            // (datafolder.$tw.wss as WebSocket);
+            // datafolder.$tw.hooks.invokeHook('th-websocket-message', event.data, client);
         });
         client.addEventListener('error', (event) => {
             debug('WS-ERROR %s %s', reqURL.pathname, event.type);
@@ -81,6 +84,7 @@ function datafolder(result) {
     //get the full path to the folder as specified in the tree
     let folder = state.statPath.statpath;
     //initialize the tiddlywiki instance
+    tsloader_1.tsloader(state, prefixURI, folder);
     if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
         loadedFolders[prefixURI] = [];
         loadTiddlyWiki(prefixURI, folder);

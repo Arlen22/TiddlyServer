@@ -148,26 +148,14 @@ class StateError extends Error {
 }
 exports.StateError = StateError;
 class StateObject {
-    constructor(req, res, debugLog, isLocalHost = false) {
+    constructor(req, res, debugLog, eventer, isLocalHost = false) {
         this.req = req;
         this.res = res;
         this.debugLog = debugLog;
+        this.eventer = eventer;
         this.isLocalHost = isLocalHost;
-        // log(str: string, ...args: any[]) {
-        //     console.log(this.timestamp + ' [' +
-        //         this.req.socket.remoteFamily + '-' +
-        //         this.req.socket.remoteAddress + '] ' +
-        //         format.apply(null, arguments)
-        //     );
-        // }
-        // error(str: string, ...args: any[]) {
-        //     this.debugLog('[' +
-        //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-        //         this.req.socket.remoteAddress + colors.Reset + '] ' +
-        //         format.apply(null, arguments)
-        //     );
-        // }
         this.loglevel = DEBUGLEVEL;
+        this.hasCriticalLogs = false;
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
@@ -176,6 +164,12 @@ class StateObject {
         this.path = this.url.pathname.split('/');
         let t = new Date();
         this.timestamp = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+        this.res.on('finish', () => {
+            if (this.hasCriticalLogs)
+                this.error();
+            if (this.errorThrown)
+                this.eventer.emit('stateError', this);
+        });
     }
     static errorRoute(status, reason) {
         return (obs) => {
@@ -204,6 +198,8 @@ class StateObject {
     log(level, ...args) {
         if (level < this.loglevel)
             return this;
+        if (level > 1)
+            this.hasCriticalLogs = true;
         this.doneMessage.push(util_1.format.apply(null, args));
         return this;
     }
