@@ -2,9 +2,21 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const url = require("url");
 const fs = require("fs");
+const path = require("path");
 const util_1 = require("util");
 const rx_1 = require("../lib/rx");
 const events_1 = require("events");
+//import { StateObject } from "./index";
+const send = require("../lib/send-lib");
+function tryParseJSON(str, errObj = {}) {
+    try {
+        return JSON.parse(str);
+    }
+    catch (e) {
+        errObj.error = e;
+    }
+}
+exports.tryParseJSON = tryParseJSON;
 function keys(o) {
     return Object.keys(o);
 }
@@ -133,12 +145,89 @@ exports.serveStatic = (function () {
         });
     };
 })();
+function serveFile(obs, file, root) {
+    return obs.mergeMap(state => {
+        return exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
+            if (err)
+                return state.throw(404);
+            send(state.req, file, { root })
+                .on('error', err => {
+                state.log(2, '%s %s', err.status, err.message).error().throw(500);
+            }).pipe(state.res);
+            return rx_1.Observable.empty();
+        });
+    }).ignoreElements();
+}
+exports.serveFile = serveFile;
+function serveFolder(obs, mount, root, serveIndex) {
+    return obs.do(state => {
+        const pathname = state.url.pathname;
+        if (state.url.pathname.slice(0, mount.length) !== mount) {
+            state.log(2, 'URL is different than the mount point %s', mount).throw(500);
+        }
+        else {
+            send(state.req, pathname.slice(mount.length), { root })
+                .on('error', (err) => {
+                state.log(-1, '%s %s', err.status, err.message).error().throw(404);
+            })
+                .on('directory', (res, fp) => {
+                if (serveIndex) {
+                    serveIndex(state, res, fp);
+                }
+                else {
+                    state.throw(403);
+                }
+            })
+                .pipe(state.res);
+        }
+    }).ignoreElements();
+}
+exports.serveFolder = serveFolder;
+function serveFolderIndex(options) {
+    function readFolder(folder) {
+        return exports.obs_readdir()(folder).mergeMap(([err, files]) => {
+            return rx_1.Observable.from(files);
+        }).mergeMap(file => {
+            return exports.obs_stat(file)(path.join(folder, file));
+        }).map(([err, stat, key]) => {
+            let itemtype = stat.isDirectory() ? 'directory' : (stat.isFile() ? 'file' : 'other');
+            return { key, itemtype };
+        }).reduce((n, e) => {
+            n[e.itemtype].push(e.key);
+            return n;
+        }, { "directory": [], "file": [] });
+    }
+    if (options.type === "json") {
+        return function (state, res, folder) {
+            readFolder(folder).subscribe(item => {
+                res.writeHead(200);
+                res.write(JSON.stringify(item));
+                res.end();
+            });
+        };
+    }
+}
+exports.serveFolderIndex = serveFolderIndex;
 // export function obs<S>(state?: S) {
 //     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
 // }
 exports.obs_stat = (state) => rx_1.Observable.bindCallback(fs.stat, (err, stat) => [err, stat, state]);
 exports.obs_readdir = (state) => rx_1.Observable.bindCallback(fs.readdir, (err, files) => [err, files, state]);
-exports.obs_readFile = (state) => rx_1.Observable.bindCallback(fs.readFile, (err, data) => [err, data, state]);
+exports.obs_readFile = (tag = undefined) => (filepath, encoding) => new rx_1.Observable(subs => {
+    if (encoding)
+        fs.readFile(filepath, encoding, (err, data) => {
+            subs.next([err, data, tag]);
+            subs.complete();
+        });
+    else
+        fs.readFile(filepath, (err, data) => {
+            subs.next([err, data, tag]);
+            subs.complete();
+        });
+});
+// Observable.bindCallback(fs.readFile,
+//     (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any
+// );
 exports.obs_writeFile = (state) => rx_1.Observable.bindCallback(fs.writeFile, (err, data) => [err, data, state]);
 class StateError extends Error {
     constructor(state, message) {
@@ -155,6 +244,7 @@ class StateObject {
         this.eventer = eventer;
         this.isLocalHost = isLocalHost;
         this.loglevel = DEBUGLEVEL;
+        this.doneMessage = [];
         this.hasCriticalLogs = false;
         this.startTime = process.hrtime();
         //parse the url and store in state.

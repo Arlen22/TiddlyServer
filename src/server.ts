@@ -6,7 +6,7 @@ import {
 
 import {
     StateObject, DebugLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
-    obs_stat, colors, obsTruthy, Hashmap
+    obs_stat, colors, obsTruthy, Hashmap, obs_readdir, serveFolder, serveFile, serveFolderIndex
 } from "./server-types";
 
 import * as http from 'http'
@@ -16,8 +16,6 @@ import * as url from 'url';
 import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 import { parse as jsonParse } from 'jsonlint';
-
-const servestatic = require('../lib/serve-static-lib');
 
 import send = require('../lib/send-lib');
 const sendOptions = {};
@@ -128,6 +126,7 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
 
 //import and init api-access
 import { doTiddlyServerRoute, init as initAPIAccess } from './tiddlyserver';
+import { ServerResponse } from 'http';
 initAPIAccess(eventer);
 
 //emit settings to everyone (I know, this could be an observable)
@@ -156,6 +155,7 @@ const serveIcons = (function () {
     }
 })();
 
+const assets = path.resolve(__dirname, '../assets');
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
 
@@ -179,11 +179,13 @@ const serverClose = Observable.merge(
 ).multicast(new Subject()).refCount();
 
 const routes = {
-    'favicon.ico': doFaviconRoute,
-    'directory.css': doStylesheetRoute,
-    'icons': doIconRoute,
+    'favicon.ico': obs => serveFile(obs, 'favicon.ico', assets),
+    'directory.css': obs => serveFile(obs, 'directory.css', assets),
+    'icons': obs => serveFolder(obs, '/icons', path.join(__dirname, "../assets/icons")),
+    'tiddlywiki': obs => serveFolder(obs, '/tiddlywiki', path.join(__dirname, "../tiddlywiki"), serveFolderIndex({ type: 'json' })),
     'admin': doAdminRoute
 };
+
 Observable.merge(
     (Observable.fromEvent(serverLocalHost, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
         if (!req || !res) console.log('blank req or res');
@@ -252,42 +254,27 @@ Observable.merge(
     console.log('finished processing for some reason');
 })
 
-function doFaviconRoute(obs: Observable<StateObject>): any {
-    return obs.mergeMap((state: StateObject) => {
-        return obs_stat(state)(favicon).mergeMap(([err, stat]): any => {
-            if (err) return state.throw(404);
-            return serveStatic(favicon, state, stat).map(([isErr, res]) => {
-                if (isErr) state.throw(res.status, res.message, res.headers);
-            }).ignoreElements();
-        })
-    })
-}
-function doStylesheetRoute(obs: Observable<StateObject>): any {
-    return obs.mergeMap(state => {
-        return obs_stat(state)(stylesheet).mergeMap(([err, stat]): any => {
-            if (err) return state.throw(404);
-            return serveStatic(stylesheet, state, stat).map(([isErr, res]) => {
-                if (isErr) state.throw(res.status, res.message, res.headers);
-            }).ignoreElements();
-        });
-    })
-}
-function doIconRoute(obs: Observable<StateObject>): any {
-    return obs.mergeMap(state => {
-        return serveIcons(state.req, state.res).do(([err, res]: [{ status: number, message: string, headers: any }, any]) => {
-            if (err) state.throw(err.status, err.message);
-        }).mapTo(state);
-    })
-}
+// function doFaviconRoute(obs: Observable<StateObject>): any {
+//     return serveFile(obs, 'favicon.ico', assets);
+// }
+// function doStylesheetRoute(obs: Observable<StateObject>): any {
+//     return serveFile(obs, 'directory.css', assets);
+// }
+// function doIconRoute(obs: Observable<StateObject>): any {
+//     return serveFolder(obs, '/icons', path.join(__dirname, "../assets/icons"));
+// }
+// function doTiddlywikiRoute(obs: Observable<StateObject>): any {
+//     return serveFolder(obs, '/tiddlywiki', path.join(__dirname, "../tiddlywiki"), serveFolderIndex({ type: 'json' }));
+// }
 
 function doAdminRoute(obs: Observable<StateObject>): any {
     return obs.mergeMap(state => {
-        if (!state.isLocalHost)
-            return state.throw(403, "Admin is only accessible from localhost");
-
+        if (!state.isLocalHost) return state.throw(403, "Admin is only accessible from localhost");
         return state.throw(404, "Reserved for future use");
-    })
+    }) as Observable<StateObject>
 }
+
+
 
 function serverListenCB(err: any, res: any) {
     function connection(client: WebSocket, request: http.IncomingMessage) {
