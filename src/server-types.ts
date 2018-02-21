@@ -8,6 +8,32 @@ import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 import send = require('../lib/send-lib');
+import { Stats } from 'fs';
+
+export const typeLookup: { [k: string]: string } = {};
+export function init(eventer: EventEmitter) {
+	eventer.on('settings', function (set: ServerConfig) {
+		Object.keys(set.types).forEach(type => {
+			set.types[type].forEach(ext => {
+				if (!typeLookup[ext]) {
+					typeLookup[ext] = type;
+				} else {
+					throw format('Multiple types for extension %s: %s', ext, typeLookup[ext], type);
+				}
+			})
+		})
+	})
+}
+
+export function getHumanSize(size: number) {
+	const TAGS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+	let power = 0;
+	while (size >= 1024) {
+		size /= 1024;
+		power++;
+	}
+	return size.toFixed(1) + TAGS[power];
+}
 
 export type Hashmap<T> = { [K: string]: T };
 
@@ -239,6 +265,173 @@ export function serveFolderIndex(options: { type: string }) {
             })
         }
     }
+}
+
+/**
+ * Returns the keys and paths from the PathResolverResult directory. If there
+ * is an error it will be sent directly to the client and nothing will be emitted. 
+ * 
+ * @param {PathResolverResult} result 
+ * @returns 
+ */
+export function getDirectoryFiles(result: PathResolverResult) {
+	let dirpath = [
+		result.treepathPortion.join('/'),
+		result.filepathPortion.join('/')
+	].filter(e => e).join('/')
+	if (typeof result.item === "object") {
+		const keys = Object.keys(result.item);
+		const paths = keys.map(k => {
+			return typeof result.item[k] === "string" ? result.item[k] : true;
+		});
+		return Observable.of({ keys, paths, dirpath });
+	} else {
+		return obs_readdir()(result.fullfilepath).map(([err, keys]) => {
+			if (err) {
+				result.state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
+				result.state.throw(500);
+				return;
+			}
+			const paths = keys.map(k => path.join(result.fullfilepath, k));
+			return { keys, paths, dirpath };
+		}).filter(obsTruthy);
+	}
+}
+
+/// directory handler section =============================================
+//I have this in a JS file so I can edit it without recompiling
+const { generateDirectoryListing } = require('./generateDirectoryListing');
+
+export function sendDirectoryIndex(_r: { keys: string[], paths: (string | boolean)[], dirpath: string }) {
+	let { keys, paths, dirpath } = _r;
+	let pairs = keys.map((k, i) => [k, paths[i]]);
+	return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
+		//if this is a category, just return the key
+		if (typeof val === "boolean") return Observable.of({ key })
+		//otherwise return the statPath result
+		else return statPath(val).then(res => { return { stat: res, key }; });
+	}).reduce((n, e: { key: string, stat?: StatPathResult }) => {
+		let linkpath = [dirpath, e.key].filter(e => e).join('/');
+		n.push({
+			name: e.key,
+			path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
+			type: (!e.stat ? "category" : (e.stat.itemtype === "file"
+				? typeLookup[e.key.split('.').pop() as string] || 'other'
+				: e.stat.itemtype as string)),
+			size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
+		});
+		return n;
+	}, [] as DirectoryEntry[]).map(entries => {
+		return generateDirectoryListing({ path: dirpath, entries });
+	});
+}
+
+/**
+ * If the path 
+ */
+export function statWalkPath(test: PathResolverResult) {
+	// let endStat = false;
+	if (typeof test.item === "object")
+		throw "property item must be a string";
+	let endWalk = false;
+	return Observable.from([test.item].concat(test.filepathPortion)).scan((n, e) => {
+		return { statpath: path.join(n.statpath, e), index: n.index + 1, endStat: false };
+	}, { statpath: "", index: -1, endStat: false }).concatMap(s => {
+		if (endWalk) return Observable.empty<never>();
+		else return Observable.fromPromise(
+			statPath(s).then(res => { endWalk = endWalk || res.endStat; return res; })
+		);
+	}).takeLast(1);
+}
+/**
+ * returns the info about the specified path. endstat is true if the statpath is not
+ * found or if it is a directory and contains a tiddlywiki.info file, or if it is a file.
+ * 
+ * @param {({ statpath: string, index: number, endStat: boolean } | string)} s 
+ * @returns 
+ */
+export function statPath(s: { statpath: string, index: number, endStat: boolean } | string) {
+	if (typeof s === "string") s = { statpath: s, index: 0, endStat: false };
+	const { statpath, index } = s;
+	let { endStat } = s;
+	if (typeof endStat !== "boolean") endStat = false;
+	return new Promise<StatPathResult>(resolve => {
+		// What I wish I could write (so I did)
+		obs_stat(fs.stat)(statpath).chainMap(([err, stat]) => {
+			if (err || stat.isFile()) endStat = true;
+			if (!err && stat.isDirectory())
+				return obs_stat(stat)(path.join(statpath, "tiddlywiki.info"));
+			else resolve({ stat, statpath, index, endStat, itemtype: '' })
+		}).concatAll().subscribe(([err2, infostat, stat]) => {
+			if (!err2 && infostat.isFile()) {
+				endStat = true;
+				resolve({ stat, statpath, infostat, index, endStat, itemtype: '' })
+			} else
+				resolve({ stat, statpath, index, endStat, itemtype: '' });
+		});
+	}).then(res => {
+		res.itemtype = getItemType(res.stat, res.infostat)
+		return res;
+	})
+}
+
+function getItemType(stat: Stats, infostat: Stats | undefined) {
+	let itemtype;
+
+	if (!stat) itemtype = "error";
+	else if (stat.isDirectory()) itemtype = !!infostat ? "datafolder" : "folder";
+	else if (stat.isFile() || stat.isSymbolicLink()) itemtype = "file"
+	else itemtype = "error"
+
+	return itemtype;
+
+}
+
+export function resolvePath(state: StateObject, tree: TreeObject): PathResolverResult | undefined {
+	var reqpath = decodeURI(state.path.slice().filter(a => a).join('/')).split('/').filter(a => a);
+
+	//if we're at root, just return it
+	if (reqpath.length === 0) return {
+		item: tree,
+		reqpath,
+		treepathPortion: [],
+		filepathPortion: [],
+		fullfilepath: typeof tree === "string" ? tree : '',
+		state
+	};
+	//check for invalid items (such as ..)
+	if (!reqpath.every(a => a !== ".." && a !== ".")) return;
+
+	var result = (function () {
+		var item: any = tree;
+		var folderPathFound = false;
+		for (var end = 0; end < reqpath.length; end++) {
+			if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
+				item = item[reqpath[end]];
+			} else if (typeof item === "string") {
+				folderPathFound = true; break;
+			} else break;
+		}
+		return { item, end, folderPathFound } as TreePathResult;
+	})();
+
+	if (reqpath.length > result.end && !result.folderPathFound) return;
+
+	//get the remainder of the path
+	let filepathPortion = reqpath.slice(result.end).map(a => a.trim());
+
+	const fullfilepath = (result.folderPathFound)
+		? path.join(result.item, ...filepathPortion)
+		: (typeof result.item === "string" ? result.item : '');
+
+	return {
+		item: result.item,
+		reqpath,
+		treepathPortion: reqpath.slice(0, result.end),
+		filepathPortion,
+		fullfilepath,
+		state
+	};
 }
 
 type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];

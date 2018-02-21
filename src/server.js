@@ -228,18 +228,6 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     //In practice, the only reason this should happen is if the server close event fires.
     console.log('finished processing for some reason');
 });
-// function doFaviconRoute(obs: Observable<StateObject>): any {
-//     return serveFile(obs, 'favicon.ico', assets);
-// }
-// function doStylesheetRoute(obs: Observable<StateObject>): any {
-//     return serveFile(obs, 'directory.css', assets);
-// }
-// function doIconRoute(obs: Observable<StateObject>): any {
-//     return serveFolder(obs, '/icons', path.join(__dirname, "../assets/icons"));
-// }
-// function doTiddlywikiRoute(obs: Observable<StateObject>): any {
-//     return serveFolder(obs, '/tiddlywiki', path.join(__dirname, "../tiddlywiki"), serveFolderIndex({ type: 'json' }));
-// }
 function doAdminRoute(obs) {
     return obs.mergeMap(state => {
         if (!state.isLocalHost)
