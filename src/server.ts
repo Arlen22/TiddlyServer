@@ -254,27 +254,12 @@ Observable.merge(
     console.log('finished processing for some reason');
 })
 
-// function doFaviconRoute(obs: Observable<StateObject>): any {
-//     return serveFile(obs, 'favicon.ico', assets);
-// }
-// function doStylesheetRoute(obs: Observable<StateObject>): any {
-//     return serveFile(obs, 'directory.css', assets);
-// }
-// function doIconRoute(obs: Observable<StateObject>): any {
-//     return serveFolder(obs, '/icons', path.join(__dirname, "../assets/icons"));
-// }
-// function doTiddlywikiRoute(obs: Observable<StateObject>): any {
-//     return serveFolder(obs, '/tiddlywiki', path.join(__dirname, "../tiddlywiki"), serveFolderIndex({ type: 'json' }));
-// }
-
 function doAdminRoute(obs: Observable<StateObject>): any {
     return obs.mergeMap(state => {
         if (!state.isLocalHost) return state.throw(403, "Admin is only accessible from localhost");
         return state.throw(404, "Reserved for future use");
     }) as Observable<StateObject>
 }
-
-
 
 function serverListenCB(err: any, res: any) {
     function connection(client: WebSocket, request: http.IncomingMessage) {
