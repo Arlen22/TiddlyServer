@@ -5,8 +5,11 @@ import {
 } from '../lib/rx';
 
 import {
-    StateObject, DebugLogger, sanitizeJSON, keys, ServerConfig, serveStatic,
-    obs_stat, colors, obsTruthy, Hashmap, obs_readdir, serveFolder, serveFile, serveFolderIndex
+    StateObject, DebugLogger, sanitizeJSON, keys, ServerConfig,
+    obs_stat, colors, obsTruthy, Hashmap, obs_readdir, serveFolder, serveFile, serveFolderIndex,
+    init as initServerTypes,
+    tryParseJSON,
+    JsonError
 } from "./server-types";
 
 import * as http from 'http'
@@ -53,32 +56,13 @@ console.log("Settings file: %s", settingsFile);
 
 var settings: ServerConfig;
 {
-    function findJSONError(message: string, json: string) {
-
-        const match = /position (\d+)/gi.exec(message);
-        if (!match) return;
-        const position = +match[1];
-        const lines = json.split('\n');
-        let current = 1;
-        let i = 0;
-        for (; i < lines.length; i++) {
-            current += lines[i].length + 1; //add one for the new line
-            console.log(lines[i]);
-            if (current > position) break;
-        }
-        const linePos = lines[i].length - (current - position) - 1; //take the new line off again
-        //not sure why I need the +4 but it seems to hold out.
-        console.log(new Array(linePos + 4).join('-') + '^  ' + message);
-        for (i++; i < lines.length; i++) {
-            console.log(lines[i]);
-        }
-    }
     const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
-    try {
-        settings = JSON.parse(settingsString) as ServerConfig;
-    } catch (e) {
-        console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.message);
-        findJSONError(e.message, settingsString);
+    let settingsError: { error?: JsonError } = {} as any;
+    settings = tryParseJSON(settingsString, settingsError);
+    if (!settings && settingsError.error) {
+        let e = settingsError.error;
+        console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
+        console.error(e.errorPosition);
         throw "The settings file could not be parsed: Invalid JSON";
     }
 }
@@ -125,35 +109,13 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
     ENV.disableLocalHost = true;
 
 //import and init api-access
-import { doTiddlyServerRoute, init as initAPIAccess } from './tiddlyserver';
+import { doTiddlyServerRoute, init as initTiddlyServer, doTiddlyWikiRoute } from './tiddlyserver';
 import { ServerResponse } from 'http';
-initAPIAccess(eventer);
+initServerTypes(eventer);
+initTiddlyServer(eventer);
 
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
-
-const serveIcons = (function () {
-    const mount = "/icons";
-    const root = path.join(__dirname, "../assets/icons");
-    return function (req: http.IncomingMessage, res: http.ServerResponse) {
-        return new Observable(subs => {
-            const pathname = url.parse(req.url as string).pathname || "";
-            if (pathname.slice(0, mount.length) !== mount) {
-                subs.next([{ status: 403, message: "No directory listing" }]);
-                subs.complete();
-            } else send(req, pathname.slice(mount.length), { root })
-                .on('error', (err: { status: number, message: string }) => {
-                    subs.next([err]);
-                    subs.complete();
-                })
-                .on('end', () => {
-                    subs.next([null, { status: res.statusCode, message: res.statusMessage }]);
-                    subs.complete();
-                })
-                .pipe(res);
-        })
-    }
-})();
 
 const assets = path.resolve(__dirname, '../assets');
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
@@ -181,8 +143,9 @@ const serverClose = Observable.merge(
 const routes = {
     'favicon.ico': obs => serveFile(obs, 'favicon.ico', assets),
     'directory.css': obs => serveFile(obs, 'directory.css', assets),
-    'icons': obs => serveFolder(obs, '/icons', path.join(__dirname, "../assets/icons")),
-    'tiddlywiki': obs => serveFolder(obs, '/tiddlywiki', path.join(__dirname, "../tiddlywiki"), serveFolderIndex({ type: 'json' })),
+    'static': obs => serveFolder(obs, '/static', path.join(assets, "static")),
+    'icons': obs => serveFolder(obs, '/icons', path.join(assets, "icons")),
+    'tiddlywiki': doTiddlyWikiRoute,
     'admin': doAdminRoute
 };
 
@@ -311,28 +274,3 @@ if (ENV.disableLocalHost) {
 
 
 
-/**
- * to be used with concatMap, mergeMap, etc.
- * @param state 
- */
-export function recieveBody(state: StateObject) {
-    //get the data from the request
-    return Observable.fromEvent<Buffer>(state.req, 'data')
-        //only take one since we only need one. this will dispose the listener
-        .takeUntil(Observable.fromEvent(state.req, 'end').take(1))
-        //accumulate all the chunks until it completes
-        .reduce<Buffer>((n, e) => { n.push(e); return n; }, [])
-        //convert to json and return state for next part
-        .map(e => {
-            state.body = Buffer.concat(e).toString('utf8');
-            //console.log(state.body);
-            if (state.body.length === 0)
-                return state;
-            try {
-                state.json = JSON.parse(state.body);
-            } catch (e) {
-                //state.json = buf;
-            }
-            return state;
-        });
-}

@@ -41,10 +41,13 @@ exports.generateDirectoryListing = function (directory) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
-<p><a href="${parentPath}">Directory: ${parentPath}</a></p>
-
+${
+        (pathArr.length > 0)
+            ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>`
+            : ``
+        }
 <table>
-  <caption>${name}</caption>
+  <caption>${(pathArr.length > 0) ? name : 'Home'}</caption>
   <thead>
     <tr>
       <th scope="col">Name</th>
@@ -58,7 +61,8 @@ ${listEntries(directory.entries)}
 </table>
 
 <p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
-<p style="color:grey; font-family:sans-serif; font-size:0.8em;">TiddlyServer v${info.version}</p>
+<p style="color:grey; font-family:sans-serif; font-size:0.8em;">
+<a href="https://github.com/Arlen22/TiddlyServer">TiddlyServer</a> v${info.version}</p>
 </body>
 </html>
 `

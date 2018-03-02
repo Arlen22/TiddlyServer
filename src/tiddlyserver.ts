@@ -1,8 +1,8 @@
 import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
 import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
-	Directory, sortBySelector, serveStatic, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
-	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath, sendDirectoryIndex, getDirectoryFiles, statWalkPath, typeLookup
+	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
+	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath, sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -16,7 +16,9 @@ import { Mime } from '../lib/mime';
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
 
-import { datafolder, init as initTiddlyWiki } from "./datafolder";
+import { datafolder, init as initTiddlyWiki, doTiddlyWikiRoute } from "./datafolder";
+export { doTiddlyWikiRoute };
+
 import { format } from "util";
 import { Stream, Writable } from "stream";
 import { Subscribable } from "rxjs/Observable";
@@ -65,15 +67,7 @@ export function doTiddlyServerRoute(input: Observable<StateObject>) {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
 		if (!result) return state.throw<never>(404);
 		else if (typeof result.item === "object") {
-			if (!state.url.path.endsWith("/")) {
-				state.redirect(state.url.path + "/");
-			} else {
-				getDirectoryFiles(result).map(sendDirectoryIndex).subscribe(res => {
-					state.res.writeHead(200);
-					state.res.write(res);
-					state.res.end();
-				})
-			}
+			serveDirectoryIndex(result);
 			return Observable.empty<never>();
 		} else {
 			return statWalkPath(result).map(stat => {
@@ -85,15 +79,7 @@ export function doTiddlyServerRoute(input: Observable<StateObject>) {
 		const { state } = result;
 
 		if (state.statPath.itemtype === "folder") {
-			if (!state.url.path.endsWith("/")) {
-				state.redirect(state.url.path + "/");
-			} else {
-				getDirectoryFiles(result).map(sendDirectoryIndex).subscribe(res => {
-					state.res.writeHead(200);
-					state.res.write(res);
-					state.res.end();
-				})
-			}
+			serveDirectoryIndex(result);
 		} else if (state.statPath.itemtype === "datafolder") {
 			datafolder(result);
 		} else if (state.statPath.itemtype === "file") {
@@ -123,6 +109,22 @@ export function doTiddlyServerRoute(input: Observable<StateObject>) {
 			state.throw(500);
 		}
 	}).ignoreElements();
+}
+
+function serveDirectoryIndex(result: PathResolverResult) {
+	const { state } = result;
+	if (!state.url.path.endsWith("/")) {
+		state.redirect(state.url.path + "/");
+	} else {
+		Observable.of(result)
+			.concatMap(getTreeItemFiles)
+			.concatMap(sendDirectoryIndex)
+			.subscribe(res => {
+				state.res.writeHead(200);
+				state.res.write(res);
+				state.res.end();
+			});
+	}
 }
 
 /// file handler section =============================================

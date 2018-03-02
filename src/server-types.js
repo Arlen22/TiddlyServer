@@ -5,7 +5,6 @@ const fs = require("fs");
 const path = require("path");
 const util_1 = require("util");
 const rx_1 = require("../lib/rx");
-const events_1 = require("events");
 //import { StateObject } from "./index";
 const send = require("../lib/send-lib");
 exports.typeLookup = {};
@@ -35,14 +34,45 @@ function getHumanSize(size) {
 }
 exports.getHumanSize = getHumanSize;
 function tryParseJSON(str, errObj = {}) {
+    function findJSONError(message, json) {
+        const res = [];
+        const match = /position (\d+)/gi.exec(message);
+        if (!match)
+            return "";
+        const position = +match[1];
+        const lines = json.split('\n');
+        let current = 1;
+        let i = 0;
+        for (; i < lines.length; i++) {
+            current += lines[i].length + 1; //add one for the new line
+            res.push(lines[i]);
+            if (current > position)
+                break;
+        }
+        const linePos = lines[i].length - (current - position) - 1; //take the new line off again
+        //not sure why I need the +4 but it seems to hold out.
+        res.push(new Array(linePos + 4).join('-') + '^  ' + message);
+        for (i++; i < lines.length; i++) {
+            res.push(lines[i]);
+        }
+        return res.join('\n');
+    }
+    str = str.replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
     try {
         return JSON.parse(str);
     }
     catch (e) {
-        errObj.error = e;
+        errObj.error = new JsonError(findJSONError(e.message, str), e);
     }
 }
 exports.tryParseJSON = tryParseJSON;
+class JsonError {
+    constructor(errorPosition, originalError) {
+        this.errorPosition = errorPosition;
+        this.originalError = originalError;
+    }
+}
+exports.JsonError = JsonError;
 function keys(o) {
     return Object.keys(o);
 }
@@ -144,33 +174,39 @@ function sanitizeJSON(key, value) {
         return value;
 }
 exports.sanitizeJSON = sanitizeJSON;
-exports.serveStatic = (function () {
-    const staticServer = require('../lib/node-static');
-    const serve = new staticServer.Server({
-        mount: '/'
-        // gzipTransfer: true, 
-        // gzip:/^(text\/html|application\/javascript|text\/css|application\/json)$/gi 
-    });
-    const promise = new events_1.EventEmitter();
-    return function (path, state, stat) {
-        const { req, res } = state;
-        return rx_1.Observable.create((subs) => {
-            serve.respond(null, 200, {
-                'x-api-access-type': 'file'
-            }, [path], stat, req, res, function (status, headers) {
-                serve.finish(status, headers, req, res, promise, (err, res) => {
-                    if (err) {
-                        subs.next([true, err]);
-                    }
-                    else {
-                        subs.next([false, res]);
-                    }
-                    subs.complete();
-                });
-            });
-        });
-    };
-})();
+// export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => Observable<[
+//     boolean, ServeStaticResult
+// ]> = (function () {
+//     interface Server {
+//         serveFile(pathname: string, status: number, headers: {}, req: http.IncomingMessage, res: http.ServerResponse): EventEmitter
+//         respond(...args: any[]): any;
+//         finish(...args: any[]): any;
+//     }
+//     const staticServer = require('../lib/node-static');
+//     const serve = new staticServer.Server({
+//         mount: '/'
+//         // gzipTransfer: true, 
+//         // gzip:/^(text\/html|application\/javascript|text\/css|application\/json)$/gi 
+//     }) as Server;
+//     const promise = new EventEmitter();
+//     return function (path: string, state: StateObject, stat: fs.Stats) {
+//         const { req, res } = state;
+//         return Observable.create((subs: Subscriber<[boolean, ServeStaticResult]>) => {
+//             serve.respond(null, 200, {
+//                 'x-api-access-type': 'file'
+//             }, [path], stat, req, res, function (status: number, headers: any) {
+//                 serve.finish(status, headers, req, res, promise, (err: ServeStaticResult, res: ServeStaticResult) => {
+//                     if (err) {
+//                         subs.next([true, err]);
+//                     } else {
+//                         subs.next([false, res]);
+//                     }
+//                     subs.complete();
+//                 });
+//             });
+//         })
+//     }
+// })();
 function serveFile(obs, file, root) {
     return obs.mergeMap(state => {
         return exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
@@ -241,7 +277,7 @@ exports.serveFolderIndex = serveFolderIndex;
  * @param {PathResolverResult} result
  * @returns
  */
-function getDirectoryFiles(result) {
+function getTreeItemFiles(result) {
     let dirpath = [
         result.treepathPortion.join('/'),
         result.filepathPortion.join('/')
@@ -265,7 +301,7 @@ function getDirectoryFiles(result) {
         }).filter(obsTruthy);
     }
 }
-exports.getDirectoryFiles = getDirectoryFiles;
+exports.getTreeItemFiles = getTreeItemFiles;
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
 const { generateDirectoryListing } = require('./generateDirectoryListing');
@@ -518,8 +554,32 @@ class StateObject {
         });
         this.res.end();
     }
+    recieveBody() {
+        return recieveBody(this);
+    }
 }
 exports.StateObject = StateObject;
+/** to be used with concatMap, mergeMap, etc. */
+function recieveBody(state) {
+    //get the data from the request
+    return rx_1.Observable.fromEvent(state.req, 'data')
+        .takeUntil(rx_1.Observable.fromEvent(state.req, 'end').take(1))
+        .reduce((n, e) => { n.push(e); return n; }, [])
+        .map(e => {
+        state.body = Buffer.concat(e).toString('utf8');
+        //console.log(state.body);
+        if (state.body.length === 0)
+            return state;
+        try {
+            state.json = JSON.parse(state.body);
+        }
+        catch (e) {
+            //state.json = buf;
+        }
+        return state;
+    });
+}
+exports.recieveBody = recieveBody;
 ;
 ;
 function createHashmapString(keys, values) {

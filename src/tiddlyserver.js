@@ -6,6 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 const datafolder_1 = require("./datafolder");
+exports.doTiddlyWikiRoute = datafolder_1.doTiddlyWikiRoute;
 const send = require("../lib/send-lib");
 const mime = require('../lib/mime');
 const debug = server_types_1.DebugLogger("SER-API");
@@ -41,16 +42,7 @@ function doTiddlyServerRoute(input) {
         if (!result)
             return state.throw(404);
         else if (typeof result.item === "object") {
-            if (!state.url.path.endsWith("/")) {
-                state.redirect(state.url.path + "/");
-            }
-            else {
-                server_types_1.getDirectoryFiles(result).map(server_types_1.sendDirectoryIndex).subscribe(res => {
-                    state.res.writeHead(200);
-                    state.res.write(res);
-                    state.res.end();
-                });
-            }
+            serveDirectoryIndex(result);
             return rx_1.Observable.empty();
         }
         else {
@@ -62,16 +54,7 @@ function doTiddlyServerRoute(input) {
     }).map(result => {
         const { state } = result;
         if (state.statPath.itemtype === "folder") {
-            if (!state.url.path.endsWith("/")) {
-                state.redirect(state.url.path + "/");
-            }
-            else {
-                server_types_1.getDirectoryFiles(result).map(server_types_1.sendDirectoryIndex).subscribe(res => {
-                    state.res.writeHead(200);
-                    state.res.write(res);
-                    state.res.end();
-                });
-            }
+            serveDirectoryIndex(result);
         }
         else if (state.statPath.itemtype === "datafolder") {
             datafolder_1.datafolder(result);
@@ -111,6 +94,22 @@ function doTiddlyServerRoute(input) {
     }).ignoreElements();
 }
 exports.doTiddlyServerRoute = doTiddlyServerRoute;
+function serveDirectoryIndex(result) {
+    const { state } = result;
+    if (!state.url.path.endsWith("/")) {
+        state.redirect(state.url.path + "/");
+    }
+    else {
+        rx_1.Observable.of(result)
+            .concatMap(server_types_1.getTreeItemFiles)
+            .concatMap(server_types_1.sendDirectoryIndex)
+            .subscribe(res => {
+            state.res.writeHead(200);
+            state.res.write(res);
+            state.res.end();
+        });
+    }
+}
 /// file handler section =============================================
 function handlePUTrequest(state) {
     // const hash = createHash('sha256').update(fullpath).digest('base64');
