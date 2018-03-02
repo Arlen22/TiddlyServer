@@ -1046,7 +1046,6 @@ $tw.Wiki = function(options) {
 			if(tiddler.fields.type === "application/json" && tiddler.hasField("plugin-type")) {
 				pluginInfo[tiddler.fields.title] = JSON.parse(tiddler.fields.text);
 			}
-
 		}
 	};
 

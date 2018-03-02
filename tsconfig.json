@@ -8,9 +8,10 @@
         "strictNullChecks": true,
         "sourceMap": false,
         "inlineSourceMap": false
-        //"lib": [],
-        
     },
+    "files": [
+        "./src/server.ts"
+    ],
     "exclude": [
         "node_modules",
         "new-server",

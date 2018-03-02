@@ -1,6 +1,7 @@
 node_modules/
 /settings.json
 /archive/
+/src/archive/
 /backup/
 *.map
 uncaughtException.log

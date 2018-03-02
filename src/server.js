@@ -6,10 +6,8 @@ const server_types_1 = require("./server-types");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const url = require("url");
 const util_1 = require("util");
 const events_1 = require("events");
-const send = require("../lib/send-lib");
 const sendOptions = {};
 const WS_1 = require("../lib/websocket-server/WS");
 __dirname = path.dirname(module.filename || process.execPath);
@@ -35,34 +33,13 @@ const settingsFile = path.normalize(process.argv[2]
 console.log("Settings file: %s", settingsFile);
 var settings;
 {
-    function findJSONError(message, json) {
-        const match = /position (\d+)/gi.exec(message);
-        if (!match)
-            return;
-        const position = +match[1];
-        const lines = json.split('\n');
-        let current = 1;
-        let i = 0;
-        for (; i < lines.length; i++) {
-            current += lines[i].length + 1; //add one for the new line
-            console.log(lines[i]);
-            if (current > position)
-                break;
-        }
-        const linePos = lines[i].length - (current - position) - 1; //take the new line off again
-        //not sure why I need the +4 but it seems to hold out.
-        console.log(new Array(linePos + 4).join('-') + '^  ' + message);
-        for (i++; i < lines.length; i++) {
-            console.log(lines[i]);
-        }
-    }
     const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
-    try {
-        settings = JSON.parse(settingsString);
-    }
-    catch (e) {
-        console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + server_types_1.colors.Reset, e.message);
-        findJSONError(e.message, settingsString);
+    let settingsError = {};
+    settings = server_types_1.tryParseJSON(settingsString, settingsError);
+    if (!settings && settingsError.error) {
+        let e = settingsError.error;
+        console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + server_types_1.colors.Reset, e.originalError.message);
+        console.error(e.errorPosition);
         throw "The settings file could not be parsed: Invalid JSON";
     }
 }
@@ -115,33 +92,10 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
     ENV.disableLocalHost = true;
 //import and init api-access
 const tiddlyserver_1 = require("./tiddlyserver");
+server_types_1.init(eventer);
 tiddlyserver_1.init(eventer);
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
-const serveIcons = (function () {
-    const mount = "/icons";
-    const root = path.join(__dirname, "../assets/icons");
-    return function (req, res) {
-        return new rx_1.Observable(subs => {
-            const pathname = url.parse(req.url).pathname || "";
-            if (pathname.slice(0, mount.length) !== mount) {
-                subs.next([{ status: 403, message: "No directory listing" }]);
-                subs.complete();
-            }
-            else
-                send(req, pathname.slice(mount.length), { root })
-                    .on('error', (err) => {
-                    subs.next([err]);
-                    subs.complete();
-                })
-                    .on('end', () => {
-                    subs.next([null, { status: res.statusCode, message: res.statusMessage }]);
-                    subs.complete();
-                })
-                    .pipe(res);
-        });
-    };
-})();
 const assets = path.resolve(__dirname, '../assets');
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
@@ -159,8 +113,9 @@ const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalH
 const routes = {
     'favicon.ico': obs => server_types_1.serveFile(obs, 'favicon.ico', assets),
     'directory.css': obs => server_types_1.serveFile(obs, 'directory.css', assets),
-    'icons': obs => server_types_1.serveFolder(obs, '/icons', path.join(__dirname, "../assets/icons")),
-    'tiddlywiki': obs => server_types_1.serveFolder(obs, '/tiddlywiki', path.join(__dirname, "../tiddlywiki"), server_types_1.serveFolderIndex({ type: 'json' })),
+    'static': obs => server_types_1.serveFolder(obs, '/static', path.join(assets, "static")),
+    'icons': obs => server_types_1.serveFolder(obs, '/icons', path.join(assets, "icons")),
+    'tiddlywiki': tiddlyserver_1.doTiddlyWikiRoute,
     'admin': doAdminRoute
 };
 rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
@@ -283,27 +238,3 @@ else {
         }
     });
 }
-/**
- * to be used with concatMap, mergeMap, etc.
- * @param state
- */
-function recieveBody(state) {
-    //get the data from the request
-    return rx_1.Observable.fromEvent(state.req, 'data')
-        .takeUntil(rx_1.Observable.fromEvent(state.req, 'end').take(1))
-        .reduce((n, e) => { n.push(e); return n; }, [])
-        .map(e => {
-        state.body = Buffer.concat(e).toString('utf8');
-        //console.log(state.body);
-        if (state.body.length === 0)
-            return state;
-        try {
-            state.json = JSON.parse(state.body);
-        }
-        catch (e) {
-            //state.json = buf;
-        }
-        return state;
-    });
-}
-exports.recieveBody = recieveBody;
