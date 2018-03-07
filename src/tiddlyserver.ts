@@ -3,7 +3,7 @@ import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
-	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup
+	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -117,9 +117,14 @@ function serveDirectoryIndex(result: PathResolverResult) {
 	if (!state.url.pathname.endsWith("/")) {
 		state.redirect(state.url.pathname + "/");
 	} else if (state.req.method === "GET") {
+		const isFolder = typeof result.item === "string";
+		const options = {
+			upload: isFolder && (settings.allowNetwork.upload || state.isLocalHost),
+			mkdir: isFolder && (settings.allowNetwork.mkdir || state.isLocalHost)
+		};
 		Observable.of(result)
 			.concatMap(getTreeItemFiles)
-			.map(e => [e, settings])
+			.map(e => [e, options] as [typeof e, typeof options])
 			.concatMap(sendDirectoryIndex)
 			.subscribe(res => {
 				state.res.writeHead(200, { 'content-type': 'text/html' });

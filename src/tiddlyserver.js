@@ -103,9 +103,14 @@ function serveDirectoryIndex(result) {
         state.redirect(state.url.pathname + "/");
     }
     else if (state.req.method === "GET") {
+        const isFolder = typeof result.item === "string";
+        const options = {
+            upload: isFolder && (settings.allowNetwork.upload || state.isLocalHost),
+            mkdir: isFolder && (settings.allowNetwork.mkdir || state.isLocalHost)
+        };
         rx_1.Observable.of(result)
             .concatMap(server_types_1.getTreeItemFiles)
-            .map(e => [e, settings])
+            .map(e => [e, options])
             .concatMap(server_types_1.sendDirectoryIndex)
             .subscribe(res => {
             state.res.writeHead(200, { 'content-type': 'text/html' });

@@ -296,6 +296,7 @@ function getTreeItemFiles(result) {
         result.treepathPortion.join('/'),
         result.filepathPortion.join('/')
     ].filter(e => e).join('/');
+    let type = typeof result.item === "object" ? "category" : "folder";
     if (typeof result.item === "object") {
         const keys = Object.keys(result.item);
         const paths = keys.map(k => {
@@ -311,7 +312,7 @@ function getTreeItemFiles(result) {
                 return;
             }
             const paths = keys.map(k => path.join(result.fullfilepath, k));
-            return { keys, paths, dirpath };
+            return { keys, paths, dirpath, type };
         }).filter(obsTruthy);
     }
 }
@@ -319,8 +320,8 @@ exports.getTreeItemFiles = getTreeItemFiles;
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
 const { generateDirectoryListing } = require('./generateDirectoryListing');
-function sendDirectoryIndex([_r, settings]) {
-    let { keys, paths, dirpath } = _r;
+function sendDirectoryIndex([_r, options]) {
+    let { keys, paths, dirpath, type } = _r;
     let pairs = keys.map((k, i) => [k, paths[i]]);
     return rx_1.Observable.from(pairs).mergeMap(([key, val]) => {
         //if this is a category, just return the key
@@ -340,7 +341,7 @@ function sendDirectoryIndex([_r, settings]) {
         });
         return n;
     }, []).map(entries => {
-        return generateDirectoryListing({ path: dirpath, entries }, settings);
+        return generateDirectoryListing({ path: dirpath, entries, type }, options);
     });
 }
 exports.sendDirectoryIndex = sendDirectoryIndex;
