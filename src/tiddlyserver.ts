@@ -129,9 +129,7 @@ function serveDirectoryIndex(result: PathResolverResult) {
 	} else if (state.req.method === "POST") {
 		var form = new formidable.IncomingForm();
 		// console.log(state.url);
-		if (!state.url.query.formtype) {
-			return state.throw(403);
-		} else if (state.url.query.formtype === "upload") {
+		if (state.url.query.formtype === "upload") {
 			if (!state.isLocalHost && !settings.allowNetwork.upload)
 				return state.throw(403, "upload is not allowed over the network")
 			form.parse(state.req, function (err, fields, files) {
@@ -172,9 +170,9 @@ function serveDirectoryIndex(result: PathResolverResult) {
 					}
 				})
 			});
-
+		} else {
+			state.throw(403);
 		}
-
 	} else {
 		state.throw(405);
 	}
