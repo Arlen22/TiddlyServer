@@ -21,8 +21,9 @@ Data folders store individual tiddlers instead of entire wikis. They take less d
  - Uses a folder structure specified in settings.json allowing you serve any folders on the filesystem in whatever tree structure you like.
  - Serves any files found in the folder structure.
  - Saves individual files using the put saver.
- - Allows you to upload a file to any directory (but not categories), or create new directories. 
- - Loads data folders using TiddlyWiki then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder/`)
+ - Allows you to upload a file to any directory (but not categories), or create new directories and data folders. 
+   - Want to make a custom data folder? First create it as a directory, then upload your custom `tiddlywiki.info` file to it.
+ - Loads data folders using TiddlyWiki then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder`)
  - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
 
 ## One thing that needs to be noted
