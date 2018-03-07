@@ -321,7 +321,7 @@ export function serveFolderIndex(options: { type: string }) {
  * @param {PathResolverResult} result 
  * @returns 
  */
-export function getTreeItemFiles(result: PathResolverResult) {
+export function getTreeItemFiles(result: PathResolverResult): Observable<DirectoryIndexData> {
     let dirpath = [
         result.treepathPortion.join('/'),
         result.filepathPortion.join('/')
@@ -332,7 +332,7 @@ export function getTreeItemFiles(result: PathResolverResult) {
         const paths = keys.map(k => {
             return typeof result.item[k] === "string" ? result.item[k] : true;
         });
-        return Observable.of({ keys, paths, dirpath });
+        return Observable.of({ keys, paths, dirpath, type });
     } else {
         return obs_readdir()(result.fullfilepath).map(([err, keys]) => {
             if (err) {

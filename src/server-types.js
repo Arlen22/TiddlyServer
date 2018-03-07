@@ -302,7 +302,7 @@ function getTreeItemFiles(result) {
         const paths = keys.map(k => {
             return typeof result.item[k] === "string" ? result.item[k] : true;
         });
-        return rx_1.Observable.of({ keys, paths, dirpath });
+        return rx_1.Observable.of({ keys, paths, dirpath, type });
     }
     else {
         return exports.obs_readdir()(result.fullfilepath).map(([err, keys]) => {
