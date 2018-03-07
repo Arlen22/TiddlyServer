@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 require("../lib/source-map-support-lib");
+const sendOptions = {};
 const rx_1 = require("../lib/rx");
 const server_types_1 = require("./server-types");
 const http = require("http");
@@ -8,7 +9,7 @@ const fs = require("fs");
 const path = require("path");
 const util_1 = require("util");
 const events_1 = require("events");
-const sendOptions = {};
+// import send = require('../lib/send-lib');
 const WS_1 = require("../lib/websocket-server/WS");
 __dirname = path.dirname(module.filename || process.execPath);
 Error.stackTraceLimit = Infinity;
@@ -137,23 +138,23 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     if (!un && !pw)
         return state;
     if (!state.req.headers['authorization']) {
-        debug('authorization required');
+        debug(-2, 'authorization required');
         state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
         state.res.end();
         return;
     }
-    debug('authorization requested');
+    debug(-3, 'authorization requested');
     var header = state.req.headers['authorization'] || '', // get the header
     token = header.split(/\s+/).pop() || '', // and the encoded auth token
     auth = new Buffer(token, 'base64').toString(), // convert from base64
     parts = auth.split(/:/), // split on colon
     username = parts[0], password = parts[1];
     if (username != un || password != pw) {
-        debug('authorization invalid - UN:%s - PW:%s', username, password);
+        debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
         state.throw(401, 'Invalid username or password');
         return;
     }
-    debug('authorization successful');
+    debug(-3, 'authorization successful');
     // securityChecks =====================
     return state;
 }).filter(server_types_1.obsTruthy).map(state => {
@@ -195,7 +196,7 @@ function serverListenCB(err, res) {
         eventer.emit('websocket-connection', client, request);
     }
     function error(error) {
-        debug('WS-ERROR %s', util_1.inspect(error));
+        debug(-2, 'WS-ERROR %s', util_1.inspect(error));
     }
     if (err) {
         console.error('error on app.listen', err);

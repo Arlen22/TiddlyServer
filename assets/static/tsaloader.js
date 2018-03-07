@@ -14,15 +14,21 @@ function httpRequest(options) {
 		req.responseType = 'arraybuffer';
 	})
 }
-function parseTransferFormat() {
-	var res = new ArrayBuffer(16);
+//load filesystem adapter
+
+/**
+ * Decodes the transfer format and returns the header and text strings
+ * @param {ArrayBuffer} res 
+ * @returns { header: { [K: string]: any }, text: string }
+ */
+function decodeTransferFormat(res) {
 	var res1 = new Uint8Array(res);
 	var nl1 = res1.indexOf(newLineCharCode);
 	var header = res1.slice(0, nl1);
 	var nl2 = res1.indexOf(newLineCharCode, nl1 + 1);
 	var encoding = utf8Array2string(res1.slice(nl1 + 1, nl2));
 	var text = res1.slice(nl2 + 1);
-	utf8Array2string(header);
+	header = utf8Array2string(header);
 	if (encoding === "base64")
 		text = encodeBase64(text);
 	else
@@ -30,13 +36,15 @@ function parseTransferFormat() {
 	header = JSON.parse(header);
 	return { header, text };
 }
-function encodeTransferFormat() {
-	var tiddler = { fields: { type: "", title: "", text: "" } };
-	var fields = Object.assign({}, tiddler.fields);
-	var text = fields.text;
-	delete fields.text;
-	var typeInfo = $tw.config.contentTypeInfo[tiddler.fields.type || "text/plain"] || { encoding: "utf8" }
-	var header = string2utf8Array(JSON.stringify(fields));
+/**
+ * Takes the header and text fields and encodes the transfer format
+ * @param { { header: { [K: string]: any }, text: string } }
+ * @returns {ArrayBuffer}
+ */
+function encodeTransferFormat(parts) {
+	var { header, text } = parts;
+	var typeInfo = $tw.config.contentTypeInfo[header.type || "text/plain"] || { encoding: "utf8" }
+	var header = string2utf8Array(JSON.stringify(header));
 	var encoding = string2utf8Array(typeinfo.encoding);
 	if (encoding === "base64")
 		text = decodeBase64(text);
@@ -45,7 +53,7 @@ function encodeTransferFormat() {
 	return concatArrayBuffer([header, newLineArrayBuffer, encoding, newLineArrayBuffer, text]);
 }
 /**
- * 
+ * Merge multiple array buffers into one
  * 
  * @param {ArrayBuffer[]} arrayBuffers 
  */

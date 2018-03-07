@@ -1,5 +1,8 @@
 require("../lib/source-map-support-lib");
 
+import { send } from '../lib/bundled-lib';
+const sendOptions = {};
+
 import {
     Observable, Subject, Subscription, BehaviorSubject, Subscriber
 } from '../lib/rx';
@@ -20,8 +23,8 @@ import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 import { parse as jsonParse } from 'jsonlint';
 
-import send = require('../lib/send-lib');
-const sendOptions = {};
+// import send = require('../lib/send-lib');
+
 
 import { Server as WebSocketServer } from '../lib/websocket-server/WS';
 
@@ -169,12 +172,12 @@ Observable.merge(
     if (!un && !pw) return state;
 
     if (!state.req.headers['authorization']) {
-        debug('authorization required');
+        debug(-2, 'authorization required');
         state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
         state.res.end();
         return;
     }
-    debug('authorization requested');
+    debug(-3, 'authorization requested');
     var header = state.req.headers['authorization'] || '',        // get the header
         token = header.split(/\s+/).pop() || '',            // and the encoded auth token
         auth = new Buffer(token, 'base64').toString(),    // convert from base64
@@ -182,11 +185,11 @@ Observable.merge(
         username = parts[0],
         password = parts[1];
     if (username != un || password != pw) {
-        debug('authorization invalid - UN:%s - PW:%s', username, password);
+        debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
         state.throw(401, 'Invalid username or password');
         return;
     }
-    debug('authorization successful')
+    debug(-3, 'authorization successful')
     // securityChecks =====================
 
     return state;
@@ -229,7 +232,7 @@ function serverListenCB(err: any, res: any) {
         eventer.emit('websocket-connection', client, request);
     }
     function error(error) {
-        debug('WS-ERROR %s', inspect(error));
+        debug(-2, 'WS-ERROR %s', inspect(error));
     }
 
     if (err) { console.error('error on app.listen', err); return; }

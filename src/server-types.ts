@@ -7,12 +7,13 @@ import { format } from "util";
 import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
-import send = require('../lib/send-lib');
+import { send } from '../lib/bundled-lib';
 import { Stats } from 'fs';
-
+let DEBUGLEVEL = -1;
 export const typeLookup: { [k: string]: string } = {};
 export function init(eventer: EventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
+        DEBUGLEVEL = typeof set.debugLevel === "number" ? set.debugLevel : -1;
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!typeLookup[ext]) {
@@ -52,7 +53,7 @@ export interface Directory {
     type: string
 }
 
-export function tryParseJSON(str: string, errObj: { error?: JsonError, } = {}) {
+export function tryParseJSON(str: string, errObj: { error?: JsonError } | true = {}) {
     function findJSONError(message: string, json: string) {
         const res: string[] = [];
         const match = /position (\d+)/gi.exec(message);
@@ -78,11 +79,18 @@ export function tryParseJSON(str: string, errObj: { error?: JsonError, } = {}) {
     try {
         return JSON.parse(str);
     } catch (e) {
-        errObj.error = new JsonError(findJSONError(e.message, str), e);
+        let err = new JsonError(findJSONError(e.message, str), e)
+        if (errObj === true) {
+
+        } else
+            errObj.error = err;
     }
 }
-
+export interface JsonErrorContainer {
+    error?: JsonError
+}
 export class JsonError {
+    public filePath: string = "";
     constructor(
         public errorPosition: string,
         public originalError: Error
@@ -149,7 +157,7 @@ export namespace colors {
     export const BgWhite = "\x1b[47m"
 }
 
-const DEBUGLEVEL = -1;
+
 /**
  *  4 - Errors that require the process to exit for restart
  *  3 - Major errors that are handled and do not require a server restart
@@ -161,19 +169,25 @@ const DEBUGLEVEL = -1;
  * -3 - Request and response data for all messages (verbose)
  * -4 - Protocol details and full data dump (such as encryption steps and keys)
  */
+declare function DebugLog(level: number, err: NodeJS.ErrnoException);
 declare function DebugLog(level: number, str: string, ...args: any[]);
-declare function DebugLog(str: string, ...args: any[]);
-
+// declare function DebugLog(str: string, ...args: any[]);
+export function isError(obj): obj is Error {
+    return obj.constructor === Error;
+    // return [obj.message, obj.name].every(e => typeof e !== "undefined");
+}
+export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException {
+    return isError(obj);
+}
 export function DebugLogger(prefix: string): typeof DebugLog {
     //if(prefix.startsWith("V:")) return function(){};
-    return function (...args: any[]) {
-        //this sets the default log level for the message
-        var msgLevel = 0;
-        if (typeof args[0] === "number") {
-            if (DEBUGLEVEL > args[0]) return;
-            else msgLevel = args.shift();
-        } else {
-            if (DEBUGLEVEL > msgLevel) return;
+    return function (msgLevel: number, ...args: any[]) {
+        if (DEBUGLEVEL > msgLevel) return;
+        if (isError(args[0])) {
+            let err = args[0];
+            args = [];
+            if (err.stack) args.push(err.stack);
+            else args.push("Error %s: %s", err.name, err.message);
         }
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
@@ -482,17 +496,17 @@ export const obs_readFile = <T>(tag: T = undefined as any): typeof obs_readFile_
     (filepath: string, encoding?: string) =>
         new Observable(subs => {
             if (encoding) fs.readFile(filepath, encoding, (err, data) => {
-                subs.next([err, data, tag]);
+                subs.next([err, data, tag, filepath]);
                 subs.complete();
             });
             else fs.readFile(filepath, (err, data) => {
-                subs.next([err, data, tag]);
+                subs.next([err, data, tag, filepath]);
                 subs.complete();
             })
         }) as any;
 
-declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T]>;
-declare function obs_readFile_inner<T>(filepath: string, encoding: string): Observable<[NodeJS.ErrnoException, string, T]>;
+declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T, string]>;
+declare function obs_readFile_inner<T>(filepath: string, encoding: string): Observable<[NodeJS.ErrnoException, string, T, string]>;
 
 // Observable.bindCallback(fs.readFile,
 //     (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any
@@ -528,7 +542,7 @@ export type StatPathResult = {
     endStat: boolean
 }
 
-export type LoggerFunc = (str: string, ...args: any[]) => void;
+// export type LoggerFunc = (str: string, ...args: any[]) => void;
 
 export class StateObject {
 
@@ -579,7 +593,7 @@ export class StateObject {
     constructor(
         public req: http.IncomingMessage,
         public res: http.ServerResponse,
-        private debugLog: LoggerFunc,
+        private debugLog: typeof DebugLog,
         private eventer: EventEmitter,
         public readonly isLocalHost: boolean = false
     ) {
@@ -599,13 +613,13 @@ export class StateObject {
         })
 
     }
-    debug(str: string, ...args: any[]) {
-        this.debugLog('[' +
-            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-            this.req.socket.remoteAddress + colors.Reset + '] ' +
-            format.apply(null, arguments)
-        );
-    }
+    // debug(str: string, ...args: any[]) {
+    //     this.debugLog('[' +
+    //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
+    //         this.req.socket.remoteAddress + colors.Reset + '] ' +
+    //         format.apply(null, arguments)
+    //     );
+    // }
 
     loglevel: number = DEBUGLEVEL;
     doneMessage: string[] = [];
@@ -650,7 +664,7 @@ export class StateObject {
         });
         this.res.end();
     }
-    recieveBody(){
+    recieveBody() {
         return recieveBody(this);
     }
 
@@ -696,6 +710,7 @@ export interface ServerConfig {
     etag: "required" | "disabled" | "", //otherwise if present
     etagWindow: number,
     useTW5path: boolean,
+    debugLevel: number,
     /** cache max age in milliseconds for different types of data */
     maxAge: { tw_plugins: number }
     tsa: {

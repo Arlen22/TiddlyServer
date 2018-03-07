@@ -6,10 +6,12 @@ const path = require("path");
 const util_1 = require("util");
 const rx_1 = require("../lib/rx");
 //import { StateObject } from "./index";
-const send = require("../lib/send-lib");
+const bundled_lib_1 = require("../lib/bundled-lib");
+let DEBUGLEVEL = -1;
 exports.typeLookup = {};
 function init(eventer) {
     eventer.on('settings', function (set) {
+        DEBUGLEVEL = typeof set.debugLevel === "number" ? set.debugLevel : -1;
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!exports.typeLookup[ext]) {
@@ -62,7 +64,11 @@ function tryParseJSON(str, errObj = {}) {
         return JSON.parse(str);
     }
     catch (e) {
-        errObj.error = new JsonError(findJSONError(e.message, str), e);
+        let err = new JsonError(findJSONError(e.message, str), e);
+        if (errObj === true) {
+        }
+        else
+            errObj.error = err;
     }
 }
 exports.tryParseJSON = tryParseJSON;
@@ -70,6 +76,7 @@ class JsonError {
     constructor(errorPosition, originalError) {
         this.errorPosition = errorPosition;
         this.originalError = originalError;
+        this.filePath = "";
     }
 }
 exports.JsonError = JsonError;
@@ -131,21 +138,28 @@ var colors;
     colors.BgCyan = "\x1b[46m";
     colors.BgWhite = "\x1b[47m";
 })(colors = exports.colors || (exports.colors = {}));
-const DEBUGLEVEL = -1;
+// declare function DebugLog(str: string, ...args: any[]);
+function isError(obj) {
+    return obj.constructor === Error;
+    // return [obj.message, obj.name].every(e => typeof e !== "undefined");
+}
+exports.isError = isError;
+function isErrnoException(obj) {
+    return isError(obj);
+}
+exports.isErrnoException = isErrnoException;
 function DebugLogger(prefix) {
     //if(prefix.startsWith("V:")) return function(){};
-    return function (...args) {
-        //this sets the default log level for the message
-        var msgLevel = 0;
-        if (typeof args[0] === "number") {
-            if (DEBUGLEVEL > args[0])
-                return;
+    return function (msgLevel, ...args) {
+        if (DEBUGLEVEL > msgLevel)
+            return;
+        if (isError(args[0])) {
+            let err = args[0];
+            args = [];
+            if (err.stack)
+                args.push(err.stack);
             else
-                msgLevel = args.shift();
-        }
-        else {
-            if (DEBUGLEVEL > msgLevel)
-                return;
+                args.push("Error %s: %s", err.name, err.message);
         }
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
@@ -212,7 +226,7 @@ function serveFile(obs, file, root) {
         return exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
             if (err)
                 return state.throw(404);
-            send(state.req, file, { root })
+            bundled_lib_1.send(state.req, file, { root })
                 .on('error', err => {
                 state.log(2, '%s %s', err.status, err.message).error().throw(500);
             }).pipe(state.res);
@@ -228,7 +242,7 @@ function serveFolder(obs, mount, root, serveIndex) {
             state.log(2, 'URL is different than the mount point %s', mount).throw(500);
         }
         else {
-            send(state.req, pathname.slice(mount.length), { root })
+            bundled_lib_1.send(state.req, pathname.slice(mount.length), { root })
                 .on('error', (err) => {
                 state.log(-1, '%s %s', err.status, err.message).error().throw(404);
             })
@@ -453,12 +467,12 @@ exports.obs_readdir = (state) => rx_1.Observable.bindCallback(fs.readdir, (err, 
 exports.obs_readFile = (tag = undefined) => (filepath, encoding) => new rx_1.Observable(subs => {
     if (encoding)
         fs.readFile(filepath, encoding, (err, data) => {
-            subs.next([err, data, tag]);
+            subs.next([err, data, tag, filepath]);
             subs.complete();
         });
     else
         fs.readFile(filepath, (err, data) => {
-            subs.next([err, data, tag]);
+            subs.next([err, data, tag, filepath]);
             subs.complete();
         });
 });
@@ -473,6 +487,7 @@ class StateError extends Error {
     }
 }
 exports.StateError = StateError;
+// export type LoggerFunc = (str: string, ...args: any[]) => void;
 class StateObject {
     constructor(req, res, debugLog, eventer, isLocalHost = false) {
         this.req = req;
@@ -480,6 +495,13 @@ class StateObject {
         this.debugLog = debugLog;
         this.eventer = eventer;
         this.isLocalHost = isLocalHost;
+        // debug(str: string, ...args: any[]) {
+        //     this.debugLog('[' +
+        //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
+        //         this.req.socket.remoteAddress + colors.Reset + '] ' +
+        //         format.apply(null, arguments)
+        //     );
+        // }
         this.loglevel = DEBUGLEVEL;
         this.doneMessage = [];
         this.hasCriticalLogs = false;
@@ -504,12 +526,6 @@ class StateObject {
                 return state.throw(status, reason);
             });
         };
-    }
-    debug(str, ...args) {
-        this.debugLog('[' +
-            this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-            this.req.socket.remoteAddress + colors.Reset + '] ' +
-            util_1.format.apply(null, arguments));
     }
     /**
      *  4 - Errors that require the process to exit for restart
