@@ -109,7 +109,7 @@ function datafolder(result) {
     }
     //pretend to the handler like the path really has a trailing slash
     let req = new Object(state.req);
-    req.url += ((isFullpath && !state.url.path.endsWith("/")) ? "/" : "");
+    req.url += ((isFullpath && !state.url.pathname.endsWith("/")) ? "/" : "");
     // console.log(req.url);
     const load = loadedFolders[prefixURI];
     if (Array.isArray(load)) {

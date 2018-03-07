@@ -319,7 +319,7 @@ exports.getTreeItemFiles = getTreeItemFiles;
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
 const { generateDirectoryListing } = require('./generateDirectoryListing');
-function sendDirectoryIndex(_r) {
+function sendDirectoryIndex([_r, settings]) {
     let { keys, paths, dirpath } = _r;
     let pairs = keys.map((k, i) => [k, paths[i]]);
     return rx_1.Observable.from(pairs).mergeMap(([key, val]) => {
@@ -340,7 +340,7 @@ function sendDirectoryIndex(_r) {
         });
         return n;
     }, []).map(entries => {
-        return generateDirectoryListing({ path: dirpath, entries });
+        return generateDirectoryListing({ path: dirpath, entries }, settings);
     });
 }
 exports.sendDirectoryIndex = sendDirectoryIndex;
