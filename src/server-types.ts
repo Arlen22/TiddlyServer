@@ -326,6 +326,7 @@ export function getTreeItemFiles(result: PathResolverResult) {
         result.treepathPortion.join('/'),
         result.filepathPortion.join('/')
     ].filter(e => e).join('/')
+    let type = typeof result.item === "object" ? "category" : "folder";
     if (typeof result.item === "object") {
         const keys = Object.keys(result.item);
         const paths = keys.map(k => {
@@ -340,7 +341,7 @@ export function getTreeItemFiles(result: PathResolverResult) {
                 return;
             }
             const paths = keys.map(k => path.join(result.fullfilepath, k));
-            return { keys, paths, dirpath };
+            return { keys, paths, dirpath, type };
         }).filter(obsTruthy);
     }
 }
@@ -348,9 +349,10 @@ export function getTreeItemFiles(result: PathResolverResult) {
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
 const { generateDirectoryListing } = require('./generateDirectoryListing');
-export type IndexData = { keys: string[], paths: (string | boolean)[], dirpath: string };
-export function sendDirectoryIndex([_r, settings]: [IndexData, ServerConfig]) {
-    let { keys, paths, dirpath } = _r;
+export type DirectoryIndexData = { keys: string[], paths: (string | boolean)[], dirpath: string, type: string };
+export type DirectoryIndexOptions = { upload: boolean, mkdir: boolean }
+export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
+    let { keys, paths, dirpath, type } = _r;
     let pairs = keys.map((k, i) => [k, paths[i]]);
     return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
         //if this is a category, just return the key
@@ -369,7 +371,7 @@ export function sendDirectoryIndex([_r, settings]: [IndexData, ServerConfig]) {
         });
         return n;
     }, [] as DirectoryEntry[]).map(entries => {
-        return generateDirectoryListing({ path: dirpath, entries }, settings);
+        return generateDirectoryListing({ path: dirpath, entries, type }, options);
     });
 }
 

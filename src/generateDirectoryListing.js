@@ -7,7 +7,7 @@ $tw.saverHandler.savers[saver] = $tw.modules.types.saver['$:/core/modules/savers
 
 const info = require('../package.json');
 
-exports.generateDirectoryListing = function (directory, settings) {
+exports.generateDirectoryListing = function (directory, options) {
     function listEntries(entries) {
         return entries.slice().sort(
             sortBySelector(e => ((e.type === 'folder' ? '0-' : '1-') + e.name.toLocaleLowerCase()))
@@ -59,14 +59,14 @@ ${
 ${listEntries(directory.entries)}
   </tbody>
 </table>
-${settings.allowNetwork.upload ? `<p>
+${(options.upload) ? `<p>
 <form action="?formtype=upload" method="post" enctype="multipart/form-data" name="upload">
     <label>Upload file</label>
     <input type="file" name="filetoupload"/>
     <input type="submit"/>
 </form>
 </p>` : ''}
-${settings.allowNetwork.mkdir ? `<p>
+${(options.mkdir) ? `<p>
 <form action="?formtype=mkdir" method="post" enctype="multipart/form-data" name="mkdir">
     <label>Create Directory</label>
     <input type="hidden" name="dirtype" value="directory" />
