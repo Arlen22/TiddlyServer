@@ -303,7 +303,7 @@ export namespace TiddlyServer {
 			else throw new Error("Invalid wiki type " + wikiInfo.type);
 		}
 
-		const includes: Observable<{ $ts: Wiki, $tw: any, wikiInfo: WikiInfo }>[] = wikiInfo.includeWikis.map(e => {
+		const includes: Observable<{ $ts: Wiki, $tw?: any, wikiInfo: WikiInfo }>[] = wikiInfo.includeWikis.map(e => {
 			var item = typeof e === "string" ? { path: e, "read-only": false } : e;
 			var subWikiPath = path.resolve(wikiPath, item.path);
 			return Observable.of(subWikiPath).mergeMap(loadWikiInfo).mergeMap(wikiInfo => {
@@ -340,7 +340,7 @@ export namespace TiddlyServer {
 					delete file.tiddlers;
 					wiki.files[file.filepath] = file;
 				})
-				return { $ts: Wiki, wikiInfo };
+				return { $ts: wiki, wikiInfo };
 			})
 		})
 	}
