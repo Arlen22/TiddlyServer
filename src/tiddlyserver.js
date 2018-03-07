@@ -7,8 +7,7 @@ const path = require("path");
 const zlib = require("zlib");
 const datafolder_1 = require("./datafolder");
 exports.doTiddlyWikiRoute = datafolder_1.doTiddlyWikiRoute;
-const send = require("../lib/send-lib");
-const mime = require('../lib/mime');
+const bundled_lib_1 = require("../lib/bundled-lib");
 const debug = server_types_1.DebugLogger("SER-API");
 __dirname = path.dirname(module.filename || process.execPath);
 function tuple(a, b, c, d, e, f) {
@@ -61,7 +60,7 @@ function doTiddlyServerRoute(input) {
         }
         else if (state.statPath.itemtype === "file") {
             if (['HEAD', 'GET'].indexOf(state.req.method) > -1) {
-                send(state.req, result.filepathPortion.join('/'), { root: result.item })
+                bundled_lib_1.send(state.req, result.filepathPortion.join('/'), { root: result.item })
                     .on('error', (err) => {
                     state.log(0, '%s %s', err.status, err.message).error().throw(500);
                 }).on('headers', (res, filepath) => {
@@ -99,7 +98,7 @@ function serveDirectoryIndex(result) {
     if (!state.url.path.endsWith("/")) {
         state.redirect(state.url.path + "/");
     }
-    else {
+    else if (state.req.method === "GET") {
         rx_1.Observable.of(result)
             .concatMap(server_types_1.getTreeItemFiles)
             .concatMap(server_types_1.sendDirectoryIndex)
@@ -107,6 +106,18 @@ function serveDirectoryIndex(result) {
             state.res.writeHead(200);
             state.res.write(res);
             state.res.end();
+        });
+    }
+    else if (state.req.method === "POST") {
+        var form = new bundled_lib_1.formidable.IncomingForm();
+        form.parse(state.req, function (err, fields, files) {
+            var oldpath = files.filetoupload.path;
+            var newpath = path.join(result.fullfilepath, files.filetoupload.name);
+            fs.rename(oldpath, newpath, function (err) {
+                if (err)
+                    debug(2, "%s %s\n%s", err.code, err.message, err.path);
+                state.redirect(state.url.path);
+            });
         });
     }
 }

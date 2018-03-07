@@ -60,6 +60,10 @@ ${listEntries(directory.entries)}
   </tbody>
 </table>
 
+<form action="" method="post" enctype="multipart/form-data">
+    <input type="file" name="filetoupload"><input type="submit">
+</form>
+
 <p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
 <p style="color:grey; font-family:sans-serif; font-size:0.8em;">
 <a href="https://github.com/Arlen22/TiddlyServer">TiddlyServer</a> v${info.version}</p>

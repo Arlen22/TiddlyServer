@@ -11,7 +11,6 @@ import * as http from 'http';
 import * as zlib from 'zlib';
 
 import { createHash } from 'crypto';
-import { Mime } from '../lib/mime';
 
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
@@ -25,10 +24,8 @@ import { Subscribable } from "rxjs/Observable";
 import { NextObserver, ErrorObserver, CompletionObserver } from "rxjs/Observer";
 import { AnonymousSubscription } from "rxjs/Subscription";
 
-import send = require('../lib/send-lib');
+import { send, formidable } from '../lib/bundled-lib';
 import { Stats } from "fs";
-
-const mime: Mime = require('../lib/mime');
 
 const debug = DebugLogger("SER-API");
 __dirname = path.dirname(module.filename || process.execPath);
@@ -115,7 +112,7 @@ function serveDirectoryIndex(result: PathResolverResult) {
 	const { state } = result;
 	if (!state.url.path.endsWith("/")) {
 		state.redirect(state.url.path + "/");
-	} else {
+	} else if (state.req.method === "GET") {
 		Observable.of(result)
 			.concatMap(getTreeItemFiles)
 			.concatMap(sendDirectoryIndex)
@@ -124,6 +121,16 @@ function serveDirectoryIndex(result: PathResolverResult) {
 				state.res.write(res);
 				state.res.end();
 			});
+	} else if (state.req.method === "POST") {
+		var form = new formidable.IncomingForm();
+		form.parse(state.req, function (err, fields, files) {
+			var oldpath = files.filetoupload.path;
+			var newpath = path.join(result.fullfilepath, files.filetoupload.name);
+			fs.rename(oldpath, newpath, function (err) {
+				if (err) debug(2, "%s %s\n%s", err.code, err.message, err.path);
+				state.redirect(state.url.path);
+			});
+		});
 	}
 }
 

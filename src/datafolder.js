@@ -16,7 +16,7 @@ function init(eventer) {
     eventer.on('websocket-connection', function (client, request) {
         let reqURL = url_1.parse(request.url); // new URL(request.url as string);
         let datafolder = loadedFolders[reqURL.pathname];
-        debug([reqURL.pathname, !!datafolder].join(' '));
+        // debug(-2, [reqURL.pathname as string, !!datafolder].join(' '));
         if (!datafolder) {
             if (!otherSocketPaths[reqURL.pathname])
                 otherSocketPaths[reqURL.pathname] = [];
@@ -30,12 +30,12 @@ function init(eventer) {
                 });
             });
             client.addEventListener('error', (event) => {
-                debug('WS-ERROR %s %s', reqURL.pathname, event.type);
+                debug(-2, 'WS-ERROR %s %s', reqURL.pathname, event.type);
                 other.splice(other.indexOf(client), 1);
                 client.close();
             });
             client.addEventListener('close', (event) => {
-                debug('WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
+                debug(-2, 'WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
                 other.splice(other.indexOf(client), 1);
             });
             return;
@@ -47,12 +47,12 @@ function init(eventer) {
             // datafolder.$tw.hooks.invokeHook('th-websocket-message', event.data, client);
         });
         client.addEventListener('error', (event) => {
-            debug('WS-ERROR %s %s', reqURL.pathname, event.type);
+            debug(-2, 'WS-ERROR %s %s', reqURL.pathname, event.type);
             datafolder.sockets.splice(datafolder.sockets.indexOf(client), 1);
             client.close();
         });
         client.addEventListener('close', (event) => {
-            debug('WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
+            debug(-2, 'WS-CLOSE %s %s %s', reqURL.pathname, event.code, event.reason);
             datafolder.sockets.splice(datafolder.sockets.indexOf(client), 1);
         });
     });
@@ -89,8 +89,9 @@ function datafolder(result) {
         initPluginLoader();
     if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
         loadedFolders[prefixURI] = [];
+        loadDataFolder(prefixURI, folder, state.url.query.reload);
         // loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
-        loadTiddlyWiki(prefixURI, folder);
+        // loadTiddlyWiki(prefixURI, folder);
     }
     const isFullpath = result.filepathPortion.length === state.statPath.index;
     //set the trailing slash correctly if this is the actual page load
@@ -119,7 +120,18 @@ function datafolder(result) {
     }
 }
 exports.datafolder = datafolder;
-function loadTiddlyWiki(mount, folder) {
+function loadDataFolder(mount, folder, reload) {
+    server_types_1.obs_readFile()(path.join(folder, "tiddlywiki.info"), 'utf8').subscribe(([err, data]) => {
+        const wikiInfo = server_types_1.tryParseJSON(data);
+        if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
+            loadTiddlyWiki(mount, folder, reload);
+        }
+        else if (wikiInfo.type === "tiddlyserver") {
+            // loadTiddlyServerAdapter(mount, folder, reload)
+        }
+    });
+}
+function loadTiddlyWiki(mount, folder, reload) {
     console.time('twboot-' + folder);
     // const dynreq = "tiddlywiki";
     DataFolder(mount, folder, complete);
@@ -217,7 +229,7 @@ function DataFolder(mount, folder, callback) {
 let counter = 0;
 const zlib_1 = require("zlib");
 const boot_startup_1 = require("./boot-startup");
-const fresh = require('../lib/fresh-lib');
+const bundled_lib_1 = require("../lib/bundled-lib");
 let pluginCache;
 let coreCache;
 let bootCache;
@@ -225,7 +237,7 @@ let pluginLoader;
 let global_tw;
 function initPluginLoader() {
     pluginCache = {};
-    const $tw = global_tw = boot_startup_1.loadCore();
+    const $tw = global_tw = boot_startup_1.TiddlyWiki.loadCore();
     const pluginConfig = {
         plugins: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
         themes: [$tw.config.themesPath, $tw.config.themesEnvVar],
@@ -309,7 +321,7 @@ function sendPluginResponse(state, pluginCache) {
     var etag = etag(body);
     debug(-3, 'etag %s', etag);
     res.setHeader('ETag', etag);
-    if (fresh(req.headers, { 'etag': etag, 'last-modified': modified })) {
+    if (bundled_lib_1.fresh(req.headers, { 'etag': etag, 'last-modified': modified })) {
         res.writeHead(304);
         res.end();
     }
@@ -317,14 +329,26 @@ function sendPluginResponse(state, pluginCache) {
         sendResponse(res, body, { doGzip: acceptGzip(req) });
     }
 }
-function loadTiddlyServerAdapter(mount, folder, reload) {
+function loadTiddlyServerAdapter(mount, folder, reload, wikiInfo) {
     let cacheRequests = [];
     let cachePrepared = (settings.tsa.alwaysRefreshCache || reload === "tsacache")
         ? false : fs.existsSync(path.join(folder, 'cache'));
-    const { $tw, wikiInfo } = boot_startup_1.loadWiki(folder);
-    const { files } = $tw.boot;
     if (!wikiInfo)
         return doError(mount, folder, new Error("WikiInfo not loaded"));
+    const { $tw } = boot_startup_1.TiddlyWiki.loadWiki(folder);
+    const files = $tw.boot.files;
+    /*
+    * tiddlyserver datafolder type is a subset of tiddlywiki datafolder type
+    * - no local plugin/theme/language folders
+    * - no server-side plugins (obviously)
+    * - no builds
+    * - no config (none is needed)
+    * - includeWikis must be tiddlyserver type, or are read only
+    * - tiddlers are all stored in the same directory
+    * - cache is sent with the tiddler PUT request, and is either the text of the tiddler,
+    *   or is sent separately, according to a marker
+    */
+    // the second line in the PUT request contains: content encoding, cache marker (cache-[name]) specifying the cache area to use
     initTiddlyServerAdapterCache(mount, folder).then(() => {
         cachePrepared = true;
         cacheRequests.forEach((state) => sendCacheFolder.next(state));
@@ -334,7 +358,6 @@ function loadTiddlyServerAdapter(mount, folder, reload) {
     server_types_1.serveFolder(sendCacheFolder.asObservable(), mount + "/cache", folder + "/cache");
     function handler(state) {
         const { req, res } = state;
-        // const state = new TiddlyServerAdapterStateObject(folder, mount, req, res, wikiInfo, files);
         const tsa = new TSASO(state, wikiInfo, folder, mount, files);
         // GET the mount, which has no trailing slash
         if (!tsa.localPath.length) {
@@ -345,17 +368,26 @@ function loadTiddlyServerAdapter(mount, folder, reload) {
                 res.end();
             }
         }
-        else if (tsa.localPathParts[1] === "tiddlers.json") {
-            // GET /tiddlers.json
+        else if (tsa.localPathParts[1] === "startup.json") {
+            // GET /startup.json - load all tiddlers for the wiki and send them
             if (req.method === "GET")
-                sendTiddlers(tsa);
+                sendAllTiddlers(tsa);
+            else {
+                res.writeHead(405);
+                res.end();
+            }
+        }
+        else if (tsa.localPathParts[1] === "tiddlers.json") {
+            // GET /tiddlers.json - get the skinny list of tiddlers in the files hashmap
+            if (req.method === "GET")
+                sendSkinnyTiddlers(tsa);
             else {
                 res.writeHead(405);
                 res.end();
             }
         }
         else if (tsa.localPathParts[1] === "tiddlers") {
-            // ALL /tiddlers/*
+            // ALL /tiddlers/* - load and save the files tiddlers
             handleTiddlersRoute(tsa);
         }
         else if (tsa.localPathParts[1] === "cache") {
@@ -412,11 +444,18 @@ const loaderText = fs.readFileSync(path.join(__dirname, './datafolder-template.h
 function sendLoader(tsa) {
     sendResponse(tsa.state.res, loaderText.replace(globalRegex, tsa.mount), { doGzip: acceptGzip(tsa.state.req), contentType: "text/html; charset=utf-8" });
 }
-function sendTiddlers(tsa) {
-    const { $tw, wikiInfo } = boot_startup_1.loadWiki(tsa.folder);
+function sendAllTiddlers(tsa) {
+    const { $tw, wikiInfo } = boot_startup_1.TiddlyWiki.loadWiki(tsa.folder);
     const tiddlers = [];
+    /** @type {string[]} */
+    const skipFields = ["",];
     $tw.wiki.each((tiddler, title) => {
-        tiddlers.push(tiddler.fields);
+        let fields = {};
+        let keys = Object.keys(tiddler.fields).forEach(key => {
+            if (skipFields.indexOf(key) === -1)
+                fields[key] = tiddler.fields[key];
+        });
+        tiddlers.push(fields);
     });
     let text = JSON.stringify(tiddlers);
     var cacheControl = 'no-cache';
@@ -425,56 +464,68 @@ function sendTiddlers(tsa) {
     var etag = etag(text);
     debug(-3, 'etag %s', etag);
     tsa.state.res.setHeader('ETag', etag);
-    sendResponse(tsa.state.res, text, { doGzip: acceptGzip(tsa.state.req), contentType: "application/json; charset=utf-8" });
+    if (bundled_lib_1.fresh(tsa.state.req.headers, { 'etag': etag })) {
+        tsa.state.res.writeHead(304);
+        tsa.state.res.end();
+    }
+    else {
+        sendResponse(tsa.state.res, text, {
+            doGzip: acceptGzip(tsa.state.req),
+            contentType: "application/json; charset=utf-8"
+        });
+    }
+}
+function sendSkinnyTiddlers(tsa) {
 }
 const newLineBuffer = Buffer.from('\n');
 function handleTiddlersRoute(tsa) {
     //GET HEAD PUT DELETE
     let title = decodeURIComponent(tsa.localPathParts[2]);
-    let fileinfo = tsa.files[title];
-    // let tiddlers = global_tw.loadTiddlersFromFile(fileinfo.filepath);
-    let { filepath } = fileinfo;
     if (tsa.state.req.method === "GET") {
-        var ext = path.extname(filepath), extensionInfo = global_tw.utils.getFileExtensionInfo(ext), type = extensionInfo ? extensionInfo.type : null, typeInfo = type ? global_tw.config.contentTypeInfo[type] : null;
-        server_types_1.obs_readFile()(filepath, typeInfo ? typeInfo.encoding : "utf8").concatMap(([err, data]) => {
-            var tiddlers = global_tw.wiki.deserializeTiddlers(ext, data, {});
-            if (ext !== ".json" && tiddlers.length === 1)
-                return server_types_1.obs_readFile(tiddlers)(filepath + ".meta", 'utf8');
-            else
-                return rx_1.Observable.of([undefined, undefined, tiddlers]);
-        }).map(([err, data, tiddlers]) => {
-            let metadata = data ? global_tw.utils.parseFields(data) : {};
-            tiddlers = global_tw.utils.extend({}, tiddlers[0], metadata);
-            return tiddlers[0];
-        }).subscribe(tiddlers => {
-            if (tiddlers.length !== 1) {
-                //we don't serve anything not in the files list here
-                tsa.state.throw(404);
-            }
-            else {
-                let tiddler = tiddlers[0];
-                let { res } = tsa.state;
-                let text = Buffer.from(tiddler.text, typeInfo.encoding);
-                delete tiddler.text;
-                //use utf16 so we can convert straight back to a string in the browser
-                let header = Buffer.from(JSON.stringify(tiddler), 'utf8');
-                let body = Buffer.concat([
-                    header,
-                    newLineBuffer,
-                    Buffer.from(typeInfo ? typeInfo.encoding : "utf8", 'binary'),
-                    newLineBuffer,
-                    text
-                ]);
-                sendResponse(res, body, {
-                    doGzip: acceptGzip(tsa.state.req),
-                    contentType: "application/octet-stream"
-                });
-            }
-        });
     }
     return ((tsa.state.req.method === "PUT")
         ? tsa.state.recieveBody().mapTo(tsa)
         : rx_1.Observable.of(tsa)).map(tsa => {
+    });
+}
+function loadTiddler(filepath) {
+    var ext = path.extname(filepath), extensionInfo = global_tw.utils.getFileExtensionInfo(ext), type = extensionInfo ? extensionInfo.type : null, typeInfo = type ? global_tw.config.contentTypeInfo[type] : null, encoding = typeInfo ? typeInfo.encoding : "utf8";
+    return server_types_1.obs_readFile()(filepath, encoding).concatMap(([err, data]) => {
+        var tiddlers = global_tw.wiki.deserializeTiddlers(ext, data, {});
+        if (ext !== ".json" && tiddlers.length === 1)
+            return server_types_1.obs_readFile(tiddlers)(filepath + ".meta", 'utf8');
+        else
+            return rx_1.Observable.of([undefined, undefined, tiddlers]);
+    }).map(([err, data, tiddlers]) => {
+        let metadata = data ? global_tw.utils.parseFields(data) : {};
+        tiddlers = (!err && data) ? [global_tw.utils.extend({}, tiddlers[0], metadata)] : tiddlers;
+        return { tiddlers, encoding };
+    });
+}
+function getSkinnyTiddlers(tsa) {
+    // let title = decodeURIComponent(tsa.localPathParts[2]);
+    // if (!tsa.files[title]) { tsa.state.throw(404); return; }
+    // var filepath = tsa.files[title].filepath;
+    const files = Object.keys(tsa.files).map(e => tsa.files[e].filepath);
+    rx_1.Observable.from(files).mergeMap(loadTiddler).subscribe(({ tiddlers, encoding }) => {
+        if (tiddlers.length !== 1) {
+            tsa.state.throw(404);
+        }
+        else {
+            let tiddler = tiddlers[0];
+            let { res } = tsa.state;
+            let text = Buffer.from(tiddler.text, encoding);
+            delete tiddler.text;
+            //use utf16 so we can convert straight back to a string in the browser
+            let header = Buffer.from(JSON.stringify(tiddler), 'utf8');
+            let body = Buffer.concat([
+                header, newLineBuffer, Buffer.from(encoding, 'binary'), newLineBuffer, text
+            ]);
+            sendResponse(res, body, {
+                doGzip: acceptGzip(tsa.state.req),
+                contentType: "application/octet-stream"
+            });
+        }
     });
 }
 function handleCacheRoute(tsa) {

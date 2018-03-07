@@ -50,6 +50,9 @@ interface SendStream {
 	on(type: "stream", cb: (stream: Stream) => void): this;
 	on(type: "end", cb: () => void): this;
 }
-declare function send(req, path, opts): SendStream;
 
-export = send;
+export declare const morgan: any;
+export declare function send(req, path, opts): SendStream;
+export declare function etag(entity: string | Buffer | Stats, options?: any);
+export declare const fresh: any;
+export declare const formidable: any;
