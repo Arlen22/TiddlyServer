@@ -95,6 +95,13 @@ if (!settings.types) settings.types = {
 if (!settings.etag) settings.etag = "";
 if (!settings.etagWindow) settings.etagWindow = 0;
 if (!settings.useTW5path) settings.useTW5path = false;
+if (typeof settings.debugLevel !== "number") settings.debugLevel = -1;
+if (!settings.allowNetwork) settings.allowNetwork = {} as any;
+if (!settings.allowNetwork.mkdir) settings.allowNetwork.mkdir = false;
+if (!settings.allowNetwork.upload) settings.allowNetwork.upload = false;
+if (!settings.allowNetwork.settings) settings.allowNetwork.settings = false;
+if (!settings.allowNetwork.WARNING_all_settings_WARNING)
+    settings.allowNetwork.WARNING_all_settings_WARNING = false;
 
 if (settings.etag === "disabled" && !settings.backupDirectory)
     console.log("Etag checking is disabled, but a backup folder is not set. "

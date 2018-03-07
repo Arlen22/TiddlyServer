@@ -21,7 +21,8 @@ Data folders store individual tiddlers instead of entire wikis. They take less d
  - Uses a folder structure specified in settings.json allowing you serve any folders on the filesystem in whatever tree structure you like.
  - Serves any files found in the folder structure.
  - Saves individual files using the put saver.
- - Loads data folders using a certain core/boot version (currently whatever gets installed with `npm install` or the bundled version if you use that) then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder/`)
+ - Allows you to upload a file to any directory (but not categories), or create new directories. 
+ - Loads data folders using TiddlyWiki then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder/`)
  - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
 
 ## One thing that needs to be noted
@@ -134,6 +135,33 @@ The rationale behind this is that if you have two copies of the same wiki open i
 But if the file on disk is only 3 seconds newer than the copy in the browser, you probably aren't going to have that much substantial work being saved. If this is your work flow and you want to disable etag altogether, that is possible by setting `etag` to `disabled` (see above).
 
 If nothing is specified, then the etag must match exactly if checked.
+
+### debugLevel
+
+Write debug messages at or above this value to the console. The max recommended is 2, and the minimum recommended is -1 for normal operation. Some debug messages are not implemented when they should be, but the following list is what I use to determine the debug level for a specific message.
+
+ *  4 - Errors that require the process to exit for restart
+ *  3 - Major errors that are handled and do not require a server restart
+ *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+ *  1 - Info - Most startup messages
+ *  0 - Normal debug messages and all software and request-side error messages
+ * -1 - Detailed debug messages from high level apis
+ * -2 - Response status messages and error response data
+ * -3 - Request and response data for all messages (verbose)
+ * -4 - Protocol details and full data dump (such as encryption steps and keys)
+
+### allowNetwork
+
+A set of options specifying whether different actions and pages are allowed for requests coming from the network (`true`) or only for requests coming from the loopback interface (`false`).
+
+* `mkdir` - Allow network users to create a directory or data folder in the current directory.
+* `upload` - Allow network users to upload files to the current directory.
+
+Coming soon:
+
+* `settings` - Allow network users to modify some of the settings.
+* `WARNING_all_settings_WARNING` - Allow network users to modify all settings.
+* - `host`, `port`, `username`, `password`, `allowNetwork`, `useTW5path` 
 
 ## Detailed Installation Instructions
 

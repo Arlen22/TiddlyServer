@@ -13,7 +13,7 @@ let DEBUGLEVEL = -1;
 export const typeLookup: { [k: string]: string } = {};
 export function init(eventer: EventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
-        DEBUGLEVEL = typeof set.debugLevel === "number" ? set.debugLevel : -1;
+        DEBUGLEVEL = set.debugLevel;
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!typeLookup[ext]) {
@@ -722,6 +722,7 @@ export interface ServerConfig {
         upload: boolean
         mkdir: boolean
         settings: boolean
+        WARNING_all_settings_WARNING: boolean
     }
 }
 
