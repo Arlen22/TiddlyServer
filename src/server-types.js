@@ -11,7 +11,7 @@ let DEBUGLEVEL = -1;
 exports.typeLookup = {};
 function init(eventer) {
     eventer.on('settings', function (set) {
-        DEBUGLEVEL = typeof set.debugLevel === "number" ? set.debugLevel : -1;
+        DEBUGLEVEL = set.debugLevel;
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!exports.typeLookup[ext]) {

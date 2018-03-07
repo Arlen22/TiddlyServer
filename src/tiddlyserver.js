@@ -117,6 +117,8 @@ function serveDirectoryIndex(result) {
         var form = new bundled_lib_1.formidable.IncomingForm();
         // console.log(state.url);
         if (state.url.query.formtype === "upload") {
+            if (typeof result.item !== "string")
+                return state.throw(400, "upload is not possible for tree items");
             if (!state.isLocalHost && !settings.allowNetwork.upload)
                 return state.throw(403, "upload is not allowed over the network");
             form.parse(state.req, function (err, fields, files) {
@@ -130,6 +132,8 @@ function serveDirectoryIndex(result) {
             });
         }
         else if (state.url.query.formtype === "mkdir") {
+            if (typeof result.item !== "string")
+                return state.throw(400, "mkdir is not possible for tree items");
             if (!state.isLocalHost && !settings.allowNetwork.mkdir)
                 return state.throw(403, "mkdir is not allowed over the network");
             form.parse(state.req, function (err, fields, files) {
@@ -231,7 +235,7 @@ function handlePUTrequest(state) {
             if (err) {
                 return state
                     .log(0, "Error writing the updated file to disk")
-                    .log(0, [err.name, err.message, err.stack].join(': '))
+                    .log(0, err.stack || [err.name, err.message].join(': '))
                     .error().throw(500);
             }
             else {
