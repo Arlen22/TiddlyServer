@@ -124,12 +124,20 @@ function serveDirectoryIndex(result: PathResolverResult) {
 	} else if (state.req.method === "POST") {
 		var form = new formidable.IncomingForm();
 		form.parse(state.req, function (err, fields, files) {
-			var oldpath = files.filetoupload.path;
-			var newpath = path.join(result.fullfilepath, files.filetoupload.name);
-			fs.rename(oldpath, newpath, function (err) {
-				if (err) debug(2, "%s %s\n%s", err.code, err.message, err.path);
-				state.redirect(state.url.path);
-			});
+			console.log(fields, Object.keys(files));
+			if (fields.formtype === "upload") {
+				var oldpath = files.filetoupload.path;
+				var newpath = path.join(result.fullfilepath, files.filetoupload.name);
+				fs.rename(oldpath, newpath, function (err) {
+					if (err) debug(2, "%s %s\n%s", err.code, err.message, err.path);
+					state.redirect(state.url.path + (err ? "?error=upload" : ""));
+				});
+			} else if (fields.formtype === "mkdir") {
+				fs.mkdir(path.join(result.fullfilepath, fields.dirname), (err) => {
+					if (err) debug(2, "%s %s\n%s", err.code, err.message, err.path);
+					state.redirect(state.url.path + (err ? "?error=mkdir" : ""));
+				})
+			}
 		});
 	} else {
 		state.throw(405);

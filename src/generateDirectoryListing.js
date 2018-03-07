@@ -59,10 +59,24 @@ ${
 ${listEntries(directory.entries)}
   </tbody>
 </table>
-
-<form action="" method="post" enctype="multipart/form-data">
-    <input type="file" name="filetoupload"><input type="submit">
+<p>
+<form action="" method="post" enctype="multipart/form-data" name="fileupload">
+    <label>Upload file</label>
+    <input type="hidden" name="formtype" value="upload" />
+    <input type="file" name="filetoupload"/>
+    <input type="submit"/>
 </form>
+</p>
+<p>
+<form action="" method="post" enctype="multipart/form-data" name="createdirectory">
+    <label>Create Directory</label>
+    <input type="hidden" name="formtype" value="mkdir" />
+    <input type="hidden" name="dirtype" value="directory" />
+    <input type="text" name="dirname"/>
+    <input type="button" onclick="this.form.elements.dirtype.value = 'directory'; this.form.submit()" value="Directory"/>
+    <input type="button" onclick="this.form.elements.dirtype.value = 'datafolder'; this.form.submit()" value="Data Folder"/>
+</form>
+</p>
 
 <p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
 <p style="color:grey; font-family:sans-serif; font-size:0.8em;">
