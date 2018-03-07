@@ -131,6 +131,8 @@ function serveDirectoryIndex(result: PathResolverResult) {
 				state.redirect(state.url.path);
 			});
 		});
+	} else {
+		state.throw(405);
 	}
 }
 

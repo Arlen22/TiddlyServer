@@ -120,6 +120,9 @@ function serveDirectoryIndex(result) {
             });
         });
     }
+    else {
+        state.throw(405);
+    }
 }
 /// file handler section =============================================
 function handlePUTrequest(state) {

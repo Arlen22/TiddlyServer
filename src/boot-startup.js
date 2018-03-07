@@ -319,7 +319,7 @@ var TiddlyServer;
                     delete file.tiddlers;
                     wiki.files[file.filepath] = file;
                 });
-                return { $ts: Wiki, wikiInfo };
+                return { $ts: wiki, wikiInfo };
             });
         });
     }
