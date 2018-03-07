@@ -1,13 +1,11 @@
 {
   "name": "tiddlyserver",
-  "version": "2.0.12-master",
+  "version": "2.0.12",
   "description": "",
   "bin": {
     "tiddlyserver": "./server.js"
   },
-  "dependencies": {
-    "source-map-support": "^0.5.3"
-  },
+  "dependencies": {},
   "devDependencies": {
     "rxjs": "5.4.3",
     "@types/node": ">=6.0.73 <7.0.0"
