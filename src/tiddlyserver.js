@@ -93,42 +93,79 @@ function doTiddlyServerRoute(input) {
     }).ignoreElements();
 }
 exports.doTiddlyServerRoute = doTiddlyServerRoute;
+function handleFileError(err) {
+    debug(2, "%s %s\n%s", err.code, err.message, err.path);
+}
 function serveDirectoryIndex(result) {
     const { state } = result;
-    if (!state.url.path.endsWith("/")) {
-        state.redirect(state.url.path + "/");
+    // console.log(state.url);
+    if (!state.url.pathname.endsWith("/")) {
+        state.redirect(state.url.pathname + "/");
     }
     else if (state.req.method === "GET") {
         rx_1.Observable.of(result)
             .concatMap(server_types_1.getTreeItemFiles)
+            .map(e => [e, settings])
             .concatMap(server_types_1.sendDirectoryIndex)
             .subscribe(res => {
-            state.res.writeHead(200);
+            state.res.writeHead(200, { 'content-type': 'text/html' });
             state.res.write(res);
             state.res.end();
         });
     }
     else if (state.req.method === "POST") {
         var form = new bundled_lib_1.formidable.IncomingForm();
-        form.parse(state.req, function (err, fields, files) {
-            console.log(fields, Object.keys(files));
-            if (fields.formtype === "upload") {
+        // console.log(state.url);
+        if (!state.url.query.formtype) {
+            return state.throw(403);
+        }
+        else if (state.url.query.formtype === "upload") {
+            if (!state.isLocalHost && !settings.allowNetwork.upload)
+                return state.throw(403, "upload is not allowed over the network");
+            form.parse(state.req, function (err, fields, files) {
                 var oldpath = files.filetoupload.path;
                 var newpath = path.join(result.fullfilepath, files.filetoupload.name);
                 fs.rename(oldpath, newpath, function (err) {
                     if (err)
-                        debug(2, "%s %s\n%s", err.code, err.message, err.path);
-                    state.redirect(state.url.path + (err ? "?error=upload" : ""));
+                        handleFileError(err);
+                    state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
                 });
-            }
-            else if (fields.formtype === "mkdir") {
+            });
+        }
+        else if (state.url.query.formtype === "mkdir") {
+            if (!state.isLocalHost && !settings.allowNetwork.mkdir)
+                return state.throw(403, "mkdir is not allowed over the network");
+            form.parse(state.req, function (err, fields, files) {
                 fs.mkdir(path.join(result.fullfilepath, fields.dirname), (err) => {
-                    if (err)
-                        debug(2, "%s %s\n%s", err.code, err.message, err.path);
-                    state.redirect(state.url.path + (err ? "?error=mkdir" : ""));
+                    if (err) {
+                        handleFileError(err);
+                        state.redirect(state.url.pathname + "?error=mkdir");
+                    }
+                    else if (fields.dirtype === "datafolder") {
+                        let read = fs.createReadStream(path.join(__dirname, "../tiddlywiki/datafolder-template.json"));
+                        let write = fs.createWriteStream(path.join(result.fullfilepath, fields.dirname, "tiddlywiki.info"));
+                        read.pipe(write);
+                        let error;
+                        const errorHandler = (err) => {
+                            handleFileError(err);
+                            error = err;
+                            state.redirect(state.url.pathname + "?error=mkdf");
+                            read.close();
+                            write.close();
+                        };
+                        write.on('error', errorHandler);
+                        read.on('error', errorHandler);
+                        write.on('close', () => {
+                            if (!error)
+                                state.redirect(state.url.pathname);
+                        });
+                    }
+                    else {
+                        state.redirect(state.url.pathname);
+                    }
                 });
-            }
-        });
+            });
+        }
     }
     else {
         state.throw(405);
@@ -159,13 +196,13 @@ function handlePUTrequest(state) {
     }
     new rx_1.Observable((subscriber) => {
         if (settings.backupDirectory) {
-            const backupFile = state.url.path.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
+            const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
             const ext = path.extname(backupFile);
             const backupWrite = fs.createWriteStream(path.join(settings.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
             const fileRead = fs.createReadStream(fullpath);
             const gzip = zlib.createGzip();
             const pipeError = (err) => {
-                debug(3, 'Error saving backup file for %s: %s\r\n%s', state.url.path, err.message, "Please make sure the backup directory actually exists or else make the " +
+                debug(3, 'Error saving backup file for %s: %s\r\n%s', state.url.pathname, err.message, "Please make sure the backup directory actually exists or else make the " +
                     "backupDirectory key falsy in your settings file (e.g. set it to a " +
                     "zero length string or false, or remove it completely)");
                 state.log(3, "Backup could not be saved, see server output").throw(500);

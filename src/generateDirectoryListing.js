@@ -7,7 +7,7 @@ $tw.saverHandler.savers[saver] = $tw.modules.types.saver['$:/core/modules/savers
 
 const info = require('../package.json');
 
-exports.generateDirectoryListing = function (directory) {
+exports.generateDirectoryListing = function (directory, settings) {
     function listEntries(entries) {
         return entries.slice().sort(
             sortBySelector(e => ((e.type === 'folder' ? '0-' : '1-') + e.name.toLocaleLowerCase()))
@@ -59,23 +59,21 @@ ${
 ${listEntries(directory.entries)}
   </tbody>
 </table>
-<p>
-<form action="" method="post" enctype="multipart/form-data" name="fileupload">
+${settings.allowNetwork.upload ? `<p>
+<form action="?formtype=upload" method="post" enctype="multipart/form-data" name="upload">
     <label>Upload file</label>
-    <input type="hidden" name="formtype" value="upload" />
     <input type="file" name="filetoupload"/>
     <input type="submit"/>
 </form>
-</p>
-<p>
-<form action="" method="post" enctype="multipart/form-data" name="createdirectory">
+</p>` : ''}
+${settings.allowNetwork.mkdir ? `<p>
+<form action="?formtype=mkdir" method="post" enctype="multipart/form-data" name="mkdir">
     <label>Create Directory</label>
-    <input type="hidden" name="formtype" value="mkdir" />
     <input type="hidden" name="dirtype" value="directory" />
     <input type="text" name="dirname"/>
-    <input type="button" onclick="this.form.elements.dirtype.value = 'directory'; this.form.submit()" value="Directory"/>
+    <input type="submit" value="Directory"/>
     <input type="button" onclick="this.form.elements.dirtype.value = 'datafolder'; this.form.submit()" value="Data Folder"/>
-</form>
+</form>` : ''}
 </p>
 
 <p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>

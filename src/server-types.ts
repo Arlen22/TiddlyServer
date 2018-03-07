@@ -204,6 +204,8 @@ export function DebugLogger(prefix: string): typeof DebugLog {
     } as typeof DebugLog;
 }
 
+
+
 export function sanitizeJSON(key: string, value: any) {
     // returning undefined omits the key from being serialized
     if (!key) { return value; } //This is the entire value to be serialized
@@ -346,8 +348,8 @@ export function getTreeItemFiles(result: PathResolverResult) {
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
 const { generateDirectoryListing } = require('./generateDirectoryListing');
-
-export function sendDirectoryIndex(_r: { keys: string[], paths: (string | boolean)[], dirpath: string }) {
+export type IndexData = { keys: string[], paths: (string | boolean)[], dirpath: string };
+export function sendDirectoryIndex([_r, settings]: [IndexData, ServerConfig]) {
     let { keys, paths, dirpath } = _r;
     let pairs = keys.map((k, i) => [k, paths[i]]);
     return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
@@ -367,7 +369,7 @@ export function sendDirectoryIndex(_r: { keys: string[], paths: (string | boolea
         });
         return n;
     }, [] as DirectoryEntry[]).map(entries => {
-        return generateDirectoryListing({ path: dirpath, entries });
+        return generateDirectoryListing({ path: dirpath, entries }, settings);
     });
 }
 
@@ -715,6 +717,11 @@ export interface ServerConfig {
     maxAge: { tw_plugins: number }
     tsa: {
         alwaysRefreshCache: boolean;
+    },
+    allowNetwork: {
+        upload: boolean
+        mkdir: boolean
+        settings: boolean
     }
 }
 
