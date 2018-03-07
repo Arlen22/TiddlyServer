@@ -1,9 +1,12 @@
-### 2.0.12
-* Upgrade to TiddlyWiki 5.1.15.
+### 2.0.12 
+
 * Use webpack to bundle the dependancies.
 * Add the ability to upload files to a directory and create directories and data folders.
 * Add `allowNetwork` hashmap to `settings.json` to specify whether requests from the network (i.e. any requests
-  not coming in through the loopback interface) are allowed to take certain actions. 
+  not coming in through the loopback interface) are allowed to take certain actions. See the readme for details.
+
+### 2.0.11
+* Upgrade to TiddlyWiki 5.1.15.
 
 ### 2.0.9
 
