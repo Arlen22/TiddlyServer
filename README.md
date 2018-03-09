@@ -71,7 +71,8 @@ Some users find the exact requirements of JSON to be somewhat difficult. If you 
     "port": 8080,                
     "backupDirectory": "",
     "etag": "",
-    "etagWindow": 0
+    "etagWindow": 0,
+    "allowNetwork": { mkdir: false, upload: false }
 }
 ```
 
