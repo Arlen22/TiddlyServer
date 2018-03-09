@@ -226,11 +226,22 @@ Observable.merge(
     //In practice, the only reason this should happen is if the server close event fires.
     console.log('finished processing for some reason');
 })
+import { generateSettingsPage } from './generateSettingsPage';
 
 function doAdminRoute(obs: Observable<StateObject>): any {
-    return obs.mergeMap(state => {
-        if (!state.isLocalHost) return state.throw(403, "Admin is only accessible from localhost");
-        return state.throw(404, "Reserved for future use");
+
+    return obs.do(state => {
+        //use a numeric indicator
+        let level = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
+            : (settings.allowNetwork.settings ? 0 : -1);
+
+        if (level > -1) {
+            state.res.writeHead(200);
+            state.res.write(generateSettingsPage(settings, level));
+            state.res.end();
+        } else {
+            state.throw(403, "Admin is only accessible from localhost")
+        }
     }) as Observable<StateObject>
 }
 
