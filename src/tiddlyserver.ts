@@ -111,6 +111,7 @@ export function doTiddlyServerRoute(input: Observable<StateObject>) {
 function handleFileError(err: NodeJS.ErrnoException) {
 	debug(2, "%s %s\n%s", err.code, err.message, err.path);
 }
+
 function serveDirectoryIndex(result: PathResolverResult) {
 	const { state } = result;
 	// console.log(state.url);
