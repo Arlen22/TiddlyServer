@@ -223,6 +223,7 @@ exports.sanitizeJSON = sanitizeJSON;
 // })();
 function serveFile(obs, file, root) {
     return obs.mergeMap(state => {
+        console.log('serving');
         return exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
             if (err)
                 return state.throw(404);
@@ -493,7 +494,13 @@ class StateError extends Error {
     }
 }
 exports.StateError = StateError;
+// export interface 
 // export type LoggerFunc = (str: string, ...args: any[]) => void;
+class URLSearchParams {
+    constructor(str) {
+    }
+}
+exports.URLSearchParams = URLSearchParams;
 class StateObject {
     constructor(req, res, debugLog, eventer, isLocalHost = false) {
         this.req = req;
@@ -514,8 +521,10 @@ class StateObject {
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
-        this.url = new URL(this.req.url);
-        this.url = url.parse(this.req.url, true);
+        // console.log(this.req.url);
+        // this.url = new URL(this.req.url as string);
+        // this.url = url.parse(this.req.url as string, true) as any;
+        this.url = StateObject.parseURL(this.req.url);
         //parse the path for future use
         this.path = this.url.pathname.split('/');
         let t = new Date();
@@ -526,6 +535,21 @@ class StateObject {
             if (this.errorThrown)
                 this.eventer.emit('stateError', this);
         });
+    }
+    static parseURL(str) {
+        let item = url.parse(str, true);
+        let { path, pathname, query, search, href } = item;
+        if (!path)
+            path = "";
+        if (!pathname)
+            pathname = "";
+        if (!query)
+            query = {};
+        if (!search)
+            search = "";
+        if (!href)
+            href = "";
+        return { path, pathname, query, search, href };
     }
     static errorRoute(status, reason) {
         return (obs) => {
