@@ -24,7 +24,17 @@ interface RootScope extends angular.IScope {
 interface GlobalScope extends RootScope {
 
 }
-angular.module('json-editor', [
+
+interface SettingsPageCtrlScope extends RootScope {
+
+}
+interface SettingsPageItemCtrlScope extends SettingsPageCtrlScope {
+
+}
+interface HashmapEnumItemCtrlScope extends SettingsPageCtrlScope {
+
+}
+angular.module('settings', [
 
 ]).config(function ($locationProvider) {
 	$locationProvider.html5Mode(false).hashPrefix('*');
@@ -57,6 +67,128 @@ angular.module('json-editor', [
 </fieldset>
 		`
 	}
+
+	for (var i in templates) {
+		$templateCache.put("template-" + i, templates[i]);
+	}
+}).controller("HashmapEnumItemCtrl", function ($scope) {
+	let parentItem: SettingsPageItem & ValueType = $scope.item;
+	if (parentItem.valueType !== "hashmapenum") return;
+	$scope.item = {
+		valueType: parentItem.valueOptions[0][0],
+		name: $scope.key,
+		type: parentItem.type
+	} as SettingsPageItem & ValueType;
+	if (typeof $scope.outputs[parentItem.name] !== "object")
+		$scope.outputs[parentItem.name] = {};
+	$scope.outputs = $scope.outputs[parentItem.name];
+	$scope.description = $scope.description[parentItem.name];
+}).controller("SettingsPageItemCtrl", function ($scope) {
+	$scope.description = $scope.description[$scope.item.name];
+}).controller("SettingsPageCtrl", function ($scope) {
+	$scope.outputs = {
+		"tree": {
+			"ArlenNotes": "C:\\Users\\Arlen\\Dropbox\\ArlenNotes",
+			"ArlenStorage": "C:\\ArlenNotesStorage",
+			"ArlenJournal": "G:/",
+			"dropbox": "C:\\Users\\Arlen\\Dropbox\\TiddlyWiki",
+			"projects": {
+				"tw5-angular": "..\\tw5-angular",
+				"monacotw5": "C:\\ArlenStuff\\TiddlyWiki-Monaco-Editor",
+				"wavenet": "C:\\Users\\Arlen\\Dropbox\\Projects\\WaveNet",
+				"tiddlywiki": "C:\\ArlenStuff\\TiddlyWiki5-5.1.14",
+				"fol": "C:\\Users\\Arlen\\Dropbox\\FOL\\tw5-notes",
+				"lambda-client": "C:\\ArlenProjects\\aws-tiddlyweb\\lambda-client"
+			},
+			"wef-reports": "c:\\ArlenProjects\\wef-reports",
+			"tesol": "C:\\Users\\Arlen\\Dropbox\\TESOL",
+			"tw5-dropbox": "C:\\ArlenStuff\\tw5-dropbox",
+			"twcloud-dropbox": "C:\\ArlenStuff\\twcloud\\dropbox",
+			"genyoutube": "C:\\Users\\Arlen\\Music\\GenYoutube",
+			"sock.pac": "C:\\sock.pac"
+		},
+		"types": {
+			"htmlfile": [
+				"htm",
+				"html"
+			]
+		},
+		"port": 80,
+		"host": "0.0.0.0",
+		"backupDirectory": "",
+		"etag": "",
+		"etagWindow": 3,
+		"useTW5path": false,
+		"allowNetwork": {
+			"settings": true
+		}
+	};
+	$scope.data = [
+		{ type: 2, name: "tree", valueType: "function", /* valueOptions: [treeGenerate] */ },
+		{ type: 0, name: "types", valueType: "function", /* valueOptions: [typesFunction] */ },
+		{ type: 1, name: "host", valueType: "string" },
+		{ type: 1, name: "port", valueType: "number" },
+		{ type: 1, name: "username", valueType: "string" },
+		{ type: 1, name: "password", valueType: "string" },
+		{ type: 0, name: "backupDirectory", valueType: "string" },
+		{ type: 0, name: "etag", valueType: "enum", valueOptions: ["string", ["", "disabled", "required"]] },
+		{ type: 0, name: "etagWindow", valueType: "number" },
+		{ type: 1, name: "useTW5path", valueType: "boolean" },
+		{ type: 0, name: "debugLevel", valueType: "enum", valueOptions: ["number", [4, 3, 2, 1, 0, -1, -2, -3, -4]] },
+		{
+			type: 1,
+			name: "allowNetwork",
+			valueType: "hashmapenum",
+			valueOptions: [
+				["boolean"],
+				["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"]
+			]
+		},
+		// { type: "disabled", name: "_disableLocalHost" },
+		// { type: "disabled", name: "tsa" },
+		// { type: "disabled", name: "maxAge" }
+	];
+	$scope.description = {
+		tree: "The mount structure of the server",
+		types: "Specifies which extensions get used for each icon",
+		host: "The IP address to listen on for requests. 0.0.0.0 listens on all IP addresses. "
+			+ "127.0.0.1 only listens on localhost. <br/>"
+			+ "TECHNICAL: 127.0.0.1 is always bound to even when another IP is specified.",
+		port: "The port number to listen on.",
+		username: "The basic auth username to use. Also forwarded to data folders for signing edits.",
+		password: "The basic auth password to use.",
+		etag: "disabled (Don't check etags), "
+			+ "required (Require etags to be used), "
+			+ "&lt;not specified&gt; (only check etag if sent by the client)",
+		etagWindow: "If the etag gets checked, allow a file to be saved if the etag is not stale by more than this many seconds.",
+		backupDirectory: "The directory to save backup files in from single file wikis. Data folders are not backed up.",
+		debugLevel: "Print out messages with this debug level or higher. <a href=\"https://github.com/Arlen22/TiddlyServer#debuglevel\">See the readme for more detail.</a>",
+		useTW5path: "Mount data folders as the directory index (like NodeJS: /mydatafolder/) instead of as a file (like single-file wikis: /mydatafolder). It is recommended to leave this off unless you need it.",
+		allowNetwork: {
+			mkdir: "Allow network users to create directories and datafolders.",
+			upload: "Allow network users to upload files.",
+			settings: "Allow network users to change non-critical settings.",
+			WARNING_all_settings_WARNING: "Allow network users to change critical settings: <br/>"
+				+ `<pre>${$scope.data.filter(e => e.type > 0).map(e => e.name).join(', ')}</pre>`
+		},
+		maxAge: "",
+		tsa: "",
+		_disableLocalHost: "",
+		__dirname: "READONLY: Directory of currently loaded settings file",
+		__assetsDir: ""
+	};
+})
+
+
+
+
+
+// angular.module("settings", [
+
+// ]).controller("globalCtrl", function ($scope: GlobalScope, $http: angular.IHttpService) {
+// 	$http.get("?")
+// })
+
 	// 	const old = {
 	// 		"template-children":/* just some green */ `
 	// <div ng-repeat="(i, item) in item.children track by $index" 
@@ -83,29 +215,3 @@ angular.module('json-editor', [
 	// <input type="text" ng-model="outputs[item.output]"/>
 	// `
 	// 	}
-	for (var i in templates) {
-		$templateCache.put(i, templates[i]);
-	}
-}).controller("HashmapEnumItemCtrl", function ($scope) {
-	let parentItem: SettingsPageItem & ValueType = $scope.item;
-	if (parentItem.valueType !== "hashmapenum") return;
-	$scope.item = {
-		valueType: parentItem.valueOptions[0][0],
-		name: $scope.key,
-		type: parentItem.type
-	} as SettingsPageItem & ValueType;
-	if (typeof $scope.outputs[parentItem.name] !== "object")
-		$scope.outputs[parentItem.name] = {};
-	$scope.outputs = $scope.outputs[parentItem.name];
-	$scope.description = $scope.description[parentItem.name];
-});
-
-
-
-
-
-angular.module("settings", [
-
-]).controller("globalCtrl", function ($scope: GlobalScope, $http: angular.IHttpService) {
-	$http.get("?")
-})

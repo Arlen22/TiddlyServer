@@ -258,6 +258,7 @@ export interface ServeStaticResult {
 
 export function serveFile(obs: Observable<StateObject>, file: string, root: string) {
     return obs.mergeMap(state => {
+        console.log('serving');
         return obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]): any => {
             if (err) return state.throw<StateObject>(404);
             send(state.req, file, { root })
@@ -557,11 +558,31 @@ export type StatPathResult = {
      */
     endStat: boolean
 }
-
+// export interface 
 // export type LoggerFunc = (str: string, ...args: any[]) => void;
+export class URLSearchParams {
+    constructor(str: string) {
 
+    }
+}
+export interface StateObjectUrl {
+    path: string,
+    pathname: string,
+    query: Hashmap<string>,
+    search: string,
+    href: string
+}
 export class StateObject {
-
+    static parseURL(str: string): StateObjectUrl {
+        let item = url.parse(str, true);
+        let { path, pathname, query, search, href } = item;
+        if (!path) path = "";
+        if (!pathname) pathname = "";
+        if (!query) query = {};
+        if (!search) search = "";
+        if (!href) href = "";
+        return { path, pathname, query, search, href };
+    }
     static errorRoute(status: number, reason?: string) {
         return (obs: Observable<any>): any => {
             return obs.mergeMap((state: StateObject) => {
@@ -580,21 +601,8 @@ export class StateObject {
 
     statPath: StatPathResult;
 
-    url: URL;
-    // {
-    //     href: string;
-    //     protocol: string;
-    //     auth?: string;
-    //     host: string;
-    //     hostname: string;
-    //     port?: string;
-    //     pathname: string;
-    //     path: string;
-    //     search?: string;
-    //     query?: string | any;
-    //     slashes?: boolean;
-    //     hash?: string;
-    // };
+    url: StateObjectUrl;
+
     path: string[];
 
     maxid: number;
@@ -617,8 +625,10 @@ export class StateObject {
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
-        this.url = new URL(this.req.url as string);
-        this.url = url.parse(this.req.url as string, true) as any
+        // console.log(this.req.url);
+        // this.url = new URL(this.req.url as string);
+        // this.url = url.parse(this.req.url as string, true) as any;
+        this.url = StateObject.parseURL(this.req.url as string);
         //parse the path for future use
         this.path = (this.url.pathname as string).split('/')
 

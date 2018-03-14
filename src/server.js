@@ -111,13 +111,13 @@ server_types_1.init(eventer);
 tiddlyserver_1.init(eventer);
 generateSettingsPage_1.initSettingsRequest(eventer);
 //emit settings to everyone (I know, this could be an observable)
-eventer.emit('settings', settings);
 const assets = path.resolve(__dirname, '../assets');
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
+settings.__assetsDir = assets;
+eventer.emit('settings', settings);
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
-settings.__assetsDir = assets;
 process.on('uncaughtException', () => {
     serverNetwork.close();
     serverLocalHost.close();

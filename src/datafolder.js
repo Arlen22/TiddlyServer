@@ -85,11 +85,11 @@ function datafolder(result) {
     let folder = state.statPath.statpath;
     //initialize the tiddlywiki instance
     // reload the plugin cache if requested
-    if (state.url.searchParams.get("reload") === "plugins")
+    if (state.url.query.reload === "plugins")
         initPluginLoader();
-    if (!loadedFolders[prefixURI] || state.url.searchParams.get("reload") === "true") {
+    if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
         loadedFolders[prefixURI] = [];
-        loadDataFolder(prefixURI, folder, state.url.searchParams.get("reload") || "");
+        loadDataFolder(prefixURI, folder, state.url.query.reload);
         // loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
         // loadTiddlyWiki(prefixURI, folder);
     }
@@ -98,7 +98,7 @@ function datafolder(result) {
     //redirect ?reload=true requests to the same, to prevent it being 
     //reloaded multiple times for the same page load.
     if (isFullpath && !settings.useTW5path !== !state.url.pathname.endsWith("/")
-        || state.url.searchParams.has("reload")) {
+        || state.url.query.reload) {
         let redirect = prefixURI + (settings.useTW5path ? "/" : "");
         state.res.writeHead(302, {
             'Location': redirect

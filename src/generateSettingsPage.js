@@ -10,12 +10,12 @@ function initSettingsRequest(e) {
     eventer = e;
     eventer.on('settings', function (set) {
         settings = set;
+        //serve the settings page file
+        if (serveSettingsPage)
+            serveSettingsPage.complete();
+        serveSettingsPage = new rx_1.Subject();
+        server_types_1.serveFile(serveSettingsPage.asObservable(), "settingsPage.html", settings.__assetsDir).subscribe();
     });
-    //serve the settings page file
-    if (serveSettingsPage)
-        serveSettingsPage.complete();
-    serveSettingsPage = new rx_1.Subject();
-    server_types_1.serveFile(serveSettingsPage.asObservable(), settings.__assetsDir, "settingsPage.html");
 }
 exports.initSettingsRequest = initSettingsRequest;
 const data = [
@@ -211,6 +211,7 @@ function typesFunction(defValue, keys) {
 }
 function handleSettingsRequest(state) {
     if (state.req.method === "GET") {
+        console.log(state.path);
         // let key;
         // if (state.path.length > 3) {
         // 	let l2index = data.filter(e => e.type === 2).map(e => e.name).indexOf(state.path[3]);
@@ -220,9 +221,10 @@ function handleSettingsRequest(state) {
         // 	key = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
         // 		: (settings.allowNetwork.settings ? 0 : -1);
         // }
-        let data;
+        // let data;
         if (state.path[3] === "") {
-            return serveSettingsPage.next(state);
+            // console.log("serving");
+            serveSettingsPage.next(state);
             // state.res.writeHead(200);
             // state.res.write(JSON.stringify({ data, settings, descriptions }, null, 2));
             // state.res.end();
