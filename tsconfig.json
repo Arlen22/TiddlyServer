@@ -10,7 +10,8 @@
         "inlineSourceMap": false
     },
     "files": [
-        "./src/server.ts"
+        "./src/server.ts",
+        "./assets/static/settings-page.ts"
     ],
     "exclude": [
         "node_modules",

@@ -96,6 +96,7 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
+settings.__dirname = settingsDir;
 var ENV;
 (function (ENV) {
     ENV.disableLocalHost = false;
@@ -105,8 +106,10 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
     ENV.disableLocalHost = true;
 //import and init api-access
 const tiddlyserver_1 = require("./tiddlyserver");
+const generateSettingsPage_1 = require("./generateSettingsPage");
 server_types_1.init(eventer);
 tiddlyserver_1.init(eventer);
+generateSettingsPage_1.initSettingsRequest(eventer);
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
 const assets = path.resolve(__dirname, '../assets');
@@ -114,6 +117,7 @@ const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
+settings.__assetsDir = assets;
 process.on('uncaughtException', () => {
     serverNetwork.close();
     serverLocalHost.close();
@@ -196,20 +200,10 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     //In practice, the only reason this should happen is if the server close event fires.
     console.log('finished processing for some reason');
 });
-const generateSettingsPage_1 = require("./generateSettingsPage");
 function doAdminRoute(obs) {
     return obs.do(state => {
-        //use a numeric indicator
-        let level = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
-            : (settings.allowNetwork.settings ? 0 : -1);
-        if (level > -1) {
-            state.res.writeHead(200);
-            state.res.write(generateSettingsPage_1.generateSettingsPage(settings, level));
-            state.res.end();
-        }
-        else {
-            state.throw(403, "Admin is only accessible from localhost");
-        }
+        if (state.path[2] === "settings")
+            generateSettingsPage_1.handleSettingsRequest(state);
     });
 }
 function serverListenCB(err, res) {

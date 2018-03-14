@@ -489,24 +489,36 @@ type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 // export function obs<S>(state?: S) {
 //     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
 // }
+export type obs_stat_result<T> = [NodeJS.ErrnoException, fs.Stats, T, string]
+export const obs_stat = <T = undefined>(tag: T = undefined as any) =>
+    (filepath: string) => new Observable<obs_stat_result<T>>(subs => {
+        fs.stat(filepath, (err, data) => {
+            subs.next([err, data, tag, filepath]);
+            subs.complete();
+        })
+    })
 
-export const obs_stat = <T>(state?: T) => Observable.bindCallback(
-    fs.stat, (err, stat): NodeCallback<fs.Stats, T> => [err, stat, state] as any);
+export type obs_readdir_result<T> = [NodeJS.ErrnoException, string[], T, string]
+export const obs_readdir = <T>(tag: T = undefined as any) =>
+    (filepath: string) => new Observable<obs_readdir_result<T>>(subs => {
+        fs.readdir(filepath, (err, data) => {
+            subs.next([err, data, tag, filepath]);
+            subs.complete();
+        })
+    })
 
-export const obs_readdir = <T>(state?: T) => Observable.bindCallback(
-    fs.readdir, (err, files): NodeCallback<string[], T> => [err, files, state] as any);
-
-export const obs_readFile = <T>(tag: T = undefined as any): typeof obs_readFile_inner =>
+export type obs_readFile_result<T> = typeof obs_readFile_inner
+export const obs_readFile = <T>(tag: T = undefined as any): obs_readFile_result<T> =>
     (filepath: string, encoding?: string) =>
         new Observable(subs => {
-            if (encoding) fs.readFile(filepath, encoding, (err, data) => {
+            const cb = (err, data) => {
                 subs.next([err, data, tag, filepath]);
                 subs.complete();
-            });
-            else fs.readFile(filepath, (err, data) => {
-                subs.next([err, data, tag, filepath]);
-                subs.complete();
-            })
+            }
+            if (encoding)
+                fs.readFile(filepath, encoding, cb);
+            else
+                fs.readFile(filepath, cb)
         }) as any;
 
 declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T, string]>;
@@ -568,20 +580,21 @@ export class StateObject {
 
     statPath: StatPathResult;
 
-    url: {
-        href: string;
-        protocol: string;
-        auth?: string;
-        host: string;
-        hostname: string;
-        port?: string;
-        pathname: string;
-        path: string;
-        search?: string;
-        query?: string | any;
-        slashes?: boolean;
-        hash?: string;
-    };
+    url: URL;
+    // {
+    //     href: string;
+    //     protocol: string;
+    //     auth?: string;
+    //     host: string;
+    //     hostname: string;
+    //     port?: string;
+    //     pathname: string;
+    //     path: string;
+    //     search?: string;
+    //     query?: string | any;
+    //     slashes?: boolean;
+    //     hash?: string;
+    // };
     path: string[];
 
     maxid: number;
@@ -604,6 +617,7 @@ export class StateObject {
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
+        this.url = new URL(this.req.url as string);
         this.url = url.parse(this.req.url as string, true) as any
         //parse the path for future use
         this.path = (this.url.pathname as string).split('/')
@@ -700,6 +714,8 @@ export interface ThrowFunc<T> {
 }
 
 export interface ServerConfig {
+    __dirname: string;
+    __assetsDir: string;
     _disableLocalHost: boolean;
     tree: any,
     types: {

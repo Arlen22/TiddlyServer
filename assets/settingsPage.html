@@ -1,10 +1,21 @@
 <!doctype html>
-
 <html>
-	<head>
-		<title>${title}</title>
-	</head>
-	<body>
 
-	</body>
+<head>
+	<style>
+		dl.treelist {
+			margin: 0;
+		}
+	</style>
+	<!-- https: //code.angularjs.org/1.6.9 -->
+	<script src="/static/polyfill-promise.js"></script>
+	<script src="/static/angular.min.js"></script>
+	<script src="/static/settings-page.js"></script>
+	<title></title>
+</head>
+
+<body>
+<div ng-include="'template-settingsPage'" ng-controller="SettingsPageCtrl"></div>
+</body>
+
 </html>

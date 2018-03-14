@@ -121,7 +121,7 @@ function serveDirectoryIndex(result) {
     else if (state.req.method === "POST") {
         var form = new bundled_lib_1.formidable.IncomingForm();
         // console.log(state.url);
-        if (state.url.query.formtype === "upload") {
+        if (state.url.searchParams.get("formtype") === "upload") {
             if (typeof result.item !== "string")
                 return state.throw(400, "upload is not possible for tree items");
             if (!state.isLocalHost && !settings.allowNetwork.upload)
@@ -136,7 +136,7 @@ function serveDirectoryIndex(result) {
                 });
             });
         }
-        else if (state.url.query.formtype === "mkdir") {
+        else if (state.url.searchParams.get("formtype") === "mkdir") {
             if (typeof result.item !== "string")
                 return state.throw(400, "mkdir is not possible for tree items");
             if (!state.isLocalHost && !settings.allowNetwork.mkdir)
