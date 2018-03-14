@@ -107,11 +107,11 @@ export function datafolder(result: PathResolverResult) {
     //initialize the tiddlywiki instance
 
     // reload the plugin cache if requested
-    if (state.url.query.reload === "plugins") initPluginLoader();
+    if (state.url.searchParams.get("reload") === "plugins") initPluginLoader();
 
-    if (!loadedFolders[prefixURI] || state.url.query.reload === "true") {
+    if (!loadedFolders[prefixURI] || state.url.searchParams.get("reload") === "true") {
         loadedFolders[prefixURI] = [];
-        loadDataFolder(prefixURI, folder, state.url.query.reload);
+        loadDataFolder(prefixURI, folder, state.url.searchParams.get("reload") || "");
         // loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
         // loadTiddlyWiki(prefixURI, folder);
     }
@@ -121,7 +121,7 @@ export function datafolder(result: PathResolverResult) {
     //redirect ?reload=true requests to the same, to prevent it being 
     //reloaded multiple times for the same page load.
     if (isFullpath && !settings.useTW5path !== !state.url.pathname.endsWith("/")
-        || state.url.query.reload) {
+        || state.url.searchParams.has("reload")) {
         let redirect = prefixURI + (settings.useTW5path ? "/" : "");
         state.res.writeHead(302, {
             'Location': redirect
@@ -522,7 +522,7 @@ function sendAllTiddlers(tsa: TSASO) {
         });
     }
 }
-function sendSkinnyTiddlers(tsa: TSASO){
+function sendSkinnyTiddlers(tsa: TSASO) {
 
 }
 const newLineBuffer = Buffer.from('\n');

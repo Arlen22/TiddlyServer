@@ -135,7 +135,7 @@ function serveDirectoryIndex(result: PathResolverResult) {
 	} else if (state.req.method === "POST") {
 		var form = new formidable.IncomingForm();
 		// console.log(state.url);
-		if (state.url.query.formtype === "upload") {
+		if (state.url.searchParams.get("formtype") === "upload") {
 			if (typeof result.item !== "string")
 				return state.throw(400, "upload is not possible for tree items");
 			if (!state.isLocalHost && !settings.allowNetwork.upload)
@@ -148,7 +148,7 @@ function serveDirectoryIndex(result: PathResolverResult) {
 					state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
 				});
 			});
-		} else if (state.url.query.formtype === "mkdir") {
+		} else if (state.url.searchParams.get("formtype") === "mkdir") {
 			if (typeof result.item !== "string")
 				return state.throw(400, "mkdir is not possible for tree items");
 			if (!state.isLocalHost && !settings.allowNetwork.mkdir)

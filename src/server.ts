@@ -111,6 +111,8 @@ if (settings.etag === "disabled" && !settings.backupDirectory)
         + "also set the etagWindow setting to allow files to be modified if not newer than "
         + "so many seconds from the copy being saved.");
 
+settings.__dirname = settingsDir;
+
 namespace ENV {
     export let disableLocalHost: boolean = false;
 };
@@ -120,9 +122,12 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
 
 //import and init api-access
 import { doTiddlyServerRoute, init as initTiddlyServer, doTiddlyWikiRoute } from './tiddlyserver';
+import { handleSettingsRequest, initSettingsRequest } from './generateSettingsPage';
+
 import { ServerResponse } from 'http';
 initServerTypes(eventer);
 initTiddlyServer(eventer);
+initSettingsRequest(eventer);
 
 //emit settings to everyone (I know, this could be an observable)
 eventer.emit('settings', settings);
@@ -133,6 +138,8 @@ const stylesheet = path.resolve(__dirname, '../assets/directory.css');
 
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
+
+settings.__assetsDir = assets;
 
 process.on('uncaughtException', () => {
     serverNetwork.close();
@@ -209,7 +216,7 @@ Observable.merge(
     if (!state.res.finished) {
         const interval = setInterval(function () {
             state.log(-2, 'LONG RUNNING RESPONSE');
-            state.log(-2, '%s %s ', state.req.method, state.req.url)
+            state.log(-2, '%s %s ', state.req.method, state.req.url);
         }, 60000);
         Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearInterval(interval));
     }
@@ -226,22 +233,11 @@ Observable.merge(
     //In practice, the only reason this should happen is if the server close event fires.
     console.log('finished processing for some reason');
 })
-import { generateSettingsPage } from './generateSettingsPage';
+
 
 function doAdminRoute(obs: Observable<StateObject>): any {
-
     return obs.do(state => {
-        //use a numeric indicator
-        let level = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
-            : (settings.allowNetwork.settings ? 0 : -1);
-
-        if (level > -1) {
-            state.res.writeHead(200);
-            state.res.write(generateSettingsPage(settings, level));
-            state.res.end();
-        } else {
-            state.throw(403, "Admin is only accessible from localhost")
-        }
+        if (state.path[2] === "settings") handleSettingsRequest(state);
     }) as Observable<StateObject>
 }
 

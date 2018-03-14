@@ -460,22 +460,27 @@ function resolvePath(state, tree) {
     };
 }
 exports.resolvePath = resolvePath;
-// export function obs<S>(state?: S) {
-//     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
-// }
-exports.obs_stat = (state) => rx_1.Observable.bindCallback(fs.stat, (err, stat) => [err, stat, state]);
-exports.obs_readdir = (state) => rx_1.Observable.bindCallback(fs.readdir, (err, files) => [err, files, state]);
+exports.obs_stat = (tag = undefined) => (filepath) => new rx_1.Observable(subs => {
+    fs.stat(filepath, (err, data) => {
+        subs.next([err, data, tag, filepath]);
+        subs.complete();
+    });
+});
+exports.obs_readdir = (tag = undefined) => (filepath) => new rx_1.Observable(subs => {
+    fs.readdir(filepath, (err, data) => {
+        subs.next([err, data, tag, filepath]);
+        subs.complete();
+    });
+});
 exports.obs_readFile = (tag = undefined) => (filepath, encoding) => new rx_1.Observable(subs => {
+    const cb = (err, data) => {
+        subs.next([err, data, tag, filepath]);
+        subs.complete();
+    };
     if (encoding)
-        fs.readFile(filepath, encoding, (err, data) => {
-            subs.next([err, data, tag, filepath]);
-            subs.complete();
-        });
+        fs.readFile(filepath, encoding, cb);
     else
-        fs.readFile(filepath, (err, data) => {
-            subs.next([err, data, tag, filepath]);
-            subs.complete();
-        });
+        fs.readFile(filepath, cb);
 });
 // Observable.bindCallback(fs.readFile,
 //     (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any
@@ -509,6 +514,7 @@ class StateObject {
         this.startTime = process.hrtime();
         //parse the url and store in state.
         //a server request will definitely have the required fields in the object
+        this.url = new URL(this.req.url);
         this.url = url.parse(this.req.url, true);
         //parse the path for future use
         this.path = this.url.pathname.split('/');
