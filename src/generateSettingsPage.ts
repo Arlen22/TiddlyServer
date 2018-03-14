@@ -23,21 +23,31 @@ type SettingsPageItem = {
 	// valueType: string,
 	// valueOptions?: any[]
 };
-type ValueType = {
+type ValueType_function = {
 	valueType: "function",
 	// valueOptions: [(defValue: any, keys: string[], readOnly: boolean, description: any) => string]
-} | {
-		valueType: "string" | "number" | "boolean"
-	} | {
-		valueType: "enum",
-		valueOptions: ["number" | "string", (number | string)[]]
-	} | {
-		valueType: "hashmapenum",
-		valueOptions: [("string" | "number" | "boolean")[], string[]]
+} & SettingsPageItem;
+type ValueType_primitive = {
+	valueType: "string" | "number" | "boolean"
+} & SettingsPageItem;
+type ValueType_enum = {
+	valueType: "enum",
+	valueOptions: ["number" | "string", (number | string)[]]
+} & SettingsPageItem;
+type ValueType_hashmapenum = {
+	valueType: "hashmapenum",
+	valueOptions: [("string" | "number" | "boolean")[], string[]]
+} & SettingsPageItem;
+type ValueType_subpage = {
+	valueType: "subpage",
+	valueOptions: {
+		handler: (state: StateObject) => void;
 	}
-const data: (SettingsPageItem & ValueType)[] = [
-	{ type: 2, name: "tree", valueType: "function", /* valueOptions: [treeGenerate] */ },
-	{ type: 0, name: "types", valueType: "function", /* valueOptions: [typesFunction] */ },
+} & SettingsPageItem;
+type SettingsPageItemTypes = ValueType_function | ValueType_enum | ValueType_hashmapenum | ValueType_primitive | ValueType_subpage;
+const data: (SettingsPageItemTypes)[] = [
+	{ type: 2, name: "tree", valueType: "subpage", valueOptions: { handler: (state) => { } } },
+	{ type: 0, name: "types", valueType: "function" },
 	{ type: 1, name: "host", valueType: "string" },
 	{ type: 1, name: "port", valueType: "number" },
 	{ type: 1, name: "username", valueType: "string" },
@@ -81,8 +91,8 @@ const descriptions: {[K in keyof ServerConfig]: any} = {
 		mkdir: "Allow network users to create directories and datafolders.",
 		upload: "Allow network users to upload files.",
 		settings: "Allow network users to change non-critical settings.",
-		WARNING_all_settings_WARNING: "Allow network users to change critical settings: <br/>"
-			+ `<pre>${data.filter(e => e.type > 0).map(e => e.name).join(', ')}</pre>`
+		WARNING_all_settings_WARNING: "Allow network users to change critical settings: "
+			+ `<code>${data.filter(e => e.type > 0).map(e => e.name).join(', ')}</code>`
 	},
 	maxAge: "",
 	tsa: "",

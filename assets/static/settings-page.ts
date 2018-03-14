@@ -40,14 +40,14 @@ angular.module('settings', [
 	$locationProvider.html5Mode(false).hashPrefix('*');
 }).run(function ($templateCache) {
 	var templates = {
-		string: `<input type="text"      name="{{item.name}}" ng-model="outputs[item.name]"/>`,
-		number: `<input type="number"    name="{{item.name}}" ng-model="outputs[item.name]"/>`,
-		boolean: `<input type="checkbox" name="{{item.name}}" ng-model="outputs[item.name]"/>`,
+		string: `<input type="text"      name="{{item.name}}" ng-model="outputs[item.name]"/> <span ng-bind-html="description"></span>`,
+		number: `<input type="number"    name="{{item.name}}" ng-model="outputs[item.name]"/> <span ng-bind-html="description"></span>`,
+		boolean: `<input type="checkbox" name="{{item.name}}" ng-model="outputs[item.name]"/> <span ng-bind-html="description"></span>`,
 		enum: `
 	<select name="{{item.name}}" value="" ng-disabled="readonly"} 
 		ng-model="outputs[item.name]" 
 		ng-options="k for k in item.valueOptions[1]">
-	</select> {{description}}
+	</select>  <span ng-bind-html="description"></span>
 `,
 		hashmapenum: `
 <fieldset>
@@ -56,10 +56,11 @@ angular.module('settings', [
 		ng-controller="HashmapEnumItemCtrl" 
 		ng-include="'template-' + item.valueType"></div>
 </fieldset>`,
+		subpage: `Please go to <a href="{{item.name}}">{{item.name}}</a> for details on changing this setting`,
 		function: `
 <ng-include src="'template-function' + item.name"></ng-include>
 		`,
-		functiontree: ``,
+		functiontypes: `Coming soon`,
 		settingsPage: `
 <fieldset ng-repeat="(i, item) in data" ng-controller="SettingsPageItemCtrl">
 <legend>{{item.name}}</legend>
@@ -71,7 +72,7 @@ angular.module('settings', [
 	for (var i in templates) {
 		$templateCache.put("template-" + i, templates[i]);
 	}
-}).controller("HashmapEnumItemCtrl", function ($scope) {
+}).controller("HashmapEnumItemCtrl", function ($scope, $sce: angular.ISCEService) {
 	let parentItem: SettingsPageItem & ValueType = $scope.item;
 	if (parentItem.valueType !== "hashmapenum") return;
 	$scope.item = {
@@ -82,9 +83,15 @@ angular.module('settings', [
 	if (typeof $scope.outputs[parentItem.name] !== "object")
 		$scope.outputs[parentItem.name] = {};
 	$scope.outputs = $scope.outputs[parentItem.name];
-	$scope.description = $scope.description[parentItem.name];
-}).controller("SettingsPageItemCtrl", function ($scope) {
+	$scope.description = $scope.description[$scope.key];
+	if(typeof $scope.description === "string"){
+		$scope.description = $sce.trustAsHtml($scope.description);
+	}
+}).controller("SettingsPageItemCtrl", function ($scope, $sce: angular.ISCEService) {
 	$scope.description = $scope.description[$scope.item.name];
+	if(typeof $scope.description === "string"){
+		$scope.description = $sce.trustAsHtml($scope.description);
+	}
 }).controller("SettingsPageCtrl", function ($scope) {
 	$scope.outputs = {
 		"tree": {
@@ -124,7 +131,7 @@ angular.module('settings', [
 		}
 	};
 	$scope.data = [
-		{ type: 2, name: "tree", valueType: "function", /* valueOptions: [treeGenerate] */ },
+		{ type: 2, name: "tree", valueType: "subpage", /* valueOptions: [treeGenerate] */ },
 		{ type: 0, name: "types", valueType: "function", /* valueOptions: [typesFunction] */ },
 		{ type: 1, name: "host", valueType: "string" },
 		{ type: 1, name: "port", valueType: "number" },
@@ -168,8 +175,8 @@ angular.module('settings', [
 			mkdir: "Allow network users to create directories and datafolders.",
 			upload: "Allow network users to upload files.",
 			settings: "Allow network users to change non-critical settings.",
-			WARNING_all_settings_WARNING: "Allow network users to change critical settings: <br/>"
-				+ `<pre>${$scope.data.filter(e => e.type > 0).map(e => e.name).join(', ')}</pre>`
+			WARNING_all_settings_WARNING: "Allow network users to change critical settings: "
+				+ `<code>${$scope.data.filter(e => e.type > 0).map(e => e.name).join(', ')}</code>`
 		},
 		maxAge: "",
 		tsa: "",
