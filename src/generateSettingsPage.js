@@ -19,8 +19,8 @@ function initSettingsRequest(e) {
 }
 exports.initSettingsRequest = initSettingsRequest;
 const data = [
-    { type: 2, name: "tree", valueType: "function", },
-    { type: 0, name: "types", valueType: "function", },
+    { type: 2, name: "tree", valueType: "subpage", valueOptions: { handler: (state) => { } } },
+    { type: 0, name: "types", valueType: "function" },
     { type: 1, name: "host", valueType: "string" },
     { type: 1, name: "port", valueType: "number" },
     { type: 1, name: "username", valueType: "string" },
@@ -60,8 +60,8 @@ const descriptions = {
         mkdir: "Allow network users to create directories and datafolders.",
         upload: "Allow network users to upload files.",
         settings: "Allow network users to change non-critical settings.",
-        WARNING_all_settings_WARNING: "Allow network users to change critical settings: <br/>"
-            + `<pre>${data.filter(e => e.type > 0).map(e => e.name).join(', ')}</pre>`
+        WARNING_all_settings_WARNING: "Allow network users to change critical settings: "
+            + `<code>${data.filter(e => e.type > 0).map(e => e.name).join(', ')}</code>`
     },
     maxAge: "",
     tsa: "",
