@@ -46,57 +46,7 @@ var settings;
 }
 if (!settings.tree)
     throw "tree is not specified in the settings file";
-const settingsDir = path.dirname(settingsFile);
-if (typeof settings.tree === "object")
-    (function normalizeTree(item) {
-        server_types_1.keys(item).forEach(e => {
-            if (typeof item[e] === 'string')
-                item[e] = path.resolve(settingsDir, item[e]);
-            else if (typeof item[e] === 'object')
-                normalizeTree(item[e]);
-            else
-                throw 'Invalid item: ' + e + ': ' + item[e];
-        });
-    })(settings.tree);
-else
-    settings.tree = path.resolve(settingsDir, settings.tree);
-if (settings.backupDirectory) {
-    settings.backupDirectory = path.resolve(settingsDir, settings.backupDirectory);
-}
-if (!settings.port)
-    settings.port = 8080;
-if (!settings.host)
-    settings.host = "127.0.0.1";
-if (!settings.types)
-    settings.types = {
-        "htmlfile": ["htm", "html"]
-    };
-if (!settings.etag)
-    settings.etag = "";
-if (!settings.etagWindow)
-    settings.etagWindow = 0;
-if (!settings.useTW5path)
-    settings.useTW5path = false;
-if (typeof settings.debugLevel !== "number")
-    settings.debugLevel = -1;
-if (!settings.allowNetwork)
-    settings.allowNetwork = {};
-if (!settings.allowNetwork.mkdir)
-    settings.allowNetwork.mkdir = false;
-if (!settings.allowNetwork.upload)
-    settings.allowNetwork.upload = false;
-if (!settings.allowNetwork.settings)
-    settings.allowNetwork.settings = false;
-if (!settings.allowNetwork.WARNING_all_settings_WARNING)
-    settings.allowNetwork.WARNING_all_settings_WARNING = false;
-if (settings.etag === "disabled" && !settings.backupDirectory)
-    console.log("Etag checking is disabled, but a backup folder is not set. "
-        + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
-        + "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
-        + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
-        + "also set the etagWindow setting to allow files to be modified if not newer than "
-        + "so many seconds from the copy being saved.");
-settings.__dirname = settingsDir;
+server_types_1.normalizeSettings(settings, settingsFile);
 var ENV;
 (function (ENV) {
     ENV.disableLocalHost = false;

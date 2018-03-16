@@ -1,6 +1,6 @@
 import {
     StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger,
-    PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolder, serveFolderIndex,
+    PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolder, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter,
 } from "./server-types";
 import { Observable, Subject } from "../lib/rx";
 
@@ -20,7 +20,10 @@ const debug = DebugLogger('DAT');
 const loadedFolders: { [k: string]: FolderData | StateObject[] } = {};
 const otherSocketPaths: { [k: string]: WebSocket[] } = {};
 
-export function init(eventer: EventEmitter) {
+let eventer: ServerEventEmitter;
+
+export function init(e: ServerEventEmitter) {
+    eventer = e;
     eventer.on('settings', function (set: ServerConfig) {
         settings = set;
     })
@@ -174,6 +177,7 @@ function loadTiddlyWiki(mount: string, folder: string, reload: string) {
         var command = new serverCommand([], { wiki: $tw.wiki });
         var server = command.server;
 
+        //If the username is changed the datafolder will just have to be reloaded
         server.set({
             rootTiddler: "$:/core/save/all",
             renderType: "text/plain",
@@ -379,7 +383,7 @@ function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null
         res.writeHead(304);
         res.end();
     } else {
-        sendResponse(res, body, { doGzip: acceptGzip(req) });
+        sendResponse(res, body, { doGzip: canAcceptGzip(req) });
     }
 }
 
@@ -486,7 +490,7 @@ function sendLoader(tsa: TSASO) {
     sendResponse(
         tsa.state.res,
         loaderText.replace(globalRegex, tsa.mount),
-        { doGzip: acceptGzip(tsa.state.req), contentType: "text/html; charset=utf-8" }
+        { doGzip: canAcceptGzip(tsa.state.req), contentType: "text/html; charset=utf-8" }
     );
 }
 function sendAllTiddlers(tsa: TSASO) {
@@ -517,7 +521,7 @@ function sendAllTiddlers(tsa: TSASO) {
         tsa.state.res.end();
     } else {
         sendResponse(tsa.state.res, text, {
-            doGzip: acceptGzip(tsa.state.req),
+            doGzip: canAcceptGzip(tsa.state.req),
             contentType: "application/json; charset=utf-8"
         });
     }
@@ -537,7 +541,7 @@ function handleTiddlersRoute(tsa: TSASO) {
 
 
     return ((tsa.state.req.method === "PUT")
-        ? tsa.state.recieveBody().mapTo(tsa)
+        ? tsa.state.recieveBody(true).mapTo(tsa)
         : Observable.of(tsa)
     ).map(tsa => {
 
@@ -583,7 +587,7 @@ function getSkinnyTiddlers(tsa) {
                 header, newLineBuffer, Buffer.from(encoding, 'binary'), newLineBuffer, text
             ]);
             sendResponse(res, body, {
-                doGzip: acceptGzip(tsa.state.req),
+                doGzip: canAcceptGzip(tsa.state.req),
                 contentType: "application/octet-stream"
             });
         }
@@ -595,33 +599,4 @@ function handleCacheRoute(tsa: TSASO) {
     //is stored in the cache. If we do not have a cache, we temporarily load the entire
     //folder during the mount sequence to generate it. 
     //PUT DELETE
-}
-function acceptGzip(header: string | http.IncomingMessage) {
-    if (((a): a is http.IncomingMessage => typeof a === "object")(header)) {
-        header = header.headers['accept-encoding'] as string;
-    }
-    var gzip = header.split(',').map(e => e.split(';')).filter(e => e[0] === "gzip")[0];
-    return !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0
-}
-function sendResponse(res: http.ServerResponse, body: Buffer | string, options: {
-    doGzip?: boolean,
-    contentType?: string
-} = {}) {
-    body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body;
-    if (options.doGzip) gzip(body, (err, gzBody) => {
-        if (err) _send(body, false);
-        else _send(gzBody, true)
-    }); else _send(body, false);
-
-    function _send(body, isGzip) {
-        res.setHeader('Content-Length', Buffer.isBuffer(body)
-            ? body.length.toString()
-            : Buffer.byteLength(body, 'utf8').toString())
-        if (isGzip) res.setHeader('Content-Encoding', 'gzip');
-        res.setHeader('Content-Type', options.contentType || 'text/plain; charset=utf-8');
-        res.writeHead(200);
-        res.write(body);
-        res.end();
-    }
-
 }

@@ -25,6 +25,61 @@ function init(eventer) {
     });
 }
 exports.init = init;
+function normalizeSettings(set, settingsFile) {
+    const settingsDir = path.dirname(settingsFile);
+    if (typeof set.tree === "object")
+        (function normalizeTree(item) {
+            keys(item).forEach(e => {
+                if (typeof item[e] === 'string')
+                    item[e] = path.resolve(settingsDir, item[e]);
+                else if (typeof item[e] === 'object')
+                    normalizeTree(item[e]);
+                else
+                    throw 'Invalid item: ' + e + ': ' + item[e];
+            });
+        })(set.tree);
+    else
+        set.tree = path.resolve(settingsDir, set.tree);
+    if (set.backupDirectory) {
+        set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
+    }
+    if (!set.port)
+        set.port = 8080;
+    if (!set.host)
+        set.host = "127.0.0.1";
+    if (!set.types)
+        set.types = {
+            "htmlfile": ["htm", "html"]
+        };
+    if (!set.etag)
+        set.etag = "";
+    if (!set.etagWindow)
+        set.etagWindow = 0;
+    if (!set.useTW5path)
+        set.useTW5path = false;
+    if (typeof set.debugLevel !== "number")
+        set.debugLevel = -1;
+    if (!set.allowNetwork)
+        set.allowNetwork = {};
+    if (!set.allowNetwork.mkdir)
+        set.allowNetwork.mkdir = false;
+    if (!set.allowNetwork.upload)
+        set.allowNetwork.upload = false;
+    if (!set.allowNetwork.settings)
+        set.allowNetwork.settings = false;
+    if (!set.allowNetwork.WARNING_all_settings_WARNING)
+        set.allowNetwork.WARNING_all_settings_WARNING = false;
+    if (set.etag === "disabled" && !set.backupDirectory)
+        console.log("Etag checking is disabled, but a backup folder is not set. "
+            + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
+            + "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
+            + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
+            + "also set the etagWindow setting to allow files to be modified if not newer than "
+            + "so many seconds from the copy being saved.");
+    set.__dirname = settingsDir;
+    set.__filename = settingsFile;
+}
+exports.normalizeSettings = normalizeSettings;
 function getHumanSize(size) {
     const TAGS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
     let power = 0;
@@ -65,10 +120,12 @@ function tryParseJSON(str, errObj = {}) {
     }
     catch (e) {
         let err = new JsonError(findJSONError(e.message, str), e);
-        if (errObj === true) {
+        if (typeof errObj === "function") {
+            errObj(err);
         }
-        else
+        else {
             errObj.error = err;
+        }
     }
 }
 exports.tryParseJSON = tryParseJSON;
@@ -163,10 +220,12 @@ function DebugLogger(prefix) {
         }
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log([' ', (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix,
-            colors.FgCyan, date, colors.Reset, util_1.format.apply(null, args)].join(' ').split('\n').map((e, i) => {
+        console.log(' '
+            + (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
+            + ' ' + colors.FgCyan + date + colors.Reset
+            + ' ' + util_1.format.apply(null, args).split('\n').map((e, i) => {
             if (i > 0) {
-                return new Array(28 + prefix.length).join(' ') + e;
+                return new Array(23 + prefix.length).join(' ') + e;
             }
             else {
                 return e;
@@ -223,7 +282,6 @@ exports.sanitizeJSON = sanitizeJSON;
 // })();
 function serveFile(obs, file, root) {
     return obs.mergeMap(state => {
-        console.log('serving');
         return exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
             if (err)
                 return state.throw(404);
@@ -277,14 +335,48 @@ function serveFolderIndex(options) {
     if (options.type === "json") {
         return function (state, res, folder) {
             readFolder(folder).subscribe(item => {
-                res.writeHead(200);
-                res.write(JSON.stringify(item));
-                res.end();
+                sendResponse(res, JSON.stringify(item), {
+                    contentType: "application/json",
+                    doGzip: canAcceptGzip(state.req)
+                });
             });
         };
     }
 }
 exports.serveFolderIndex = serveFolderIndex;
+function canAcceptGzip(header) {
+    if (((a) => typeof a === "object")(header)) {
+        header = header.headers['accept-encoding'];
+    }
+    var gzip = header.split(',').map(e => e.split(';')).filter(e => e[0] === "gzip")[0];
+    return !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0;
+}
+exports.canAcceptGzip = canAcceptGzip;
+const zlib_1 = require("zlib");
+function sendResponse(res, body, options = {}) {
+    body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body;
+    if (options.doGzip)
+        zlib_1.gzip(body, (err, gzBody) => {
+            if (err)
+                _send(body, false);
+            else
+                _send(gzBody, true);
+        });
+    else
+        _send(body, false);
+    function _send(body, isGzip) {
+        res.setHeader('Content-Length', Buffer.isBuffer(body)
+            ? body.length.toString()
+            : Buffer.byteLength(body, 'utf8').toString());
+        if (isGzip)
+            res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Content-Type', options.contentType || 'text/plain; charset=utf-8');
+        res.writeHead(200);
+        res.write(body);
+        res.end();
+    }
+}
+exports.sendResponse = sendResponse;
 /**
  * Returns the keys and paths from the PathResolverResult directory. If there
  * is an error it will be sent directly to the client and nothing will be emitted.
@@ -483,10 +575,13 @@ exports.obs_readFile = (tag = undefined) => (filepath, encoding) => new rx_1.Obs
     else
         fs.readFile(filepath, cb);
 });
-// Observable.bindCallback(fs.readFile,
-//     (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any
-// );
-exports.obs_writeFile = (state) => rx_1.Observable.bindCallback(fs.writeFile, (err, data) => [err, data, state]);
+// export type obs_writeFile_result<T> = typeof obs_readFile_inner
+exports.obs_writeFile = (tag = undefined) => (filepath, data) => new rx_1.Observable(subs => fs.writeFile(filepath, data, (err) => {
+    subs.next([err, tag, filepath]);
+    subs.complete();
+}));
+// export const obs_writeFile = <T>(state?: T) => Observable.bindCallback(
+//     fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
 class StateError extends Error {
     constructor(state, message) {
         super(message);
@@ -601,13 +696,23 @@ class StateObject {
         });
         this.res.end();
     }
-    recieveBody() {
-        return recieveBody(this);
+    /**
+     * Recieves the body of the request and stores it in body and json. If there is an
+     * error parsing body as json, the error callback will be called or if the callback
+     * is boolean true it will send an error response with the json error position.
+     *
+     * @param {(true | ((e: JsonError) => void))} errorCB sends an error response
+     * showing the incorrect JSON syntax if true, or calls the function
+     * @returns {Observable<StateObject>}
+     * @memberof StateObject
+     */
+    recieveBody(errorCB) {
+        return recieveBody(this, errorCB);
     }
 }
 exports.StateObject = StateObject;
 /** to be used with concatMap, mergeMap, etc. */
-function recieveBody(state) {
+function recieveBody(state, sendError) {
     //get the data from the request
     return rx_1.Observable.fromEvent(state.req, 'data')
         .takeUntil(rx_1.Observable.fromEvent(state.req, 'end').take(1))
@@ -617,12 +722,14 @@ function recieveBody(state) {
         //console.log(state.body);
         if (state.body.length === 0)
             return state;
-        try {
-            state.json = JSON.parse(state.body);
-        }
-        catch (e) {
-            //state.json = buf;
-        }
+        let catchHandler = sendError === true ? (e) => {
+            state.res.writeHead(400, {
+                "Content-Type": "text/plain"
+            });
+            state.res.write(e.errorPosition);
+            state.res.end();
+        } : sendError;
+        state.json = tryParseJSON(state.body, catchHandler);
         return state;
     });
 }
