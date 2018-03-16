@@ -26,6 +26,78 @@ export function init(eventer: EventEmitter) {
     })
 }
 
+export function normalizeSettings(set: ServerConfig, settingsFile) {
+
+    const settingsDir = path.dirname(settingsFile);
+
+    if (typeof set.tree === "object")
+        (function normalizeTree(item) {
+            keys(item).forEach(e => {
+                if (typeof item[e] === 'string') item[e] = path.resolve(settingsDir, item[e]);
+                else if (typeof item[e] === 'object') normalizeTree(item[e]);
+                else throw 'Invalid item: ' + e + ': ' + item[e];
+            })
+        })(set.tree);
+    else set.tree = path.resolve(settingsDir, set.tree);
+
+    if (set.backupDirectory) {
+        set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
+    }
+
+    if (!set.port) set.port = 8080;
+    if (!set.host) set.host = "127.0.0.1";
+    if (!set.types) set.types = {
+        "htmlfile": ["htm", "html"]
+    }
+    if (!set.etag) set.etag = "";
+    if (!set.etagWindow) set.etagWindow = 0;
+    if (!set.useTW5path) set.useTW5path = false;
+    if (typeof set.debugLevel !== "number") set.debugLevel = -1;
+    if (!set.allowNetwork) set.allowNetwork = {} as any;
+    if (!set.allowNetwork.mkdir) set.allowNetwork.mkdir = false;
+    if (!set.allowNetwork.upload) set.allowNetwork.upload = false;
+    if (!set.allowNetwork.settings) set.allowNetwork.settings = false;
+    if (!set.allowNetwork.WARNING_all_settings_WARNING)
+        set.allowNetwork.WARNING_all_settings_WARNING = false;
+
+    if (set.etag === "disabled" && !set.backupDirectory)
+        console.log("Etag checking is disabled, but a backup folder is not set. "
+            + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
+            + "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
+            + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
+            + "also set the etagWindow setting to allow files to be modified if not newer than "
+            + "so many seconds from the copy being saved.");
+
+    set.__dirname = settingsDir;
+    set.__filename = settingsFile;
+}
+
+interface ServerEventsListener<THIS> {
+    (event: "websocket-connection", listener: (client: WebSocket, request: http.IncomingMessage) => void): THIS;
+    (event: "settingsChanged", listener: (keys: (keyof ServerConfig)[]) => void): THIS;
+    (event: "settings", listener: (settings: ServerConfig) => void): THIS;
+    (event: "stateError", listener: (state: StateObject) => void): THIS;
+}
+type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
+export interface ServerEventEmitter extends EventEmitter {
+    emit(event: "websocket-connection", client: WebSocket, request: http.IncomingMessage): boolean;
+    emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
+    emit(event: "settings", settings: ServerConfig): boolean;
+    emit(event: "stateError", state: StateObject): boolean;
+
+    addListener: ServerEventsListener<this>;
+    on: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+    once: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+    prependListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+    prependOnceListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+    removeListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+    removeAllListeners(event?: ServerEvents): this;
+    setMaxListeners(n: number): this;
+    getMaxListeners(): number;
+    listeners(event: ServerEvents): Function[];
+    eventNames(): (ServerEvents)[];
+    listenerCount(type: ServerEvents): number;
+}
 export function getHumanSize(size: number) {
     const TAGS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
     let power = 0;
@@ -53,7 +125,7 @@ export interface Directory {
     type: string
 }
 
-export function tryParseJSON(str: string, errObj: { error?: JsonError } | true = {}) {
+export function tryParseJSON(str: string, errObj: { error?: JsonError } | ((e: JsonError) => void) = {}) {
     function findJSONError(message: string, json: string) {
         const res: string[] = [];
         const match = /position (\d+)/gi.exec(message);
@@ -80,10 +152,11 @@ export function tryParseJSON(str: string, errObj: { error?: JsonError } | true =
         return JSON.parse(str);
     } catch (e) {
         let err = new JsonError(findJSONError(e.message, str), e)
-        if (errObj === true) {
-
-        } else
+        if (typeof errObj === "function") {
+            errObj(err);
+        } else {
             errObj.error = err;
+        }
     }
 }
 export interface JsonErrorContainer {
@@ -169,8 +242,7 @@ export namespace colors {
  * -3 - Request and response data for all messages (verbose)
  * -4 - Protocol details and full data dump (such as encryption steps and keys)
  */
-declare function DebugLog(level: number, err: NodeJS.ErrnoException);
-declare function DebugLog(level: number, str: string, ...args: any[]);
+declare function DebugLog(level: number, str: string | NodeJS.ErrnoException, ...args: any[]);
 // declare function DebugLog(str: string, ...args: any[]);
 export function isError(obj): obj is Error {
     return obj.constructor === Error;
@@ -192,15 +264,16 @@ export function DebugLogger(prefix: string): typeof DebugLog {
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log([' ', (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix,
-            colors.FgCyan, date, colors.Reset, format.apply(null, args)].join(' ').split('\n').map((e, i) => {
+        console.log(' '
+            + (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
+            + ' ' + colors.FgCyan + date + colors.Reset
+            + ' ' + format.apply(null, args).split('\n').map((e, i) => {
                 if (i > 0) {
-                    return new Array(28 + prefix.length).join(' ') + e;
+                    return new Array(23 + prefix.length).join(' ') + e;
                 } else {
                     return e;
                 }
             }).join('\n'));
-
     } as typeof DebugLog;
 }
 
@@ -258,7 +331,6 @@ export interface ServeStaticResult {
 
 export function serveFile(obs: Observable<StateObject>, file: string, root: string) {
     return obs.mergeMap(state => {
-        console.log('serving');
         return obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]): any => {
             if (err) return state.throw<StateObject>(404);
             send(state.req, file, { root })
@@ -307,14 +379,44 @@ export function serveFolderIndex(options: { type: string }) {
     if (options.type === "json") {
         return function (state: StateObject, res: http.ServerResponse, folder: string) {
             readFolder(folder).subscribe(item => {
-                res.writeHead(200);
-                res.write(JSON.stringify(item));
-                res.end();
+                sendResponse(res, JSON.stringify(item), {
+                    contentType: "application/json",
+                    doGzip: canAcceptGzip(state.req)
+                })
             })
         }
     }
 }
+export function canAcceptGzip(header: string | http.IncomingMessage) {
+    if (((a): a is http.IncomingMessage => typeof a === "object")(header)) {
+        header = header.headers['accept-encoding'] as string;
+    }
+    var gzip = header.split(',').map(e => e.split(';')).filter(e => e[0] === "gzip")[0];
+    return !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0
+}
+import { gzip } from 'zlib';
+export function sendResponse(res: http.ServerResponse, body: Buffer | string, options: {
+    doGzip?: boolean,
+    contentType?: string
+} = {}) {
+    body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body;
+    if (options.doGzip) gzip(body, (err, gzBody) => {
+        if (err) _send(body, false);
+        else _send(gzBody, true)
+    }); else _send(body, false);
 
+    function _send(body, isGzip) {
+        res.setHeader('Content-Length', Buffer.isBuffer(body)
+            ? body.length.toString()
+            : Buffer.byteLength(body, 'utf8').toString())
+        if (isGzip) res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Content-Type', options.contentType || 'text/plain; charset=utf-8');
+        res.writeHead(200);
+        res.write(body);
+        res.end();
+    }
+
+}
 /**
  * Returns the keys and paths from the PathResolverResult directory. If there
  * is an error it will be sent directly to the client and nothing will be emitted. 
@@ -525,12 +627,18 @@ export const obs_readFile = <T>(tag: T = undefined as any): obs_readFile_result<
 declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T, string]>;
 declare function obs_readFile_inner<T>(filepath: string, encoding: string): Observable<[NodeJS.ErrnoException, string, T, string]>;
 
-// Observable.bindCallback(fs.readFile,
-//     (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any
-// );
 
-export const obs_writeFile = <T>(state?: T) => Observable.bindCallback(
-    fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
+// export type obs_writeFile_result<T> = typeof obs_readFile_inner
+export const obs_writeFile = <T>(tag: T = undefined as any) =>
+    (filepath: string, data: any) => new Observable<[NodeJS.ErrnoException | undefined, T, string]>(subs =>
+        fs.writeFile(filepath, data, (err) => {
+            subs.next([err, tag, filepath]);
+            subs.complete();
+        })
+    );
+
+// export const obs_writeFile = <T>(state?: T) => Observable.bindCallback(
+//     fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
 
 
 export class StateError extends Error {
@@ -619,7 +727,7 @@ export class StateObject {
         public req: http.IncomingMessage,
         public res: http.ServerResponse,
         private debugLog: typeof DebugLog,
-        private eventer: EventEmitter,
+        private eventer: ServerEventEmitter,
         public readonly isLocalHost: boolean = false
     ) {
         this.startTime = process.hrtime();
@@ -692,13 +800,23 @@ export class StateObject {
         });
         this.res.end();
     }
-    recieveBody() {
-        return recieveBody(this);
+    /**
+     * Recieves the body of the request and stores it in body and json. If there is an
+     * error parsing body as json, the error callback will be called or if the callback
+     * is boolean true it will send an error response with the json error position.
+     * 
+     * @param {(true | ((e: JsonError) => void))} errorCB sends an error response 
+     * showing the incorrect JSON syntax if true, or calls the function
+     * @returns {Observable<StateObject>}
+     * @memberof StateObject
+     */
+    recieveBody(errorCB?: true | ((e: JsonError) => void)) {
+        return recieveBody(this, errorCB);
     }
 
 }
 /** to be used with concatMap, mergeMap, etc. */
-export function recieveBody(state: StateObject) {
+export function recieveBody(state: StateObject, sendError?: true | ((e: JsonError) => void)) {
     //get the data from the request
     return Observable.fromEvent<Buffer>(state.req, 'data')
         //only take one since we only need one. this will dispose the listener
@@ -711,11 +829,16 @@ export function recieveBody(state: StateObject) {
             //console.log(state.body);
             if (state.body.length === 0)
                 return state;
-            try {
-                state.json = JSON.parse(state.body);
-            } catch (e) {
-                //state.json = buf;
-            }
+
+            let catchHandler = sendError === true ? (e: JsonError) => {
+                state.res.writeHead(400, {
+                    "Content-Type": "text/plain"
+                });
+                state.res.write(e.errorPosition);
+                state.res.end();
+            } : sendError;
+
+            state.json = tryParseJSON(state.body, catchHandler);
             return state;
         });
 }
@@ -725,6 +848,7 @@ export interface ThrowFunc<T> {
 
 export interface ServerConfig {
     __dirname: string;
+    __filename: string;
     __assetsDir: string;
     _disableLocalHost: boolean;
     tree: any,

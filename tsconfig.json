@@ -10,12 +10,12 @@
         "inlineSourceMap": false
     },
     "files": [
-        "./src/server.ts",
-        "./assets/static/settings-page.ts"
+        "./src/server.ts"
     ],
     "exclude": [
         "node_modules",
         "new-server",
-        "archive"
+        "archive",
+        "static"
     ]
 }

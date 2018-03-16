@@ -3,7 +3,7 @@ import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
-	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData
+	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData, ServerEventEmitter
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -50,7 +50,7 @@ export function parsePath(path: string, jsonFile: string) {
 
 var settings: ServerConfig = {} as any;
 
-export function init(eventer: EventEmitter) {
+export function init(eventer: ServerEventEmitter) {
 	eventer.on('settings', function (set: ServerConfig) {
 		settings = set;
 	});
