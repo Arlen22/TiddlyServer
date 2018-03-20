@@ -10,10 +10,12 @@ import { EventEmitter } from "events";
 import { send } from '../lib/bundled-lib';
 import { Stats } from 'fs';
 let DEBUGLEVEL = -1;
+let settings: ServerConfig;
 export const typeLookup: { [k: string]: string } = {};
-export function init(eventer: EventEmitter) {
+export function init(eventer: ServerEventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
-        DEBUGLEVEL = set.debugLevel;
+        // DEBUGLEVEL = set.debugLevel;
+        settings = set;
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!typeLookup[ext]) {
@@ -23,7 +25,7 @@ export function init(eventer: EventEmitter) {
                 }
             })
         })
-    })
+    });
 }
 
 export function normalizeSettings(set: ServerConfig, settingsFile) {
@@ -125,7 +127,16 @@ export interface Directory {
     type: string
 }
 
-export function tryParseJSON(str: string, errObj: { error?: JsonError } | ((e: JsonError) => void) = {}) {
+
+// export function tryParseJSON(str: string, errObj?: { error?: JsonError }): any;
+// export function tryParseJSON(str: string, errObj?: ((e: JsonError) => T | void)): T;
+/**
+ * Calls the onerror handler if there is a JSON error.  
+ */
+export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => never)): T;
+export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => T)): T;
+export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => void)): T | undefined;
+export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => T)): T | undefined {
     function findJSONError(message: string, json: string) {
         const res: string[] = [];
         const match = /position (\d+)/gi.exec(message);
@@ -152,11 +163,7 @@ export function tryParseJSON(str: string, errObj: { error?: JsonError } | ((e: J
         return JSON.parse(str);
     } catch (e) {
         let err = new JsonError(findJSONError(e.message, str), e)
-        if (typeof errObj === "function") {
-            errObj(err);
-        } else {
-            errObj.error = err;
-        }
+        if (onerror) return onerror(err);
     }
 }
 export interface JsonErrorContainer {
@@ -254,7 +261,7 @@ export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.Errn
 export function DebugLogger(prefix: string): typeof DebugLog {
     //if(prefix.startsWith("V:")) return function(){};
     return function (msgLevel: number, ...args: any[]) {
-        if (DEBUGLEVEL > msgLevel) return;
+        if (settings.debugLevel > msgLevel) return;
         if (isError(args[0])) {
             let err = args[0];
             args = [];
@@ -392,7 +399,8 @@ export function canAcceptGzip(header: string | http.IncomingMessage) {
         header = header.headers['accept-encoding'] as string;
     }
     var gzip = header.split(',').map(e => e.split(';')).filter(e => e[0] === "gzip")[0];
-    return !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0
+    var can = !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0;
+    return can;
 }
 import { gzip } from 'zlib';
 export function sendResponse(res: http.ServerResponse, body: Buffer | string, options: {
@@ -838,7 +846,7 @@ export function recieveBody(state: StateObject, sendError?: true | ((e: JsonErro
                 state.res.end();
             } : sendError;
 
-            state.json = tryParseJSON(state.body, catchHandler);
+            state.json = tryParseJSON<any>(state.body, catchHandler);
             return state;
         });
 }

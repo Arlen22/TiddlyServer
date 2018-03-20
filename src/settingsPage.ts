@@ -23,7 +23,7 @@ function serveAssets() {
 	serveFile(serveSettingsTree.asObservable(), "settings-tree.html", join(settings.__assetsDir, "settings-tree")).subscribe();
 
 }
-export function initSettingsRequest(e) {
+export function initSettings(e) {
 	eventer = e;
 	eventer.on('settings', (set) => {
 		settings = set;
@@ -211,7 +211,7 @@ function updateSettings(level: number, upd: ServerConfig, current: ServerConfig)
 function validateTypes(level: number, upd: ServerConfig, current: ServerConfig) {
 	return { valid: true, value: [], changed: false };
 }
-export function handleSettingsRequest(state: StateObject) {
+export function handleSettings(state: StateObject) {
 	let level = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
 		: (settings.allowNetwork.settings ? 0 : -1);
 
@@ -256,6 +256,7 @@ export function handleSettingsRequest(state: StateObject) {
 	}
 
 }
+const DRYRUN_SETTINGS = true;
 function handleSettingsUpdate(state: StateObject, level: number) {
 	state.recieveBody(true).concatMap(() => {
 		if (typeof state.json === "undefined") return Observable.empty<never>();
@@ -263,14 +264,14 @@ function handleSettingsUpdate(state: StateObject, level: number) {
 		return obs_readFile()(settings.__filename, "utf8");
 	}).concatMap(r => {
 		let [err, res] = r
-		let threw = false, curjson = tryParseJSON(res, (err) => {
+		let threw = false, curjson = tryParseJSON<ServerConfig>(res, (err) => {
 			state.throw(500, "Settings file could not be accessed");
 			threw = true
 		});
-		if (threw) return Observable.empty<never>();
+		if (threw || !curjson) return Observable.empty<never>();
 		let { response, keys } = updateSettings(level, state.json, curjson);
 		const tag = { curjson, keys, response };
-		if (keys.length) {
+		if (!DRYRUN_SETTINGS && keys.length) {
 			let newfile = JSON.stringify(curjson, null, 2);
 			return obs_writeFile(tag)(settings.__filename, newfile);
 		} else {
@@ -287,9 +288,19 @@ function handleSettingsUpdate(state: StateObject, level: number) {
 			if (keys.length) {
 				debug(1, "New settings written to current settings file");
 				normalizeSettings(curjson, settings.__filename);
-				keys.forEach(k => {
-					settings[k] = curjson[k];
-				});
+				if (!DRYRUN_SETTINGS) {
+					let consts: (keyof ServerConfig)[] = ["__assetsDir", "host", "port"];
+					keys.forEach(k => {
+						if (consts.indexOf(k) > -1)
+							debug(1, "%s will not be changed until the server is restarted", k);
+						else
+							settings[k] = curjson[k];
+					});
+				}
+				debug(-1, "== settingsChanged event emit ==\n%s",
+					keys.map(k => `${k}: ${JSON.stringify(curjson[k])}\n`).join('')
+				);
+				if (DRYRUN_SETTINGS) debug(1, "DRYRUN_SETTINGS enabled");
 				eventer.emit('settingsChanged', keys as any);
 			}
 
@@ -298,7 +309,6 @@ function handleSettingsUpdate(state: StateObject, level: number) {
 				doGzip: canAcceptGzip(state.req)
 			});
 		}
-		// }
 	})
 }
 function handleTreeSubpage(state: StateObject) {
