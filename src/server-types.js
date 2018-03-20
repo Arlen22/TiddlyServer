@@ -8,10 +8,12 @@ const rx_1 = require("../lib/rx");
 //import { StateObject } from "./index";
 const bundled_lib_1 = require("../lib/bundled-lib");
 let DEBUGLEVEL = -1;
+let settings;
 exports.typeLookup = {};
 function init(eventer) {
     eventer.on('settings', function (set) {
-        DEBUGLEVEL = set.debugLevel;
+        // DEBUGLEVEL = set.debugLevel;
+        settings = set;
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!exports.typeLookup[ext]) {
@@ -90,7 +92,7 @@ function getHumanSize(size) {
     return size.toFixed(1) + TAGS[power];
 }
 exports.getHumanSize = getHumanSize;
-function tryParseJSON(str, errObj = {}) {
+function tryParseJSON(str, onerror) {
     function findJSONError(message, json) {
         const res = [];
         const match = /position (\d+)/gi.exec(message);
@@ -120,12 +122,8 @@ function tryParseJSON(str, errObj = {}) {
     }
     catch (e) {
         let err = new JsonError(findJSONError(e.message, str), e);
-        if (typeof errObj === "function") {
-            errObj(err);
-        }
-        else {
-            errObj.error = err;
-        }
+        if (onerror)
+            return onerror(err);
     }
 }
 exports.tryParseJSON = tryParseJSON;
@@ -208,7 +206,7 @@ exports.isErrnoException = isErrnoException;
 function DebugLogger(prefix) {
     //if(prefix.startsWith("V:")) return function(){};
     return function (msgLevel, ...args) {
-        if (DEBUGLEVEL > msgLevel)
+        if (settings.debugLevel > msgLevel)
             return;
         if (isError(args[0])) {
             let err = args[0];
@@ -349,7 +347,8 @@ function canAcceptGzip(header) {
         header = header.headers['accept-encoding'];
     }
     var gzip = header.split(',').map(e => e.split(';')).filter(e => e[0] === "gzip")[0];
-    return !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0;
+    var can = !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0;
+    return can;
 }
 exports.canAcceptGzip = canAcceptGzip;
 const zlib_1 = require("zlib");

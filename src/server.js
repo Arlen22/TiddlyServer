@@ -33,20 +33,19 @@ const settingsFile = path.normalize(process.argv[2]
     : path.join(__dirname, '../settings.json'));
 console.log("Settings file: %s", settingsFile);
 var settings;
-{
-    const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
-    let settingsError = {};
-    settings = server_types_1.tryParseJSON(settingsString, settingsError);
-    if (!settings && settingsError.error) {
-        let e = settingsError.error;
-        console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + server_types_1.colors.Reset, e.originalError.message);
-        console.error(e.errorPosition);
-        throw "The settings file could not be parsed: Invalid JSON";
-    }
-}
+const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
+settings = server_types_1.tryParseJSON(settingsString, (e) => {
+    console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + server_types_1.colors.Reset, e.originalError.message);
+    console.error(e.errorPosition);
+    throw "The settings file could not be parsed: Invalid JSON";
+});
 if (!settings.tree)
     throw "tree is not specified in the settings file";
 server_types_1.normalizeSettings(settings, settingsFile);
+if (typeof settings.username !== "string")
+    throw "username must be a JSON string";
+if (typeof settings.password !== "string")
+    throw "password must be a JSON string";
 var ENV;
 (function (ENV) {
     ENV.disableLocalHost = false;
@@ -56,10 +55,10 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
     ENV.disableLocalHost = true;
 //import and init api-access
 const tiddlyserver_1 = require("./tiddlyserver");
-const generateSettingsPage_1 = require("./generateSettingsPage");
+const settingsPage_1 = require("./settingsPage");
 server_types_1.init(eventer);
 tiddlyserver_1.init(eventer);
-generateSettingsPage_1.initSettingsRequest(eventer);
+settingsPage_1.initSettings(eventer);
 //emit settings to everyone (I know, this could be an observable)
 const assets = path.resolve(__dirname, '../assets');
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
@@ -73,8 +72,8 @@ process.on('uncaughtException', () => {
     serverLocalHost.close();
     console.log('closing server');
 });
-const un = settings.username;
-const pw = settings.password;
+// const un = settings.username;
+// const pw = settings.password;
 const log = rx_1.Observable.bindNodeCallback(logger);
 const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 const routes = {
@@ -101,7 +100,7 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     //check authentication and do sanity/security checks
     //https://github.com/hueniverse/iron
     //auth headers =====================
-    if (!un && !pw)
+    if (!settings.username && !settings.password)
         return state;
     if (!state.req.headers['authorization']) {
         debug(-2, 'authorization required');
@@ -115,7 +114,7 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     auth = new Buffer(token, 'base64').toString(), // convert from base64
     parts = auth.split(/:/), // split on colon
     username = parts[0], password = parts[1];
-    if (username != un || password != pw) {
+    if (username !== settings.username || password !== settings.password) {
         debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
         state.throw(401, 'Invalid username or password');
         return;
@@ -153,7 +152,7 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
 function doAdminRoute(obs) {
     return obs.do(state => {
         if (state.path[2] === "settings")
-            generateSettingsPage_1.handleSettingsRequest(state);
+            settingsPage_1.handleSettings(state);
     });
 }
 function serverListenCB(err, res) {

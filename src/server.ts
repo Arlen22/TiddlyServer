@@ -3,6 +3,7 @@ require("../lib/source-map-support-lib");
 import { send } from '../lib/bundled-lib';
 const sendOptions = {};
 
+
 import {
     Observable, Subject, Subscription, BehaviorSubject, Subscriber
 } from '../lib/rx';
@@ -60,20 +61,20 @@ const settingsFile = path.normalize(process.argv[2]
 console.log("Settings file: %s", settingsFile);
 
 var settings: ServerConfig;
-{
-    const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
-    let settingsError: { error?: JsonError } = {} as any;
-    settings = tryParseJSON(settingsString, settingsError);
-    if (!settings && settingsError.error) {
-        let e = settingsError.error;
-        console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
-        console.error(e.errorPosition);
-        throw "The settings file could not be parsed: Invalid JSON";
-    }
-}
+
+const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
+settings = tryParseJSON<ServerConfig>(settingsString, (e) => {
+    console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
+    console.error(e.errorPosition);
+    throw "The settings file could not be parsed: Invalid JSON";
+});
+
 
 if (!settings.tree) throw "tree is not specified in the settings file";
 normalizeSettings(settings, settingsFile);
+if (typeof settings.username !== "string") throw "username must be a JSON string";
+if (typeof settings.password !== "string") throw "password must be a JSON string";
+
 
 namespace ENV {
     export let disableLocalHost: boolean = false;
@@ -84,12 +85,13 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
 
 //import and init api-access
 import { doTiddlyServerRoute, init as initTiddlyServer, doTiddlyWikiRoute } from './tiddlyserver';
-import { handleSettingsRequest, initSettingsRequest } from './generateSettingsPage';
+import { handleSettings, initSettings } from './settingsPage';
 
 import { ServerResponse } from 'http';
+
 initServerTypes(eventer);
 initTiddlyServer(eventer);
-initSettingsRequest(eventer);
+initSettings(eventer);
 
 //emit settings to everyone (I know, this could be an observable)
 
@@ -111,8 +113,8 @@ process.on('uncaughtException', () => {
     console.log('closing server');
 })
 
-const un = settings.username;
-const pw = settings.password;
+// const un = settings.username;
+// const pw = settings.password;
 
 const log = Observable.bindNodeCallback<http.IncomingMessage, http.ServerResponse, void>(logger);
 
@@ -147,7 +149,7 @@ Observable.merge(
     //check authentication and do sanity/security checks
     //https://github.com/hueniverse/iron
     //auth headers =====================
-    if (!un && !pw) return state;
+    if (!settings.username && !settings.password) return state;
 
     if (!state.req.headers['authorization']) {
         debug(-2, 'authorization required');
@@ -162,7 +164,7 @@ Observable.merge(
         parts = auth.split(/:/),                          // split on colon
         username = parts[0],
         password = parts[1];
-    if (username != un || password != pw) {
+    if (username !== settings.username || password !== settings.password) {
         debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
         state.throw(401, 'Invalid username or password');
         return;
@@ -201,7 +203,7 @@ Observable.merge(
 
 function doAdminRoute(obs: Observable<StateObject>): any {
     return obs.do(state => {
-        if (state.path[2] === "settings") handleSettingsRequest(state);
+        if (state.path[2] === "settings") handleSettings(state);
     }) as Observable<StateObject>
 }
 

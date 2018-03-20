@@ -19,7 +19,7 @@ function serveAssets() {
     server_types_1.serveFile(serveSettingsRoot.asObservable(), "settings-root.html", path_1.join(settings.__assetsDir, "settings-root")).subscribe();
     server_types_1.serveFile(serveSettingsTree.asObservable(), "settings-tree.html", path_1.join(settings.__assetsDir, "settings-tree")).subscribe();
 }
-function initSettingsRequest(e) {
+function initSettings(e) {
     eventer = e;
     eventer.on('settings', (set) => {
         settings = set;
@@ -30,7 +30,7 @@ function initSettingsRequest(e) {
             serveAssets();
     });
 }
-exports.initSettingsRequest = initSettingsRequest;
+exports.initSettings = initSettings;
 const data = [
     { level: 1, name: "tree", valueType: "subpage", handler: handleTreeSubpage },
     { level: 0, name: "types", valueType: "function", validate: validateTypes },
@@ -200,7 +200,7 @@ function updateSettings(level, upd, current) {
 function validateTypes(level, upd, current) {
     return { valid: true, value: [], changed: false };
 }
-function handleSettingsRequest(state) {
+function handleSettings(state) {
     let level = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
         : (settings.allowNetwork.settings ? 0 : -1);
     if (state.path[3] === "") {
@@ -249,7 +249,8 @@ function handleSettingsRequest(state) {
         subpage.handler(state);
     }
 }
-exports.handleSettingsRequest = handleSettingsRequest;
+exports.handleSettings = handleSettings;
+const DRYRUN_SETTINGS = true;
 function handleSettingsUpdate(state, level) {
     state.recieveBody(true).concatMap(() => {
         if (typeof state.json === "undefined")
@@ -262,11 +263,11 @@ function handleSettingsUpdate(state, level) {
             state.throw(500, "Settings file could not be accessed");
             threw = true;
         });
-        if (threw)
+        if (threw || !curjson)
             return rx_1.Observable.empty();
         let { response, keys } = updateSettings(level, state.json, curjson);
         const tag = { curjson, keys, response };
-        if (keys.length) {
+        if (!DRYRUN_SETTINGS && keys.length) {
             let newfile = JSON.stringify(curjson, null, 2);
             return server_types_1.obs_writeFile(tag)(settings.__filename, newfile);
         }
@@ -284,9 +285,18 @@ function handleSettingsUpdate(state, level) {
             if (keys.length) {
                 debug(1, "New settings written to current settings file");
                 server_types_1.normalizeSettings(curjson, settings.__filename);
-                keys.forEach(k => {
-                    settings[k] = curjson[k];
-                });
+                if (!DRYRUN_SETTINGS) {
+                    let consts = ["__assetsDir", "host", "port"];
+                    keys.forEach(k => {
+                        if (consts.indexOf(k) > -1)
+                            debug(1, "%s will not be changed until the server is restarted", k);
+                        else
+                            settings[k] = curjson[k];
+                    });
+                }
+                debug(-1, "== settingsChanged event emit ==\n%s", keys.map(k => `${k}: ${JSON.stringify(curjson[k])}\n`).join(''));
+                if (DRYRUN_SETTINGS)
+                    debug(1, "DRYRUN_SETTINGS enabled");
                 eventer.emit('settingsChanged', keys);
             }
             server_types_1.sendResponse(state.res, JSON.stringify(response), {
@@ -294,7 +304,6 @@ function handleSettingsUpdate(state, level) {
                 doGzip: server_types_1.canAcceptGzip(state.req)
             });
         }
-        // }
     });
 }
 function handleTreeSubpage(state) {
