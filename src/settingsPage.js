@@ -232,9 +232,9 @@ function handleSettings(state) {
                         let set = {};
                         data.forEach(item => {
                             // if(item.level > level) return;
-                            set[item.name] = settings[item.name];
+                            set[item.name] = curjson[item.name];
                         });
-                        server_types_1.sendResponse(state.res, JSON.stringify({ level, data, descriptions, settings: set }), {
+                        server_types_1.sendResponse(state.res, JSON.stringify({ level, data, descriptions, settings: set, currentPath: settings.__filename }), {
                             contentType: "application/json",
                             doGzip: server_types_1.canAcceptGzip(state.req)
                         });

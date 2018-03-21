@@ -37,6 +37,7 @@ type primitive = "string" | "number" | "boolean";
 type SettingsPageItem = {
 	level: 0 | 1 | 2,
 	name: keyof ServerConfig,
+
 };
 type ValueType_function = {
 	fieldType: "function",
@@ -62,7 +63,7 @@ type ValueType_subpage = {
 } & SettingsPageItem;
 type ValueType_ifenabled = {
 	fieldType: "ifenabled",
-	valueType: SettingsPageItemTypes["fieldType"]
+	valueType: primitive //SettingsPageItemTypes["fieldType"]
 } & SettingsPageItem;
 type SettingsPageItemTypes = ValueType_function | ValueType_enum | ValueType_hashmapenum
 	| ValueType_primitive | ValueType_subpage | ValueType_ifenabled;
@@ -250,9 +251,9 @@ export function handleSettings(state: StateObject) {
 						let set = {};
 						data.forEach(item => {
 							// if(item.level > level) return;
-							set[item.name] = settings[item.name];
+							set[item.name] = curjson[item.name];
 						})
-						sendResponse(state.res, JSON.stringify({ level, data, descriptions, settings: set }), {
+						sendResponse(state.res, JSON.stringify({ level, data, descriptions, settings: set, currentPath: settings.__filename }), {
 							contentType: "application/json",
 							doGzip: canAcceptGzip(state.req)
 						})
