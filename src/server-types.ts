@@ -8,9 +8,34 @@ import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 import { send } from '../lib/bundled-lib';
-import { Stats } from 'fs';
+import { Stats, appendFileSync } from 'fs';
+import { gzip } from 'zlib';
+import { Writable } from 'stream';
+
 let DEBUGLEVEL = -1;
 let settings: ServerConfig;
+const colorsRegex = /\x1b\[[0-9]+m/gi
+let debugOutput: Writable = new Writable({
+    write: function (chunk, encoding, callback) {
+        // if we're given a buffer, convert it to a string
+        if (Buffer.isBuffer(chunk)) chunk = chunk.toString('utf8');
+        // remove ending linebreaks for consistency
+        chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
+
+        if (settings.logError) {
+            appendFileSync(
+                settings.logError, 
+                (settings.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n", 
+                { encoding: "utf8" }
+            );
+        }
+        if (!settings.logError || settings.logToConsoleAlso) {
+            console.log(chunk);
+        }
+        callback && callback();
+        return true;
+    }
+});;
 export const typeLookup: { [k: string]: string } = {};
 export function init(eventer: ServerEventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
@@ -24,7 +49,8 @@ export function init(eventer: ServerEventEmitter) {
                     throw format('Multiple types for extension %s: %s', ext, typeLookup[ext], type);
                 }
             })
-        })
+        });
+        // const myWritable = new stream.
     });
 }
 
@@ -42,9 +68,8 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
         })(set.tree);
     else set.tree = path.resolve(settingsDir, set.tree);
 
-    if (set.backupDirectory) {
-        set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
-    }
+    if (set.backupDirectory) set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
+
 
     if (!set.port) set.port = 8080;
     if (!set.host) set.host = "127.0.0.1";
@@ -69,6 +94,12 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
             + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
             + "also set the etagWindow setting to allow files to be modified if not newer than "
             + "so many seconds from the copy being saved.");
+
+    if (set.logAccess) set.logAccess = path.resolve(settingsDir, set.logAccess);
+    if (set.logError) set.logError = path.resolve(settingsDir, set.logError);
+
+    if (!set.logColorsToFile) set.logColorsToFile = false;
+    if (!set.logToConsoleAlso) set.logToConsoleAlso = false;
 
     set.__dirname = settingsDir;
     set.__filename = settingsFile;
@@ -271,16 +302,16 @@ export function DebugLogger(prefix: string): typeof DebugLog {
         let t = new Date();
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log(' '
-            + (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
-            + ' ' + colors.FgCyan + date + colors.Reset
-            + ' ' + format.apply(null, args).split('\n').map((e, i) => {
-                if (i > 0) {
-                    return new Array(23 + prefix.length).join(' ') + e;
-                } else {
-                    return e;
-                }
-            }).join('\n'));
+        debugOutput.write(' '
+        + (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
+        + ' ' + colors.FgCyan + date + colors.Reset
+        + ' ' + format.apply(null, args).split('\n').map((e, i) => {
+            if (i > 0) {
+                return new Array(23 + prefix.length).join(' ') + e;
+            } else {
+                return e;
+            }
+        }).join('\n'), "utf8");
     } as typeof DebugLog;
 }
 
@@ -402,7 +433,7 @@ export function canAcceptGzip(header: string | http.IncomingMessage) {
     var can = !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0;
     return can;
 }
-import { gzip } from 'zlib';
+
 export function sendResponse(res: http.ServerResponse, body: Buffer | string, options: {
     doGzip?: boolean,
     contentType?: string
@@ -884,6 +915,10 @@ export interface ServerConfig {
         settings: boolean
         WARNING_all_settings_WARNING: boolean
     }
+    logAccess: string,
+    logError: string,
+    logColorsToFile: boolean,
+    logToConsoleAlso: boolean;
 }
 
 export interface AccessPathResult<T> {

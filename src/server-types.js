@@ -7,8 +7,30 @@ const util_1 = require("util");
 const rx_1 = require("../lib/rx");
 //import { StateObject } from "./index";
 const bundled_lib_1 = require("../lib/bundled-lib");
+const fs_1 = require("fs");
+const zlib_1 = require("zlib");
+const stream_1 = require("stream");
 let DEBUGLEVEL = -1;
 let settings;
+const colorsRegex = /\x1b\[[0-9]+m/gi;
+let debugOutput = new stream_1.Writable({
+    write: function (chunk, encoding, callback) {
+        // if we're given a buffer, convert it to a string
+        if (Buffer.isBuffer(chunk))
+            chunk = chunk.toString('utf8');
+        // remove ending linebreaks for consistency
+        chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
+        if (settings.logError) {
+            fs_1.appendFileSync(settings.logError, (settings.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n", { encoding: "utf8" });
+        }
+        if (!settings.logError || settings.logToConsoleAlso) {
+            console.log(chunk);
+        }
+        callback && callback();
+        return true;
+    }
+});
+;
 exports.typeLookup = {};
 function init(eventer) {
     eventer.on('settings', function (set) {
@@ -24,6 +46,7 @@ function init(eventer) {
                 }
             });
         });
+        // const myWritable = new stream.
     });
 }
 exports.init = init;
@@ -42,9 +65,8 @@ function normalizeSettings(set, settingsFile) {
         })(set.tree);
     else
         set.tree = path.resolve(settingsDir, set.tree);
-    if (set.backupDirectory) {
+    if (set.backupDirectory)
         set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
-    }
     if (!set.port)
         set.port = 8080;
     if (!set.host)
@@ -78,6 +100,14 @@ function normalizeSettings(set, settingsFile) {
             + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
             + "also set the etagWindow setting to allow files to be modified if not newer than "
             + "so many seconds from the copy being saved.");
+    if (set.logAccess)
+        set.logAccess = path.resolve(settingsDir, set.logAccess);
+    if (set.logError)
+        set.logError = path.resolve(settingsDir, set.logError);
+    if (!set.logColorsToFile)
+        set.logColorsToFile = false;
+    if (!set.logToConsoleAlso)
+        set.logToConsoleAlso = false;
     set.__dirname = settingsDir;
     set.__filename = settingsFile;
 }
@@ -218,7 +248,7 @@ function DebugLogger(prefix) {
         }
         let t = new Date();
         let date = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-        console.log(' '
+        debugOutput.write(' '
             + (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
             + ' ' + colors.FgCyan + date + colors.Reset
             + ' ' + util_1.format.apply(null, args).split('\n').map((e, i) => {
@@ -228,7 +258,7 @@ function DebugLogger(prefix) {
             else {
                 return e;
             }
-        }).join('\n'));
+        }).join('\n'), "utf8");
     };
 }
 exports.DebugLogger = DebugLogger;
@@ -351,7 +381,6 @@ function canAcceptGzip(header) {
     return can;
 }
 exports.canAcceptGzip = canAcceptGzip;
-const zlib_1 = require("zlib");
 function sendResponse(res, body, options = {}) {
     body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body;
     if (options.doGzip)

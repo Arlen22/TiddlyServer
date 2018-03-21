@@ -52,7 +52,7 @@ console.debug = function () { }; //noop console debug;
 //setup global objects
 const eventer = new EventEmitter() as ServerEventEmitter;
 const debug = DebugLogger('APP');
-const logger = require('../lib/morgan.js').handler;
+
 
 const settingsFile = path.normalize(process.argv[2]
     ? path.resolve(process.argv[2])
@@ -72,8 +72,10 @@ settings = tryParseJSON<ServerConfig>(settingsString, (e) => {
 
 if (!settings.tree) throw "tree is not specified in the settings file";
 normalizeSettings(settings, settingsFile);
-if (typeof settings.username !== "string") throw "username must be a JSON string";
-if (typeof settings.password !== "string") throw "password must be a JSON string";
+if (["string", "undefined"].indexOf(typeof settings.username) === -1)
+    throw "username must be a JSON string if specified";
+if (["string", "undefined"].indexOf(typeof settings.password) === -1)
+    throw "password must be a JSON string if specified";
 
 
 namespace ENV {
@@ -115,7 +117,12 @@ process.on('uncaughtException', () => {
 
 // const un = settings.username;
 // const pw = settings.password;
-
+// fs.createWriteStream()
+const logger = require('../lib/morgan.js').handler({ 
+    logFile: settings.logAccess || undefined,
+    logToConsole: !settings.logAccess || settings.logToConsoleAlso,
+    logColorsToFile: settings.logColorsToFile
+});
 const log = Observable.bindNodeCallback<http.IncomingMessage, http.ServerResponse, void>(logger);
 
 const serverClose = Observable.merge(
