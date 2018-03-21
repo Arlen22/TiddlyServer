@@ -1,4 +1,4 @@
-import { ServerConfig, StateObject, Hashmap, obs_stat, serveFile, sendResponse, canAcceptGzip, recieveBody, DebugLogger, ServerEventEmitter, tryParseJSON, normalizeSettings, obs_readFile, obs_writeFile } from "./server-types";
+import { ServerConfig, StateObject, Hashmap, obs_stat, serveFile, sendResponse, canAcceptGzip, recieveBody, DebugLogger, ServerEventEmitter, tryParseJSON, normalizeSettings, obs_readFile, obs_writeFile, defaultSettings } from "./server-types";
 import { EventEmitter } from "events";
 import { Observable, Subject } from "../lib/rx";
 import { resolve, join } from "path";
@@ -87,17 +87,17 @@ const data: (SettingsPageItemTypes)[] = [
 		enumType: "number",
 		enumOpts: [4, 3, 2, 1, 0, -1, -2, -3, -4]
 	},
+	{ level: 0, name: "logAccess", fieldType: "ifenabled", valueType: "string" },
+	{ level: 0, name: "logError", fieldType: "string" },
+	{ level: 0, name: "logColorsToFile", fieldType: "boolean" },
+	{ level: 0, name: "logToConsoleAlso", fieldType: "boolean" },
 	{
 		level: 1,
 		name: "allowNetwork",
 		fieldType: "hashmapenum",
 		enumType: "boolean",
 		enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
-	},
-	{ level: 0, name: "logAccess", fieldType: "ifenabled", valueType: "string" },
-	{ level: 0, name: "logError", fieldType: "string" },
-	{ level: 0, name: "logColorsToFile", fieldType: "boolean" },
-	{ level: 0, name: "logToConsoleAlso", fieldType: "boolean" }
+	}
 ];
 
 const descriptions: {[K in keyof ServerConfig]: any} = {
@@ -248,6 +248,7 @@ export function handleSettings(state: StateObject) {
 						state.throw(500, "Settings file could not be accessed");
 					})
 					if (typeof curjson !== "undefined") {
+						defaultSettings(curjson);
 						let set = {};
 						data.forEach(item => {
 							// if(item.level > level) return;

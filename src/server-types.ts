@@ -24,8 +24,8 @@ let debugOutput: Writable = new Writable({
 
         if (settings.logError) {
             appendFileSync(
-                settings.logError, 
-                (settings.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n", 
+                settings.logError,
+                (settings.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
                 { encoding: "utf8" }
             );
         }
@@ -53,24 +53,7 @@ export function init(eventer: ServerEventEmitter) {
         // const myWritable = new stream.
     });
 }
-
-export function normalizeSettings(set: ServerConfig, settingsFile) {
-
-    const settingsDir = path.dirname(settingsFile);
-
-    if (typeof set.tree === "object")
-        (function normalizeTree(item) {
-            keys(item).forEach(e => {
-                if (typeof item[e] === 'string') item[e] = path.resolve(settingsDir, item[e]);
-                else if (typeof item[e] === 'object') normalizeTree(item[e]);
-                else throw 'Invalid item: ' + e + ': ' + item[e];
-            })
-        })(set.tree);
-    else set.tree = path.resolve(settingsDir, set.tree);
-
-    if (set.backupDirectory) set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
-
-
+export function defaultSettings(set: ServerConfig) {
     if (!set.port) set.port = 8080;
     if (!set.host) set.host = "127.0.0.1";
     if (!set.types) set.types = {
@@ -86,6 +69,31 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
     if (!set.allowNetwork.settings) set.allowNetwork.settings = false;
     if (!set.allowNetwork.WARNING_all_settings_WARNING)
         set.allowNetwork.WARNING_all_settings_WARNING = false;
+    if (!set.logColorsToFile) set.logColorsToFile = false;
+    if (!set.logToConsoleAlso) set.logToConsoleAlso = false;
+
+}
+export function normalizeSettings(set: ServerConfig, settingsFile) {
+    const settingsDir = path.dirname(settingsFile);
+    
+    defaultSettings(set);
+
+    if (typeof set.tree === "object")
+        (function normalizeTree(item) {
+            keys(item).forEach(e => {
+                if (typeof item[e] === 'string') item[e] = path.resolve(settingsDir, item[e]);
+                else if (typeof item[e] === 'object') normalizeTree(item[e]);
+                else throw 'Invalid item: ' + e + ': ' + item[e];
+            })
+        })(set.tree);
+    else set.tree = path.resolve(settingsDir, set.tree);
+    
+    if (set.backupDirectory) set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
+    if (set.logAccess) set.logAccess = path.resolve(settingsDir, set.logAccess);
+    if (set.logError) set.logError = path.resolve(settingsDir, set.logError);
+
+    set.__dirname = settingsDir;
+    set.__filename = settingsFile;
 
     if (set.etag === "disabled" && !set.backupDirectory)
         console.log("Etag checking is disabled, but a backup folder is not set. "
@@ -95,14 +103,6 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
             + "also set the etagWindow setting to allow files to be modified if not newer than "
             + "so many seconds from the copy being saved.");
 
-    if (set.logAccess) set.logAccess = path.resolve(settingsDir, set.logAccess);
-    if (set.logError) set.logError = path.resolve(settingsDir, set.logError);
-
-    if (!set.logColorsToFile) set.logColorsToFile = false;
-    if (!set.logToConsoleAlso) set.logToConsoleAlso = false;
-
-    set.__dirname = settingsDir;
-    set.__filename = settingsFile;
 }
 
 interface ServerEventsListener<THIS> {
@@ -303,15 +303,15 @@ export function DebugLogger(prefix: string): typeof DebugLog {
         let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
         debugOutput.write(' '
-        + (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
-        + ' ' + colors.FgCyan + date + colors.Reset
-        + ' ' + format.apply(null, args).split('\n').map((e, i) => {
-            if (i > 0) {
-                return new Array(23 + prefix.length).join(' ') + e;
-            } else {
-                return e;
-            }
-        }).join('\n'), "utf8");
+            + (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
+            + ' ' + colors.FgCyan + date + colors.Reset
+            + ' ' + format.apply(null, args).split('\n').map((e, i) => {
+                if (i > 0) {
+                    return new Array(23 + prefix.length).join(' ') + e;
+                } else {
+                    return e;
+                }
+            }).join('\n'), "utf8");
     } as typeof DebugLog;
 }
 
