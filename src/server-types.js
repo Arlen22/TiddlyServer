@@ -50,23 +50,7 @@ function init(eventer) {
     });
 }
 exports.init = init;
-function normalizeSettings(set, settingsFile) {
-    const settingsDir = path.dirname(settingsFile);
-    if (typeof set.tree === "object")
-        (function normalizeTree(item) {
-            keys(item).forEach(e => {
-                if (typeof item[e] === 'string')
-                    item[e] = path.resolve(settingsDir, item[e]);
-                else if (typeof item[e] === 'object')
-                    normalizeTree(item[e]);
-                else
-                    throw 'Invalid item: ' + e + ': ' + item[e];
-            });
-        })(set.tree);
-    else
-        set.tree = path.resolve(settingsDir, set.tree);
-    if (set.backupDirectory)
-        set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
+function defaultSettings(set) {
     if (!set.port)
         set.port = 8080;
     if (!set.host)
@@ -93,6 +77,36 @@ function normalizeSettings(set, settingsFile) {
         set.allowNetwork.settings = false;
     if (!set.allowNetwork.WARNING_all_settings_WARNING)
         set.allowNetwork.WARNING_all_settings_WARNING = false;
+    if (!set.logColorsToFile)
+        set.logColorsToFile = false;
+    if (!set.logToConsoleAlso)
+        set.logToConsoleAlso = false;
+}
+exports.defaultSettings = defaultSettings;
+function normalizeSettings(set, settingsFile) {
+    const settingsDir = path.dirname(settingsFile);
+    defaultSettings(set);
+    if (typeof set.tree === "object")
+        (function normalizeTree(item) {
+            keys(item).forEach(e => {
+                if (typeof item[e] === 'string')
+                    item[e] = path.resolve(settingsDir, item[e]);
+                else if (typeof item[e] === 'object')
+                    normalizeTree(item[e]);
+                else
+                    throw 'Invalid item: ' + e + ': ' + item[e];
+            });
+        })(set.tree);
+    else
+        set.tree = path.resolve(settingsDir, set.tree);
+    if (set.backupDirectory)
+        set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
+    if (set.logAccess)
+        set.logAccess = path.resolve(settingsDir, set.logAccess);
+    if (set.logError)
+        set.logError = path.resolve(settingsDir, set.logError);
+    set.__dirname = settingsDir;
+    set.__filename = settingsFile;
     if (set.etag === "disabled" && !set.backupDirectory)
         console.log("Etag checking is disabled, but a backup folder is not set. "
             + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
@@ -100,16 +114,6 @@ function normalizeSettings(set, settingsFile) {
             + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
             + "also set the etagWindow setting to allow files to be modified if not newer than "
             + "so many seconds from the copy being saved.");
-    if (set.logAccess)
-        set.logAccess = path.resolve(settingsDir, set.logAccess);
-    if (set.logError)
-        set.logError = path.resolve(settingsDir, set.logError);
-    if (!set.logColorsToFile)
-        set.logColorsToFile = false;
-    if (!set.logToConsoleAlso)
-        set.logToConsoleAlso = false;
-    set.__dirname = settingsDir;
-    set.__filename = settingsFile;
 }
 exports.normalizeSettings = normalizeSettings;
 function getHumanSize(size) {

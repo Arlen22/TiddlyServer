@@ -50,17 +50,17 @@ const data = [
         enumType: "number",
         enumOpts: [4, 3, 2, 1, 0, -1, -2, -3, -4]
     },
+    { level: 0, name: "logAccess", fieldType: "ifenabled", valueType: "string" },
+    { level: 0, name: "logError", fieldType: "string" },
+    { level: 0, name: "logColorsToFile", fieldType: "boolean" },
+    { level: 0, name: "logToConsoleAlso", fieldType: "boolean" },
     {
         level: 1,
         name: "allowNetwork",
         fieldType: "hashmapenum",
         enumType: "boolean",
         enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
-    },
-    { level: 0, name: "logAccess", fieldType: "ifenabled", valueType: "string" },
-    { level: 0, name: "logError", fieldType: "string" },
-    { level: 0, name: "logColorsToFile", fieldType: "boolean" },
-    { level: 0, name: "logToConsoleAlso", fieldType: "boolean" }
+    }
 ];
 const descriptions = {
     tree: "The mount structure of the server",
@@ -229,6 +229,7 @@ function handleSettings(state) {
                         state.throw(500, "Settings file could not be accessed");
                     });
                     if (typeof curjson !== "undefined") {
+                        server_types_1.defaultSettings(curjson);
                         let set = {};
                         data.forEach(item => {
                             // if(item.level > level) return;
