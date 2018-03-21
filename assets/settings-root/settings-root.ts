@@ -8,28 +8,33 @@ type SettingsPageItem = {
 	// valueOptions?: any[]
 };
 type ValueType_function = {
-	valueType: "function",
-	// validate: (level: number, upd: ServerConfig) => { valid: boolean, value: any, isChanged: boolean }
+	fieldType: "function",
+	// validate: (level: number, upd: ServerConfig, current: ServerConfig) => { valid: boolean, value: any, changed: boolean }
 } & SettingsPageItem;
 type ValueType_primitive = {
-	valueType: primitive
+	fieldType: primitive
 } & SettingsPageItem;
 type ValueType_enum = {
-	valueType: "enum",
+	fieldType: "enum",
 	enumType: primitive,
 	enumOpts: any[]
 	// valueOptions: ["number" | "string", (number | string)[]]
 } & SettingsPageItem;
 type ValueType_hashmapenum = {
-	valueType: "hashmapenum",
+	fieldType: "hashmapenum",
 	enumType: primitive,
 	enumKeys: string[]
 } & SettingsPageItem;
 type ValueType_subpage = {
-	valueType: "subpage",
+	fieldType: "subpage",
 	// handler: (state: StateObject) => void;
 } & SettingsPageItem;
-type SettingsPageItemTypes = ValueType_function | ValueType_enum | ValueType_hashmapenum | ValueType_primitive | ValueType_subpage;
+type ValueType_ifenabled = {
+	fieldType: "ifenabled",
+	valueType: primitive
+} & SettingsPageItem;
+type SettingsPageItemTypes = ValueType_function | ValueType_enum | ValueType_hashmapenum
+	| ValueType_primitive | ValueType_subpage | ValueType_ifenabled;
 
 interface RootScope extends angular.IScope {
 
@@ -53,6 +58,12 @@ app.run(function ($templateCache) {
 		string: `<input type="text"      title="{{item.name}}" name="{{item.name}}" ng-disabled="readonly" ng-model="outputs[item.name]"/> <span ng-bind-html="description"></span>`,
 		number: `<input type="number"    title="{{item.name}}" name="{{item.name}}" ng-disabled="readonly" ng-model="outputs[item.name]"/> <span ng-bind-html="description"></span>`,
 		boolean: `<input type="checkbox" title="{{item.name}}" name="{{item.name}}" ng-disabled="readonly" ng-model="outputs[item.name]"/> <span ng-bind-html="description"></span>`,
+		ifenabled: `
+<div ng-controller="IfEnabledCtrl">
+	<input type="checkbox" title="{{item.name}} name="isenabled_{{item.name}}" ng-disabled="readonly" ng-model="outputs['isenabled_' + item.name]"/> Enable {{item.name}}
+	<div ng-include="'template-' + item.valueType" ng-disabled="!outputs['isenabled_' + item.name]"></div>
+</div>
+`,
 		enum: `
 	<select name="{{item.name}}" value="" ng-disabled="readonly" title="{{item.name}}" 
 		ng-model="outputs[item.name]" 
@@ -62,7 +73,7 @@ app.run(function ($templateCache) {
 		hashmapenum: `
 <div ng-repeat="(i, key) in item.enumKeys track by $index" 
 	ng-controller="HashmapEnumItemCtrl" 
-	ng-include="'template-' + item.valueType"></div>
+	ng-include="'template-' + item.fieldType"></div>
 `,
 		subpage: `<a href="{{item.name}}">Please access this setting at the {{item.name}} subpage.</a>`,
 		function: `
@@ -72,7 +83,7 @@ app.run(function ($templateCache) {
 		settingsPage: `
 <fieldset ng-repeat="(i, item) in data" ng-controller="SettingsPageItemCtrl">
 <legend>{{item.name}}</legend>
-<div ng-include="'template-' + item.valueType"></div>
+<div ng-include="'template-' + item.fieldType"></div>
 </fieldset>
 		`
 	}
@@ -86,9 +97,9 @@ interface HashmapEnumItemCtrlScope extends SettingsPageItemCtrlScope {
 }
 app.controller("HashmapEnumItemCtrl", function ($scope: HashmapEnumItemCtrlScope, $sce: angular.ISCEService) {
 	let parentItem: SettingsPageItemTypes = $scope.item;
-	if (parentItem.valueType !== "hashmapenum") return;
+	if (parentItem.fieldType !== "hashmapenum") return;
 	$scope.item = {
-		valueType: parentItem.enumType,
+		fieldType: parentItem.enumType,
 		name: $scope.key,
 		level: parentItem.level
 	} as SettingsPageItemTypes;
@@ -100,6 +111,12 @@ app.controller("HashmapEnumItemCtrl", function ($scope: HashmapEnumItemCtrlScope
 		$scope.description = $sce.trustAsHtml($scope.description);
 	}
 });
+app.controller("IfEnabledCtrl", function ($scope: SettingsPageItemCtrlScope) {
+	$scope.outputs["isenabled_" + $scope.item.name] = ($scope.outputs[$scope.item.name] !== false);
+	// $scope.$watch(`outputs[${$scope.item.name}]`, (item, old) => {
+	// 	$scope.outputs["isenabled_" + $scope.item.name] = item !== false;
+	// })
+})
 interface SettingsPageItemCtrlScope extends SettingsPageCtrlScope {
 	item: SettingsPageItemTypes;
 	description: string | Hashmap<any>;
@@ -127,18 +144,24 @@ app.controller("SettingsPageCtrl", function ($scope: SettingsPageCtrlScope, $htt
 	function saveSettings() {
 		let set = {};
 		$scope.data.forEach(item => {
-			let key = item.name;
-			let newval = JSON.stringify($scope.outputs[key]);
+			let key = item.name, newval;
+			if (item.fieldType === "ifenabled") {
+				newval = JSON.stringify(
+					$scope.outputs["isenabled_" + key] ? $scope.outputs[key] : false
+				);
+			} else {
+				newval = JSON.stringify($scope.outputs[key]);
+			}
 			console.log(newval, oldSettings[key]);
 			if (oldSettings[key] !== newval) {
 				if (item.level <= $scope.level)
-					set[key] = $scope.outputs[key];
+					set[key] = JSON.parse(newval);
 				oldSettings[key] = newval;
 			}
 		})
 		$http.put("?action=update", JSON.stringify(set));
 	}
-	
+
 	$http.get('?action=getdata').then(res => {
 		let { level, data, descriptions, settings } = res.data as any;
 		let timeout;

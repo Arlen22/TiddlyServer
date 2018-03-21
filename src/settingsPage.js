@@ -32,35 +32,35 @@ function initSettings(e) {
 }
 exports.initSettings = initSettings;
 const data = [
-    { level: 1, name: "tree", valueType: "subpage", handler: handleTreeSubpage },
-    { level: 0, name: "types", valueType: "function", validate: validateTypes },
-    { level: 1, name: "host", valueType: "string" },
-    { level: 1, name: "port", valueType: "number" },
-    { level: 1, name: "username", valueType: "string" },
-    { level: 1, name: "password", valueType: "string" },
-    { level: 0, name: "backupDirectory", valueType: "string" },
+    { level: 1, name: "tree", fieldType: "subpage", handler: handleTreeSubpage },
+    { level: 0, name: "types", fieldType: "function", validate: validateTypes },
+    { level: 1, name: "host", fieldType: "string" },
+    { level: 1, name: "port", fieldType: "number" },
+    { level: 1, name: "username", fieldType: "string" },
+    { level: 1, name: "password", fieldType: "string" },
+    { level: 0, name: "backupDirectory", fieldType: "string" },
     {
-        level: 0, name: "etag", valueType: "enum",
+        level: 0, name: "etag", fieldType: "enum",
         enumType: "string", enumOpts: ["", "disabled", "required"]
     },
-    { level: 0, name: "etagWindow", valueType: "number" },
-    { level: 1, name: "useTW5path", valueType: "boolean" },
+    { level: 0, name: "etagWindow", fieldType: "number" },
+    { level: 1, name: "useTW5path", fieldType: "boolean" },
     {
-        level: 0, name: "debugLevel", valueType: "enum",
+        level: 0, name: "debugLevel", fieldType: "enum",
         enumType: "number",
         enumOpts: [4, 3, 2, 1, 0, -1, -2, -3, -4]
     },
     {
         level: 1,
         name: "allowNetwork",
-        valueType: "hashmapenum",
+        fieldType: "hashmapenum",
         enumType: "boolean",
         enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
     },
-    { level: 0, name: "logAccess", valueType: "string" },
-    { level: 0, name: "logError", valueType: "string" },
-    { level: 0, name: "logColorsToFile", valueType: "boolean" },
-    { level: 0, name: "logToConsoleAlso", valueType: "boolean" }
+    { level: 0, name: "logAccess", fieldType: "ifenabled", valueType: "string" },
+    { level: 0, name: "logError", fieldType: "string" },
+    { level: 0, name: "logColorsToFile", fieldType: "boolean" },
+    { level: 0, name: "logToConsoleAlso", fieldType: "boolean" }
 ];
 const descriptions = {
     tree: "The mount structure of the server",
@@ -87,7 +87,7 @@ const descriptions = {
         WARNING_all_settings_WARNING: "Allow network users to change critical settings: "
             + `<code>${data.filter(e => e.level > 0).map(e => e.name).join(', ')}</code>`
     },
-    logAccess: "Log file to write all HTTP request logs to (may be the same as logError)",
+    logAccess: "If access log is enabled, set the log file to write all HTTP request logs to (may be the same as logError)",
     logError: "Log file to write all debug messages to (may be the same as logAccess)",
     logColorsToFile: "Log the console color markers to the file (helpful if read from the console later)",
     logToConsoleAlso: "Also log all messages to console",
@@ -145,14 +145,14 @@ function updateSettings(level, upd, current) {
         let key = item.name;
         let changed = false;
         if (isPrimitive(item)) {
-            let { valid, value } = testPrimitive(item.valueType, upd[key]);
+            let { valid, value } = testPrimitive(item.fieldType, upd[key]);
             if (valid && (value !== current[key])) {
                 current[key] = value;
                 changed = true;
             }
             return { valid, changed };
         }
-        else if (item.valueType === "function") {
+        else if (item.fieldType === "function") {
             let { valid, value, changed } = item.validate(level, JSON.parse(JSON.stringify(upd)), current);
             //depend on the function to tell us whether the setting changed
             if (valid && changed) {
@@ -161,12 +161,12 @@ function updateSettings(level, upd, current) {
             }
             return { valid, changed };
         }
-        else if (item.valueType === "subpage") {
+        else if (item.fieldType === "subpage") {
             //subpage handlers take care of validation and saving.
             //if it's here, it shouldn't be.
             return { valid: false, changed: false };
         }
-        else if (item.valueType === "hashmapenum") {
+        else if (item.fieldType === "hashmapenum") {
             if (typeof current[key] !== "object")
                 current[key] = {};
             return item.enumKeys.map(e => {
@@ -182,7 +182,7 @@ function updateSettings(level, upd, current) {
                 return n;
             }, { valid: true, changed: false });
         }
-        else if (item.valueType === "enum") {
+        else if (item.fieldType === "enum") {
             let { valid, value } = testPrimitive(item.enumType, upd[key]);
             if (valid && (current[key] !== value) && item.enumOpts.indexOf(value) > -1) {
                 current[key] = value;
@@ -191,6 +191,16 @@ function updateSettings(level, upd, current) {
             }
             else
                 return { valid, changed };
+        }
+        else if (item.fieldType === "ifenabled") {
+            let { valid, value } = testPrimitive(item.valueType, upd[key]);
+            if (valid) {
+                if (current[key] !== (upd['isenabled_' + key] && value)) {
+                    current[key] = (upd['isenabled_' + key] && value);
+                    changed = true;
+                }
+            }
+            return { valid, changed };
         }
         else {
             return { valid: false, changed: false };
@@ -247,7 +257,7 @@ function handleSettings(state) {
     }
     else if (typeof state.path[3] === "string") {
         let key;
-        let subpages = data.filter((e) => e.valueType === "subpage");
+        let subpages = data.filter((e) => e.fieldType === "subpage");
         let subIndex = subpages.map(e => e.name).indexOf(state.path[3]);
         if (subIndex === -1)
             return state.throw(404);
