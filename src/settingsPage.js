@@ -57,6 +57,10 @@ const data = [
         enumType: "boolean",
         enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
     },
+    { level: 0, name: "logAccess", valueType: "string" },
+    { level: 0, name: "logError", valueType: "string" },
+    { level: 0, name: "logColorsToFile", valueType: "boolean" },
+    { level: 0, name: "logToConsoleAlso", valueType: "boolean" }
 ];
 const descriptions = {
     tree: "The mount structure of the server",
@@ -83,6 +87,10 @@ const descriptions = {
         WARNING_all_settings_WARNING: "Allow network users to change critical settings: "
             + `<code>${data.filter(e => e.level > 0).map(e => e.name).join(', ')}</code>`
     },
+    logAccess: "Log file to write all HTTP request logs to (may be the same as logError)",
+    logError: "Log file to write all debug messages to (may be the same as logAccess)",
+    logColorsToFile: "Log the console color markers to the file (helpful if read from the console later)",
+    logToConsoleAlso: "Also log all messages to console",
     maxAge: "",
     tsa: "",
     _disableLocalHost: "",
@@ -283,7 +291,7 @@ function handleSettingsUpdate(state, level) {
         }
         else {
             if (keys.length) {
-                debug(1, "New settings written to current settings file");
+                debug(-1, "New settings written to current settings file");
                 server_types_1.normalizeSettings(curjson, settings.__filename);
                 if (!DRYRUN_SETTINGS) {
                     let consts = ["__assetsDir", "host", "port"];

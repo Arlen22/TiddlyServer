@@ -27,7 +27,6 @@ console.debug = function () { }; //noop console debug;
 //setup global objects
 const eventer = new events_1.EventEmitter();
 const debug = server_types_1.DebugLogger('APP');
-const logger = require('../lib/morgan.js').handler;
 const settingsFile = path.normalize(process.argv[2]
     ? path.resolve(process.argv[2])
     : path.join(__dirname, '../settings.json'));
@@ -42,10 +41,10 @@ settings = server_types_1.tryParseJSON(settingsString, (e) => {
 if (!settings.tree)
     throw "tree is not specified in the settings file";
 server_types_1.normalizeSettings(settings, settingsFile);
-if (typeof settings.username !== "string")
-    throw "username must be a JSON string";
-if (typeof settings.password !== "string")
-    throw "password must be a JSON string";
+if (["string", "undefined"].indexOf(typeof settings.username) === -1)
+    throw "username must be a JSON string if specified";
+if (["string", "undefined"].indexOf(typeof settings.password) === -1)
+    throw "password must be a JSON string if specified";
 var ENV;
 (function (ENV) {
     ENV.disableLocalHost = false;
@@ -74,6 +73,12 @@ process.on('uncaughtException', () => {
 });
 // const un = settings.username;
 // const pw = settings.password;
+// fs.createWriteStream()
+const logger = require('../lib/morgan.js').handler({
+    logFile: settings.logAccess || undefined,
+    logToConsole: !settings.logAccess || settings.logToConsoleAlso,
+    logColorsToFile: settings.logColorsToFile
+});
 const log = rx_1.Observable.bindNodeCallback(logger);
 const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 const routes = {
