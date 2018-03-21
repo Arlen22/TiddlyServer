@@ -11,3 +11,4 @@ uncaughtException.log
 /tiddlywiki-*
 *.exe
 test.js
+*.log
