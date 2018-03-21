@@ -8,12 +8,13 @@ app.run(function ($templateCache) {
         string: "<input type=\"text\"      title=\"{{item.name}}\" name=\"{{item.name}}\" ng-disabled=\"readonly\" ng-model=\"outputs[item.name]\"/> <span ng-bind-html=\"description\"></span>",
         number: "<input type=\"number\"    title=\"{{item.name}}\" name=\"{{item.name}}\" ng-disabled=\"readonly\" ng-model=\"outputs[item.name]\"/> <span ng-bind-html=\"description\"></span>",
         boolean: "<input type=\"checkbox\" title=\"{{item.name}}\" name=\"{{item.name}}\" ng-disabled=\"readonly\" ng-model=\"outputs[item.name]\"/> <span ng-bind-html=\"description\"></span>",
+        ifenabled: "\n<div ng-controller=\"IfEnabledCtrl\">\n\t<input type=\"checkbox\" title=\"{{item.name}} name=\"isenabled_{{item.name}}\" ng-disabled=\"readonly\" ng-model=\"outputs['isenabled_' + item.name]\"/> Enable {{item.name}}\n\t<div ng-include=\"'template-' + item.valueType\" ng-disabled=\"!outputs['isenabled_' + item.name]\"></div>\n</div>\n",
         "enum": "\n\t<select name=\"{{item.name}}\" value=\"\" ng-disabled=\"readonly\" title=\"{{item.name}}\" \n\t\tng-model=\"outputs[item.name]\" \n\t\tng-options=\"k for k in item.enumOpts\">\n\t</select>  <span ng-bind-html=\"description\"></span>\n",
-        hashmapenum: "\n<div ng-repeat=\"(i, key) in item.enumKeys track by $index\" \n\tng-controller=\"HashmapEnumItemCtrl\" \n\tng-include=\"'template-' + item.valueType\"></div>\n",
+        hashmapenum: "\n<div ng-repeat=\"(i, key) in item.enumKeys track by $index\" \n\tng-controller=\"HashmapEnumItemCtrl\" \n\tng-include=\"'template-' + item.fieldType\"></div>\n",
         subpage: "<a href=\"{{item.name}}\">Please access this setting at the {{item.name}} subpage.</a>",
         "function": "\n<ng-include src=\"'template-function' + item.name\"></ng-include>\n\t\t",
         functiontypes: "Coming soon",
-        settingsPage: "\n<fieldset ng-repeat=\"(i, item) in data\" ng-controller=\"SettingsPageItemCtrl\">\n<legend>{{item.name}}</legend>\n<div ng-include=\"'template-' + item.valueType\"></div>\n</fieldset>\n\t\t"
+        settingsPage: "\n<fieldset ng-repeat=\"(i, item) in data\" ng-controller=\"SettingsPageItemCtrl\">\n<legend>{{item.name}}</legend>\n<div ng-include=\"'template-' + item.fieldType\"></div>\n</fieldset>\n\t\t"
     };
     for (var i in templates) {
         $templateCache.put("template-" + i, templates[i]);
@@ -21,10 +22,10 @@ app.run(function ($templateCache) {
 });
 app.controller("HashmapEnumItemCtrl", function ($scope, $sce) {
     var parentItem = $scope.item;
-    if (parentItem.valueType !== "hashmapenum")
+    if (parentItem.fieldType !== "hashmapenum")
         return;
     $scope.item = {
-        valueType: parentItem.enumType,
+        fieldType: parentItem.enumType,
         name: $scope.key,
         level: parentItem.level
     };
@@ -35,6 +36,12 @@ app.controller("HashmapEnumItemCtrl", function ($scope, $sce) {
     if (typeof $scope.description === "string") {
         $scope.description = $sce.trustAsHtml($scope.description);
     }
+});
+app.controller("IfEnabledCtrl", function ($scope) {
+    $scope.outputs["isenabled_" + $scope.item.name] = ($scope.outputs[$scope.item.name] !== false);
+    // $scope.$watch(`outputs[${$scope.item.name}]`, (item, old) => {
+    // 	$scope.outputs["isenabled_" + $scope.item.name] = item !== false;
+    // })
 });
 app.controller("SettingsPageItemCtrl", function ($scope, $sce) {
     $scope.description = $scope.descriptions[$scope.item.name];
@@ -50,12 +57,17 @@ app.controller("SettingsPageCtrl", function ($scope, $http) {
     function saveSettings() {
         var set = {};
         $scope.data.forEach(function (item) {
-            var key = item.name;
-            var newval = JSON.stringify($scope.outputs[key]);
+            var key = item.name, newval;
+            if (item.fieldType === "ifenabled") {
+                newval = JSON.stringify($scope.outputs["isenabled_" + key] ? $scope.outputs[key] : false);
+            }
+            else {
+                newval = JSON.stringify($scope.outputs[key]);
+            }
             console.log(newval, oldSettings[key]);
             if (oldSettings[key] !== newval) {
                 if (item.level <= $scope.level)
-                    set[key] = $scope.outputs[key];
+                    set[key] = JSON.parse(newval);
                 oldSettings[key] = newval;
             }
         });

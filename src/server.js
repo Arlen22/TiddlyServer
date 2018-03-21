@@ -79,7 +79,16 @@ const logger = require('../lib/morgan.js').handler({
     logToConsole: !settings.logAccess || settings.logToConsoleAlso,
     logColorsToFile: settings.logColorsToFile
 });
-const log = rx_1.Observable.bindNodeCallback(logger);
+function setLog() {
+    return settings.logAccess === false ? ((...args) => rx_1.Observable.of(args))
+        : rx_1.Observable.bindNodeCallback(logger);
+}
+let log = setLog();
+eventer.on('settingsChanged', (keys) => {
+    if (keys.indexOf("logAccess") > -1) {
+        log = setLog();
+    }
+});
 const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 const routes = {
     'favicon.ico': obs => server_types_1.serveFile(obs, 'favicon.ico', assets),
@@ -101,7 +110,7 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     return new server_types_1.StateObject(req, res, debug, eventer, false);
 }).takeUntil(serverClose).concatMap(state => {
     return log(state.req, state.res).mapTo(state);
-})).map(state => {
+})).map((state) => {
     //check authentication and do sanity/security checks
     //https://github.com/hueniverse/iron
     //auth headers =====================

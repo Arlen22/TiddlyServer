@@ -118,12 +118,22 @@ process.on('uncaughtException', () => {
 // const un = settings.username;
 // const pw = settings.password;
 // fs.createWriteStream()
-const logger = require('../lib/morgan.js').handler({ 
+const logger = require('../lib/morgan.js').handler({
     logFile: settings.logAccess || undefined,
     logToConsole: !settings.logAccess || settings.logToConsoleAlso,
     logColorsToFile: settings.logColorsToFile
 });
-const log = Observable.bindNodeCallback<http.IncomingMessage, http.ServerResponse, void>(logger);
+
+function setLog() {
+    return settings.logAccess === false ? ((...args: any[]) => Observable.of(args)) as never
+        : Observable.bindNodeCallback<http.IncomingMessage, http.ServerResponse, void>(logger);
+}
+let log = setLog();
+eventer.on('settingsChanged', (keys) => {
+    if (keys.indexOf("logAccess") > -1) {
+        log = setLog();
+    }
+})
 
 const serverClose = Observable.merge(
     Observable.fromEvent(serverLocalHost, 'close').take(1),
@@ -152,7 +162,7 @@ Observable.merge(
     }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
         return log(state.req, state.res).mapTo(state);
     })
-).map(state => {
+).map((state: StateObject) => {
     //check authentication and do sanity/security checks
     //https://github.com/hueniverse/iron
     //auth headers =====================

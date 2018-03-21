@@ -915,8 +915,8 @@ export interface ServerConfig {
         settings: boolean
         WARNING_all_settings_WARNING: boolean
     }
-    logAccess: string,
-    logError: string,
+    logAccess: string | false,
+    logError: string | false,
     logColorsToFile: boolean,
     logToConsoleAlso: boolean;
 }
