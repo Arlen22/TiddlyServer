@@ -44,7 +44,6 @@ const data = [
         enumType: "string", enumOpts: ["", "disabled", "required"]
     },
     { level: 0, name: "etagWindow", fieldType: "number" },
-    { level: 1, name: "useTW5path", fieldType: "boolean" },
     {
         level: 0, name: "debugLevel", fieldType: "enum",
         enumType: "number",
@@ -60,7 +59,8 @@ const data = [
         fieldType: "hashmapenum",
         enumType: "boolean",
         enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
-    }
+    },
+    { level: 1, name: "useTW5path", fieldType: "boolean" }
 ];
 const descriptions = {
     tree: "The mount structure of the server",
