@@ -62,7 +62,7 @@ function doTiddlyServerRoute(input) {
             if (['HEAD', 'GET'].indexOf(state.req.method) > -1) {
                 bundled_lib_1.send(state.req, result.filepathPortion.join('/'), { root: result.item })
                     .on('error', (err) => {
-                    state.log(0, '%s %s', err.status, err.message).error().throw(500);
+                    state.log(2, '%s %s', err.status, err.message).throw(500);
                 }).on('headers', (res, filepath) => {
                     const statItem = state.statPath.stat;
                     const mtime = Date.parse(state.statPath.stat.mtime);
@@ -98,6 +98,7 @@ function handleFileError(err) {
 }
 function serveDirectoryIndex(result) {
     const { state } = result;
+    const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
     // console.log(state.url);
     if (!state.url.pathname.endsWith("/")) {
         state.redirect(state.url.pathname + "/");
@@ -105,8 +106,8 @@ function serveDirectoryIndex(result) {
     else if (state.req.method === "GET") {
         const isFolder = typeof result.item === "string";
         const options = {
-            upload: isFolder && (settings.allowNetwork.upload || state.isLocalHost),
-            mkdir: isFolder && (settings.allowNetwork.mkdir || state.isLocalHost)
+            upload: isFolder && (allow.upload),
+            mkdir: isFolder && (allow.mkdir)
         };
         rx_1.Observable.of(result)
             .concatMap(server_types_1.getTreeItemFiles)
@@ -239,9 +240,9 @@ function handlePUTrequest(state) {
         return rx_1.Observable.merge(finish, rx_1.Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err) => {
             if (err) {
                 return state
-                    .log(0, "Error writing the updated file to disk")
-                    .log(0, err.stack || [err.name, err.message].join(': '))
-                    .error().throw(500);
+                    .log(2, "Error writing the updated file to disk")
+                    .log(2, err.stack || [err.name, err.message].join(': '))
+                    .throw(500);
             }
             else {
                 return server_types_1.obs_stat(false)(fullpath);

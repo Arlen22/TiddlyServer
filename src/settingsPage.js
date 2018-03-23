@@ -60,8 +60,25 @@ const data = [
         enumType: "boolean",
         enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
     },
+    {
+        level: 1,
+        name: "allowLocalhost",
+        fieldType: "hashmapenum",
+        enumType: "boolean",
+        enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
+    },
     { level: 1, name: "useTW5path", fieldType: "boolean" }
 ];
+const accessOptions = (type) => {
+    return {
+        _: `Specifies which advanced and powerful features can be used by <strong>${type}</strong> users`,
+        mkdir: `Allow ${type} users to create directories and datafolders.`,
+        upload: `Allow ${type} users to upload files.`,
+        settings: `Allow ${type} users to change non-critical settings.`,
+        WARNING_all_settings_WARNING: `Allow ${type} users to change critical settings: `
+            + `<code>${data.filter(e => e.level > 0).map(e => e.name).join(', ')}</code>`
+    };
+};
 const descriptions = {
     tree: "The mount structure of the server",
     types: "Specifies which extensions get used for each icon",
@@ -80,13 +97,8 @@ const descriptions = {
     backupDirectory: "The directory to save backup files in from single file wikis. Data folders are not backed up.",
     debugLevel: "Print out messages with this debug level or higher. <a href=\"https://github.com/Arlen22/TiddlyServer#debuglevel\">See the readme for more detail.</a>",
     useTW5path: "Mount data folders as the directory index (like NodeJS: /mydatafolder/) instead of as a file (like single-file wikis: /mydatafolder). It is recommended to leave this off unless you need it.",
-    allowNetwork: {
-        mkdir: "Allow network users to create directories and datafolders.",
-        upload: "Allow network users to upload files.",
-        settings: "Allow network users to change non-critical settings.",
-        WARNING_all_settings_WARNING: "Allow network users to change critical settings: "
-            + `<code>${data.filter(e => e.level > 0).map(e => e.name).join(', ')}</code>`
-    },
+    allowNetwork: accessOptions("network"),
+    allowLocalhost: accessOptions("localhost"),
     logAccess: "If access log is enabled, set the log file to write all HTTP request logs to (may be the same as logError)",
     logError: "Log file to write all debug messages to (may be the same as logAccess)",
     logColorsToFile: "Log the console color markers to the file (helpful if read from the console later)",
@@ -100,12 +112,12 @@ const descriptions = {
 };
 const primitives = ["string", "number", "boolean"];
 function isPrimitive(a) {
-    return primitives.indexOf(a.valueType) > -1;
+    return primitives.indexOf(a.fieldType) > -1;
 }
-function testPrimitive(valueType, value) {
-    if (typeof value === valueType)
+function testPrimitive(fieldType, value) {
+    if (typeof value === fieldType)
         return { valid: true, value };
-    else if (valueType === "boolean") {
+    else if (fieldType === "boolean") {
         switch (value) {
             case 1:
             case "yes":
@@ -120,12 +132,12 @@ function testPrimitive(valueType, value) {
         }
         return { valid: typeof value === "boolean", value };
     }
-    else if (valueType === "number") {
+    else if (fieldType === "number") {
         let test;
         test = +value;
         return { valid: test === test, value: test };
     }
-    else if (valueType === "string") {
+    else if (fieldType === "string") {
         try {
             return { valid: true, value: value.toString() };
         }
@@ -139,6 +151,8 @@ function testPrimitive(valueType, value) {
 }
 function updateSettings(level, upd, current) {
     let allowdata = data.filter(e => +e.level <= level);
+    debug(-1, 'updateSettings allowdata: length %s, level %s', allowdata.length, level);
+    // console.log(upd, current);
     const valids = allowdata.map(item => {
         if (item.level > level)
             return { valid: false, changed: false };
@@ -146,6 +160,7 @@ function updateSettings(level, upd, current) {
         let changed = false;
         if (isPrimitive(item)) {
             let { valid, value } = testPrimitive(item.fieldType, upd[key]);
+            console.log(key, current[key], value);
             if (valid && (value !== current[key])) {
                 current[key] = value;
                 changed = true;
@@ -203,9 +218,12 @@ function updateSettings(level, upd, current) {
             return { valid, changed };
         }
         else {
+            //@ts-ignore because item has type never in this block
+            debug(-2, "WARNING: updateSettings fieldType %s not found for item %s", item.fieldType, item.name);
             return { valid: false, changed: false };
         }
     });
+    console.log(allowdata.map((item, i) => [item.name, valids[i].valid, valids[i].changed]).join('\n'));
     let keys = [];
     let response = allowdata.map((item, i) => {
         let { valid, changed } = valids[i];
@@ -219,8 +237,8 @@ function validateTypes(level, upd, current) {
     return { valid: true, value: [], changed: false };
 }
 function handleSettings(state) {
-    let level = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
-        : (settings.allowNetwork.settings ? 0 : -1);
+    const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+    const level = (allow.WARNING_all_settings_WARNING) ? 1 : (allow.settings ? 0 : -1);
     if (state.path[3] === "") {
         if (state.req.method === "GET") {
             if (state.url.query.action === "getdata" && state.req.method === "GET") {
@@ -279,7 +297,7 @@ function handleSettingsUpdate(state, level) {
     }).concatMap(r => {
         let [err, res] = r;
         let threw = false, curjson = server_types_1.tryParseJSON(res, (err) => {
-            state.throw(500, "Settings file could not be accessed");
+            state.log(2, "Settings file could not be accessed").log(2, err.errorPosition).throw(500);
             threw = true;
         });
         if (threw || !curjson)
@@ -304,19 +322,24 @@ function handleSettingsUpdate(state, level) {
             if (keys.length) {
                 debug(-1, "New settings written to current settings file");
                 server_types_1.normalizeSettings(curjson, settings.__filename);
-                if (!DRYRUN_SETTINGS) {
-                    let consts = ["__assetsDir", "host", "port"];
-                    keys.forEach(k => {
-                        if (consts.indexOf(k) > -1)
-                            debug(1, "%s will not be changed until the server is restarted", k);
-                        else
+                let consts = ["__assetsDir", "host", "port"];
+                keys.forEach(k => {
+                    if (consts.indexOf(k) > -1) {
+                        debug(1, "%s will not be changed until the server is restarted", k);
+                    }
+                    else {
+                        if (!DRYRUN_SETTINGS)
                             settings[k] = curjson[k];
-                    });
-                }
+                    }
+                });
                 debug(-1, "== settingsChanged event emit ==\n%s", keys.map(k => `${k}: ${JSON.stringify(curjson[k])}\n`).join(''));
-                if (DRYRUN_SETTINGS)
-                    debug(1, "DRYRUN_SETTINGS enabled");
+                if (DRYRUN_SETTINGS) {
+                    debug(2, "DRYRUN_SETTINGS enabled");
+                }
                 eventer.emit('settingsChanged', keys);
+            }
+            else {
+                debug(-1, "no keys to be written");
             }
             server_types_1.sendResponse(state.res, JSON.stringify(response), {
                 contentType: "application/json",
@@ -326,8 +349,8 @@ function handleSettingsUpdate(state, level) {
     });
 }
 function handleTreeSubpage(state) {
-    let level = (state.isLocalHost || settings.allowNetwork.WARNING_all_settings_WARNING) ? 1
-        : (settings.allowNetwork.settings ? 0 : -1);
+    const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+    const level = (allow.WARNING_all_settings_WARNING) ? 1 : (allow.settings ? 0 : -1);
     // we don't need to process anything here because the user will paste the new settings into 
     // settings.json and then restart the server. The best way to prevent unauthorized access
     // is to not build a door. If code running on the user's computer can't access the file system

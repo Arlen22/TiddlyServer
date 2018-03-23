@@ -10,7 +10,7 @@ app.run(function ($templateCache) {
         boolean: "<input type=\"checkbox\" title=\"{{item.name}}\" name=\"{{item.name}}\" ng-disabled=\"readonly\" ng-model=\"outputs[item.name]\"/> <span ng-bind-html=\"description\"></span>",
         ifenabled: "\n<div ng-controller=\"IfEnabledCtrl\">\n\t<input type=\"checkbox\" title=\"{{item.name}} name=\"isenabled_{{item.name}}\" ng-disabled=\"readonly\" ng-model=\"outputs['isenabled_' + item.name]\"/> Enable {{item.name}}\n\t<div ng-include=\"'template-' + item.valueType\" ng-disabled=\"!outputs['isenabled_' + item.name]\"></div>\n</div>\n",
         "enum": "\n\t<select name=\"{{item.name}}\" value=\"\" ng-disabled=\"readonly\" title=\"{{item.name}}\" \n\t\tng-model=\"outputs[item.name]\" \n\t\tng-options=\"k for k in item.enumOpts\">\n\t</select>  <span ng-bind-html=\"description\"></span>\n",
-        hashmapenum: "\n<div ng-repeat=\"(i, key) in item.enumKeys track by $index\" \n\tng-controller=\"HashmapEnumItemCtrl\" \n\tng-include=\"'template-' + item.fieldType\"></div>\n",
+        hashmapenum: "\n<label><span ng-bind-html=\"description._\"></span></label>\n<div ng-repeat=\"(i, key) in item.enumKeys track by $index\" ng-controller=\"HashmapEnumItemCtrl\">\n\t<div>{{key}}</div>\n\t<div ng-include=\"'template-' + item.fieldType\"></div>\n</div>\n",
         subpage: "<a href=\"{{item.name}}\">Please access this setting at the {{item.name}} subpage.</a>",
         "function": "\n<ng-include src=\"'template-function' + item.name\"></ng-include>\n\t\t",
         functiontypes: "Coming soon",
@@ -47,6 +47,10 @@ app.controller("SettingsPageItemCtrl", function ($scope, $sce) {
     $scope.description = $scope.descriptions[$scope.item.name];
     if (typeof $scope.description === "string") {
         $scope.description = $sce.trustAsHtml($scope.description);
+    }
+    else if (typeof $scope.description === "object") {
+        if ($scope.description._)
+            $scope.description._ = $sce.trustAsHtml($scope.description._);
     }
     $scope.readonly = $scope.item.level > $scope.level;
 });

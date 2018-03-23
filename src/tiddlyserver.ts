@@ -84,7 +84,7 @@ export function doTiddlyServerRoute(input: Observable<StateObject>) {
 			if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
 				send(state.req, result.filepathPortion.join('/'), { root: result.item })
 					.on('error', (err) => {
-						state.log(0, '%s %s', err.status, err.message).error().throw(500);
+						state.log(2, '%s %s', err.status, err.message).throw(500);
 					}).on('headers', (res, filepath) => {
 						const statItem = state.statPath.stat;
 						const mtime = Date.parse(state.statPath.stat.mtime as any);
@@ -114,14 +114,15 @@ function handleFileError(err: NodeJS.ErrnoException) {
 
 function serveDirectoryIndex(result: PathResolverResult) {
 	const { state } = result;
+	const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
 	// console.log(state.url);
 	if (!state.url.pathname.endsWith("/")) {
 		state.redirect(state.url.pathname + "/");
 	} else if (state.req.method === "GET") {
 		const isFolder = typeof result.item === "string";
 		const options = {
-			upload: isFolder && (settings.allowNetwork.upload || state.isLocalHost),
-			mkdir: isFolder && (settings.allowNetwork.mkdir || state.isLocalHost)
+			upload: isFolder && (allow.upload),
+			mkdir: isFolder && (allow.mkdir)
 		};
 		Observable.of(result)
 			.concatMap(getTreeItemFiles)
@@ -249,9 +250,9 @@ function handlePUTrequest(state: StateObject) {
 		return Observable.merge(finish, Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err: Error) => {
 			if (err) {
 				return state
-					.log(0, "Error writing the updated file to disk")
-					.log(0, err.stack || [err.name, err.message].join(': '))
-					.error().throw(500);
+					.log(2, "Error writing the updated file to disk")
+					.log(2, err.stack || [err.name, err.message].join(': '))
+					.throw(500);
 			} else {
 				return obs_stat(false)(fullpath) as any;
 			}

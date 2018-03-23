@@ -63,19 +63,23 @@ export function defaultSettings(set: ServerConfig) {
     if (!set.etagWindow) set.etagWindow = 0;
     if (!set.useTW5path) set.useTW5path = false;
     if (typeof set.debugLevel !== "number") set.debugLevel = -1;
-    if (!set.allowNetwork) set.allowNetwork = {} as any;
-    if (!set.allowNetwork.mkdir) set.allowNetwork.mkdir = false;
-    if (!set.allowNetwork.upload) set.allowNetwork.upload = false;
-    if (!set.allowNetwork.settings) set.allowNetwork.settings = false;
-    if (!set.allowNetwork.WARNING_all_settings_WARNING)
-        set.allowNetwork.WARNING_all_settings_WARNING = false;
+
+    ["allowNetwork", "allowLocalhost"].forEach((key: string) => {
+        if (!set[key]) set[key] = {} as any;
+        if (!set[key].mkdir) set[key].mkdir = false;
+        if (!set[key].upload) set[key].upload = false;
+        if (!set[key].settings) set[key].settings = false;
+        if (!set[key].WARNING_all_settings_WARNING)
+            set[key].WARNING_all_settings_WARNING = false;
+    });
+
     if (!set.logColorsToFile) set.logColorsToFile = false;
     if (!set.logToConsoleAlso) set.logToConsoleAlso = false;
 
 }
 export function normalizeSettings(set: ServerConfig, settingsFile) {
     const settingsDir = path.dirname(settingsFile);
-    
+
     defaultSettings(set);
 
     if (typeof set.tree === "object")
@@ -87,7 +91,7 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
             })
         })(set.tree);
     else set.tree = path.resolve(settingsDir, set.tree);
-    
+
     if (set.backupDirectory) set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
     if (set.logAccess) set.logAccess = path.resolve(settingsDir, set.logAccess);
     if (set.logError) set.logError = path.resolve(settingsDir, set.logError);
@@ -110,6 +114,7 @@ interface ServerEventsListener<THIS> {
     (event: "settingsChanged", listener: (keys: (keyof ServerConfig)[]) => void): THIS;
     (event: "settings", listener: (settings: ServerConfig) => void): THIS;
     (event: "stateError", listener: (state: StateObject) => void): THIS;
+    (event: "stateDebug", listener: (state: StateObject) => void): THIS;
 }
 type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
 export interface ServerEventEmitter extends EventEmitter {
@@ -117,6 +122,7 @@ export interface ServerEventEmitter extends EventEmitter {
     emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
     emit(event: "settings", settings: ServerConfig): boolean;
     emit(event: "stateError", state: StateObject): boolean;
+    emit(event: "stateDebug", state: StateObject): boolean;
 
     addListener: ServerEventsListener<this>;
     on: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
@@ -289,10 +295,10 @@ export function isError(obj): obj is Error {
 export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException {
     return isError(obj);
 }
-export function DebugLogger(prefix: string): typeof DebugLog {
+export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
     //if(prefix.startsWith("V:")) return function(){};
     return function (msgLevel: number, ...args: any[]) {
-        if (settings.debugLevel > msgLevel) return;
+        if (!ignoreLevel && settings.debugLevel > msgLevel) return;
         if (isError(args[0])) {
             let err = args[0];
             args = [];
@@ -373,7 +379,7 @@ export function serveFile(obs: Observable<StateObject>, file: string, root: stri
             if (err) return state.throw<StateObject>(404);
             send(state.req, file, { root })
                 .on('error', err => {
-                    state.log(2, '%s %s', err.status, err.message).error().throw(500);
+                    state.log(2, '%s %s', err.status, err.message).throw(500);
                 }).pipe(state.res);
             return Observable.empty<StateObject>();
         }) as Observable<StateObject>;
@@ -387,7 +393,7 @@ export function serveFolder(obs: Observable<StateObject>, mount: string, root: s
         } else {
             send(state.req, pathname.slice(mount.length), { root })
                 .on('error', (err) => {
-                    state.log(-1, '%s %s', err.status, err.message).error().throw(404);
+                    state.log(-1, '%s %s', err.status, err.message).throw(404);
                 })
                 .on('directory', (res, fp) => {
                     if (serveIndex) {
@@ -782,11 +788,17 @@ export class StateObject {
         let t = new Date();
         this.timestamp = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
             padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+        const interval = setInterval(() => {
+            this.log(-2, 'LONG RUNNING RESPONSE');
+            this.log(-2, '%s %s ', this.req.method, this.req.url);
+        }, 60000);
         this.res.on('finish', () => {
-            if (this.hasCriticalLogs) this.error();
-            if (this.errorThrown) this.eventer.emit('stateError', this);
+            clearInterval(interval);
+            if (this.hasCriticalLogs) 
+                this.eventer.emit('stateError', this);
+            else
+                this.eventer.emit("stateDebug", this);
         })
-
     }
     // debug(str: string, ...args: any[]) {
     //     this.debugLog('[' +
@@ -816,10 +828,11 @@ export class StateObject {
         this.doneMessage.push(format.apply(null, args));
         return this;
     }
-    error() {
-        this.errorThrown = new Error(this.doneMessage.join('\n'));
-        return this;
-    }
+    // error() {
+    //     this.errorThrown = new Error(this.doneMessage.join('\n'));
+    //     this.errorThrown.name = "StateObjectError";
+    //     return this;
+    // }
     throw<T = StateObject>(statusCode: number, reason?: string, headers?: Hashmap<string>): Observable<T> {
         if (!this.res.headersSent) {
             this.res.writeHead(statusCode, reason && reason.toString(), headers);
@@ -884,7 +897,12 @@ export function recieveBody(state: StateObject, sendError?: true | ((e: JsonErro
 export interface ThrowFunc<T> {
     throw(statusCode: number, reason?: string, str?: string, ...args: any[]): Observable<T>;
 }
-
+export interface ServerConfig_AccessOptions {
+    upload: boolean
+    mkdir: boolean
+    settings: boolean
+    WARNING_all_settings_WARNING: boolean
+}
 export interface ServerConfig {
     __dirname: string;
     __filename: string;
@@ -909,12 +927,8 @@ export interface ServerConfig {
     tsa: {
         alwaysRefreshCache: boolean;
     },
-    allowNetwork: {
-        upload: boolean
-        mkdir: boolean
-        settings: boolean
-        WARNING_all_settings_WARNING: boolean
-    }
+    allowNetwork: ServerConfig_AccessOptions,
+    allowLocalhost: ServerConfig_AccessOptions,
     logAccess: string | false,
     logError: string,
     logColorsToFile: boolean,

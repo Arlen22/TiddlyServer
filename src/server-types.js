@@ -67,16 +67,18 @@ function defaultSettings(set) {
         set.useTW5path = false;
     if (typeof set.debugLevel !== "number")
         set.debugLevel = -1;
-    if (!set.allowNetwork)
-        set.allowNetwork = {};
-    if (!set.allowNetwork.mkdir)
-        set.allowNetwork.mkdir = false;
-    if (!set.allowNetwork.upload)
-        set.allowNetwork.upload = false;
-    if (!set.allowNetwork.settings)
-        set.allowNetwork.settings = false;
-    if (!set.allowNetwork.WARNING_all_settings_WARNING)
-        set.allowNetwork.WARNING_all_settings_WARNING = false;
+    ["allowNetwork", "allowLocalhost"].forEach((key) => {
+        if (!set[key])
+            set[key] = {};
+        if (!set[key].mkdir)
+            set[key].mkdir = false;
+        if (!set[key].upload)
+            set[key].upload = false;
+        if (!set[key].settings)
+            set[key].settings = false;
+        if (!set[key].WARNING_all_settings_WARNING)
+            set[key].WARNING_all_settings_WARNING = false;
+    });
     if (!set.logColorsToFile)
         set.logColorsToFile = false;
     if (!set.logToConsoleAlso)
@@ -237,10 +239,10 @@ function isErrnoException(obj) {
     return isError(obj);
 }
 exports.isErrnoException = isErrnoException;
-function DebugLogger(prefix) {
+function DebugLogger(prefix, ignoreLevel) {
     //if(prefix.startsWith("V:")) return function(){};
     return function (msgLevel, ...args) {
-        if (settings.debugLevel > msgLevel)
+        if (!ignoreLevel && settings.debugLevel > msgLevel)
             return;
         if (isError(args[0])) {
             let err = args[0];
@@ -319,7 +321,7 @@ function serveFile(obs, file, root) {
                 return state.throw(404);
             bundled_lib_1.send(state.req, file, { root })
                 .on('error', err => {
-                state.log(2, '%s %s', err.status, err.message).error().throw(500);
+                state.log(2, '%s %s', err.status, err.message).throw(500);
             }).pipe(state.res);
             return rx_1.Observable.empty();
         });
@@ -335,7 +337,7 @@ function serveFolder(obs, mount, root, serveIndex) {
         else {
             bundled_lib_1.send(state.req, pathname.slice(mount.length), { root })
                 .on('error', (err) => {
-                state.log(-1, '%s %s', err.status, err.message).error().throw(404);
+                state.log(-1, '%s %s', err.status, err.message).throw(404);
             })
                 .on('directory', (res, fp) => {
                 if (serveIndex) {
@@ -656,11 +658,16 @@ class StateObject {
         this.path = this.url.pathname.split('/');
         let t = new Date();
         this.timestamp = util_1.format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'), padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+        const interval = setInterval(() => {
+            this.log(-2, 'LONG RUNNING RESPONSE');
+            this.log(-2, '%s %s ', this.req.method, this.req.url);
+        }, 60000);
         this.res.on('finish', () => {
+            clearInterval(interval);
             if (this.hasCriticalLogs)
-                this.error();
-            if (this.errorThrown)
                 this.eventer.emit('stateError', this);
+            else
+                this.eventer.emit("stateDebug", this);
         });
     }
     static parseURL(str) {
@@ -704,10 +711,11 @@ class StateObject {
         this.doneMessage.push(util_1.format.apply(null, args));
         return this;
     }
-    error() {
-        this.errorThrown = new Error(this.doneMessage.join('\n'));
-        return this;
-    }
+    // error() {
+    //     this.errorThrown = new Error(this.doneMessage.join('\n'));
+    //     this.errorThrown.name = "StateObjectError";
+    //     return this;
+    // }
     throw(statusCode, reason, headers) {
         if (!this.res.headersSent) {
             this.res.writeHead(statusCode, reason && reason.toString(), headers);
