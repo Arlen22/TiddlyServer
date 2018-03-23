@@ -130,7 +130,7 @@ app.controller("SettingsPageItemCtrl", function ($scope: SettingsPageItemCtrlSco
 	if (typeof $scope.description === "string") {
 		$scope.description = $sce.trustAsHtml($scope.description);
 	} else if (typeof $scope.description === "object") {
-		if($scope.description._) 
+		if ($scope.description._)
 			$scope.description._ = $sce.trustAsHtml($scope.description._);
 	}
 	$scope.readonly = $scope.item.level > $scope.level;
@@ -146,23 +146,26 @@ app.controller("SettingsPageCtrl", function ($scope: SettingsPageCtrlScope, $htt
 	let timeout: number;
 	let saveWait = 1000;
 	let oldSettings: Hashmap<string>;
+	function saveKey(set: any, key: string, val: any, allowed: boolean) {
+		let newval = JSON.stringify(val);
+		console.log(newval, oldSettings[key]);
+		if (oldSettings[key] !== newval) {
+			if (allowed) set[key] = JSON.parse(newval);
+			oldSettings[key] = newval;
+		}
+	}
 	function saveSettings() {
 		let set = {};
+
 		$scope.data.forEach(item => {
-			let key = item.name, newval;
+			let key = item.name,
+				allowed = item.level <= $scope.level;
 			if (item.fieldType === "ifenabled") {
-				newval = JSON.stringify(
-					$scope.outputs["isenabled_" + key] ? $scope.outputs[key] : false
-				);
+				saveKey(set, key, $scope.outputs["isenabled_" + key] && $scope.outputs[key], allowed);
 			} else {
-				newval = JSON.stringify($scope.outputs[key]);
+				saveKey(set, key, $scope.outputs[key], allowed);
 			}
-			console.log(newval, oldSettings[key]);
-			if (oldSettings[key] !== newval) {
-				if (item.level <= $scope.level)
-					set[key] = JSON.parse(newval);
-				oldSettings[key] = newval;
-			}
+
 		})
 		$http.put("?action=update", JSON.stringify(set));
 	}
