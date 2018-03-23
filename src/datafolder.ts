@@ -27,6 +27,13 @@ export function init(e: ServerEventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
         settings = set;
     })
+    eventer.on('settingsChanged', (keys) => {
+        if (keys.indexOf("username") > -1) {
+            debug(1, "The username will not be updated on currently loaded data folders. " +
+                "To apply the new username you will need to reload the data folders or restart the server."
+            );
+        }
+    })
     eventer.on('websocket-connection', function (client: WebSocket, request: http.IncomingMessage) {
         let reqURL = parse(request.url as string);// new URL(request.url as string);
         let datafolder = loadedFolders[reqURL.pathname as string] as FolderData;
