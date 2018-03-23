@@ -183,14 +183,14 @@ function testPrimitive(fieldType: "string" | "number" | "boolean", value: any): 
 function updateSettings(level: number, upd: ServerConfig, current: ServerConfig) {
 	let allowdata = data.filter(e => +e.level <= level);
 	debug(-1, 'updateSettings allowdata: length %s, level %s', allowdata.length, level);
-	// console.log(upd, current);
 	const valids = allowdata.map(item => {
 		if (item.level > level) return { valid: false, changed: false };
 		let key = item.name;
 		let changed = false;
-		if (isPrimitive(item)) {
-			let { valid, value } = testPrimitive(item.fieldType, upd[key]);
-			console.log(key, current[key], value);
+		if (isPrimitive(item) || item.fieldType === "ifenabled") {
+			let { valid, value } = (item.fieldType === "ifenabled" && upd[key] === false)
+				? testPrimitive("boolean", false)
+				: testPrimitive(item.fieldType === "ifenabled" ? item.valueType : item.fieldType, upd[key]);
 			if (valid && (value !== current[key])) { current[key] = value; changed = true; }
 			return { valid, changed };
 		} else if (item.fieldType === "function") {
@@ -204,8 +204,9 @@ function updateSettings(level: number, upd: ServerConfig, current: ServerConfig)
 			return { valid: false, changed: false };
 		} else if (item.fieldType === "hashmapenum") {
 			if (typeof current[key] !== "object") current[key] = {};
+			if (typeof upd[key] === "undefined") return { valid: false, changed: false };
 			return item.enumKeys.map(e => {
-				let { valid, value } = testPrimitive(item.enumType, upd[key]);
+				let { valid, value } = testPrimitive(item.enumType, upd[key][e]);
 				if (valid && (value !== current[key][e])) {
 					current[key][e] = value;
 					changed = true;
@@ -224,8 +225,10 @@ function updateSettings(level: number, upd: ServerConfig, current: ServerConfig)
 				return { valid, changed };
 			} else
 				return { valid, changed };
-		} else if (item.fieldType === "ifenabled") {
-			let { valid, value } = testPrimitive(item.valueType, upd[key]);
+		} /* else if (item.fieldType === "ifenabled") {
+			let { valid, value } = (upd[key] === false)
+				? testPrimitive("boolean", false)
+				: testPrimitive(item.valueType, upd[key]);
 			if (valid) {
 				if (current[key] !== (upd['isenabled_' + key] && value)) {
 					current[key] = (upd['isenabled_' + key] && value);
@@ -233,13 +236,13 @@ function updateSettings(level: number, upd: ServerConfig, current: ServerConfig)
 				}
 			}
 			return { valid, changed };
-		} else {
+		} */ else {
 			//@ts-ignore because item has type never in this block
 			debug(-2, "WARNING: updateSettings fieldType %s not found for item %s", item.fieldType, item.name);
 			return { valid: false, changed: false };
 		}
 	});
-	console.log(allowdata.map((item, i) => [item.name, valids[i].valid, valids[i].changed]).join('\n'));
+	// console.log(allowdata.map((item, i) => [item.name, valids[i].valid, valids[i].changed]).join('\n'));
 
 	let keys: (keyof ServerConfig)[] = [];
 	let response = allowdata.map((item, i) => {
@@ -298,7 +301,7 @@ export function handleSettings(state: StateObject) {
 	}
 
 }
-const DRYRUN_SETTINGS = true;
+const DRYRUN_SETTINGS = false;
 function handleSettingsUpdate(state: StateObject, level: number) {
 	state.recieveBody(true).concatMap(() => {
 		if (typeof state.json === "undefined") return Observable.empty<never>();
@@ -337,6 +340,7 @@ function handleSettingsUpdate(state: StateObject, level: number) {
 						debug(1, "%s will not be changed until the server is restarted", k);
 					} else {
 						if (!DRYRUN_SETTINGS) settings[k] = curjson[k];
+						debug(1, "update setting %s to %s", k, JSON.stringify(curjson[k]));
 					}
 				});
 

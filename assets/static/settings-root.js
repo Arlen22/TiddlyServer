@@ -58,21 +58,24 @@ app.controller("SettingsPageCtrl", function ($scope, $http) {
     var timeout;
     var saveWait = 1000;
     var oldSettings;
+    function saveKey(set, key, val, allowed) {
+        var newval = JSON.stringify(val);
+        console.log(newval, oldSettings[key]);
+        if (oldSettings[key] !== newval) {
+            if (allowed)
+                set[key] = JSON.parse(newval);
+            oldSettings[key] = newval;
+        }
+    }
     function saveSettings() {
         var set = {};
         $scope.data.forEach(function (item) {
-            var key = item.name, newval;
+            var key = item.name, allowed = item.level <= $scope.level;
             if (item.fieldType === "ifenabled") {
-                newval = JSON.stringify($scope.outputs["isenabled_" + key] ? $scope.outputs[key] : false);
+                saveKey(set, key, $scope.outputs["isenabled_" + key] && $scope.outputs[key], allowed);
             }
             else {
-                newval = JSON.stringify($scope.outputs[key]);
-            }
-            console.log(newval, oldSettings[key]);
-            if (oldSettings[key] !== newval) {
-                if (item.level <= $scope.level)
-                    set[key] = JSON.parse(newval);
-                oldSettings[key] = newval;
+                saveKey(set, key, $scope.outputs[key], allowed);
             }
         });
         $http.put("?action=update", JSON.stringify(set));
