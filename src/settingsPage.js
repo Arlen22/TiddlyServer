@@ -102,7 +102,7 @@ const descriptions = {
     logAccess: "If access log is enabled, set the log file to write all HTTP request logs to (may be the same as logError)",
     logError: "Log file to write all debug messages to (may be the same as logAccess)",
     logColorsToFile: "Log the console color markers to the file (helpful if read from the console later)",
-    logToConsoleAlso: "Also log all messages to console",
+    logToConsoleAlso: "Log all messages to console, even if logged to file",
     maxAge: "",
     tsa: "",
     _disableLocalHost: "",

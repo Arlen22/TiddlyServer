@@ -139,7 +139,7 @@ function serveDirectoryIndex(result: PathResolverResult) {
 		if (state.url.query.formtype === "upload") {
 			if (typeof result.item !== "string")
 				return state.throw(400, "upload is not possible for tree items");
-			if (!state.isLocalHost && !settings.allowNetwork.upload)
+			if (!allow.upload)
 				return state.throw(403, "upload is not allowed over the network")
 			form.parse(state.req, function (err, fields, files) {
 				var oldpath = files.filetoupload.path;
@@ -152,7 +152,7 @@ function serveDirectoryIndex(result: PathResolverResult) {
 		} else if (state.url.query.formtype === "mkdir") {
 			if (typeof result.item !== "string")
 				return state.throw(400, "mkdir is not possible for tree items");
-			if (!state.isLocalHost && !settings.allowNetwork.mkdir)
+			if (!allow.mkdir)
 				return state.throw(403, "mkdir is not allowed over the network")
 			form.parse(state.req, function (err, fields, files) {
 				fs.mkdir(path.join(result.fullfilepath, fields.dirname), (err) => {
