@@ -71,9 +71,11 @@ app.run(function ($templateCache) {
 	</select>  <span ng-bind-html="description"></span>
 `,
 		hashmapenum: `
-<div ng-repeat="(i, key) in item.enumKeys track by $index" 
-	ng-controller="HashmapEnumItemCtrl" 
-	ng-include="'template-' + item.fieldType"></div>
+<label><span ng-bind-html="description._"></span></label>
+<div ng-repeat="(i, key) in item.enumKeys track by $index" ng-controller="HashmapEnumItemCtrl">
+	<div>{{key}}</div>
+	<div ng-include="'template-' + item.fieldType"></div>
+</div>
 `,
 		subpage: `<a href="{{item.name}}">Please access this setting at the {{item.name}} subpage.</a>`,
 		function: `
@@ -127,6 +129,9 @@ app.controller("SettingsPageItemCtrl", function ($scope: SettingsPageItemCtrlSco
 	$scope.description = $scope.descriptions[$scope.item.name];
 	if (typeof $scope.description === "string") {
 		$scope.description = $sce.trustAsHtml($scope.description);
+	} else if (typeof $scope.description === "object") {
+		if($scope.description._) 
+			$scope.description._ = $sce.trustAsHtml($scope.description._);
 	}
 	$scope.readonly = $scope.item.level > $scope.level;
 

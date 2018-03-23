@@ -74,20 +74,21 @@ process.on('uncaughtException', () => {
 // const un = settings.username;
 // const pw = settings.password;
 // fs.createWriteStream()
-const logger = require('../lib/morgan.js').handler({
-    logFile: settings.logAccess || undefined,
-    logToConsole: !settings.logAccess || settings.logToConsoleAlso,
-    logColorsToFile: settings.logColorsToFile
-});
+const morgan = require('../lib/morgan.js');
 function setLog() {
-    return settings.logAccess === false ? ((...args) => rx_1.Observable.of(args))
+    const logger = morgan.handler({
+        logFile: settings.logAccess || undefined,
+        logToConsole: !settings.logAccess || settings.logToConsoleAlso,
+        logColorsToFile: settings.logColorsToFile
+    });
+    return settings.logAccess === false ? ((...args) => rx_1.Observable.of({}).map(() => { }))
         : rx_1.Observable.bindNodeCallback(logger);
 }
 let log = setLog();
 eventer.on('settingsChanged', (keys) => {
-    if (keys.indexOf("logAccess") > -1) {
+    let watch = ["logAccess", "logToConsoleAlso", "logColorsToFile"];
+    if (watch.some(e => keys.indexOf(e) > -1))
         log = setLog();
-    }
 });
 const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 const routes = {
@@ -136,20 +137,7 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     debug(-3, 'authorization successful');
     // securityChecks =====================
     return state;
-}).filter(server_types_1.obsTruthy).map(state => {
-    return state;
-}).routeCase(state => {
-    return state.path[1];
-}, routes, tiddlyserver_1.doTiddlyServerRoute).subscribe((state) => {
-    if (!state)
-        return; // console.log('blank item');
-    if (!state.res.finished) {
-        const interval = setInterval(function () {
-            state.log(-2, 'LONG RUNNING RESPONSE');
-            state.log(-2, '%s %s ', state.req.method, state.req.url);
-        }, 60000);
-        rx_1.Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearInterval(interval));
-    }
+}).filter(server_types_1.obsTruthy).routeCase(state => state.path[1], routes, tiddlyserver_1.doTiddlyServerRoute).subscribe((state) => {
 }, err => {
     debug(4, 'Uncaught error in the server route: ' + err.message);
     debug(4, err.stack);
@@ -162,6 +150,16 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     //there will be no more listeners so the process will probably exit.
     //In practice, the only reason this should happen is if the server close event fires.
     console.log('finished processing for some reason');
+});
+const errLog = server_types_1.DebugLogger('STATE_ERR');
+eventer.on("stateError", (state) => {
+    if (state.doneMessage.length > 0)
+        errLog(2, state.errorThrown.message);
+});
+const dbgLog = server_types_1.DebugLogger('STATE_DBG');
+eventer.on("stateDebug", (state) => {
+    if (state.doneMessage.length > 0)
+        dbgLog(-2, state.doneMessage.join('\n'));
 });
 function doAdminRoute(obs) {
     return obs.do(state => {

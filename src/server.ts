@@ -118,21 +118,21 @@ process.on('uncaughtException', () => {
 // const un = settings.username;
 // const pw = settings.password;
 // fs.createWriteStream()
-const logger = require('../lib/morgan.js').handler({
-    logFile: settings.logAccess || undefined,
-    logToConsole: !settings.logAccess || settings.logToConsoleAlso,
-    logColorsToFile: settings.logColorsToFile
-});
 
+const morgan = require('../lib/morgan.js');
 function setLog() {
-    return settings.logAccess === false ? ((...args: any[]) => Observable.of(args)) as never
+    const logger = morgan.handler({
+        logFile: settings.logAccess || undefined,
+        logToConsole: !settings.logAccess || settings.logToConsoleAlso,
+        logColorsToFile: settings.logColorsToFile
+    });
+    return settings.logAccess === false ? ((...args: any[]) => Observable.of({}).map(() => { }))
         : Observable.bindNodeCallback<http.IncomingMessage, http.ServerResponse, void>(logger);
 }
 let log = setLog();
 eventer.on('settingsChanged', (keys) => {
-    if (keys.indexOf("logAccess") > -1) {
-        log = setLog();
-    }
+    let watch: (keyof ServerConfig)[] = ["logAccess", "logToConsoleAlso", "logColorsToFile"];
+    if (watch.some(e => keys.indexOf(e) > -1)) log = setLog();
 })
 
 const serverClose = Observable.merge(
@@ -190,19 +190,10 @@ Observable.merge(
     // securityChecks =====================
 
     return state;
-}).filter(obsTruthy).map(state => {
-    return state;
-}).routeCase<StateObject>(state => {
-    return state.path[1];
-}, routes, doTiddlyServerRoute).subscribe((state: StateObject) => {
-    if (!state) return;// console.log('blank item');
-    if (!state.res.finished) {
-        const interval = setInterval(function () {
-            state.log(-2, 'LONG RUNNING RESPONSE');
-            state.log(-2, '%s %s ', state.req.method, state.req.url);
-        }, 60000);
-        Observable.fromEvent(state.res, 'finish').take(1).subscribe(() => clearInterval(interval));
-    }
+}).filter(obsTruthy).routeCase<StateObject>(
+    state => state.path[1], routes, doTiddlyServerRoute
+).subscribe((state: StateObject) => {
+
 }, err => {
     debug(4, 'Uncaught error in the server route: ' + err.message);
     debug(4, err.stack);
@@ -216,7 +207,16 @@ Observable.merge(
     //In practice, the only reason this should happen is if the server close event fires.
     console.log('finished processing for some reason');
 })
-
+const errLog = DebugLogger('STATE_ERR');
+eventer.on("stateError", (state) => {
+    if (state.doneMessage.length > 0)
+        errLog(2, state.errorThrown.message);
+})
+const dbgLog = DebugLogger('STATE_DBG');
+eventer.on("stateDebug", (state) => {
+    if (state.doneMessage.length > 0)
+        dbgLog(-2, state.doneMessage.join('\n'));
+})
 
 function doAdminRoute(obs: Observable<StateObject>): any {
     return obs.do(state => {
