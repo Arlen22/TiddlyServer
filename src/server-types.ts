@@ -76,6 +76,11 @@ export function defaultSettings(set: ServerConfig) {
     if (!set.logColorsToFile) set.logColorsToFile = false;
     if (!set.logToConsoleAlso) set.logToConsoleAlso = false;
 
+    if (!set.maxAge) set.maxAge = {} as any;
+    if (typeof set.maxAge.tw_plugins !== "number")
+        set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
+
+
 }
 export function normalizeSettings(set: ServerConfig, settingsFile) {
     const settingsDir = path.dirname(settingsFile);
@@ -794,7 +799,7 @@ export class StateObject {
         }, 60000);
         this.res.on('finish', () => {
             clearInterval(interval);
-            if (this.hasCriticalLogs) 
+            if (this.hasCriticalLogs)
                 this.eventer.emit('stateError', this);
             else
                 this.eventer.emit("stateDebug", this);
@@ -922,17 +927,16 @@ export interface ServerConfig {
     etagWindow: number,
     useTW5path: boolean,
     debugLevel: number,
-    /** cache max age in milliseconds for different types of data */
-    maxAge: { tw_plugins: number }
-    tsa: {
-        alwaysRefreshCache: boolean;
-    },
     allowNetwork: ServerConfig_AccessOptions,
     allowLocalhost: ServerConfig_AccessOptions,
     logAccess: string | false,
     logError: string,
     logColorsToFile: boolean,
     logToConsoleAlso: boolean;
+    /** cache max age in milliseconds for different types of data */
+    maxAge: { tw_plugins: number }
+    tsa: { alwaysRefreshCache: boolean; },
+
 }
 
 export interface AccessPathResult<T> {

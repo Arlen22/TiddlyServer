@@ -86,7 +86,7 @@ In the example above, `/alias2/alias2child/` would end up serving the folder nam
 
 There is no default value for tree. The program will throw an exception if it is not specified. 
 
-There are a few aliases which cannot be used directly under tree as they are reserved for other things on the server. Currently they are `favicon.ico`, `directory.css`, `icons`, and `admin`. If tree contains any of these they will simply be ignored. This only applies to the top level tree, not to sub trees.
+There are a few aliases which cannot be used directly under tree as they are reserved for other things on the server. Currently they are `favicon.ico`, `directory.css`, `assets`, `icons`, and `admin`. If tree contains any of these they will simply be ignored. This only applies to the top level tree, not to sub trees.
 
 ### types
 
@@ -152,18 +152,17 @@ Write debug messages at or above this value to the console. The max recommended 
  * -3 - Request and response data for all messages (verbose)
  * -4 - Protocol details and full data dump (such as encryption steps and keys)
 
-### allowNetwork
+### allowNetwork and allowLocalhost
 
-A set of options specifying whether different actions and pages are allowed for requests coming from the network (`true`) or only for requests coming from the loopback interface (`false`).
+A set of options specifying whether different actions and pages are allowed for requests coming from the network (`allowNetwork`) and the loopback interface (`allowLocalhost`)
 
 * `mkdir` - Allow network users to create a directory or data folder in the current directory.
 * `upload` - Allow network users to upload files to the current directory.
-
-Coming soon:
-
 * `settings` - Allow network users to modify some of the settings.
 * `WARNING_all_settings_WARNING` - Allow network users to modify all settings.
-* - `host`, `port`, `username`, `password`, `allowNetwork`, `useTW5path` 
+* - `host`, `port`, `username`, `password`, `allowNetwork`, `allowLocalhost`, `useTW5path`
+
+Whether `tree` will be allowed at all has not been decided yet. There are several serious security problems that need to be considered before allowing the tree variable to be updated via a web request.
 
 ## Detailed Installation Instructions
 

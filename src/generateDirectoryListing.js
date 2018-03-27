@@ -17,7 +17,7 @@ exports.generateDirectoryListing = function (directory, options) {
 <tr class="row ${(index + 1) % 2 ? 'odd' : 'even'} ${entry.type}">
     <td>
         <span class="icon">
-            <img style="width:16px;" src="/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
+            <img style="width:16px;" src="/assets/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
         </span>
         <span class="name">
             <a href="${encodeURI(entry.path)}">${entry.name}</a>

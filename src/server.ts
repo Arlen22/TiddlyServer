@@ -71,7 +71,9 @@ settings = tryParseJSON<ServerConfig>(settingsString, (e) => {
 
 
 if (!settings.tree) throw "tree is not specified in the settings file";
+
 normalizeSettings(settings, settingsFile);
+
 if (["string", "undefined"].indexOf(typeof settings.username) === -1)
     throw "username must be a JSON string if specified";
 if (["string", "undefined"].indexOf(typeof settings.password) === -1)
@@ -104,6 +106,7 @@ const stylesheet = path.resolve(__dirname, '../assets/directory.css');
 settings.__assetsDir = assets;
 
 eventer.emit('settings', settings);
+
 
 const serverLocalHost = http.createServer();
 const serverNetwork = http.createServer();
@@ -141,13 +144,18 @@ const serverClose = Observable.merge(
 ).multicast(new Subject()).refCount();
 
 const routes = {
+    'admin': doAdminRoute,
+    'assets': doAssetsRoute,
     'favicon.ico': obs => serveFile(obs, 'favicon.ico', assets),
     'directory.css': obs => serveFile(obs, 'directory.css', assets),
-    'static': obs => serveFolder(obs, '/static', path.join(assets, "static")),
-    'icons': obs => serveFolder(obs, '/icons', path.join(assets, "icons")),
-    'tiddlywiki': doTiddlyWikiRoute,
-    'admin': doAdminRoute
 };
+
+if (typeof settings.tree === "object") {
+    let keys = Object.keys(settings.tree);
+    let routeKeys = Object.keys(routes);
+    let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
+    if (conflict.length) console.log("The paths %s are reserved for use by TiddlyServer", conflict.join(', '));
+}
 
 Observable.merge(
     (Observable.fromEvent(serverLocalHost, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
@@ -210,13 +218,21 @@ Observable.merge(
 const errLog = DebugLogger('STATE_ERR');
 eventer.on("stateError", (state) => {
     if (state.doneMessage.length > 0)
-        errLog(2, state.errorThrown.message);
+        dbgLog(2, state.doneMessage.join('\n'));
 })
 const dbgLog = DebugLogger('STATE_DBG');
 eventer.on("stateDebug", (state) => {
     if (state.doneMessage.length > 0)
         dbgLog(-2, state.doneMessage.join('\n'));
 })
+
+function doAssetsRoute(obs: Observable<StateObject>): any {
+    return obs.routeCase(state => state.path[2], {
+        'static': obs => serveFolder(obs, '/assets/static', path.join(assets, "static")),
+        'icons': obs => serveFolder(obs, '/assets/icons', path.join(assets, "icons")),
+        'tiddlywiki': doTiddlyWikiRoute
+    }, StateObject.errorRoute(404));
+}
 
 function doAdminRoute(obs: Observable<StateObject>): any {
     return obs.do(state => {

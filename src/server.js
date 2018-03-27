@@ -92,13 +92,18 @@ eventer.on('settingsChanged', (keys) => {
 });
 const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 const routes = {
+    'admin': doAdminRoute,
+    'assets': doAssetsRoute,
     'favicon.ico': obs => server_types_1.serveFile(obs, 'favicon.ico', assets),
     'directory.css': obs => server_types_1.serveFile(obs, 'directory.css', assets),
-    'static': obs => server_types_1.serveFolder(obs, '/static', path.join(assets, "static")),
-    'icons': obs => server_types_1.serveFolder(obs, '/icons', path.join(assets, "icons")),
-    'tiddlywiki': tiddlyserver_1.doTiddlyWikiRoute,
-    'admin': doAdminRoute
 };
+if (typeof settings.tree === "object") {
+    let keys = Object.keys(settings.tree);
+    let routeKeys = Object.keys(routes);
+    let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
+    if (conflict.length)
+        console.log("The paths %s are reserved for use by TiddlyServer", conflict.join(', '));
+}
 rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
     if (!req || !res)
         console.log('blank req or res');
@@ -154,13 +159,20 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
 const errLog = server_types_1.DebugLogger('STATE_ERR');
 eventer.on("stateError", (state) => {
     if (state.doneMessage.length > 0)
-        errLog(2, state.errorThrown.message);
+        dbgLog(2, state.doneMessage.join('\n'));
 });
 const dbgLog = server_types_1.DebugLogger('STATE_DBG');
 eventer.on("stateDebug", (state) => {
     if (state.doneMessage.length > 0)
         dbgLog(-2, state.doneMessage.join('\n'));
 });
+function doAssetsRoute(obs) {
+    return obs.routeCase(state => state.path[2], {
+        'static': obs => server_types_1.serveFolder(obs, '/assets/static', path.join(assets, "static")),
+        'icons': obs => server_types_1.serveFolder(obs, '/assets/icons', path.join(assets, "icons")),
+        'tiddlywiki': tiddlyserver_1.doTiddlyWikiRoute
+    }, server_types_1.StateObject.errorRoute(404));
+}
 function doAdminRoute(obs) {
     return obs.do(state => {
         if (state.path[2] === "settings")
