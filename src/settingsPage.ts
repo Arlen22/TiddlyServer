@@ -271,13 +271,20 @@ export function handleSettings(state: StateObject) {
 						defaultSettings(curjson);
 						let set = {};
 						data.forEach(item => {
-							// if(item.level > level) return;
+							//don't send sensitive settings unless they are allowed
+							if (item.level > level) return;
 							set[item.name] = curjson[item.name];
 						})
-						sendResponse(state.res, JSON.stringify({ level, data, descriptions, settings: set, currentPath: settings.__filename }), {
-							contentType: "application/json",
-							doGzip: canAcceptGzip(state.req)
-						})
+						sendResponse(state.res, JSON.stringify({
+							level, 
+							data, 
+							descriptions,
+							settings: set,
+							currentPath: settings.__filename
+						}), {
+								contentType: "application/json",
+								doGzip: canAcceptGzip(state.req)
+							})
 					}
 				});
 			} else {
