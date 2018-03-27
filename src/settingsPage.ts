@@ -69,7 +69,7 @@ type SettingsPageItemTypes = ValueType_function | ValueType_enum | ValueType_has
 	| ValueType_primitive | ValueType_subpage | ValueType_ifenabled;
 
 const data: (SettingsPageItemTypes)[] = [
-	{ level: 1, name: "tree", fieldType: "subpage", handler: handleTreeSubpage },
+	// { level: 1, name: "tree", fieldType: "subpage", handler: handleTreeSubpage },
 	{ level: 0, name: "types", fieldType: "function", validate: validateTypes },
 	{ level: 1, name: "host", fieldType: "string" },
 	{ level: 1, name: "port", fieldType: "number" },

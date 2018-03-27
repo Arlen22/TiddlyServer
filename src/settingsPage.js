@@ -32,7 +32,7 @@ function initSettings(e) {
 }
 exports.initSettings = initSettings;
 const data = [
-    { level: 1, name: "tree", fieldType: "subpage", handler: handleTreeSubpage },
+    // { level: 1, name: "tree", fieldType: "subpage", handler: handleTreeSubpage },
     { level: 0, name: "types", fieldType: "function", validate: validateTypes },
     { level: 1, name: "host", fieldType: "string" },
     { level: 1, name: "port", fieldType: "number" },
