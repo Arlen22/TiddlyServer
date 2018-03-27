@@ -5,6 +5,8 @@ const rx_1 = require("../lib/rx");
 const path = require("path");
 const fs = require("fs");
 const url_1 = require("url");
+const boot_startup_1 = require("./boot-startup");
+const bundled_lib_1 = require("../lib/bundled-lib");
 var settings = {};
 const debug = server_types_1.DebugLogger('DAT');
 const loadedFolders = {};
@@ -236,8 +238,6 @@ function DataFolder(mount, folder, callback) {
     }
 }
 let counter = 0;
-const boot_startup_1 = require("./boot-startup");
-const bundled_lib_1 = require("../lib/bundled-lib");
 let pluginCache;
 let coreCache;
 let bootCache;
@@ -289,20 +289,23 @@ function initPluginLoader() {
 initPluginLoader();
 // mounted at /tiddlywiki
 const serveBootFolder = new rx_1.Subject();
-server_types_1.serveFolder(serveBootFolder.asObservable(), '/tiddlywiki/boot', path.join(__dirname, "../tiddlywiki/boot"), server_types_1.serveFolderIndex({ type: 'json' }));
+server_types_1.serveFolder(serveBootFolder.asObservable(), '/assets/tiddlywiki/boot', path.join(__dirname, "../tiddlywiki/boot"), server_types_1.serveFolderIndex({ type: 'json' }));
 function doTiddlyWikiRoute(input) {
+    //number of elements on state.path that are part of the mount path.
+    //the zero-based index of the first subpath is the same as the number of elements
+    let mountLength = 3;
     return input.do(state => {
-        if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[2]) === -1) {
+        if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
             state.throw(404);
         }
-        else if (state.path[2] === "core") {
+        else if (state.path[mountLength] === "core") {
             sendPluginResponse(state, coreCache);
         }
-        else if (state.path[2] === "boot") {
+        else if (state.path[mountLength] === "boot") {
             serveBootFolder.next(state);
         }
         else {
-            sendPluginResponse(state, pluginLoader(state.path[2], decodeURIComponent(state.path[3])));
+            sendPluginResponse(state, pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1])));
         }
     }).ignoreElements();
 }
@@ -317,6 +320,27 @@ function sendPluginResponse(state, pluginCache) {
     let text = pluginCache.plugin.text;
     delete pluginCache.plugin.text;
     let meta = JSON.stringify(pluginCache.plugin);
+    // Just an experiment
+    // let tiddlersArray = (() => {
+    //     let gkeys: string[] = [];
+    //     let { tiddlers } = JSON.parse(text1);
+    //     let keys = Object.keys(tiddlers);
+    //     let tiddlersArray = keys.map(k => {
+    //         let tkeys = Object.keys(tiddlers[k]);
+    //         let vals = {};
+    //         tkeys.forEach(tk => {
+    //             let index = gkeys.indexOf(tk);
+    //             if (index === -1) {
+    //                 vals[gkeys.length] = tiddlers[k][tk];
+    //                 gkeys.push(tk);
+    //             } else {
+    //                 vals[index] = tiddlers[k][tk];
+    //             }
+    //         });
+    //         return vals;
+    //     });
+    //     return { keys: gkeys, vals: tiddlersArray };
+    // })();
     const body = meta + '\n\n' + text;
     var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1000; //1 year
     var maxAge = Math.min(Math.max(0, settings.maxAge.tw_plugins), MAX_MAXAGE);
@@ -326,10 +350,10 @@ function sendPluginResponse(state, pluginCache) {
     var modified = new Date(pluginCache.cacheTime).toUTCString();
     debug(-3, 'modified %s', modified);
     res.setHeader('Last-Modified', modified);
-    var etag = etag(body);
-    debug(-3, 'etag %s', etag);
-    res.setHeader('ETag', etag);
-    if (bundled_lib_1.fresh(req.headers, { 'etag': etag, 'last-modified': modified })) {
+    var etagStr = bundled_lib_1.etag(body);
+    debug(-3, 'etag %s', etagStr);
+    res.setHeader('ETag', etagStr);
+    if (bundled_lib_1.fresh(req.headers, { 'etag': etagStr, 'last-modified': modified })) {
         res.writeHead(304);
         res.end();
     }

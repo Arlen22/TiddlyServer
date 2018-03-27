@@ -83,6 +83,10 @@ function defaultSettings(set) {
         set.logColorsToFile = false;
     if (!set.logToConsoleAlso)
         set.logToConsoleAlso = false;
+    if (!set.maxAge)
+        set.maxAge = {};
+    if (typeof set.maxAge.tw_plugins !== "number")
+        set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
 }
 exports.defaultSettings = defaultSettings;
 function normalizeSettings(set, settingsFile) {
