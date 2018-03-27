@@ -78,7 +78,7 @@ Some users find the exact requirements of JSON to be somewhat difficult. If you 
 
 All relative folder paths in settings.json are resolved relative to the `settings.json` file itself.
 
-### tree
+### `tree`
 
 An object (hashmap) with the key being the "folder" name (`http://localhost/alias/`) and the value being either a folder path string, or a hashmap containing "folder" names under that folder. 
 
@@ -88,19 +88,19 @@ There is no default value for tree. The program will throw an exception if it is
 
 There are a few aliases which cannot be used directly under tree as they are reserved for other things on the server. Currently they are `favicon.ico`, `directory.css`, `assets`, `icons`, and `admin`. If tree contains any of these they will simply be ignored. This only applies to the top level tree, not to sub trees.
 
-### types
+### `types`
 
 A hashmap with the key being the name of a png file in `assets/icons/files` (without the extension), and the value being an array of extensions listed under that type. This is only used in the directory listing currently.
 
-### username
+### `username`
 
 A string specifying the username for Basic Auth and for signing tiddlers when editing data folders. Single file wikis do not get the username set, but will still require Basic Auth. Defaults to an empty string.
 
-### password
+### `password`
 
 The password for Basic Auth. Defaults to an empty string.
 
-### host
+### `host`
 
 The host IP address to listen on. 
 
@@ -112,11 +112,11 @@ If `0.0.0.0` is specified, then the server will listen on all IP addresses.
 
 Under the hood, this just uses the default Node HTTP server, so you may refer to that documentation if you want more technical information.
 
-### port
+### `port`
 
 The port to listen on. The default is `8080`.
 
-### backupDirectory
+### `backupDirectory`
 
 On every save for all single-file TiddlyWikis, TiddlyServer will gzip the old version and write it to this folder before saving the new version.
 
@@ -124,11 +124,11 @@ If the backupDirectory is specified, it must exist, otherwise saving will fail f
 
 If not specified, backup is disabled.
 
-### etag
+### `etag`
 
 Either `required` or `disabled`. If not specified then only checks etag if the client provides one.
 
-### etagWindow
+### `etagWindow`
 
 If the etag gets checked and does not match, allow it to save if the file on disk was not modified more than this many seconds later than the modified time in the etag. 
 
@@ -152,7 +152,7 @@ Write debug messages at or above this value to the console. The max recommended 
  * -3 - Request and response data for all messages (verbose)
  * -4 - Protocol details and full data dump (such as encryption steps and keys)
 
-### allowNetwork and allowLocalhost
+### `allowNetwork` and `allowLocalhost`
 
 A set of options specifying whether different actions and pages are allowed for requests coming from the network (`allowNetwork`) and the loopback interface (`allowLocalhost`)
 
@@ -160,9 +160,21 @@ A set of options specifying whether different actions and pages are allowed for 
 * `upload` - Allow network users to upload files to the current directory.
 * `settings` - Allow network users to modify some of the settings.
 * `WARNING_all_settings_WARNING` - Allow network users to modify all settings.
-* - `host`, `port`, `username`, `password`, `allowNetwork`, `allowLocalhost`, `useTW5path`
+  * `host`, `port`, `username`, `password`, `allowNetwork`, `allowLocalhost`, `useTW5path`
 
-Whether `tree` will be allowed at all has not been decided yet. There are several serious security problems that need to be considered before allowing the tree variable to be updated via a web request.
+Whether `tree` will be allowed at all has not been decided yet. There are several serious security problems that need to be considered before allowing the tree variable to be updated via a web request. The main problem is that code running in a sandboxed environment such as a web browser can potentially make calls to localhost and modify the tree to expose sensitive operating system files. One possibility I have considered is to simply provide the new JSON text to the user to copy and paste into `settings.json` themself.
+
+### `logAccess` and `logError`
+
+Specifies the log files to log request info (`logAccess`) and debug info (`logError`) to. If a path is not specified, the info will instead be logged to console using `console.log(...)`.
+
+### `logColorsToFile`
+
+Log the color codes to file. Useful if you read the logs by writing them back to the console. 
+
+### `logToConsoleAlso`.
+
+Log to console regardless of whether we are logging to a file. 
 
 ## Detailed Installation Instructions
 
@@ -178,7 +190,7 @@ The instructions below are intended to be detailed and thorough, so read on if y
 
 TiddlyServer contains all its dependancies directly in the repository and therefore does not use NPM. The NodeJS executable still needs to be installed (which will also install NPM), or can be copied into the folder for a portable install.
 
-The editions folder from TiddlyWiki is not included because of the number of files it contains. Since it only contains data folders, it is not needed for TiddlyServer to operate. It is included in each release as a separate zip file and is always from the same version of TiddlyWiki as is used in that release.
+The editions folder from TiddlyWiki is not included because of the number of files it contains. Since it only contains data folders, it is not needed for TiddlyServer to operate. It is included in each release (or in an earlier release) as a separate zip file and is always from the same version of TiddlyWiki as is used in that release.
 
 For convenience, the "server" edition is also included as a separate download because this is used as a data folder template.
 
