@@ -274,7 +274,7 @@ export function handleSettings(state: StateObject) {
 							//don't send sensitive settings unless they are allowed
 							if (item.level > level) return;
 							set[item.name] = curjson[item.name];
-						})
+						});
 						sendResponse(state.res, JSON.stringify({
 							level, 
 							data, 

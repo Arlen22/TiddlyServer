@@ -6,5 +6,11 @@
 	"password": "",
 	"host": "127.0.0.1",
 	"port": 8080,
-	"backupDirectory": "backup"
+	"backupDirectory": "backup",
+	"etagWindow": 5,
+	"allowLocalhost": {
+		"settings": true,
+		"mkdir": true,
+		"upload": true
+	}
 }
