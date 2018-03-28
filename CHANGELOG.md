@@ -4,6 +4,7 @@
 * Added several options related to logging, and now allows logs to be saved to file using NodeJS `appendFile`.
 * * Added options: `logAccess`, `logError`, `logColorsToFile`, `logToConsoleAlso`.
 * Added `debugLevel` to set the debug level of the messages to be logged to console or the error log.
+* Add filename field to specify the filename of the file being uploaded.
 
 ### 2.0.12 
 
