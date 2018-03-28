@@ -1,38 +1,45 @@
-If you want to help cover the cost of making this all happen, use https://www.paypal.me/Arlen22. Your help is appreciated and will increase the likelihood of future improvements.
+If you want to help cover the cost of making this all happen, use https://www.paypal.me/Arlen22. Your help is appreciated and directly affects my work on TiddlyServer.
 
 ## TiddlyServer 2.0 "Lite"
 
 TiddlyServer 2.0 takes the server command of TiddlyWiki on NodeJS and adds it to a static file server. This means you can load and serve any TiddlyWiki data folder in the same way you can serve a single file TiddlyWiki. 
 
-But you don't need to serve files and folders from just one place, you can serve them from multiple places anywhere on your harddrive (literally anywhere NodeJS can stat, readdir, and readFile). You can even organize them into virtual folders (aka aliases in Apache and mounts in Express). 
+But you don't need to serve files and folders from just one place, you can serve them from multiple places anywhere on your harddrive (literally anywhere NodeJS can stat, readdir, and readFile). You can even organize them into virtual folders (aka "aliases" in Apache and "mounts" in Express). 
 
 The main point, of course, is that you can actually edit your files, not just look at them. Single file TiddlyWikis use the put saver, which needs to be patched using a bookmarklet included on the index page. The instructions for this are below under the heading "One thing that needs to be noted".
 
-And, of course, you can edit data folder tiddlywikis just like you were running `node tiddlywiki.js data --server`, except that you run it on the path that you found it at (e.g. http://localhost/personal/notes/). You can have as many data folders open as you want, they don't conflict (though they will each take memory).
+And, of course, you can edit data folder tiddlywikis just like you were running `node tiddlywiki.js data --server`, except that you run it on the path that you found it at (e.g. http://localhost/personal/notes). You can have as many data folders open as you want, they don't conflict (though they will each take memory).
 
 Data folders store individual tiddlers instead of entire wikis. They take less disk space as they also do not store the core and plugins. This means they also save much quicker, especially over the internet. They also save immediately (within 10 seconds or so) and they save drafts.
 
 ### Benefits
-  - Allows relative linking to external files.
-    - All files found in the folder structure can be served. Relative and path urls work fine. You can even link to the folder, if you like.
-  - Easy access to data folders and files from any computer on the network and any browser. Saving on localhost is as fast as TiddlyFox (no benchmarks, but localhost never goes across the network, making it instant).
+
+* Seemlessly convert between data folders and single-file wikis.
+* Allows relative linking to external files. The same link works in both data folders and single files. 
+* Allows you to access your wikis from any computer on the network. 
+* Files save and load instantly on the same computer, and quickly across the network.
+* Mount any location on your computer (in theory, anything NodeJS can stat).
 
 ### Features
  - Uses a folder structure specified in settings.json allowing you serve any folders on the filesystem in whatever tree structure you like.
- - Serves any files found in the folder structure.
+ - Serves all files found in the folder structure.
  - Saves individual files using the put saver.
  - Allows you to upload a file to any directory (but not categories), or create new directories and data folders. 
    - Want to make a custom data folder? First create it as a directory, then upload your custom `tiddlywiki.info` file to it.
  - Loads data folders using TiddlyWiki then forwards all requests to the server command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder`)
  - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
 
-## One thing that needs to be noted
+## One thing that needs to be noted for single file wikis before 5.1.15
+
+This does not apply to data folders. 
 
 TiddlyWiki Five files currently use the put saver. The put saver URI encodes the document location, which is usually already encoded by the browser, resulting in a 404 error when saving, if the URL contains any characters that get converted to percent codes (such as %20). 
 
-You will need to use the bookmarklet included in the directory pages to fix the saving. The bookmarklet needs to be clicked each time the affected wiki is opened, after which saving should work normally until the page is reloaded. This does not apply to data folders.
+You will need to use the bookmarklet included in the directory pages to fix the saving. The bookmarklet needs to be clicked each time the affected wiki is opened, after which saving should work normally until the page is reloaded. If there are unsaved changes, another change needs to be made to trigger a save.
 
-This is a bug in TiddlyWiki, and is fixed in TW5.1.15.
+The updated tiddler is also included as another link and may be dragged into the wiki to import the tiddler normally. After import the wiki will still need to be saved, either by downloading or by using the bookmarklet.
+
+This is a bug in TiddlyWiki, and is fixed in version 5.1.15. 
 
 ## [Change log](CHANGELOG.md)
 
@@ -45,34 +52,51 @@ Just follow the installation instructions, and copy the `settings.json` file fro
 * Download and install NodeJS from https://nodejs.org
   * **ProTip:** TiddlyServer only requires `node.exe`, allowing a portable install.
 * Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the TiddlyServer folder contained in the zip file to wherever you want it. 
-* Copy `example-settings.json` and rename it `settings.json`, then edit it as desired. This process will be simplified in the future.
-* Open command prompt, `cd` to the TiddlyServer folder and run `/path/to/node server.js`.
-
+* Copy `example-settings-simple.json` and rename it `settings.json`.
+  * This configuration serves a folder named `data` located in the same folder as `settings.json`. This folder does not exist and must be created.
+* Open command prompt and run `/path/to/node /path/to/server.js`.
 
 ## settings.json
 
 Some users find the exact requirements of JSON to be somewhat difficult. If you get the error `The settings file could not be parsed correctly`, it means the settings file contains invalid JSON and could not be parsed. **It does not mean the settings are incorrect, rather that it cannot read them.** You can use a service like https://jsonlint.com/ to show you where the problem is in your JSON file -- just paste in your settings file and click Validate.
 
-```json
-// all comments need to be removed for settings.json to parse correctly
-{
-    "tree": { 
-        "alias": "C:/my folder path",
-        "alias2": {
-            "alias2child": "folder relative to settings file"
-        }
-    },
-    "types":{  
-        "htmlfile": ["htm", "html"] 
-    }, 
-    "username": "",  
-    "password": "",  
-    "host": "127.0.0.1",  
-    "port": 8080,                
-    "backupDirectory": "",
-    "etag": "",
-    "etagWindow": 0,
-    "allowNetwork": { mkdir: false, upload: false }
+The settings.json follows this TypeScript interface definition, except for the properties marked "internal use".
+
+```ts
+export interface ServerConfig {
+  __dirname: string;          //internal use
+  __filename: string;         //internal use
+  __assetsDir: string;        //internal use
+  _disableLocalHost: boolean; //internal use
+  tree: any, //string or "deep hashmap" of string
+  types: {
+      htmlfile: string[];
+      [K: string]: string[]
+  }
+  username?: string,
+  password?: string,
+  host: string,
+  port: number | 8080,
+  backupDirectory?: string,
+  etag: "required" | "disabled" | "", //otherwise if present
+  etagWindow: number,
+  useTW5path: boolean,
+  debugLevel: number,
+  allowNetwork: ServerConfig_AccessOptions,
+  allowLocalhost: ServerConfig_AccessOptions,
+  logAccess: string | false,
+  logError: string,
+  logColorsToFile: boolean,
+  logToConsoleAlso: boolean;
+  /** cache max age in milliseconds for different types of data */
+  maxAge: { tw_plugins: number }           // Coming soon
+  tsa: { alwaysRefreshCache: boolean; },   // Coming soon
+}
+export interface ServerConfig_AccessOptions {
+  upload: boolean
+  mkdir: boolean
+  settings: boolean
+  WARNING_all_settings_WARNING: boolean
 }
 ```
 
