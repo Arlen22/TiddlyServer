@@ -142,8 +142,13 @@ function serveDirectoryIndex(result: PathResolverResult) {
 			if (!allow.upload)
 				return state.throw(403, "upload is not allowed over the network")
 			form.parse(state.req, function (err, fields, files) {
+				// console.log(fields, files);
 				var oldpath = files.filetoupload.path;
-				var newpath = path.join(result.fullfilepath, files.filetoupload.name);
+				//get the filename to use
+				let newname = fields.filename || files.filetoupload.name;
+				//sanitize this to make sure we just 
+				newname = path.basename(newname);
+				var newpath = path.join(result.fullfilepath, newname);
 				fs.rename(oldpath, newpath, function (err) {
 					if (err) handleFileError(err)
 					state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
