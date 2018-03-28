@@ -1,6 +1,6 @@
 {
 	"tree": {
-		"data": "../data"
+		"data": "./data"
 	},
 	"username": "",
 	"password": "",
