@@ -56,6 +56,14 @@ Just follow the installation instructions, and copy the `settings.json` file fro
   * This configuration serves a folder named `data` located in the same folder as `settings.json`. This folder does not exist and must be created.
 * Open command prompt and run `/path/to/node /path/to/server.js`.
 
+## FAQ
+
+If these do not answer your question, feel free to open an issue or ask on the TiddlyWiki Google Group.
+
+### TiddlyServer throws a Syntax Error on start up
+
+Make sure you are running at least Node version 6. This is the minimum supported.
+
 ## settings.json
 
 Some users find the exact requirements of JSON to be somewhat difficult. If you get the error `The settings file could not be parsed correctly`, it means the settings file contains invalid JSON and could not be parsed. **It does not mean the settings are incorrect, rather that it cannot read them.** You can use a service like https://jsonlint.com/ to show you where the problem is in your JSON file -- just paste in your settings file and click Validate.
