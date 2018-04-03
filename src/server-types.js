@@ -692,9 +692,15 @@ class StateObject {
     static errorRoute(status, reason) {
         return (obs) => {
             return obs.mergeMap((state) => {
-                return state.throw(status, reason);
+                if (reason)
+                    return state.throwReason(status, reason);
+                else
+                    return state.throw(status);
             });
         };
+    }
+    get allow() {
+        return this.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
     }
     /**
      *  4 - Errors that require the process to exit for restart
@@ -720,12 +726,35 @@ class StateObject {
     //     this.errorThrown.name = "StateObjectError";
     //     return this;
     // }
-    throw(statusCode, reason, headers) {
+    /**
+     * if the client is allowed to recieve error info, sends `message`, otherwise sends `reason`.
+     * `reason` is always sent as the status header.
+     */
+    throwError(statusCode, error, headers) {
+        if (!this.res.headersSent) {
+            this.res.writeHead(statusCode, error.reason, headers);
+            //don't write 204 reason
+            if (statusCode !== 204)
+                this.res.write(this.allow.writeErrors ? error.message : error.reason);
+        }
+        this.res.end();
+        return rx_1.Observable.empty();
+    }
+    throwReason(statusCode, reason, headers) {
         if (!this.res.headersSent) {
             this.res.writeHead(statusCode, reason && reason.toString(), headers);
             //don't write 204 reason
             if (statusCode !== 204 && reason)
                 this.res.write(reason.toString());
+        }
+        this.res.end();
+        return rx_1.Observable.empty();
+    }
+    throw(statusCode, headers) {
+        if (!this.res.headersSent) {
+            this.res.writeHead(statusCode, headers);
+            //don't write 204 reason
+            // if (statusCode !== 204 && reason) this.res.write(reason.toString());
         }
         this.res.end();
         return rx_1.Observable.empty();
@@ -755,6 +784,13 @@ class StateObject {
     }
 }
 exports.StateObject = StateObject;
+class ER extends Error {
+    constructor(reason, message) {
+        super(message);
+        this.reason = reason;
+    }
+}
+exports.ER = ER;
 /** to be used with concatMap, mergeMap, etc. */
 function recieveBody(state, sendError) {
     //get the data from the request

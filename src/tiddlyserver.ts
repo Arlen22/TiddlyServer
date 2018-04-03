@@ -3,7 +3,7 @@ import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
-	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData, ServerEventEmitter
+	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData, ServerEventEmitter, ER
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -19,7 +19,7 @@ import { EventEmitter } from "events";
 import { datafolder, init as initTiddlyWiki, doTiddlyWikiRoute } from "./datafolder";
 export { doTiddlyWikiRoute };
 
-import { format } from "util";
+import { format, inspect } from "util";
 import { Stream, Writable } from "stream";
 import { Subscribable } from "rxjs/Observable";
 import { NextObserver, ErrorObserver, CompletionObserver } from "rxjs/Observer";
@@ -84,7 +84,9 @@ export function doTiddlyServerRoute(input: Observable<StateObject>) {
 			if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
 				send(state.req, result.filepathPortion.join('/'), { root: result.item })
 					.on('error', (err) => {
-						state.log(2, '%s %s', err.status, err.message).throw(500);
+						state.log(2, '%s %s', err.status, err.message);
+						
+						if(state.allow.writeErrors) state.throw(500);
 					}).on('headers', (res, filepath) => {
 						const statItem = state.statPath.stat;
 						const mtime = Date.parse(state.statPath.stat.mtime as any);
@@ -114,7 +116,7 @@ function handleFileError(err: NodeJS.ErrnoException) {
 
 function serveDirectoryIndex(result: PathResolverResult) {
 	const { state } = result;
-	const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+	const allow = state.allow;
 	// console.log(state.url);
 	if (!state.url.pathname.endsWith("/")) {
 		state.redirect(state.url.pathname + "/");
@@ -137,11 +139,17 @@ function serveDirectoryIndex(result: PathResolverResult) {
 		var form = new formidable.IncomingForm();
 		// console.log(state.url);
 		if (state.url.query.formtype === "upload") {
+
 			if (typeof result.item !== "string")
-				return state.throw(400, "upload is not possible for tree items");
+				return state.throwReason(400, "upload is not possible for tree items");
 			if (!allow.upload)
-				return state.throw(403, "upload is not allowed over the network")
-			form.parse(state.req, function (err, fields, files) {
+				return state.throwReason(403, "upload is not allowed over the network")
+			form.parse(state.req, function (err: Error, fields, files) {
+				if (err) {
+					debug(2, "upload %s", err.toString());
+					state.throwError(500, new ER("Error recieving request", err.toString()));
+					return;
+				}
 				// console.log(fields, files);
 				var oldpath = files.filetoupload.path;
 				//get the filename to use
@@ -156,10 +164,15 @@ function serveDirectoryIndex(result: PathResolverResult) {
 			});
 		} else if (state.url.query.formtype === "mkdir") {
 			if (typeof result.item !== "string")
-				return state.throw(400, "mkdir is not possible for tree items");
+				return state.throwReason(400, "mkdir is not possible for tree items");
 			if (!allow.mkdir)
-				return state.throw(403, "mkdir is not allowed over the network")
-			form.parse(state.req, function (err, fields, files) {
+				return state.throwReason(403, "mkdir is not allowed over the network")
+			form.parse(state.req, function (err: Error, fields, files) {
+				if (err) {
+					debug(2, "mkdir %s", err.toString());
+					state.throwError(500, new ER("Error recieving request", err.toString()))
+					return;
+				}
 				fs.mkdir(path.join(result.fullfilepath, fields.dirname), (err) => {
 					if (err) {
 						handleFileError(err);
