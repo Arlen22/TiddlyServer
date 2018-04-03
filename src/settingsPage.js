@@ -247,7 +247,7 @@ function handleSettings(state) {
             if (state.url.query.action === "getdata" && state.req.method === "GET") {
                 fs_1.readFile(settings.__filename, "utf8", (err, setfile) => {
                     let curjson = server_types_1.tryParseJSON(setfile, (err) => {
-                        state.throw(500, "Settings file could not be accessed");
+                        state.throwReason(500, "Settings file could not be accessed");
                     });
                     if (typeof curjson !== "undefined") {
                         server_types_1.defaultSettings(curjson);

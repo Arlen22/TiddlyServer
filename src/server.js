@@ -136,7 +136,7 @@ rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req
     username = parts[0], password = parts[1];
     if (username !== settings.username || password !== settings.password) {
         debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
-        state.throw(401, 'Invalid username or password');
+        state.throwReason(401, 'Invalid username or password');
         return;
     }
     debug(-3, 'authorization successful');

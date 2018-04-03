@@ -265,7 +265,7 @@ export function handleSettings(state: StateObject) {
 
 				readFile(settings.__filename, "utf8", (err, setfile) => {
 					let curjson = tryParseJSON(setfile, (err) => {
-						state.throw(500, "Settings file could not be accessed");
+						state.throwReason(500, "Settings file could not be accessed");
 					})
 					if (typeof curjson !== "undefined") {
 						defaultSettings(curjson);

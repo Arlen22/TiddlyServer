@@ -730,6 +730,7 @@ export interface StateObjectUrl {
     search: string,
     href: string
 }
+
 export class StateObject {
     static parseURL(str: string): StateObjectUrl {
         let item = url.parse(str, true);
@@ -744,9 +745,16 @@ export class StateObject {
     static errorRoute(status: number, reason?: string) {
         return (obs: Observable<any>): any => {
             return obs.mergeMap((state: StateObject) => {
-                return state.throw(status, reason);
+                if (reason)
+                    return state.throwReason(status, reason);
+                else
+                    return state.throw(status);
             })
         }
+    }
+
+    get allow() {
+        return this.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
     }
 
     // req: http.IncomingMessage;
@@ -838,14 +846,36 @@ export class StateObject {
     //     this.errorThrown.name = "StateObjectError";
     //     return this;
     // }
-    throw<T = StateObject>(statusCode: number, reason?: string, headers?: Hashmap<string>): Observable<T> {
+    /** 
+     * if the client is allowed to recieve error info, sends `message`, otherwise sends `reason`.
+     * `reason` is always sent as the status header.
+     */
+    throwError<T = StateObject>(statusCode: number, error: ER, headers?: Hashmap<string>) {
+        if (!this.res.headersSent) {
+            this.res.writeHead(statusCode, error.reason, headers);
+            //don't write 204 reason
+            if (statusCode !== 204) this.res.write(this.allow.writeErrors ? error.message : error.reason);
+        }
+        this.res.end();
+        return Observable.empty<T>();
+    }
+    throwReason<T = StateObject>(statusCode: number, reason: string, headers?: Hashmap<string>) {
         if (!this.res.headersSent) {
             this.res.writeHead(statusCode, reason && reason.toString(), headers);
             //don't write 204 reason
             if (statusCode !== 204 && reason) this.res.write(reason.toString());
         }
         this.res.end();
-        return Observable.empty<never>();
+        return Observable.empty<T>();
+    }
+    throw<T = StateObject>(statusCode: number, headers?: Hashmap<string>) {
+        if (!this.res.headersSent) {
+            this.res.writeHead(statusCode, headers);
+            //don't write 204 reason
+            // if (statusCode !== 204 && reason) this.res.write(reason.toString());
+        }
+        this.res.end();
+        return Observable.empty<T>();
     }
     endJSON(data: any) {
         this.res.write(JSON.stringify(data));
@@ -871,6 +901,12 @@ export class StateObject {
         return recieveBody(this, errorCB);
     }
 
+}
+
+export class ER extends Error {
+    constructor(public reason: string, message: string) {
+        super(message);
+    }
 }
 /** to be used with concatMap, mergeMap, etc. */
 export function recieveBody(state: StateObject, sendError?: true | ((e: JsonError) => void)) {
@@ -903,6 +939,7 @@ export interface ThrowFunc<T> {
     throw(statusCode: number, reason?: string, str?: string, ...args: any[]): Observable<T>;
 }
 export interface ServerConfig_AccessOptions {
+    writeErrors: boolean
     upload: boolean
     mkdir: boolean
     settings: boolean
