@@ -14,19 +14,29 @@ exports.generateDirectoryListing = function (directory, options) {
             sortBySelector(e => ((e.type === 'folder' ? '0-' : '1-') + e.name.toLocaleLowerCase()))
         ).map((entry, index) => {
             const isFile = ['category', 'folder', 'datafolder', 'error', 'other'].indexOf(entry.type) === -1;
+            const showSize = isFile || entry.type === "other";
             return `
-<tr class="row ${(index + 1) % 2 ? 'odd' : 'even'} ${entry.type}">
-    <td>
-        <span class="icon">
-            <img style="width:16px;" src="/assets/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
-        </span>
-        <span class="name">
-            <a href="${encodeURI(entry.path)}">${entry.name}</a>
-        </span>
-    </td>
-    <td class="type"><span>${entry.type}</span></td>
-    <td class="size"><span>${entry.size}</span></td>
-</tr>`
+<li>
+    <span class="icon">
+        <img style="width:16px;" src="/assets/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
+    </span>
+    <span class="size">${showSize ? entry.size : ""}</span>
+    <span class="name">
+        <a href="${encodeURI(entry.path)}">${entry.name}</a>
+    </span>
+</li>`
+// return `<tr class="row ${(index + 1) % 2 ? 'odd' : 'even'} ${entry.type}">
+//     <td>
+//         <span class="icon">
+//             <img style="width:16px;" src="/assets/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
+//         </span>
+//         <span class="name">
+//             <a href="${encodeURI(entry.path)}">${entry.name}</a>
+//         </span>
+//     </td>
+//     <td class="type"><span>${entry.type}</span></td>
+//     <td class="size"><span>${entry.size}</span></td>
+// </tr>`
         }).join("")
     }
     const pathArr = directory.path.split('/').filter(a => a);
@@ -48,19 +58,7 @@ ${
             ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>`
             : ``
         }
-<table>
-  <caption>${(pathArr.length > 0) ? name : 'Home'}</caption>
-  <thead>
-    <tr>
-      <th scope="col">Name</th>
-      <th scope="col">Type</th>
-      <th scope="col">Size</th>
-    </tr>
-  </thead>
- <tbody>
-${listEntries(directory.entries)}
-  </tbody>
-</table>
+<ul>${listEntries(directory.entries)}</ul>
 ${(options.upload) ? `<p>
 <form action="?formtype=upload" method="post" enctype="multipart/form-data" name="upload">
     <label>Upload file</label>
@@ -88,3 +86,17 @@ ${(options.mkdir) ? `<p>
 </html>
 `
 }
+
+// `<table>
+//   <caption>${(pathArr.length > 0) ? name : 'Home'}</caption>
+//   <thead>
+//     <tr>
+//       <th scope="col">Name</th>
+//       <th scope="col">Type</th>
+//       <th scope="col">Size</th>
+//     </tr>
+//   </thead>
+//  <tbody>
+// ${listEntries(directory.entries)}
+//   </tbody>
+// </table>`

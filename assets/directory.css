@@ -39,6 +39,9 @@ table .icon img {
   width: 16px;
 }
 @media screen and (max-width: 600px) {
+  ul li {
+    white-space: nowrap;
+  }
   table {
     border: 0;
   }
@@ -56,15 +59,23 @@ table .icon img {
     width: 1px;
   }
   table tr {
-    border-bottom: 3px solid #ddd;
+    /* border-bottom: 3px solid #ddd; */
     display: block;
-    margin-bottom: .625em;
+    /* position: relative; */
+    /* margin-bottom: .625em; */
   }
   table td {
     border-bottom: 1px solid #ddd;
     display: block;
     font-size: .8em;
-    text-align: right;
+    text-align: left;
+    white-space: nowrap;
+  }
+  table td.type {
+    display:none;
+  }
+  table td.size {
+    float:left;
   }
   table td:before {
     /*
@@ -78,6 +89,6 @@ table .icon img {
   }
   table td:last-child {
     border-bottom: 0;
-    padding-bottom: 2em;
+    /* padding-bottom: 2em; */
   }
 }
