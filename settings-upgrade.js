@@ -16,4 +16,7 @@ function walkTree(item, key){
 	}
 }
 
-console.log(walkTree(settings.tree));
+settings.tree = walkTree(settings.tree);
+settings.version = 1;
+
+console.log(JSON.stringify(settings, null, 2));
