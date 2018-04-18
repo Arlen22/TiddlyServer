@@ -6,7 +6,7 @@ const fs = require("fs");
 const path = require("path");
 const zlib = require("zlib");
 const datafolder_1 = require("./datafolder");
-exports.doTiddlyWikiRoute = datafolder_1.doTiddlyWikiRoute;
+exports.handleTiddlyWikiRoute = datafolder_1.handleTiddlyWikiRoute;
 const bundled_lib_1 = require("../lib/bundled-lib");
 const debug = server_types_1.DebugLogger("SER-API");
 __dirname = path.dirname(module.filename || process.execPath);
@@ -34,9 +34,9 @@ function init(eventer) {
     datafolder_1.init(eventer);
 }
 exports.init = init;
-function doTiddlyServerRoute(input) {
+function handleTiddlyServerRoute(state) {
     // const resolvePath = (settings.tree);
-    return input.mergeMap((state) => {
+    rx_1.Observable.of(state).mergeMap((state) => {
         var result = server_types_1.resolvePath(state, settings.tree);
         if (!result)
             return state.throw(404);
@@ -92,9 +92,9 @@ function doTiddlyServerRoute(input) {
         else {
             state.throw(500);
         }
-    }).ignoreElements();
+    }).subscribe();
 }
-exports.doTiddlyServerRoute = doTiddlyServerRoute;
+exports.handleTiddlyServerRoute = handleTiddlyServerRoute;
 function handleFileError(err) {
     debug(2, "%s %s\n%s", err.code, err.message, err.path);
 }

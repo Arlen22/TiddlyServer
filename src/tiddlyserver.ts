@@ -16,8 +16,8 @@ import { createHash } from 'crypto';
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
 
-import { datafolder, init as initTiddlyWiki, doTiddlyWikiRoute } from "./datafolder";
-export { doTiddlyWikiRoute };
+import { datafolder, init as initTiddlyWiki, handleTiddlyWikiRoute } from "./datafolder";
+export { handleTiddlyWikiRoute };
 
 import { format, inspect } from "util";
 import { Stream, Writable } from "stream";
@@ -59,9 +59,9 @@ export function init(eventer: ServerEventEmitter) {
 
 type apiListRouteState = [[string, string], string | any, StateObject]
 
-export function doTiddlyServerRoute(input: Observable<StateObject>) {
+export function handleTiddlyServerRoute(state: StateObject) {
 	// const resolvePath = (settings.tree);
-	return input.mergeMap((state: StateObject) => {
+	Observable.of(state).mergeMap((state: StateObject) => {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
 		if (!result) return state.throw<never>(404);
 		else if (typeof result.item === "object") {
@@ -108,7 +108,7 @@ export function doTiddlyServerRoute(input: Observable<StateObject>) {
 		} else {
 			state.throw(500);
 		}
-	}).ignoreElements();
+	}).subscribe();
 }
 function handleFileError(err: NodeJS.ErrnoException) {
 	debug(2, "%s %s\n%s", err.code, err.message, err.path);
