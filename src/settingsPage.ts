@@ -1,4 +1,4 @@
-import { ServerConfig, StateObject, Hashmap, obs_stat, serveFile, sendResponse, canAcceptGzip, recieveBody, DebugLogger, ServerEventEmitter, tryParseJSON, normalizeSettings, obs_readFile, obs_writeFile, defaultSettings } from "./server-types";
+import { ServerConfig, StateObject, Hashmap, obs_stat, serveFileObs, sendResponse, canAcceptGzip, recieveBody, DebugLogger, ServerEventEmitter, tryParseJSON, normalizeSettings, obs_readFile, obs_writeFile, defaultSettings } from "./server-types";
 import { EventEmitter } from "events";
 import { Observable, Subject } from "../lib/rx";
 import { resolve, join } from "path";
@@ -19,8 +19,8 @@ function serveAssets() {
 	serveSettingsRoot = new Subject<StateObject>();
 	serveSettingsTree = new Subject<StateObject>();
 
-	serveFile(serveSettingsRoot.asObservable(), "settings-root.html", join(settings.__assetsDir, "settings-root")).subscribe();
-	serveFile(serveSettingsTree.asObservable(), "settings-tree.html", join(settings.__assetsDir, "settings-tree")).subscribe();
+	serveFileObs(serveSettingsRoot.asObservable(), "settings-root.html", join(settings.__assetsDir, "settings-root")).subscribe();
+	serveFileObs(serveSettingsTree.asObservable(), "settings-tree.html", join(settings.__assetsDir, "settings-tree")).subscribe();
 
 }
 export function initSettings(e) {

@@ -64,8 +64,7 @@ const favicon = path.resolve(__dirname, '../assets/favicon.ico');
 const stylesheet = path.resolve(__dirname, '../assets/directory.css');
 settings.__assetsDir = assets;
 eventer.emit('settings', settings);
-const serverLocalHost = http.createServer();
-const serverNetwork = http.createServer();
+let serverLocalHost, serverNetwork;
 process.on('uncaughtException', () => {
     serverNetwork.close();
     serverLocalHost.close();
@@ -90,12 +89,11 @@ eventer.on('settingsChanged', (keys) => {
     if (watch.some(e => keys.indexOf(e) > -1))
         log = setLog();
 });
-const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
 const routes = {
-    'admin': doAdminRoute,
-    'assets': doAssetsRoute,
-    'favicon.ico': obs => server_types_1.serveFile(obs, 'favicon.ico', assets),
-    'directory.css': obs => server_types_1.serveFile(obs, 'directory.css', assets),
+    'admin': state => handleAdminRoute(state),
+    'assets': state => handleAssetsRoute(state),
+    'favicon.ico': state => server_types_1.serveFile(state, 'favicon.ico', assets),
+    'directory.css': state => server_types_1.serveFile(state, 'directory.css', assets),
 };
 if (typeof settings.tree === "object") {
     let keys = Object.keys(settings.tree);
@@ -104,58 +102,58 @@ if (typeof settings.tree === "object") {
     if (conflict.length)
         console.log("The paths %s are reserved for use by TiddlyServer", conflict.join(', '));
 }
-rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
-    if (!req || !res)
-        console.log('blank req or res');
-    return new server_types_1.StateObject(req, res, debug, eventer, true);
-}).takeUntil(serverClose).concatMap(state => {
-    return log(state.req, state.res).mapTo(state);
-}), rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
-    if (!req || !res)
-        console.log('blank req or res');
-    return new server_types_1.StateObject(req, res, debug, eventer, false);
-}).takeUntil(serverClose).concatMap(state => {
-    return log(state.req, state.res).mapTo(state);
-})).map((state) => {
-    //check authentication and do sanity/security checks
-    //https://github.com/hueniverse/iron
-    //auth headers =====================
-    if (!settings.username && !settings.password)
-        return state;
-    if (!state.req.headers['authorization']) {
-        debug(-2, 'authorization required');
-        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
-        state.res.end();
-        return;
+function initServer() {
+    serverLocalHost = http.createServer();
+    serverNetwork = http.createServer();
+    const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
+    rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
+        if (!req || !res)
+            console.log('blank req or res');
+        return new server_types_1.StateObject(req, res, debug, eventer, true);
+    }).takeUntil(serverClose).concatMap(state => {
+        return log(state.req, state.res).mapTo(state);
+    }), rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
+        if (!req || !res)
+            console.log('blank req or res');
+        return new server_types_1.StateObject(req, res, debug, eventer, false);
+    }).takeUntil(serverClose).concatMap(state => {
+        return log(state.req, state.res).mapTo(state);
+    })).subscribe((state) => {
+        if (!handleBasicAuth(state))
+            return;
+        const route = routes[state.path[1]];
+        if (route)
+            route(state);
+        else
+            tiddlyserver_1.handleTiddlyServerRoute(state);
+    }, err => {
+        debug(4, 'Uncaught error in the server route: ' + err.message);
+        debug(4, err.stack);
+        debug(4, "the server will now close");
+        serverNetwork.close();
+        serverLocalHost.close();
+    }, () => {
+        //theoretically we could rebind the listening port without restarting the process, 
+        //but I don't know what would be the point of that. If this actually happens, 
+        //there will be no more listeners so the process will probably exit.
+        //In practice, the only reason this should happen is if the server close event fires.
+        console.log('finished processing for some reason');
+    });
+    if (ENV.disableLocalHost) {
+        serverNetwork.listen(settings.port, settings.host, serverListenCB);
     }
-    debug(-3, 'authorization requested');
-    var header = state.req.headers['authorization'] || '', // get the header
-    token = header.split(/\s+/).pop() || '', // and the encoded auth token
-    auth = new Buffer(token, 'base64').toString(), // convert from base64
-    parts = auth.split(/:/), // split on colon
-    username = parts[0], password = parts[1];
-    if (username !== settings.username || password !== settings.password) {
-        debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
-        state.throwReason(401, 'Invalid username or password');
-        return;
+    else {
+        serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
+            if (settings.host !== "127.0.0.1") {
+                serverNetwork.listen(settings.port, settings.host, serverListenCB);
+            }
+            else {
+                serverListenCB(err, res);
+            }
+        });
     }
-    debug(-3, 'authorization successful');
-    // securityChecks =====================
-    return state;
-}).filter(server_types_1.obsTruthy).routeCase(state => state.path[1], routes, tiddlyserver_1.doTiddlyServerRoute).subscribe((state) => {
-}, err => {
-    debug(4, 'Uncaught error in the server route: ' + err.message);
-    debug(4, err.stack);
-    debug(4, "the server will now close");
-    serverNetwork.close();
-    serverLocalHost.close();
-}, () => {
-    //theoretically we could rebind the listening port without restarting the process, 
-    //but I don't know what would be the point of that. If this actually happens, 
-    //there will be no more listeners so the process will probably exit.
-    //In practice, the only reason this should happen is if the server close event fires.
-    console.log('finished processing for some reason');
-});
+}
+initServer();
 const errLog = server_types_1.DebugLogger('STATE_ERR');
 eventer.on("stateError", (state) => {
     if (state.doneMessage.length > 0)
@@ -166,18 +164,27 @@ eventer.on("stateDebug", (state) => {
     if (state.doneMessage.length > 0)
         dbgLog(-2, state.doneMessage.join('\n'));
 });
-function doAssetsRoute(obs) {
-    return obs.routeCase(state => state.path[2], {
-        'static': obs => server_types_1.serveFolder(obs, '/assets/static', path.join(assets, "static")),
-        'icons': obs => server_types_1.serveFolder(obs, '/assets/icons', path.join(assets, "icons")),
-        'tiddlywiki': tiddlyserver_1.doTiddlyWikiRoute
-    }, server_types_1.StateObject.errorRoute(404));
+function handleAssetsRoute(state) {
+    switch (state.path[2]) {
+        case "static":
+            server_types_1.serveFolder(state, '/assets/static', path.join(assets, "static"));
+            break;
+        case "icons":
+            server_types_1.serveFolder(state, '/assets/icons', path.join(assets, "icons"));
+            break;
+        case "tiddlywiki":
+            tiddlyserver_1.handleTiddlyWikiRoute(state);
+            break;
+        default: state.throw(404);
+    }
 }
-function doAdminRoute(obs) {
-    return obs.do(state => {
-        if (state.path[2] === "settings")
+function handleAdminRoute(state) {
+    switch (state.path[2]) {
+        case "settings":
             settingsPage_1.handleSettings(state);
-    });
+            break;
+        default: state.throw(404);
+    }
 }
 function serverListenCB(err, res) {
     function connection(client, request) {
@@ -214,16 +221,59 @@ function serverListenCB(err, res) {
         console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
     }
 }
-if (ENV.disableLocalHost) {
-    serverNetwork.listen(settings.port, settings.host, serverListenCB);
+function handleBasicAuth(state) {
+    //check authentication and do sanity/security checks
+    //https://github.com/hueniverse/iron
+    //auth headers =====================
+    if (!settings.username && !settings.password)
+        return true;
+    if (!state.req.headers['authorization']) {
+        debug(-2, 'authorization required');
+        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
+        state.res.end();
+        return false;
+    }
+    debug(-3, 'authorization requested');
+    var header = state.req.headers['authorization'] || '', // get the header
+    token = header.split(/\s+/).pop() || '', // and the encoded auth token
+    auth = new Buffer(token, 'base64').toString(), // convert from base64
+    parts = auth.split(/:/), // split on colon
+    username = parts[0], password = parts[1];
+    if (username !== settings.username || password !== settings.password) {
+        debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
+        state.throwReason(401, 'Invalid username or password');
+        return false;
+    }
+    debug(-3, 'authorization successful');
+    // securityChecks =====================
+    return true;
 }
-else {
-    serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
-        if (settings.host !== "127.0.0.1") {
-            serverNetwork.listen(settings.port, settings.host, serverListenCB);
-        }
-        else {
-            serverListenCB(err, res);
-        }
-    });
-}
+// .map((state: StateObject) => {
+//     //check authentication and do sanity/security checks
+//     //https://github.com/hueniverse/iron
+//     //auth headers =====================
+//     if (!settings.username && !settings.password) return state;
+//     if (!state.req.headers['authorization']) {
+//         debug(-2, 'authorization required');
+//         state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
+//         state.res.end();
+//         return;
+//     }
+//     debug(-3, 'authorization requested');
+//     var header = state.req.headers['authorization'] || '',        // get the header
+//         token = header.split(/\s+/).pop() || '',            // and the encoded auth token
+//         auth = new Buffer(token, 'base64').toString(),    // convert from base64
+//         parts = auth.split(/:/),                          // split on colon
+//         username = parts[0],
+//         password = parts[1];
+//     if (username !== settings.username || password !== settings.password) {
+//         debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
+//         state.throwReason(401, 'Invalid username or password');
+//         return;
+//     }
+//     debug(-3, 'authorization successful')
+//     // securityChecks =====================
+//     return state;
+// }).filter(obsTruthy).routeCase<StateObject>(
+//     state => state.path[1], routes, doTiddlyServerRoute
+// ) 

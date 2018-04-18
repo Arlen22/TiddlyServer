@@ -16,8 +16,8 @@ function serveAssets() {
         serveSettingsTree.complete();
     serveSettingsRoot = new rx_1.Subject();
     serveSettingsTree = new rx_1.Subject();
-    server_types_1.serveFile(serveSettingsRoot.asObservable(), "settings-root.html", path_1.join(settings.__assetsDir, "settings-root")).subscribe();
-    server_types_1.serveFile(serveSettingsTree.asObservable(), "settings-tree.html", path_1.join(settings.__assetsDir, "settings-tree")).subscribe();
+    server_types_1.serveFileObs(serveSettingsRoot.asObservable(), "settings-root.html", path_1.join(settings.__assetsDir, "settings-root")).subscribe();
+    server_types_1.serveFileObs(serveSettingsTree.asObservable(), "settings-tree.html", path_1.join(settings.__assetsDir, "settings-tree")).subscribe();
 }
 function initSettings(e) {
     eventer = e;

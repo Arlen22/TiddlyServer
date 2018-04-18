@@ -10,12 +10,14 @@ import {
 
 import {
     StateObject, DebugLogger, sanitizeJSON, keys, ServerConfig,
-    obs_stat, colors, obsTruthy, Hashmap, obs_readdir, serveFolder, serveFile, serveFolderIndex,
+    obs_stat, colors, obsTruthy, Hashmap, obs_readdir, serveFolderObs, serveFileObs, serveFolderIndex,
     init as initServerTypes,
     tryParseJSON,
     JsonError,
     ServerEventEmitter,
-    normalizeSettings
+    normalizeSettings,
+    serveFolder,
+    serveFile
 } from "./server-types";
 
 import * as http from 'http'
@@ -88,7 +90,7 @@ if (process.env.TiddlyServer_disableLocalHost || settings._disableLocalHost)
     ENV.disableLocalHost = true;
 
 //import and init api-access
-import { doTiddlyServerRoute, init as initTiddlyServer, doTiddlyWikiRoute } from './tiddlyserver';
+import { handleTiddlyServerRoute, init as initTiddlyServer, handleTiddlyWikiRoute } from './tiddlyserver';
 import { handleSettings, initSettings } from './settingsPage';
 
 import { ServerResponse } from 'http';
@@ -107,9 +109,7 @@ settings.__assetsDir = assets;
 
 eventer.emit('settings', settings);
 
-
-const serverLocalHost = http.createServer();
-const serverNetwork = http.createServer();
+let serverLocalHost, serverNetwork;
 
 
 process.on('uncaughtException', () => {
@@ -138,18 +138,12 @@ eventer.on('settingsChanged', (keys) => {
     if (watch.some(e => keys.indexOf(e) > -1)) log = setLog();
 })
 
-const serverClose = Observable.merge(
-    Observable.fromEvent(serverLocalHost, 'close').take(1),
-    Observable.fromEvent(serverNetwork, 'close').take(1)
-).multicast(new Subject()).refCount();
-
 const routes = {
-    'admin': doAdminRoute,
-    'assets': doAssetsRoute,
-    'favicon.ico': obs => serveFile(obs, 'favicon.ico', assets),
-    'directory.css': obs => serveFile(obs, 'directory.css', assets),
+    'admin': state => handleAdminRoute(state),
+    'assets': state => handleAssetsRoute(state),
+    'favicon.ico': state => serveFile(state, 'favicon.ico', assets),
+    'directory.css': state => serveFile(state, 'directory.css', assets),
 };
-
 if (typeof settings.tree === "object") {
     let keys = Object.keys(settings.tree);
     let routeKeys = Object.keys(routes);
@@ -157,64 +151,62 @@ if (typeof settings.tree === "object") {
     if (conflict.length) console.log("The paths %s are reserved for use by TiddlyServer", conflict.join(', '));
 }
 
-Observable.merge(
-    (Observable.fromEvent(serverLocalHost, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
-        if (!req || !res) console.log('blank req or res');
-        return new StateObject(req, res, debug, eventer, true);
-    }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
-        return log(state.req, state.res).mapTo(state);
-    }),
-    (Observable.fromEvent(serverNetwork, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
-        if (!req || !res) console.log('blank req or res');
-        return new StateObject(req, res, debug, eventer, false);
-    }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
-        return log(state.req, state.res).mapTo(state);
-    })
-).map((state: StateObject) => {
-    //check authentication and do sanity/security checks
-    //https://github.com/hueniverse/iron
-    //auth headers =====================
-    if (!settings.username && !settings.password) return state;
+function initServer() {
 
-    if (!state.req.headers['authorization']) {
-        debug(-2, 'authorization required');
-        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
-        state.res.end();
-        return;
+    serverLocalHost = http.createServer();
+    serverNetwork = http.createServer();
+
+    const serverClose = Observable.merge(
+        Observable.fromEvent(serverLocalHost, 'close').take(1),
+        Observable.fromEvent(serverNetwork, 'close').take(1)
+    ).multicast(new Subject()).refCount();
+
+    Observable.merge(
+        (Observable.fromEvent(serverLocalHost, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
+            if (!req || !res) console.log('blank req or res');
+            return new StateObject(req, res, debug, eventer, true);
+        }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
+            return log(state.req, state.res).mapTo(state);
+        }),
+        (Observable.fromEvent(serverNetwork, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
+            if (!req || !res) console.log('blank req or res');
+            return new StateObject(req, res, debug, eventer, false);
+        }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
+            return log(state.req, state.res).mapTo(state);
+        })
+    ).subscribe((state: StateObject) => {
+        if (!handleBasicAuth(state)) return;
+        const route = routes[state.path[1]];
+        if (route) route(state);
+        else handleTiddlyServerRoute(state);
+    }, err => {
+        debug(4, 'Uncaught error in the server route: ' + err.message);
+        debug(4, err.stack);
+        debug(4, "the server will now close");
+        serverNetwork.close();
+        serverLocalHost.close();
+    }, () => {
+        //theoretically we could rebind the listening port without restarting the process, 
+        //but I don't know what would be the point of that. If this actually happens, 
+        //there will be no more listeners so the process will probably exit.
+        //In practice, the only reason this should happen is if the server close event fires.
+        console.log('finished processing for some reason');
+    });
+
+    if (ENV.disableLocalHost) {
+        serverNetwork.listen(settings.port, settings.host, serverListenCB);
+    } else {
+        serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
+            if (settings.host !== "127.0.0.1") {
+                serverNetwork.listen(settings.port, settings.host, serverListenCB);
+            } else {
+                serverListenCB(err, res);
+            }
+        });
     }
-    debug(-3, 'authorization requested');
-    var header = state.req.headers['authorization'] || '',        // get the header
-        token = header.split(/\s+/).pop() || '',            // and the encoded auth token
-        auth = new Buffer(token, 'base64').toString(),    // convert from base64
-        parts = auth.split(/:/),                          // split on colon
-        username = parts[0],
-        password = parts[1];
-    if (username !== settings.username || password !== settings.password) {
-        debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
-        state.throwReason(401, 'Invalid username or password');
-        return;
-    }
-    debug(-3, 'authorization successful')
-    // securityChecks =====================
+}
+initServer();
 
-    return state;
-}).filter(obsTruthy).routeCase<StateObject>(
-    state => state.path[1], routes, doTiddlyServerRoute
-).subscribe((state: StateObject) => {
-
-}, err => {
-    debug(4, 'Uncaught error in the server route: ' + err.message);
-    debug(4, err.stack);
-    debug(4, "the server will now close");
-    serverNetwork.close();
-    serverLocalHost.close();
-}, () => {
-    //theoretically we could rebind the listening port without restarting the process, 
-    //but I don't know what would be the point of that. If this actually happens, 
-    //there will be no more listeners so the process will probably exit.
-    //In practice, the only reason this should happen is if the server close event fires.
-    console.log('finished processing for some reason');
-})
 const errLog = DebugLogger('STATE_ERR');
 eventer.on("stateError", (state) => {
     if (state.doneMessage.length > 0)
@@ -226,20 +218,22 @@ eventer.on("stateDebug", (state) => {
         dbgLog(-2, state.doneMessage.join('\n'));
 })
 
-function doAssetsRoute(obs: Observable<StateObject>): any {
-    return obs.routeCase(state => state.path[2], {
-        'static': obs => serveFolder(obs, '/assets/static', path.join(assets, "static")),
-        'icons': obs => serveFolder(obs, '/assets/icons', path.join(assets, "icons")),
-        'tiddlywiki': doTiddlyWikiRoute
-    }, StateObject.errorRoute(404));
+
+function handleAssetsRoute(state: StateObject) {
+    switch (state.path[2]) {
+        case "static": serveFolder(state, '/assets/static', path.join(assets, "static")); break;
+        case "icons": serveFolder(state, '/assets/icons', path.join(assets, "icons")); break;
+        case "tiddlywiki": handleTiddlyWikiRoute(state); break;
+        default: state.throw(404);
+    }
 }
 
-function doAdminRoute(obs: Observable<StateObject>): any {
-    return obs.do(state => {
-        if (state.path[2] === "settings") handleSettings(state);
-    }) as Observable<StateObject>
+function handleAdminRoute(state: StateObject) {
+    switch (state.path[2]) {
+        case "settings": handleSettings(state); break;
+        default: state.throw(404);
+    }
 }
-
 function serverListenCB(err: any, res: any) {
     function connection(client: WebSocket, request: http.IncomingMessage) {
         eventer.emit('websocket-connection', client, request);
@@ -274,19 +268,69 @@ function serverListenCB(err: any, res: any) {
     } else {
         console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
     }
-}
-
-if (ENV.disableLocalHost) {
-    serverNetwork.listen(settings.port, settings.host, serverListenCB);
-} else {
-    serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
-        if (settings.host !== "127.0.0.1") {
-            serverNetwork.listen(settings.port, settings.host, serverListenCB);
-        } else {
-            serverListenCB(err, res);
-        }
-    });
+    
 }
 
 
 
+function handleBasicAuth(state: StateObject): boolean {
+    //check authentication and do sanity/security checks
+    //https://github.com/hueniverse/iron
+    //auth headers =====================
+    if (!settings.username && !settings.password) return true;
+
+    if (!state.req.headers['authorization']) {
+        debug(-2, 'authorization required');
+        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
+        state.res.end();
+        return false;
+    }
+    debug(-3, 'authorization requested');
+    var header = state.req.headers['authorization'] || '',        // get the header
+        token = header.split(/\s+/).pop() || '',            // and the encoded auth token
+        auth = new Buffer(token, 'base64').toString(),    // convert from base64
+        parts = auth.split(/:/),                          // split on colon
+        username = parts[0],
+        password = parts[1];
+    if (username !== settings.username || password !== settings.password) {
+        debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
+        state.throwReason(401, 'Invalid username or password');
+        return false;
+    }
+    debug(-3, 'authorization successful')
+    // securityChecks =====================
+
+    return true;
+}
+
+// .map((state: StateObject) => {
+//     //check authentication and do sanity/security checks
+//     //https://github.com/hueniverse/iron
+//     //auth headers =====================
+//     if (!settings.username && !settings.password) return state;
+
+//     if (!state.req.headers['authorization']) {
+//         debug(-2, 'authorization required');
+//         state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
+//         state.res.end();
+//         return;
+//     }
+//     debug(-3, 'authorization requested');
+//     var header = state.req.headers['authorization'] || '',        // get the header
+//         token = header.split(/\s+/).pop() || '',            // and the encoded auth token
+//         auth = new Buffer(token, 'base64').toString(),    // convert from base64
+//         parts = auth.split(/:/),                          // split on colon
+//         username = parts[0],
+//         password = parts[1];
+//     if (username !== settings.username || password !== settings.password) {
+//         debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
+//         state.throwReason(401, 'Invalid username or password');
+//         return;
+//     }
+//     debug(-3, 'authorization successful')
+//     // securityChecks =====================
+
+//     return state;
+// }).filter(obsTruthy).routeCase<StateObject>(
+//     state => state.path[1], routes, doTiddlyServerRoute
+// )

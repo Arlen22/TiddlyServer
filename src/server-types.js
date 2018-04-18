@@ -318,44 +318,48 @@ exports.sanitizeJSON = sanitizeJSON;
 //         })
 //     }
 // })();
-function serveFile(obs, file, root) {
-    return obs.mergeMap(state => {
-        return exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
-            if (err)
-                return state.throw(404);
-            bundled_lib_1.send(state.req, file, { root })
-                .on('error', err => {
-                state.log(2, '%s %s', err.status, err.message).throw(500);
-            }).pipe(state.res);
-            return rx_1.Observable.empty();
-        });
-    }).ignoreElements();
+function serveFile(state, file, root) {
+    exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
+        if (err)
+            return state.throw(404);
+        bundled_lib_1.send(state.req, file, { root })
+            .on('error', err => {
+            state.log(2, '%s %s', err.status, err.message).throw(500);
+        }).pipe(state.res);
+        return rx_1.Observable.empty();
+    }).subscribe();
 }
 exports.serveFile = serveFile;
-function serveFolder(obs, mount, root, serveIndex) {
-    return obs.do(state => {
-        const pathname = state.url.pathname;
-        if (state.url.pathname.slice(0, mount.length) !== mount) {
-            state.log(2, 'URL is different than the mount point %s', mount).throw(500);
-        }
-        else {
-            bundled_lib_1.send(state.req, pathname.slice(mount.length), { root })
-                .on('error', (err) => {
-                state.log(-1, '%s %s', err.status, err.message).throw(404);
-            })
-                .on('directory', (res, fp) => {
-                if (serveIndex) {
-                    serveIndex(state, res, fp);
-                }
-                else {
-                    state.throw(403);
-                }
-            })
-                .pipe(state.res);
-        }
-    }).ignoreElements();
+function serveFileObs(obs, file, root) {
+    return obs.do(state => serveFile(state, file, root)).ignoreElements();
+}
+exports.serveFileObs = serveFileObs;
+function serveFolder(state, mount, root, serveIndex) {
+    const pathname = state.url.pathname;
+    if (state.url.pathname.slice(0, mount.length) !== mount) {
+        state.log(2, 'URL is different than the mount point %s', mount).throw(500);
+    }
+    else {
+        bundled_lib_1.send(state.req, pathname.slice(mount.length), { root })
+            .on('error', (err) => {
+            state.log(-1, '%s %s', err.status, err.message).throw(404);
+        })
+            .on('directory', (res, fp) => {
+            if (serveIndex) {
+                serveIndex(state, res, fp);
+            }
+            else {
+                state.throw(403);
+            }
+        })
+            .pipe(state.res);
+    }
 }
 exports.serveFolder = serveFolder;
+function serveFolderObs(obs, mount, root, serveIndex) {
+    return obs.do(state => serveFolder(state, mount, root, serveIndex)).ignoreElements();
+}
+exports.serveFolderObs = serveFolderObs;
 function serveFolderIndex(options) {
     function readFolder(folder) {
         return exports.obs_readdir()(folder).mergeMap(([err, files]) => {
@@ -618,6 +622,31 @@ exports.obs_writeFile = (tag = undefined) => (filepath, data) => new rx_1.Observ
     subs.next([err, tag, filepath]);
     subs.complete();
 }));
+function fs_move(oldPath, newPath, callback) {
+    fs.rename(oldPath, newPath, function (err) {
+        if (err) {
+            if (err.code === 'EXDEV') {
+                copy();
+            }
+            else {
+                callback(err);
+            }
+            return;
+        }
+        callback();
+    });
+    function copy() {
+        var readStream = fs.createReadStream(oldPath);
+        var writeStream = fs.createWriteStream(newPath);
+        readStream.on('error', callback);
+        writeStream.on('error', callback);
+        readStream.on('close', function () {
+            fs.unlink(oldPath, callback);
+        });
+        readStream.pipe(writeStream);
+    }
+}
+exports.fs_move = fs_move;
 // export const obs_writeFile = <T>(state?: T) => Observable.bindCallback(
 //     fs.writeFile, (err, data): NodeCallback<string | Buffer, T> => [err, data, state] as any);
 class StateError extends Error {

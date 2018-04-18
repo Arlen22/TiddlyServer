@@ -289,27 +289,25 @@ function initPluginLoader() {
 initPluginLoader();
 // mounted at /tiddlywiki
 const serveBootFolder = new rx_1.Subject();
-server_types_1.serveFolder(serveBootFolder.asObservable(), '/assets/tiddlywiki/boot', path.join(__dirname, "../tiddlywiki/boot"), server_types_1.serveFolderIndex({ type: 'json' }));
-function doTiddlyWikiRoute(input) {
+server_types_1.serveFolderObs(serveBootFolder.asObservable(), '/assets/tiddlywiki/boot', path.join(__dirname, "../tiddlywiki/boot"), server_types_1.serveFolderIndex({ type: 'json' }));
+function handleTiddlyWikiRoute(state) {
     //number of elements on state.path that are part of the mount path.
     //the zero-based index of the first subpath is the same as the number of elements
     let mountLength = 3;
-    return input.do(state => {
-        if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
-            state.throw(404);
-        }
-        else if (state.path[mountLength] === "core") {
-            sendPluginResponse(state, coreCache);
-        }
-        else if (state.path[mountLength] === "boot") {
-            serveBootFolder.next(state);
-        }
-        else {
-            sendPluginResponse(state, pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1])));
-        }
-    }).ignoreElements();
+    if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
+        state.throw(404);
+    }
+    else if (state.path[mountLength] === "core") {
+        sendPluginResponse(state, coreCache);
+    }
+    else if (state.path[mountLength] === "boot") {
+        serveBootFolder.next(state);
+    }
+    else {
+        sendPluginResponse(state, pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1])));
+    }
 }
-exports.doTiddlyWikiRoute = doTiddlyWikiRoute;
+exports.handleTiddlyWikiRoute = handleTiddlyWikiRoute;
 function sendPluginResponse(state, pluginCache) {
     const { req, res } = state;
     if (pluginCache === "null") {
@@ -387,7 +385,7 @@ function loadTiddlyServerAdapter(mount, folder, reload, wikiInfo) {
         cacheRequests = [];
     });
     const sendCacheFolder = new rx_1.Subject();
-    server_types_1.serveFolder(sendCacheFolder.asObservable(), mount + "/cache", folder + "/cache");
+    server_types_1.serveFolderObs(sendCacheFolder.asObservable(), mount + "/cache", folder + "/cache");
     function handler(state) {
         const { req, res } = state;
         const tsa = new TSASO(state, wikiInfo, folder, mount, files);

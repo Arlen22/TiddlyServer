@@ -1,6 +1,6 @@
 import {
     StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger,
-    PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolder, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter,
+    PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter,
 } from "./server-types";
 import { Observable, Subject } from "../lib/rx";
 
@@ -339,30 +339,30 @@ function initPluginLoader() {
 initPluginLoader();
 // mounted at /tiddlywiki
 const serveBootFolder = new Subject<StateObject>();
-serveFolder(
+serveFolderObs(
     serveBootFolder.asObservable(),
     '/assets/tiddlywiki/boot',
     path.join(__dirname, "../tiddlywiki/boot"),
     serveFolderIndex({ type: 'json' })
 );
 
-export function doTiddlyWikiRoute(input: Observable<StateObject>) {
+export function handleTiddlyWikiRoute(state: StateObject) {
     //number of elements on state.path that are part of the mount path.
     //the zero-based index of the first subpath is the same as the number of elements
     let mountLength = 3;
-    return input.do(state => {
-        if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
-            state.throw(404);
-        } else if (state.path[mountLength] === "core") {
-            sendPluginResponse(state, coreCache);
-        } else if (state.path[mountLength] === "boot") {
-            serveBootFolder.next(state);
-        } else {
-            sendPluginResponse(state, 
-                pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1]))
-            );
-        }
-    }).ignoreElements();
+
+    if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
+        state.throw(404);
+    } else if (state.path[mountLength] === "core") {
+        sendPluginResponse(state, coreCache);
+    } else if (state.path[mountLength] === "boot") {
+        serveBootFolder.next(state);
+    } else {
+        sendPluginResponse(state,
+            pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1]))
+        );
+    }
+
 }
 
 function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null") {
@@ -454,7 +454,7 @@ function loadTiddlyServerAdapter(mount: string, folder: string, reload: string, 
 
 
     const sendCacheFolder = new Subject<StateObject>();
-    serveFolder(sendCacheFolder.asObservable(), mount + "/cache", folder + "/cache");
+    serveFolderObs(sendCacheFolder.asObservable(), mount + "/cache", folder + "/cache");
     function handler(state: StateObject) {
         const { req, res } = state;
 
