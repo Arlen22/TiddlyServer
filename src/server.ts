@@ -1,6 +1,6 @@
 require("../lib/source-map-support-lib");
 
-import { send } from '../lib/bundled-lib';
+import { send, ws } from '../lib/bundled-lib';
 const sendOptions = {};
 
 
@@ -30,8 +30,7 @@ import { parse as jsonParse } from 'jsonlint';
 
 // import send = require('../lib/send-lib');
 
-
-import { Server as WebSocketServer } from '../lib/websocket-server/WS';
+const { Server: WebSocketServer } = ws;
 
 __dirname = path.dirname(module.filename || process.execPath);
 

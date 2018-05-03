@@ -60,6 +60,7 @@ export function init(eventer: ServerEventEmitter) {
 type apiListRouteState = [[string, string], string | any, StateObject]
 
 export function handleTiddlyServerRoute(state: StateObject) {
+	
 	// const resolvePath = (settings.tree);
 	Observable.of(state).mergeMap((state: StateObject) => {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
