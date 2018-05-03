@@ -1,10 +1,19 @@
+
+
+### 2.0.13
+
+#### Breaking changes
 * Added `/static` as a reserved mount path and moved `/icons` to `/static/icons`.
+* Upgraded to TiddlyWiki 5.1.16
+
+#### Improvements
+* Added a warning if a mount path in `settings.json` is reserved.
 * Added a settings page at `/admin/settings/`. The `tree` and `types` options are not yet available.
-* Added `allowLocalhost` hashmap to `settings.json` identical to `allowNetwork`. Options for one of them does not affect options for the other one, so localhost may be more restricted than network. 
+* Added `allowLocalhost` hashmap to `settings.json` identical to `allowNetwork`. Options for one of them does not affect options for the other one, so localhost can be more restricted than network. 
 * Added several options related to logging, and now allows logs to be saved to file using NodeJS `appendFile`.
-* * Added options: `logAccess`, `logError`, `logColorsToFile`, `logToConsoleAlso`.
+  * Added options: `logAccess`, `logError`, `logColorsToFile`, `logToConsoleAlso`.
 * Added `debugLevel` to set the debug level of the messages to be logged to console or the error log.
-* Add filename field to specify the filename of the file being uploaded.
+* Added filename field to specify the filename of the file being uploaded.
 
 ### 2.0.12 
 
