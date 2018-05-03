@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 require("../lib/source-map-support-lib");
+const bundled_lib_1 = require("../lib/bundled-lib");
 const sendOptions = {};
 const rx_1 = require("../lib/rx");
 const server_types_1 = require("./server-types");
@@ -10,7 +11,7 @@ const path = require("path");
 const util_1 = require("util");
 const events_1 = require("events");
 // import send = require('../lib/send-lib');
-const WS_1 = require("../lib/websocket-server/WS");
+const { Server: WebSocketServer } = bundled_lib_1.ws;
 __dirname = path.dirname(module.filename || process.execPath);
 Error.stackTraceLimit = Infinity;
 process.on('uncaughtException', err => {
@@ -197,10 +198,10 @@ function serverListenCB(err, res) {
         console.error('error on app.listen', err);
         return;
     }
-    const wssl = new WS_1.Server({ server: serverLocalHost });
+    const wssl = new WebSocketServer({ server: serverLocalHost });
     wssl.on('connection', connection);
     wssl.on('error', error);
-    const wssn = new WS_1.Server({ server: serverNetwork });
+    const wssn = new WebSocketServer({ server: serverNetwork });
     wssn.on('connection', connection);
     wssn.on('error', error);
     console.log('Open your browser and type in one of the following:');
