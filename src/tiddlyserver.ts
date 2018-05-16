@@ -16,7 +16,7 @@ import { createHash } from 'crypto';
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
 
-import { datafolder, init as initTiddlyWiki, handleTiddlyWikiRoute } from "./datafolder";
+import { handleDataFolderRequest, init as initTiddlyWiki, handleTiddlyWikiRoute } from "./datafolder";
 export { handleTiddlyWikiRoute };
 
 import { format, inspect } from "util";
@@ -60,13 +60,13 @@ export function init(eventer: ServerEventEmitter) {
 type apiListRouteState = [[string, string], string | any, StateObject]
 
 export function handleTiddlyServerRoute(state: StateObject) {
-	
+
 	// const resolvePath = (settings.tree);
 	Observable.of(state).mergeMap((state: StateObject) => {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
 		if (!result) return state.throw<never>(404);
 		else if (typeof result.item === "object") {
-			serveDirectoryIndex(result);
+			serveDirectoryIndex(result, state);
 			return Observable.empty<never>();
 		} else {
 			return statWalkPath(result).map(stat => {
@@ -75,19 +75,17 @@ export function handleTiddlyServerRoute(state: StateObject) {
 			});
 		}
 	}).map(result => {
-		const { state } = result;
-
 		if (state.statPath.itemtype === "folder") {
-			serveDirectoryIndex(result);
+			serveDirectoryIndex(result, state);
 		} else if (state.statPath.itemtype === "datafolder") {
-			datafolder(result);
+			handleDataFolderRequest(result, state);
 		} else if (state.statPath.itemtype === "file") {
 			if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
 				send(state.req, result.filepathPortion.join('/'), { root: result.item })
 					.on('error', (err) => {
 						state.log(2, '%s %s', err.status, err.message);
-						
-						if(state.allow.writeErrors) state.throw(500);
+
+						if (state.allow.writeErrors) state.throw(500);
 					}).on('headers', (res, filepath) => {
 						const statItem = state.statPath.stat;
 						const mtime = Date.parse(state.statPath.stat.mtime as any);
@@ -115,8 +113,8 @@ function handleFileError(err: NodeJS.ErrnoException) {
 	debug(2, "%s %s\n%s", err.code, err.message, err.path);
 }
 
-function serveDirectoryIndex(result: PathResolverResult) {
-	const { state } = result;
+function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
+	// const { state } = result;
 	const allow = state.allow;
 	// console.log(state.url);
 	if (!state.url.pathname.endsWith("/")) {
@@ -127,8 +125,7 @@ function serveDirectoryIndex(result: PathResolverResult) {
 			upload: isFolder && (allow.upload),
 			mkdir: isFolder && (allow.mkdir)
 		};
-		Observable.of(result)
-			.concatMap(getTreeItemFiles)
+		getTreeItemFiles(result, state)
 			.map(e => [e, options] as [typeof e, typeof options])
 			.concatMap(sendDirectoryIndex)
 			.subscribe(res => {

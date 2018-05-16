@@ -41,7 +41,7 @@ function handleTiddlyServerRoute(state) {
         if (!result)
             return state.throw(404);
         else if (typeof result.item === "object") {
-            serveDirectoryIndex(result);
+            serveDirectoryIndex(result, state);
             return rx_1.Observable.empty();
         }
         else {
@@ -51,12 +51,11 @@ function handleTiddlyServerRoute(state) {
             });
         }
     }).map(result => {
-        const { state } = result;
         if (state.statPath.itemtype === "folder") {
-            serveDirectoryIndex(result);
+            serveDirectoryIndex(result, state);
         }
         else if (state.statPath.itemtype === "datafolder") {
-            datafolder_1.datafolder(result);
+            datafolder_1.handleDataFolderRequest(result, state);
         }
         else if (state.statPath.itemtype === "file") {
             if (['HEAD', 'GET'].indexOf(state.req.method) > -1) {
@@ -98,8 +97,8 @@ exports.handleTiddlyServerRoute = handleTiddlyServerRoute;
 function handleFileError(err) {
     debug(2, "%s %s\n%s", err.code, err.message, err.path);
 }
-function serveDirectoryIndex(result) {
-    const { state } = result;
+function serveDirectoryIndex(result, state) {
+    // const { state } = result;
     const allow = state.allow;
     // console.log(state.url);
     if (!state.url.pathname.endsWith("/")) {
@@ -111,8 +110,7 @@ function serveDirectoryIndex(result) {
             upload: isFolder && (allow.upload),
             mkdir: isFolder && (allow.mkdir)
         };
-        rx_1.Observable.of(result)
-            .concatMap(server_types_1.getTreeItemFiles)
+        server_types_1.getTreeItemFiles(result, state)
             .map(e => [e, options])
             .concatMap(server_types_1.sendDirectoryIndex)
             .subscribe(res => {

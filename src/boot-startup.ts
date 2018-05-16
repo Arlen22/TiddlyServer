@@ -31,12 +31,11 @@ export interface FileInfo {
 export function loadWikiInfo(wikipath) {
 	return obs_readFile()(path.join(wikipath, 'tiddlywiki.info'), 'utf8').map(([err, data, _tag, filePath]) => {
 		if (err) throw err;
-		let errObj: JsonErrorContainer = {};
-		let wikiInfo: WikiInfo = tryParseJSON(data, errObj);
-		if (errObj.error) {
-			errObj.error.filePath = filePath;
-			throw errObj.error;
-		}
+		let isError = false;
+		let wikiInfo: WikiInfo = tryParseJSON(data, (error) => {
+			error.filePath = filePath;
+			throw error;
+		});
 		return wikiInfo;
 	})
 }
