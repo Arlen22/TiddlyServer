@@ -426,7 +426,7 @@ exports.sendResponse = sendResponse;
  * @param {PathResolverResult} result
  * @returns
  */
-function getTreeItemFiles(result) {
+function getTreeItemFiles(result, state) {
     let dirpath = [
         result.treepathPortion.join('/'),
         result.filepathPortion.join('/')
@@ -442,8 +442,8 @@ function getTreeItemFiles(result) {
     else {
         return exports.obs_readdir()(result.fullfilepath).map(([err, keys]) => {
             if (err) {
-                result.state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
-                result.state.throw(500);
+                state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
+                state.throw(500);
                 return;
             }
             const paths = keys.map(k => path.join(result.fullfilepath, k));
@@ -548,7 +548,14 @@ function getItemType(stat, infostat) {
     return itemtype;
 }
 function resolvePath(state, tree) {
-    var reqpath = decodeURI(state.path.slice().filter(a => a).join('/')).split('/').filter(a => a);
+    var reqpath;
+    if (Array.isArray(state)) {
+        reqpath = path;
+    }
+    else {
+        reqpath = state.path;
+    }
+    reqpath = decodeURI(reqpath.slice().filter(a => a).join('/')).split('/').filter(a => a);
     //if we're at root, just return it
     if (reqpath.length === 0)
         return {
@@ -556,8 +563,7 @@ function resolvePath(state, tree) {
             reqpath,
             treepathPortion: [],
             filepathPortion: [],
-            fullfilepath: typeof tree === "string" ? tree : '',
-            state
+            fullfilepath: typeof tree === "string" ? tree : ''
         };
     //check for invalid items (such as ..)
     if (!reqpath.every(a => a !== ".." && a !== "."))
@@ -590,8 +596,7 @@ function resolvePath(state, tree) {
         reqpath,
         treepathPortion: reqpath.slice(0, result.end),
         filepathPortion,
-        fullfilepath,
-        state
+        fullfilepath
     };
 }
 exports.resolvePath = resolvePath;

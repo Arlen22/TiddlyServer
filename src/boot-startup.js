@@ -8,12 +8,11 @@ function loadWikiInfo(wikipath) {
     return server_types_1.obs_readFile()(path.join(wikipath, 'tiddlywiki.info'), 'utf8').map(([err, data, _tag, filePath]) => {
         if (err)
             throw err;
-        let errObj = {};
-        let wikiInfo = server_types_1.tryParseJSON(data, errObj);
-        if (errObj.error) {
-            errObj.error.filePath = filePath;
-            throw errObj.error;
-        }
+        let isError = false;
+        let wikiInfo = server_types_1.tryParseJSON(data, (error) => {
+            error.filePath = filePath;
+            throw error;
+        });
         return wikiInfo;
     });
 }

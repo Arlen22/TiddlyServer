@@ -478,7 +478,7 @@ export function sendResponse(res: http.ServerResponse, body: Buffer | string, op
  * @param {PathResolverResult} result 
  * @returns 
  */
-export function getTreeItemFiles(result: PathResolverResult): Observable<DirectoryIndexData> {
+export function getTreeItemFiles(result: PathResolverResult, state: StateObject): Observable<DirectoryIndexData> {
     let dirpath = [
         result.treepathPortion.join('/'),
         result.filepathPortion.join('/')
@@ -493,8 +493,8 @@ export function getTreeItemFiles(result: PathResolverResult): Observable<Directo
     } else {
         return obs_readdir()(result.fullfilepath).map(([err, keys]) => {
             if (err) {
-                result.state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
-                result.state.throw(500);
+                state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
+                state.throw(500);
                 return;
             }
             const paths = keys.map(k => path.join(result.fullfilepath, k));
@@ -593,8 +593,15 @@ function getItemType(stat: Stats, infostat: Stats | undefined) {
 
 }
 
-export function resolvePath(state: StateObject, tree: TreeObject): PathResolverResult | undefined {
-    var reqpath = decodeURI(state.path.slice().filter(a => a).join('/')).split('/').filter(a => a);
+export function resolvePath(state: StateObject | string[], tree: TreeObject): PathResolverResult | undefined {
+    var reqpath;
+    if (Array.isArray(state)) {
+        reqpath = path;
+    } else {
+        reqpath = state.path;
+    }
+
+    reqpath = decodeURI(reqpath.slice().filter(a => a).join('/')).split('/').filter(a => a);
 
     //if we're at root, just return it
     if (reqpath.length === 0) return {
@@ -602,9 +609,8 @@ export function resolvePath(state: StateObject, tree: TreeObject): PathResolverR
         reqpath,
         treepathPortion: [],
         filepathPortion: [],
-        fullfilepath: typeof tree === "string" ? tree : '',
-        state
-    };
+        fullfilepath: typeof tree === "string" ? tree : ''
+    }
     //check for invalid items (such as ..)
     if (!reqpath.every(a => a !== ".." && a !== ".")) return;
 
@@ -635,8 +641,7 @@ export function resolvePath(state: StateObject, tree: TreeObject): PathResolverR
         reqpath,
         treepathPortion: reqpath.slice(0, result.end),
         filepathPortion,
-        fullfilepath,
-        state
+        fullfilepath
     };
 }
 
@@ -1034,7 +1039,7 @@ export interface PathResolverResult {
     filepathPortion: string[];
     // item + filepath if item is a string
     fullfilepath: string;
-    state: StateObject;
+    // state: StateObject;
 }
 export type TreeObject = { [K: string]: string | TreeObject };
 export type TreePathResultObject<T, U, V> = { item: T, end: U, folderPathFound: V }
