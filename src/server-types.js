@@ -550,7 +550,7 @@ function getItemType(stat, infostat) {
 function resolvePath(state, tree) {
     var reqpath;
     if (Array.isArray(state)) {
-        reqpath = path;
+        reqpath = state;
     }
     else {
         reqpath = state.path;
