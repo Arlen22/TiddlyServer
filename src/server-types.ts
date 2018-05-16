@@ -596,7 +596,7 @@ function getItemType(stat: Stats, infostat: Stats | undefined) {
 export function resolvePath(state: StateObject | string[], tree: TreeObject): PathResolverResult | undefined {
     var reqpath;
     if (Array.isArray(state)) {
-        reqpath = path;
+        reqpath = state;
     } else {
         reqpath = state.path;
     }
