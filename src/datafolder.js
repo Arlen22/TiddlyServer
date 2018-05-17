@@ -138,7 +138,7 @@ function loadDataFolderType(mount, folder, reload) {
 }
 function loadDataFolderTiddlyWiki(mount, folder, reload) {
     console.time('twboot-' + folder);
-    const target = "../../TiddlyWiki5-Jermolene";
+    const target = "../tiddlywiki";
     const $tw = require(target + "/boot/boot.js").TiddlyWiki(require(target + "/boot/bootprefix.js").bootprefix({
         packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, target + '/package.json'), 'utf8'))
     }));
