@@ -209,14 +209,17 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 
 function handlePUTrequest(state: StateObject) {
 	// const hash = createHash('sha256').update(fullpath).digest('base64');
+	const first = (header?: string | string[]) =>
+		Array.isArray(header) ? header[0] : header;
 	const fullpath = state.statPath.statpath;
 	const statItem = state.statPath.stat;
 	const mtime = Date.parse(state.statPath.stat.mtime as any);
 	const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
-	if (settings.etag !== "disabled" && (state.req.headers['if-match'] || settings.etag === "required") && (state.req.headers['if-match'] !== etag)) {
-		const ifmatch = JSON.parse(state.req.headers['if-match']).split('-');
+	const ifmatchStr: string = first(state.req.headers['if-match']) || '';
+	if (settings.etag !== "disabled" && (ifmatchStr || settings.etag === "required") && (ifmatchStr !== etag)) {
+		const ifmatch = JSON.parse(ifmatchStr).split('-');
 		const _etag = JSON.parse(etag).split('-');
-		console.log('412 ifmatch %s', state.req.headers['if-match']);
+		console.log('412 ifmatch %s', ifmatchStr);
 		console.log('412 etag %s', etag);
 		ifmatch.forEach((e, i) => {
 			if (_etag[i] !== e) console.log("412 caused by difference in %s", ['inode', 'size', 'modified'][i])
