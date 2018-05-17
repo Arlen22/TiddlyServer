@@ -37,10 +37,11 @@ function init(e) {
             if (statPath.itemtype === "datafolder") {
                 //trigger the datafolder to load in case it isn't
                 const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '');
+                const subpath = pathname.slice(mount.length);
                 //event to give the client to the data folder
                 const loadClient = () => {
                     debug(-1, 'ws-client-connect %s', mount);
-                    loadedFolders[mount].events.emit('ws-client-connect', client, request);
+                    loadedFolders[mount].events.emit('ws-client-connect', client, request, subpath);
                 };
                 //if the data folder is still loading, we wait, otherwise give immediately
                 if (Array.isArray(loadedFolders[mount].handler)) {
