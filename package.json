@@ -1,6 +1,6 @@
 {
   "name": "tiddlyserver",
-  "version": "2.0.14-master",
+  "version": "2.0.14",
   "description": "",
   "bin": {
     "tiddlyserver": "./server.js"
