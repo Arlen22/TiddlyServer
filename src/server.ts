@@ -26,7 +26,7 @@ import * as path from 'path';
 import * as url from 'url';
 import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
-import { parse as jsonParse } from 'jsonlint';
+// import { parse as jsonParse } from 'jsonlint';
 
 // import send = require('../lib/send-lib');
 
@@ -277,7 +277,8 @@ function handleBasicAuth(state: StateObject): boolean {
     //https://github.com/hueniverse/iron
     //auth headers =====================
     if (!settings.username && !settings.password) return true;
-
+    const first = (header?: string | string[]) => 
+        Array.isArray(header) ? header[0] : header;
     if (!state.req.headers['authorization']) {
         debug(-2, 'authorization required');
         state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
@@ -285,10 +286,10 @@ function handleBasicAuth(state: StateObject): boolean {
         return false;
     }
     debug(-3, 'authorization requested');
-    var header = state.req.headers['authorization'] || '',        // get the header
-        token = header.split(/\s+/).pop() || '',            // and the encoded auth token
-        auth = new Buffer(token, 'base64').toString(),    // convert from base64
-        parts = auth.split(/:/),                          // split on colon
+    var header = first(state.req.headers['authorization']) || '',  // get the header
+        token = header.split(/\s+/).pop() || '',                   // and the encoded auth token
+        auth = new Buffer(token, 'base64').toString(),             // convert from base64
+        parts = auth.split(/:/),                                   // split on colon
         username = parts[0],
         password = parts[1];
     if (username !== settings.username || password !== settings.password) {

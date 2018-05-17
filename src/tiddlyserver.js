@@ -199,14 +199,16 @@ function serveDirectoryIndex(result, state) {
 /// file handler section =============================================
 function handlePUTrequest(state) {
     // const hash = createHash('sha256').update(fullpath).digest('base64');
+    const first = (header) => Array.isArray(header) ? header[0] : header;
     const fullpath = state.statPath.statpath;
     const statItem = state.statPath.stat;
     const mtime = Date.parse(state.statPath.stat.mtime);
     const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
-    if (settings.etag !== "disabled" && (state.req.headers['if-match'] || settings.etag === "required") && (state.req.headers['if-match'] !== etag)) {
-        const ifmatch = JSON.parse(state.req.headers['if-match']).split('-');
+    const ifmatchStr = first(state.req.headers['if-match']) || '';
+    if (settings.etag !== "disabled" && (ifmatchStr || settings.etag === "required") && (ifmatchStr !== etag)) {
+        const ifmatch = JSON.parse(ifmatchStr).split('-');
         const _etag = JSON.parse(etag).split('-');
-        console.log('412 ifmatch %s', state.req.headers['if-match']);
+        console.log('412 ifmatch %s', ifmatchStr);
         console.log('412 etag %s', etag);
         ifmatch.forEach((e, i) => {
             if (_etag[i] !== e)
