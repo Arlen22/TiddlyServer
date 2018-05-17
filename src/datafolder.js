@@ -38,7 +38,10 @@ function init(e) {
                 //trigger the datafolder to load in case it isn't
                 const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '');
                 //event to give the client to the data folder
-                const loadClient = () => loadedFolders[mount].events.emit('ws-client-connect', client, request);
+                const loadClient = () => {
+                    debug(-1, 'ws-client-connect %s', mount);
+                    loadedFolders[mount].events.emit('ws-client-connect', client, request);
+                };
                 //if the data folder is still loading, we wait, otherwise give immediately
                 if (Array.isArray(loadedFolders[mount].handler)) {
                     loadedFolders[mount].events.once('ws-client-preload', loadClient);
@@ -176,8 +179,11 @@ function loadDataFolderTiddlyWiki(mount, folder, reload) {
             password: "",
             pathprefix: mount
         });
-        //websocket requests coming in here will need to be handled 
-        //with $tw.hooks.invokeHook('th-websocket-message', event);
+        //invoke the server start hook so plugins can extend the server or attach to the event handler
+        $tw.hooks.invokeHook('th-server-command-post-start', server, loadedFolders[mount].events, "tiddlyserver");
+        //add the event emitter to the $tw variable
+        $tw.wss = loadedFolders[mount].events;
+        //set the request handler, indicating we are now ready to recieve requests
         const requests = loadedFolders[mount].handler;
         loadedFolders[mount].handler = (state) => {
             //pretend to the handler like the path really has a trailing slash
@@ -185,11 +191,9 @@ function loadDataFolderTiddlyWiki(mount, folder, reload) {
             req.url += ((state.url.pathname === mount && !state.url.pathname.endsWith("/")) ? "/" : "");
             server.requestHandler(state.req, state.res);
         };
-        //invoke the server start hook so plugins can extend the server or attach to the event handler
-        $tw.hooks.invokeHook('th-server-command-post-start', server, loadedFolders[mount].events, "tiddlyserver");
-        //tell the socket handler to send any clients that have already connected
+        //send queued websocket clients to the event emitter
         loadedFolders[mount].events.emit('ws-client-preload');
-        //send the requests to the handler
+        //send the queued requests to the handler
         requests.forEach(e => loadedFolders[mount].handler(e));
     }
 }
