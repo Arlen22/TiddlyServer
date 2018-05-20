@@ -1,1 +1,0 @@
-console.log(require('fs').readFileSync('./server.log', 'utf8'));

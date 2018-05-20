@@ -1,4 +1,6 @@
-const settings = require('./settings.json');
+const path = require('path');
+const settings = require(process.argv[2] || path.resolve(__dirname, '../settings.json'));
+if(process.argv[3] !== "iknow") throw "This script is not finished yet.";
 
 function walkTree(item, key){
 	if(typeof item === "object") {
