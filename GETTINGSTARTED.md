@@ -1,3 +1,7 @@
+# The Getting Started Guide
+
+This guide is intended for those who are less techy or who just like more verbose instructions. 
+
 ## Where to Start
 
 The first thing you need to do is download and install NodeJS on your computer. If you're on Linux, read the note below this paragraph. If you have never heard of NodeJS and you either don't know what a "command prompt" or "terminal" is or you never use it, then just go to the NodeJS website (https://nodejs.org/en/download/), and download the installer for your operating system. Once it's downloaded, you can just run the downloaded file. 
@@ -44,7 +48,7 @@ In case you haven't figured it out yet, TiddlyServer's only dependancy is Node i
 
 ## Configuration 
 
-See the README for details on the configuration. 
+See [SETTINGS](SETTINGS.md) for details on configuring `settings.json`. 
 
 ## The History of TiddlyServer
 
@@ -52,8 +56,8 @@ The inspiration for TiddlyServer came from some discussions between sevaral Tidd
 
 I had worked with NodeJS and Apache servers for a few years already and so I got the idea to create a file server that would let you load your wikis from various places on your computer and edit and save them in any browser, not just Firefox. 
 
-Another TiddlyWiki enthusiast had wrote a TiddlyServer 1.x which had the ability to load data folders as separate node instances and proxy them alongside single file wikis. It was based on TiddlyDesktop, but was still running into bugs. This inspired me to try to build a file server which would serve data folders, but without using the somewhat cumbersome and error-prone port proxying of TiddlyServer 1. I had already done this with ExpressJS and liked the result.
+Another TiddlyWiki enthusiast had written a TiddlyServer 1.x which had the ability to load data folders as separate node instances and proxy them alongside single file wikis. It was based on TiddlyDesktop, but was still running into bugs. This inspired me to try to build a file server which would serve data folders, but without using the somewhat cumbersome and error-prone port proxying of TiddlyServer 1. I had already done this with ExpressJS and liked the result.
 
-With the Firefox 57 Apocolypse looming, I smashed together a working prototype and posted it on the TiddlyWiki Google Group. The response was overwhelmingly positive, and the feedback was very helpful. mklauber and I agreed to call it TiddlyServer 2. So now you know what happened to version 1. 
+With the Firefox 57 Apocolypse looming, I smashed together a working prototype and posted it on the TiddlyWiki Google Group. The response was overwhelmingly positive, and the feedback was very helpful. That's when mklauber and I agreed to call it TiddlyServer 2. So now you know what happened to version 1. 
 
 
