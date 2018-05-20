@@ -50,11 +50,11 @@ Just follow the installation instructions, and copy the `settings.json` file fro
 ## Quick Install 
 
 * Download and install NodeJS from https://nodejs.org
-  * **ProTip:** TiddlyServer only requires `node.exe`, allowing a portable install.
+  * **ProTip:** TiddlyServer only requires `node.exe`, allowing a portable install. The current directory (aka cwd) is completely ignored.
 * Download the latest release from https://github.com/Arlen22/TiddlyServer/releases and unzip the TiddlyServer folder contained in the zip file to wherever you want it. 
 * Copy `example-settings-simple.json` and rename it `settings.json`.
   * This configuration serves a folder named `data` located in the same folder as `settings.json`. This folder does not exist and must be created.
-* Open command prompt and run `/path/to/node /path/to/server.js`.
+* Open command prompt and run `/path/to/node /path/to/tiddlyserver/server.js`.
 
 ## FAQ
 
@@ -63,6 +63,10 @@ If these do not answer your question, feel free to open an issue or ask on the T
 ### TiddlyServer throws a Syntax Error on start up
 
 Make sure you are running at least Node version 6. This is the minimum supported.
+
+## TiddlyServer for "the-not-so-techy"
+
+Inspired by those black and yellow books, I present [[GETTINGSTARTED.md]]
 
 ## settings.json
 
