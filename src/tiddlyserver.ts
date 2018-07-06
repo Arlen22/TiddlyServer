@@ -95,12 +95,10 @@ export function handleTiddlyServerRoute(state: StateObject) {
 			} else if (['PUT'].indexOf(state.req.method as string) > -1) {
 				handlePUTrequest(state);
 			} else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
-				state.res.writeHead(200, {
+				state.respond(200, "", {
 					'x-api-access-type': 'file',
 					'dav': 'tw5/put'
-				});
-				state.res.write("GET,HEAD,PUT,OPTIONS");
-				state.res.end();
+				}).string("GET,HEAD,PUT,OPTIONS");
 			} else state.throw(405);
 		} else if (state.statPath.itemtype === "error") {
 			state.throw(404);
@@ -129,9 +127,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 			.map(e => [e, options] as [typeof e, typeof options])
 			.concatMap(sendDirectoryIndex)
 			.subscribe(res => {
-				state.res.writeHead(200, { 'content-type': 'text/html' });
-				state.res.write(res);
-				state.res.end();
+				state.respond(200, "", { 'content-type': 'text/html' }).string(res);
 			});
 	} else if (state.req.method === "POST") {
 		var form = new formidable.IncomingForm();
@@ -142,6 +138,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				return state.throwReason(400, "upload is not possible for tree items");
 			if (!allow.upload)
 				return state.throwReason(403, "upload is not allowed over the network")
+			
 			form.parse(state.req, function (err: Error, fields, files) {
 				if (err) {
 					debug(2, "upload %s", err.toString());
@@ -262,9 +259,9 @@ function handlePUTrequest(state: StateObject) {
 			subscriber.complete();
 		}
 	}).switchMap(() => {
-		let stream: Stream = state.req;
+		// let stream: Stream = state.req;
 
-		const write = stream.pipe(fs.createWriteStream(fullpath));
+		const write = state.req.pipe(fs.createWriteStream(fullpath));
 		const finish = Observable.fromEvent(write, 'finish').take(1);
 		return Observable.merge(finish, Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err: Error) => {
 			if (err) {
@@ -278,11 +275,10 @@ function handlePUTrequest(state: StateObject) {
 		}).map(([err, statNew]) => {
 			const mtimeNew = Date.parse(statNew.mtime as any);
 			const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
-			state.res.writeHead(200, {
+			state.respond(200, "", {
 				'x-api-access-type': 'file',
 				'etag': etagNew
 			})
-			state.res.end();
 		})
 	}).subscribe();
 }
