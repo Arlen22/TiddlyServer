@@ -240,7 +240,7 @@ function validateTypes(level, upd, current) {
     return { valid: true, value: [], changed: false };
 }
 function handleSettings(state) {
-    const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+    const allow = state.allow;
     const level = (allow.WARNING_all_settings_WARNING) ? 1 : (allow.settings ? 0 : -1);
     if (state.path[3] === "") {
         if (state.req.method === "GET") {
@@ -258,7 +258,7 @@ function handleSettings(state) {
                                 return;
                             set[item.name] = curjson[item.name];
                         });
-                        server_types_1.sendResponse(state.res, JSON.stringify({
+                        server_types_1.sendResponse(state, JSON.stringify({
                             level,
                             data,
                             descriptions,
@@ -353,7 +353,7 @@ function handleSettingsUpdate(state, level) {
             else {
                 debug(-1, "no keys to be written");
             }
-            server_types_1.sendResponse(state.res, JSON.stringify(response), {
+            server_types_1.sendResponse(state, JSON.stringify(response), {
                 contentType: "application/json",
                 doGzip: server_types_1.canAcceptGzip(state.req)
             });
@@ -361,7 +361,7 @@ function handleSettingsUpdate(state, level) {
     });
 }
 function handleTreeSubpage(state) {
-    const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+    const allow = state.allow;
     const level = (allow.WARNING_all_settings_WARNING) ? 1 : (allow.settings ? 0 : -1);
     // we don't need to process anything here because the user will paste the new settings into 
     // settings.json and then restart the server. The best way to prevent unauthorized access
@@ -374,7 +374,7 @@ function handleTreeSubpage(state) {
         serveSettingsTree.next(state);
     }
     else if (state.url.query.action === "getdata") {
-        server_types_1.sendResponse(state.res, JSON.stringify({ level, settings }), {
+        server_types_1.sendResponse(state, JSON.stringify({ level, settings }), {
             contentType: "application/json",
             doGzip: server_types_1.canAcceptGzip(state.req)
         });

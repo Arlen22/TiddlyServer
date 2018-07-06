@@ -256,7 +256,7 @@ function validateTypes(level: number, upd: ServerConfig, current: ServerConfig) 
 	return { valid: true, value: [], changed: false };
 }
 export function handleSettings(state: StateObject) {
-	const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+	const allow = state.allow;
 	const level = (allow.WARNING_all_settings_WARNING) ? 1 : (allow.settings ? 0 : -1);
 
 	if (state.path[3] === "") {
@@ -275,9 +275,9 @@ export function handleSettings(state: StateObject) {
 							if (item.level > level) return;
 							set[item.name] = curjson[item.name];
 						});
-						sendResponse(state.res, JSON.stringify({
-							level, 
-							data, 
+						sendResponse(state, JSON.stringify({
+							level,
+							data,
 							descriptions,
 							settings: set,
 							currentPath: settings.__filename
@@ -360,7 +360,7 @@ function handleSettingsUpdate(state: StateObject, level: number) {
 				debug(-1, "no keys to be written");
 			}
 
-			sendResponse(state.res, JSON.stringify(response), {
+			sendResponse(state, JSON.stringify(response), {
 				contentType: "application/json",
 				doGzip: canAcceptGzip(state.req)
 			});
@@ -368,7 +368,7 @@ function handleSettingsUpdate(state: StateObject, level: number) {
 	})
 }
 function handleTreeSubpage(state: StateObject) {
-	const allow = state.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+	const allow = state.allow;
 	const level = (allow.WARNING_all_settings_WARNING) ? 1 : (allow.settings ? 0 : -1);
 	// we don't need to process anything here because the user will paste the new settings into 
 	// settings.json and then restart the server. The best way to prevent unauthorized access
@@ -380,7 +380,7 @@ function handleTreeSubpage(state: StateObject) {
 	if (state.url.search === "") {
 		serveSettingsTree.next(state);
 	} else if (state.url.query.action === "getdata") {
-		sendResponse(state.res, JSON.stringify({ level, settings }), {
+		sendResponse(state, JSON.stringify({ level, settings }), {
 			contentType: "application/json",
 			doGzip: canAcceptGzip(state.req)
 		})

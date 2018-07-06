@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const http = require("http");
 const url = require("url");
 const fs = require("fs");
 const path = require("path");
@@ -377,7 +378,7 @@ function serveFolderIndex(options) {
     if (options.type === "json") {
         return function (state, res, folder) {
             readFolder(folder).subscribe(item => {
-                sendResponse(res, JSON.stringify(item), {
+                sendResponse(state, JSON.stringify(item), {
                     contentType: "application/json",
                     doGzip: canAcceptGzip(state.req)
                 });
@@ -395,7 +396,7 @@ function canAcceptGzip(header) {
     return can;
 }
 exports.canAcceptGzip = canAcceptGzip;
-function sendResponse(res, body, options = {}) {
+function sendResponse(state, body, options = {}) {
     body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body;
     if (options.doGzip)
         zlib_1.gzip(body, (err, gzBody) => {
@@ -407,15 +408,15 @@ function sendResponse(res, body, options = {}) {
     else
         _send(body, false);
     function _send(body, isGzip) {
-        res.setHeader('Content-Length', Buffer.isBuffer(body)
-            ? body.length.toString()
-            : Buffer.byteLength(body, 'utf8').toString());
+        state.setHeaders({
+            'Content-Length': Buffer.isBuffer(body)
+                ? body.length.toString()
+                : Buffer.byteLength(body, 'utf8').toString(),
+            'Content-Type': options.contentType || 'text/plain; charset=utf-8'
+        });
         if (isGzip)
-            res.setHeader('Content-Encoding', 'gzip');
-        res.setHeader('Content-Type', options.contentType || 'text/plain; charset=utf-8');
-        res.writeHead(200);
-        res.write(body);
-        res.end();
+            state.setHeaders({ 'Content-Encoding': 'gzip' });
+        state.respond(200).buffer(body);
     }
 }
 exports.sendResponse = sendResponse;
@@ -454,7 +455,7 @@ function getTreeItemFiles(result, state) {
 exports.getTreeItemFiles = getTreeItemFiles;
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
-const { generateDirectoryListing } = require('./generateDirectoryListing');
+const generateDirectoryListing = require('./generateDirectoryListing').generateDirectoryListing;
 function sendDirectoryIndex([_r, options]) {
     let { keys, paths, dirpath, type } = _r;
     let pairs = keys.map((k, i) => [k, paths[i]]);
@@ -476,7 +477,12 @@ function sendDirectoryIndex([_r, options]) {
         });
         return n;
     }, []).map(entries => {
-        return generateDirectoryListing({ path: dirpath, entries, type }, options);
+        if (options.format === "json") {
+            return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
+        }
+        else {
+            return generateDirectoryListing({ path: dirpath, entries, type }, options);
+        }
     });
 }
 exports.sendDirectoryIndex = sendDirectoryIndex;
@@ -669,12 +675,14 @@ class URLSearchParams {
 }
 exports.URLSearchParams = URLSearchParams;
 class StateObject {
-    constructor(req, res, debugLog, eventer, isLocalHost = false) {
-        this.req = req;
-        this.res = res;
+    constructor(_req, _res, debugLog, eventer, trustLevel = "network") {
+        this._req = _req;
+        this._res = _res;
         this.debugLog = debugLog;
         this.eventer = eventer;
-        this.isLocalHost = isLocalHost;
+        this.trustLevel = trustLevel;
+        this.responseHeaders = {};
+        this.responseSent = false;
         // debug(str: string, ...args: any[]) {
         //     this.debugLog('[' +
         //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
@@ -686,11 +694,15 @@ class StateObject {
         this.doneMessage = [];
         this.hasCriticalLogs = false;
         this.startTime = process.hrtime();
+        this.req = _req;
+        this.res = _res;
+        // this.req = {
+        //     method: _req.method as string,
+        //     url: _req.url as string,
+        //     headers: _req.headers,
+        //     pipe: _req.pipe.bind(_req)
+        // }
         //parse the url and store in state.
-        //a server request will definitely have the required fields in the object
-        // console.log(this.req.url);
-        // this.url = new URL(this.req.url as string);
-        // this.url = url.parse(this.req.url as string, true) as any;
         this.url = StateObject.parseURL(this.req.url);
         //parse the path for future use
         this.path = this.url.pathname.split('/');
@@ -700,7 +712,7 @@ class StateObject {
             this.log(-2, 'LONG RUNNING RESPONSE');
             this.log(-2, '%s %s ', this.req.method, this.req.url);
         }, 60000);
-        this.res.on('finish', () => {
+        _res.on('finish', () => {
             clearInterval(interval);
             if (this.hasCriticalLogs)
                 this.eventer.emit('stateError', this);
@@ -734,7 +746,17 @@ class StateObject {
         };
     }
     get allow() {
-        return this.isLocalHost ? settings.allowLocalhost : settings.allowNetwork;
+        switch (this.trustLevel) {
+            case "trusted": return {
+                mkdir: true,
+                settings: true,
+                upload: true,
+                WARNING_all_settings_WARNING: true,
+                writeErrors: true
+            };
+            case "localhost": return settings.allowLocalhost;
+            case "network": return settings.allowNetwork;
+        }
     }
     /**
      *  4 - Errors that require the process to exit for restart
@@ -765,43 +787,70 @@ class StateObject {
      * `reason` is always sent as the status header.
      */
     throwError(statusCode, error, headers) {
-        if (!this.res.headersSent) {
-            this.res.writeHead(statusCode, error.reason, headers);
-            //don't write 204 reason
-            if (statusCode !== 204)
-                this.res.write(this.allow.writeErrors ? error.message : error.reason);
-        }
-        this.res.end();
-        return rx_1.Observable.empty();
+        return this.throwReason(statusCode, this.allow.writeErrors ? error.message : error.reason, headers);
     }
     throwReason(statusCode, reason, headers) {
-        if (!this.res.headersSent) {
-            this.res.writeHead(statusCode, reason && reason.toString(), headers);
+        if (!this.responseSent) {
+            var res = this.respond(statusCode, reason, headers);
             //don't write 204 reason
             if (statusCode !== 204 && reason)
-                this.res.write(reason.toString());
+                res.string(reason.toString());
         }
-        this.res.end();
         return rx_1.Observable.empty();
     }
     throw(statusCode, headers) {
-        if (!this.res.headersSent) {
-            this.res.writeHead(statusCode, headers);
-            //don't write 204 reason
-            // if (statusCode !== 204 && reason) this.res.write(reason.toString());
+        if (!this.responseSent) {
+            if (headers)
+                this.setHeaders(headers);
+            this.respond(statusCode);
         }
-        this.res.end();
         return rx_1.Observable.empty();
     }
-    endJSON(data) {
-        this.res.write(JSON.stringify(data));
-        this.res.end();
+    setHeader(key, val) {
+        this.responseHeaders[key] = val;
+    }
+    setHeaders(headers) {
+        Object.assign(this.responseHeaders, headers);
+    }
+    respond(code, message, headers) {
+        if (headers)
+            this.setHeaders(headers);
+        if (!message)
+            message = http.STATUS_CODES[code];
+        var subthis = {
+            json: (data) => {
+                subthis.string(JSON.stringify(data));
+            },
+            string: (data) => {
+                subthis.buffer(Buffer.from(data, 'utf8'));
+            },
+            stream: (data) => {
+                this._res.writeHead(code, message, this.responseHeaders);
+                data.pipe(this._res);
+                subthis.empty();
+            },
+            buffer: (data) => {
+                this._res.writeHead(code, message, this.responseHeaders);
+                this._res.write(data);
+                subthis.empty();
+            },
+            empty: () => {
+                this.responseSent = true;
+                this._res.end();
+            }
+        };
+        return subthis;
+    }
+    respondJSON(data) {
+    }
+    respondBuffer(data) {
+    }
+    respondStream(data) {
     }
     redirect(redirect) {
-        this.res.writeHead(302, {
+        this.respond(302, "", {
             'Location': redirect
-        });
-        this.res.end();
+        }).empty();
     }
     /**
      * Recieves the body of the request and stores it in body and json. If there is an
@@ -814,7 +863,22 @@ class StateObject {
      * @memberof StateObject
      */
     recieveBody(errorCB) {
-        return recieveBody(this, errorCB);
+        return rx_1.Observable.fromEvent(this._req, 'data')
+            .takeUntil(rx_1.Observable.fromEvent(this._req, 'end').take(1))
+            .reduce((n, e) => { n.push(e); return n; }, [])
+            .map(e => {
+            this.body = Buffer.concat(e).toString('utf8');
+            //console.log(state.body);
+            if (this.body.length === 0)
+                return this;
+            let catchHandler = errorCB === true ? (e) => {
+                this.respond(400, "", {
+                    "Content-Type": "text/plain"
+                }).string(e.errorPosition);
+            } : errorCB;
+            this.json = tryParseJSON(this.body, catchHandler);
+            return this;
+        });
     }
 }
 exports.StateObject = StateObject;
@@ -828,24 +892,7 @@ exports.ER = ER;
 /** to be used with concatMap, mergeMap, etc. */
 function recieveBody(state, sendError) {
     //get the data from the request
-    return rx_1.Observable.fromEvent(state.req, 'data')
-        .takeUntil(rx_1.Observable.fromEvent(state.req, 'end').take(1))
-        .reduce((n, e) => { n.push(e); return n; }, [])
-        .map(e => {
-        state.body = Buffer.concat(e).toString('utf8');
-        //console.log(state.body);
-        if (state.body.length === 0)
-            return state;
-        let catchHandler = sendError === true ? (e) => {
-            state.res.writeHead(400, {
-                "Content-Type": "text/plain"
-            });
-            state.res.write(e.errorPosition);
-            state.res.end();
-        } : sendError;
-        state.json = tryParseJSON(state.body, catchHandler);
-        return state;
-    });
+    return state.recieveBody(sendError);
 }
 exports.recieveBody = recieveBody;
 ;

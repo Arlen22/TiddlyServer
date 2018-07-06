@@ -102,24 +102,25 @@ if (typeof settings.tree === "object") {
     let routeKeys = Object.keys(routes);
     let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
     if (conflict.length)
-        console.log("The paths %s are reserved for use by TiddlyServer", conflict.join(', '));
+        console.log("The paths %s are reserved for use by TiddlyServer", conflict.map(e => '"' + e + '"').join(', '));
 }
 function initServer() {
     serverLocalHost = http.createServer();
     serverNetwork = http.createServer();
     const serverClose = rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'close').take(1), rx_1.Observable.fromEvent(serverNetwork, 'close').take(1)).multicast(new rx_1.Subject()).refCount();
-    rx_1.Observable.merge(rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
+    serverLocalHost;
+    rx_1.Observable.merge((rx_1.Observable.fromEvent(serverLocalHost, 'request', (req, res) => {
         if (!req || !res)
             console.log('blank req or res');
-        return new server_types_1.StateObject(req, res, debug, eventer, true);
-    }).takeUntil(serverClose).concatMap(state => {
-        return log(state.req, state.res).mapTo(state);
-    }), rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
+        return { req, res, state: new server_types_1.StateObject(req, res, debug, eventer, "localhost") };
+    })).takeUntil(serverClose).concatMap(({ req, res, state }) => {
+        return log(req, res).mapTo(state);
+    }), (rx_1.Observable.fromEvent(serverNetwork, 'request', (req, res) => {
         if (!req || !res)
             console.log('blank req or res');
-        return new server_types_1.StateObject(req, res, debug, eventer, false);
-    }).takeUntil(serverClose).concatMap(state => {
-        return log(state.req, state.res).mapTo(state);
+        return { req, res, state: new server_types_1.StateObject(req, res, debug, eventer, "network") };
+    })).takeUntil(serverClose).concatMap(({ req, res, state }) => {
+        return log(req, res).mapTo(state);
     })).subscribe((state) => {
         if (!handleBasicAuth(state))
             return;
@@ -232,8 +233,7 @@ function handleBasicAuth(state) {
     const first = (header) => Array.isArray(header) ? header[0] : header;
     if (!state.req.headers['authorization']) {
         debug(-2, 'authorization required');
-        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
-        state.res.end();
+        state.respond(401, "", { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' }).empty();
         return false;
     }
     debug(-3, 'authorization requested');

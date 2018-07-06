@@ -147,7 +147,10 @@ if (typeof settings.tree === "object") {
     let keys = Object.keys(settings.tree);
     let routeKeys = Object.keys(routes);
     let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
-    if (conflict.length) console.log("The paths %s are reserved for use by TiddlyServer", conflict.join(', '));
+    if (conflict.length) console.log(
+        "The paths %s are reserved for use by TiddlyServer",
+        conflict.map(e => '"' + e + '"').join(', ')
+    );
 }
 
 function initServer() {
@@ -160,18 +163,19 @@ function initServer() {
         Observable.fromEvent(serverNetwork, 'close').take(1)
     ).multicast(new Subject()).refCount();
 
+    serverLocalHost
     Observable.merge(
         (Observable.fromEvent(serverLocalHost, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
             if (!req || !res) console.log('blank req or res');
-            return new StateObject(req, res, debug, eventer, true);
-        }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
-            return log(state.req, state.res).mapTo(state);
+            return { req, res, state: new StateObject(req, res, debug, eventer, "localhost") };
+        })).takeUntil(serverClose).concatMap(({ req, res, state }) => {
+            return log(req, res).mapTo(state);
         }),
         (Observable.fromEvent(serverNetwork, 'request', (req: http.IncomingMessage, res: http.ServerResponse) => {
             if (!req || !res) console.log('blank req or res');
-            return new StateObject(req, res, debug, eventer, false);
-        }) as Observable<StateObject>).takeUntil(serverClose).concatMap(state => {
-            return log(state.req, state.res).mapTo(state);
+            return { req, res, state: new StateObject(req, res, debug, eventer, "network") };
+        })).takeUntil(serverClose).concatMap(({ req, res, state }) => {
+            return log(req, res).mapTo(state);
         })
     ).subscribe((state: StateObject) => {
         if (!handleBasicAuth(state)) return;
@@ -267,7 +271,7 @@ function serverListenCB(err: any, res: any) {
     } else {
         console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
     }
-    
+
 }
 
 
@@ -277,12 +281,11 @@ function handleBasicAuth(state: StateObject): boolean {
     //https://github.com/hueniverse/iron
     //auth headers =====================
     if (!settings.username && !settings.password) return true;
-    const first = (header?: string | string[]) => 
+    const first = (header?: string | string[]) =>
         Array.isArray(header) ? header[0] : header;
     if (!state.req.headers['authorization']) {
         debug(-2, 'authorization required');
-        state.res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' });
-        state.res.end();
+        state.respond(401, "", { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' }).empty();
         return false;
     }
     debug(-3, 'authorization requested');

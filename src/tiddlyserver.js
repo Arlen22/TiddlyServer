@@ -75,12 +75,10 @@ function handleTiddlyServerRoute(state) {
                 handlePUTrequest(state);
             }
             else if (['OPTIONS'].indexOf(state.req.method) > -1) {
-                state.res.writeHead(200, {
+                state.respond(200, "", {
                     'x-api-access-type': 'file',
                     'dav': 'tw5/put'
-                });
-                state.res.write("GET,HEAD,PUT,OPTIONS");
-                state.res.end();
+                }).string("GET,HEAD,PUT,OPTIONS");
             }
             else
                 state.throw(405);
@@ -114,9 +112,7 @@ function serveDirectoryIndex(result, state) {
             .map(e => [e, options])
             .concatMap(server_types_1.sendDirectoryIndex)
             .subscribe(res => {
-            state.res.writeHead(200, { 'content-type': 'text/html' });
-            state.res.write(res);
-            state.res.end();
+            state.respond(200, "", { 'content-type': 'text/html' }).string(res);
         });
     }
     else if (state.req.method === "POST") {
@@ -251,8 +247,8 @@ function handlePUTrequest(state) {
             subscriber.complete();
         }
     }).switchMap(() => {
-        let stream = state.req;
-        const write = stream.pipe(fs.createWriteStream(fullpath));
+        // let stream: Stream = state.req;
+        const write = state.req.pipe(fs.createWriteStream(fullpath));
         const finish = rx_1.Observable.fromEvent(write, 'finish').take(1);
         return rx_1.Observable.merge(finish, rx_1.Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err) => {
             if (err) {
@@ -267,11 +263,10 @@ function handlePUTrequest(state) {
         }).map(([err, statNew]) => {
             const mtimeNew = Date.parse(statNew.mtime);
             const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
-            state.res.writeHead(200, {
+            state.respond(200, "", {
                 'x-api-access-type': 'file',
                 'etag': etagNew
             });
-            state.res.end();
         });
     }).subscribe();
 }
