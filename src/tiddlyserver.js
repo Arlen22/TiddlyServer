@@ -59,17 +59,21 @@ function handleTiddlyServerRoute(state) {
         }
         else if (state.statPath.itemtype === "file") {
             if (['HEAD', 'GET'].indexOf(state.req.method) > -1) {
-                bundled_lib_1.send(state.req, result.filepathPortion.join('/'), { root: result.item })
-                    .on('error', (err) => {
-                    state.log(2, '%s %s', err.status, err.message);
-                    if (state.allow.writeErrors)
-                        state.throw(500);
-                }).on('headers', (res, filepath) => {
-                    const statItem = state.statPath.stat;
-                    const mtime = Date.parse(state.statPath.stat.mtime);
-                    const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
-                    res.setHeader('Etag', etag);
-                }).pipe(state.res);
+                state.send({
+                    root: result.item,
+                    filepath: result.filepathPortion.join('/'),
+                    error: err => {
+                        state.log(2, '%s %s', err.status, err.message);
+                        if (state.allow.writeErrors)
+                            state.throw(500);
+                    },
+                    headers: (filepath) => {
+                        const statItem = state.statPath.stat;
+                        const mtime = Date.parse(state.statPath.stat.mtime);
+                        const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
+                        return { 'Etag': etag };
+                    }
+                });
             }
             else if (['PUT'].indexOf(state.req.method) > -1) {
                 handlePUTrequest(state);
@@ -106,7 +110,8 @@ function serveDirectoryIndex(result, state) {
         const isFolder = typeof result.item === "string";
         const options = {
             upload: isFolder && (allow.upload),
-            mkdir: isFolder && (allow.mkdir)
+            mkdir: isFolder && (allow.mkdir),
+            mixFolders: settings.mixFolders
         };
         server_types_1.getTreeItemFiles(result, state)
             .map(e => [e, options])

@@ -282,7 +282,7 @@ function handleTiddlyWikiRoute(state) {
 }
 exports.handleTiddlyWikiRoute = handleTiddlyWikiRoute;
 function sendPluginResponse(state, pluginCache) {
-    const { req, res } = state;
+    // const { req, res } = state;
     if (pluginCache === "null") {
         state.respond(404).empty();
         return;
@@ -323,11 +323,11 @@ function sendPluginResponse(state, pluginCache) {
     var etagStr = bundled_lib_1.etag(body);
     debug(-3, 'etag %s', etagStr);
     state.setHeader('ETag', etagStr);
-    if (bundled_lib_1.fresh(req.headers, { 'etag': etagStr, 'last-modified': modified })) {
+    if (bundled_lib_1.fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
         state.respond(304).empty();
     }
     else {
-        server_types_1.sendResponse(state, body, { doGzip: server_types_1.canAcceptGzip(req) });
+        server_types_1.sendResponse(state, body, { doGzip: server_types_1.canAcceptGzip(state.req) });
     }
 }
 // function loadTiddlyServerAdapter(mount: string, folder: string, reload: string, wikiInfo: WikiInfo) {

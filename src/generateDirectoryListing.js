@@ -11,7 +11,7 @@ const info = require('../package.json');
 exports.generateDirectoryListing = function (directory, options) {
     function listEntries(entries) {
         return entries.slice().sort(
-            sortBySelector(e => ((e.type === 'folder' ? '0-' : '1-') + e.name.toLocaleLowerCase()))
+            sortBySelector(e => ((options.mixFolders ? "" : (e.type === 'folder' ? '0-' : '1-')) + e.name.toLocaleLowerCase()))
         ).map((entry, index) => {
             const isFile = ['category', 'folder', 'datafolder', 'error', 'other'].indexOf(entry.type) === -1;
             const showSize = isFile || entry.type === "other";

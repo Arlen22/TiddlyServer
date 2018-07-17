@@ -81,17 +81,20 @@ export function handleTiddlyServerRoute(state: StateObject) {
 			handleDataFolderRequest(result, state);
 		} else if (state.statPath.itemtype === "file") {
 			if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
-				send(state.req, result.filepathPortion.join('/'), { root: result.item })
-					.on('error', (err) => {
+				state.send({
+					root: result.item as string,
+					filepath: result.filepathPortion.join('/'),
+					error: err => {
 						state.log(2, '%s %s', err.status, err.message);
-
 						if (state.allow.writeErrors) state.throw(500);
-					}).on('headers', (res, filepath) => {
+					},
+					headers: (filepath) => {
 						const statItem = state.statPath.stat;
 						const mtime = Date.parse(state.statPath.stat.mtime as any);
 						const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
-						res.setHeader('Etag', etag);
-					}).pipe(state.res);
+						return { 'Etag': etag };
+					}
+				})
 			} else if (['PUT'].indexOf(state.req.method as string) > -1) {
 				handlePUTrequest(state);
 			} else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
@@ -121,7 +124,8 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		const isFolder = typeof result.item === "string";
 		const options = {
 			upload: isFolder && (allow.upload),
-			mkdir: isFolder && (allow.mkdir)
+			mkdir: isFolder && (allow.mkdir),
+			mixFolders: settings.mixFolders
 		};
 		getTreeItemFiles(result, state)
 			.map(e => [e, options] as [typeof e, typeof options])
@@ -138,7 +142,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				return state.throwReason(400, "upload is not possible for tree items");
 			if (!allow.upload)
 				return state.throwReason(403, "upload is not allowed over the network")
-			
+
 			form.parse(state.req, function (err: Error, fields, files) {
 				if (err) {
 					debug(2, "upload %s", err.toString());
