@@ -104,7 +104,8 @@ const data: (SettingsPageItemTypes)[] = [
 		enumType: "boolean",
 		enumKeys: ["mkdir", "upload", "settings", "WARNING_all_settings_WARNING"],
 	},
-	{ level: 1, name: "useTW5path", fieldType: "boolean" }
+	{ level: 1, name: "useTW5path", fieldType: "boolean" },
+	{ level: 0, name: "mixFolders", fieldType: "boolean" }
 ];
 const accessOptions = (type: "network" | "localhost") => {
 	return {
@@ -142,7 +143,9 @@ const descriptions: {[K in keyof ServerConfig]: any} = {
 	logToConsoleAlso: "Log all messages to console, even if logged to file",
 	maxAge: "",
 	tsa: "",
+	mixFolders: "",
 	_disableLocalHost: "",
+	_devmode: "",
 	__dirname: "READONLY: Directory of currently loaded settings file",
 	__filename: "READONLY: Full file path of the currently loaded settings file",
 	__assetsDir: ""

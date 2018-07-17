@@ -32,11 +32,11 @@ let debugOutput = new stream_1.Writable({
     }
 });
 ;
-exports.typeLookup = {};
 function init(eventer) {
     eventer.on('settings', function (set) {
         // DEBUGLEVEL = set.debugLevel;
         settings = set;
+        exports.typeLookup = {};
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!exports.typeLookup[ext]) {
@@ -101,7 +101,7 @@ function normalizeSettings(set, settingsFile) {
                 else if (typeof item[e] === 'object')
                     normalizeTree(item[e]);
                 else
-                    throw 'Invalid item: ' + e + ': ' + item[e];
+                    throw 'Invalid item: ' + e.toString() + ': ' + item[e];
             });
         })(set.tree);
     else
@@ -323,10 +323,13 @@ function serveFile(state, file, root) {
     exports.obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]) => {
         if (err)
             return state.throw(404);
-        bundled_lib_1.send(state.req, file, { root })
-            .on('error', err => {
-            state.log(2, '%s %s', err.status, err.message).throw(500);
-        }).pipe(state.res);
+        state.send({
+            root,
+            filepath: file,
+            error: err => {
+                state.log(2, '%s %s', err.status, err.message).throw(500);
+            }
+        });
         return rx_1.Observable.empty();
     }).subscribe();
 }
@@ -341,19 +344,19 @@ function serveFolder(state, mount, root, serveIndex) {
         state.log(2, 'URL is different than the mount point %s', mount).throw(500);
     }
     else {
-        bundled_lib_1.send(state.req, pathname.slice(mount.length), { root })
-            .on('error', (err) => {
-            state.log(-1, '%s %s', err.status, err.message).throw(404);
-        })
-            .on('directory', (res, fp) => {
-            if (serveIndex) {
-                serveIndex(state, res, fp);
+        state.send({
+            root,
+            filepath: pathname.slice(mount.length),
+            error: err => { state.log(-1, '%s %s', err.status, err.message).throw(404); },
+            directory: (filepath) => {
+                if (serveIndex) {
+                    serveIndex(state, filepath);
+                }
+                else {
+                    state.throw(403);
+                }
             }
-            else {
-                state.throw(403);
-            }
-        })
-            .pipe(state.res);
+        });
     }
 }
 exports.serveFolder = serveFolder;
@@ -376,7 +379,7 @@ function serveFolderIndex(options) {
         }, { "directory": [], "file": [] });
     }
     if (options.type === "json") {
-        return function (state, res, folder) {
+        return function (state, folder) {
             readFolder(folder).subscribe(item => {
                 sendResponse(state, JSON.stringify(item), {
                     contentType: "application/json",
@@ -802,7 +805,7 @@ class StateObject {
         if (!this.responseSent) {
             if (headers)
                 this.setHeaders(headers);
-            this.respond(statusCode);
+            this.respond(statusCode).empty();
         }
         return rx_1.Observable.empty();
     }
@@ -817,6 +820,11 @@ class StateObject {
             this.setHeaders(headers);
         if (!message)
             message = http.STATUS_CODES[code];
+        if (settings._devmode)
+            setTimeout(() => {
+                if (!this.responseSent)
+                    this.debugLog(3, "Response not sent \n %s", new Error().stack);
+            }, 0);
         var subthis = {
             json: (data) => {
                 subthis.string(JSON.stringify(data));
@@ -827,7 +835,7 @@ class StateObject {
             stream: (data) => {
                 this._res.writeHead(code, message, this.responseHeaders);
                 data.pipe(this._res);
-                subthis.empty();
+                this.responseSent = true;
             },
             buffer: (data) => {
                 this._res.writeHead(code, message, this.responseHeaders);
@@ -841,16 +849,28 @@ class StateObject {
         };
         return subthis;
     }
-    respondJSON(data) {
-    }
-    respondBuffer(data) {
-    }
-    respondStream(data) {
-    }
     redirect(redirect) {
         this.respond(302, "", {
             'Location': redirect
         }).empty();
+    }
+    send(options) {
+        const { filepath, root, error, directory, headers } = options;
+        const sender = bundled_lib_1.send(this._req, filepath, { root });
+        if (error)
+            sender.on('error', options.error);
+        if (directory)
+            sender.on('directory', (res, fp) => directory(fp));
+        if (headers)
+            sender.on('headers', (res, fp) => {
+                const hdrs = headers(fp);
+                Object.keys(hdrs).forEach(e => {
+                    let item = hdrs[e];
+                    if (item)
+                        res.setHeader(e, item.toString());
+                });
+            });
+        sender.pipe(this._res);
     }
     /**
      * Recieves the body of the request and stores it in body and json. If there is an

@@ -342,7 +342,7 @@ export function handleTiddlyWikiRoute(state: StateObject) {
 }
 
 function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null") {
-    const { req, res } = state;
+    // const { req, res } = state;
     if (pluginCache === "null") {
         state.respond(404).empty();
         return;
@@ -390,10 +390,10 @@ function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null
     debug(-3, 'etag %s', etagStr)
     state.setHeader('ETag', etagStr)
 
-    if (fresh(req.headers, { 'etag': etagStr, 'last-modified': modified })) {
+    if (fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
         state.respond(304).empty();
     } else {
-        sendResponse(state, body, { doGzip: canAcceptGzip(req) });
+        sendResponse(state, body, { doGzip: canAcceptGzip(state.req) });
     }
 }
 

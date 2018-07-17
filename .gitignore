@@ -12,3 +12,4 @@ uncaughtException.log
 *.exe
 test.js
 *.log
+/tiddlywiki/plugins/danielo515

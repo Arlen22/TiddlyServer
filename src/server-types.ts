@@ -36,11 +36,12 @@ let debugOutput: Writable = new Writable({
         return true;
     }
 });;
-export const typeLookup: { [k: string]: string } = {};
+export let typeLookup: { [k: string]: string };
 export function init(eventer: ServerEventEmitter) {
     eventer.on('settings', function (set: ServerConfig) {
         // DEBUGLEVEL = set.debugLevel;
         settings = set;
+        typeLookup = {};
         Object.keys(set.types).forEach(type => {
             set.types[type].forEach(ext => {
                 if (!typeLookup[ext]) {
@@ -92,7 +93,7 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
             keys(item).forEach(e => {
                 if (typeof item[e] === 'string') item[e] = path.resolve(settingsDir, item[e]);
                 else if (typeof item[e] === 'object') normalizeTree(item[e]);
-                else throw 'Invalid item: ' + e + ': ' + item[e];
+                else throw 'Invalid item: ' + e.toString() + ': ' + item[e];
             })
         })(set.tree);
     else set.tree = path.resolve(settingsDir, set.tree);
@@ -120,6 +121,7 @@ interface ServerEventsListener<THIS> {
     (event: "settings", listener: (settings: ServerConfig) => void): THIS;
     (event: "stateError", listener: (state: StateObject) => void): THIS;
     (event: "stateDebug", listener: (state: StateObject) => void): THIS;
+    (event: "serverClose", listener: (iface: "localhost" | "network") => void): THIS;
 }
 type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
 export interface ServerEventEmitter extends EventEmitter {
@@ -128,6 +130,7 @@ export interface ServerEventEmitter extends EventEmitter {
     emit(event: "settings", settings: ServerConfig): boolean;
     emit(event: "stateError", state: StateObject): boolean;
     emit(event: "stateDebug", state: StateObject): boolean;
+    emit(event: "serverClose", iface: "localhost" | "network"): boolean;
 
     addListener: ServerEventsListener<this>;
     on: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
@@ -382,10 +385,13 @@ export interface ServeStaticResult {
 export function serveFile(state: StateObject, file: string, root: string) {
     obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]): any => {
         if (err) return state.throw<StateObject>(404);
-        send(state.req, file, { root })
-            .on('error', err => {
+        state.send({
+            root,
+            filepath: file,
+            error: err => {
                 state.log(2, '%s %s', err.status, err.message).throw(500);
-            }).pipe(state.res);
+            }
+        });
         return Observable.empty<StateObject>();
     }).subscribe();
 
@@ -398,18 +404,18 @@ export function serveFolder(state: StateObject, mount: string, root: string, ser
     if (state.url.pathname.slice(0, mount.length) !== mount) {
         state.log(2, 'URL is different than the mount point %s', mount).throw(500);
     } else {
-        send(state.req, pathname.slice(mount.length), { root })
-            .on('error', (err) => {
-                state.log(-1, '%s %s', err.status, err.message).throw(404);
-            })
-            .on('directory', (res, fp) => {
+        state.send({
+            root,
+            filepath: pathname.slice(mount.length),
+            error: err => { state.log(-1, '%s %s', err.status, err.message).throw(404); },
+            directory: (filepath) => {
                 if (serveIndex) {
-                    serveIndex(state, res, fp);
+                    serveIndex(state, filepath);
                 } else {
                     state.throw(403);
                 }
-            })
-            .pipe(state.res);
+            }
+        })
     }
 }
 export function serveFolderObs(obs: Observable<StateObject>, mount: string, root: string, serveIndex?: Function) {
@@ -430,7 +436,7 @@ export function serveFolderIndex(options: { type: string }) {
         }, { "directory": [], "file": [] });
     }
     if (options.type === "json") {
-        return function (state: StateObject, res: http.ServerResponse, folder: string) {
+        return function (state: StateObject, folder: string) {
             readFolder(folder).subscribe(item => {
                 sendResponse(state, JSON.stringify(item), {
                     contentType: "application/json",
@@ -507,7 +513,7 @@ export function getTreeItemFiles(result: PathResolverResult, state: StateObject)
 //I have this in a JS file so I can edit it without recompiling
 const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
 export type DirectoryIndexData = { keys: string[], paths: (string | boolean)[], dirpath: string, type: string };
-export type DirectoryIndexOptions = { upload: boolean, mkdir: boolean, format: "json" | "html" }
+export type DirectoryIndexOptions = { upload: boolean, mkdir: boolean, format: "json" | "html", mixFolders: boolean }
 export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
     let { keys, paths, dirpath, type } = _r;
     let pairs = keys.map((k, i) => [k, paths[i]]);
@@ -847,7 +853,7 @@ export class StateObject {
     // ) {
 
     // }
-    
+
     req: http.IncomingMessage;
     res: http.ServerResponse;
 
@@ -941,7 +947,7 @@ export class StateObject {
     throw<T = StateObject>(statusCode: number, headers?: Hashmap<string>) {
         if (!this.responseSent) {
             if (headers) this.setHeaders(headers);
-            this.respond(statusCode);
+            this.respond(statusCode).empty();
         }
         return Observable.empty<T>();
     }
@@ -954,6 +960,10 @@ export class StateObject {
     respond(code: number, message?: string, headers?: http.OutgoingHttpHeaders) {
         if (headers) this.setHeaders(headers);
         if (!message) message = http.STATUS_CODES[code];
+        if(settings._devmode) setTimeout(() => {
+            if (!this.responseSent)
+                this.debugLog(3, "Response not sent \n %s", new Error().stack);
+        }, 0);
         var subthis = {
             json: (data: any) => {
                 subthis.string(JSON.stringify(data));
@@ -964,7 +974,7 @@ export class StateObject {
             stream: (data: Stream) => {
                 this._res.writeHead(code, message, this.responseHeaders);
                 data.pipe(this._res);
-                subthis.empty();
+                this.responseSent = true;
             },
             buffer: (data: Buffer) => {
                 this._res.writeHead(code, message, this.responseHeaders);
@@ -978,19 +988,34 @@ export class StateObject {
         }
         return subthis;
     }
-    respondJSON(data: any) {
 
-    }
-    respondBuffer(data: Buffer) {
-
-    }
-    respondStream(data: ReadableStream) {
-
-    }
     redirect(redirect: string) {
         this.respond(302, "", {
             'Location': redirect
         }).empty();
+    }
+    send(options: {
+        root: string;
+        filepath: string;
+        error?: (err: any) => void;
+        directory?: (filepath: string) => void;
+        headers?: (filepath: string) => http.OutgoingHttpHeaders;
+    }) {
+        const { filepath, root, error, directory, headers } = options;
+        const sender = send(this._req, filepath, { root });
+        if (error)
+            sender.on('error', options.error);
+        if (directory)
+            sender.on('directory', (res: http.ServerResponse, fp) => directory(fp));
+        if (headers)
+            sender.on('headers', (res: http.ServerResponse, fp) => {
+                const hdrs = headers(fp);
+                Object.keys(hdrs).forEach(e => {
+                    let item = hdrs[e];
+                    if (item) res.setHeader(e, item.toString());
+                })
+            });
+        sender.pipe(this._res);
     }
     /**
      * Recieves the body of the request and stores it in body and json. If there is an
@@ -1055,6 +1080,7 @@ export interface ServerConfig {
     __filename: string;
     __assetsDir: string;
     _disableLocalHost: boolean;
+    _devmode: boolean;
     tree: any,
     types: {
         htmlfile: string[];
@@ -1078,7 +1104,7 @@ export interface ServerConfig {
     /** cache max age in milliseconds for different types of data */
     maxAge: { tw_plugins: number }
     tsa: { alwaysRefreshCache: boolean; },
-
+    mixFolders: boolean;
 }
 
 export interface AccessPathResult<T> {
