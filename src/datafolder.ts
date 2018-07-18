@@ -66,6 +66,7 @@ export function init(e: ServerEventEmitter) {
             } else {
                 client.addEventListener('message', (event) => {
                     console.log('message', event);
+                    debug(-3, 'WS-MESSAGE %s', inspect(event));
                     clientsList[pathname].forEach(e => {
                         if (e !== client) e.send(event.data);
                     })
@@ -73,14 +74,19 @@ export function init(e: ServerEventEmitter) {
 
                 client.addEventListener('error', (event) => {
                     debug(-2, 'WS-ERROR %s %s', pathname, event.type)
-                    clientsList[pathname].splice(clientsList[pathname].indexOf(client), 1);
+                    var index = clientsList[pathname].indexOf(client);
+                    if (index > -1) clientsList[pathname].splice(index, 1);
                     client.close();
                 })
 
                 client.addEventListener('close', (event) => {
                     debug(-2, 'WS-CLOSE %s %s %s', pathname, event.code, event.reason);
-                    clientsList[pathname].splice(clientsList[pathname].indexOf(client), 1);
+                    var index = clientsList[pathname].indexOf(client);
+                    if (index > -1) clientsList[pathname].splice(index, 1);
                 })
+
+                if (!clientsList[pathname]) clientsList[pathname] = [];
+                clientsList[pathname].push(client);
             }
         });
     })
@@ -190,24 +196,19 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
         }
 
         //we use $tw.modules.execute so that the module has its respective $tw variable.
-        var serverCommand;
+        var server;
         try {
-            serverCommand = $tw.modules.execute('$:/core/modules/commands/server.js').Command;
+            server = $tw.modules.execute('$:/core/modules/server/server.js').Server;
         } catch (e) {
             doError(mount, folder, e);
             return;
         }
-        var command = new serverCommand([], { wiki: $tw.wiki });
-        var server = command.server;
-
-        //If the username is changed the datafolder will just have to be reloaded
-        server.set({
-            rootTiddler: "$:/core/save/all",
-            renderType: "text/plain",
-            serveType: "text/html",
-            username: settings.username,
-            password: "",
-            pathprefix: mount
+        var server = new server({
+            wiki: $tw.wiki,
+            variables: {
+                "username": settings.username,
+                "path-prefix": mount
+            }
         });
 
         //invoke the server start hook so plugins can extend the server or attach to the event handler
