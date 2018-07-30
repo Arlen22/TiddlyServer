@@ -36,7 +36,11 @@ Open the terminal if you aren't already there, then `cd` to the TiddlyServer dir
 
 ### Android
 
-If you want to install it on Android, I recommend using the Termux app. Once you enable shared storage you can use your file manager to unzip the TiddlyServer files and then access them from Termux. You can install Node on Termux using the built-in package manager. 
+The easy way to install it on Android is to use Dory (https://play.google.com/store/apps/details?id=io.tempage.dorynode). Open the app, tap the + button on the bottom right, then select file. Select the TiddlyServer server.js file in your filesystem. If your settings.json file is not beside the server.js file, paste the full path into the "argument" field (not the "Node option" field). That's basically all there is to it. Save it, then hit back to return to the list of scripts and tap start. Tap stdout to see the terminal output.
+
+The other option is to use Termux, but it's complicated enough that I don't need to explain it here. It's similar to linux.
+ - Once you enable shared storage inside Termux you can use your file manager to unzip the TiddlyServer files and then access them from Termux. 
+ - You can install Node on Termux using the built-in package manager. 
 
 ### iOS
 
