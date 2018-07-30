@@ -1,4 +1,4 @@
-If you want to help cover the cost of making this all happen, use https://www.paypal.me/Arlen22. Your help is appreciated and directly affects my work on TiddlyServer.
+My work on tools related to TiddlyWiki is entirely a side project for me that does not generate any income. If you want to help cover the cost of the time it takes to make these tools, you are welcome to donate at https://www.paypal.me/Arlen22. 
 
 ## TiddlyServer 2.0 "Lite"
 
