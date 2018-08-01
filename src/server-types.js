@@ -840,11 +840,13 @@ class StateObject {
             buffer: (data) => {
                 this._res.writeHead(code, message, this.responseHeaders);
                 this._res.write(data);
-                subthis.empty();
+                this._res.end();
+                this.responseSent = true;
             },
             empty: () => {
-                this.responseSent = true;
+                this._res.writeHead(code, message, this.responseHeaders);
                 this._res.end();
+                this.responseSent = true;
             }
         };
         return subthis;

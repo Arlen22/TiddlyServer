@@ -1,6 +1,6 @@
 import {
     StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger,
-    PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath,
+    PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath, obs_stat,
 } from "./server-types";
 import { Observable, Subject } from "../lib/rx";
 
@@ -253,7 +253,8 @@ function doError(mount, folder, err) {
 
 
 interface PluginCache {
-    plugin: PluginInfo
+    meta: PluginInfo
+    text: string
     cacheTime: number
 }
 
@@ -269,19 +270,24 @@ function initPluginLoader() {
     const $tw = global_tw = TiddlyWiki.loadCore();
 
     const pluginConfig = {
-        plugins: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
-        themes: [$tw.config.themesPath, $tw.config.themesEnvVar],
-        languages: [$tw.config.languagesPath, $tw.config.languagesEnvVar]
+        plugin: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
+        theme: [$tw.config.themesPath, $tw.config.themesEnvVar],
+        language: [$tw.config.languagesPath, $tw.config.languagesEnvVar]
     };
 
     Object.keys(pluginConfig).forEach(type => {
         pluginCache[type] = {};
     });
 
+    let core = $tw.loadPluginFolder($tw.boot.corePath);
+
     coreCache = {
-        plugin: $tw.loadPluginFolder($tw.boot.corePath),
+        text: core.text,
+        meta: core,
         cacheTime: new Date().valueOf()
     };
+
+    delete core.text;
 
     // bootCache = {};
     // $tw.loadTiddlersFromPath($tw.boot.bootPath).forEach(tiddlerFile => {
@@ -299,7 +305,12 @@ function initPluginLoader() {
             let pluginPath = $tw.findLibraryItem(name, paths);
             let plugin = $tw.loadPluginFolder(pluginPath);
             if (!plugin) pluginCache[type][name] = "null";
-            else pluginCache[type][name] = { plugin, cacheTime: new Date().valueOf() };
+            else {
+                let text = plugin.text,
+                    meta = plugin;
+                delete plugin.text;
+                pluginCache[type][name] = { meta, text, cacheTime: new Date().valueOf() };
+            }
         }
         return pluginCache[type][name];
     }
@@ -327,13 +338,31 @@ export function handleTiddlyWikiRoute(state: StateObject) {
     //number of elements on state.path that are part of the mount path.
     //the zero-based index of the first subpath is the same as the number of elements
     let mountLength = 3;
-
-    if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
+    console.log(state.path);
+    if (['plugin', 'theme', 'language', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
+        console.log('throw', state.responseSent);
         state.throw(404);
     } else if (state.path[mountLength] === "core") {
         sendPluginResponse(state, coreCache);
     } else if (state.path[mountLength] === "boot") {
         serveBootFolder.next(state);
+    } else if (!state.path[mountLength]) {
+        const folder = path.join(__dirname, "../tiddlywiki");
+        const folderPaths: string[] = [];
+        const processFolder = (dirpath: string): Observable<never> => {
+            return obs_readdir()(dirpath).mergeMap(([err, files, tag, dirpath]) => {
+                return Observable.from(files).mergeMap(file => obs_stat()(path.join(dirpath, file)))
+            }).mergeMap(([err, stat, tag, subpath]) => {
+                folderPaths.push(subpath.slice(folder.length));
+                return stat.isDirectory() ? processFolder(subpath) : Observable.empty<never>();
+            });
+        }
+        processFolder(folder).subscribe({
+            complete: () => {
+                state.respond(200).json(folderPaths);
+            }
+        })
+
     } else {
         sendPluginResponse(state,
             pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1]))
@@ -348,9 +377,10 @@ function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null
         state.respond(404).empty();
         return;
     }
-    let text = pluginCache.plugin.text;
-    delete pluginCache.plugin.text;
-    let meta = JSON.stringify(pluginCache.plugin);
+    // console.log('pluginCache', pluginCache.plugin.text && pluginCache.plugin.text.length);
+    // let text = pluginCache.plugin.text;
+    // delete pluginCache.plugin.text;
+    let meta = JSON.stringify(pluginCache.meta), text = pluginCache.text;
 
     // Just an experiment
     // let tiddlersArray = (() => {
@@ -392,8 +422,10 @@ function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null
     state.setHeader('ETag', etagStr)
 
     if (fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
+        debug(-1, "client plugin still fresh")
         state.respond(304).empty();
     } else {
+        debug(-1, "sending plugin")
         sendResponse(state, body, { doGzip: canAcceptGzip(state.req) });
     }
 }

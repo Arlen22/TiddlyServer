@@ -225,17 +225,20 @@ function initPluginLoader() {
     pluginCache = {};
     const $tw = global_tw = boot_startup_1.TiddlyWiki.loadCore();
     const pluginConfig = {
-        plugins: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
-        themes: [$tw.config.themesPath, $tw.config.themesEnvVar],
-        languages: [$tw.config.languagesPath, $tw.config.languagesEnvVar]
+        plugin: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
+        theme: [$tw.config.themesPath, $tw.config.themesEnvVar],
+        language: [$tw.config.languagesPath, $tw.config.languagesEnvVar]
     };
     Object.keys(pluginConfig).forEach(type => {
         pluginCache[type] = {};
     });
+    let core = $tw.loadPluginFolder($tw.boot.corePath);
     coreCache = {
-        plugin: $tw.loadPluginFolder($tw.boot.corePath),
+        text: core.text,
+        meta: core,
         cacheTime: new Date().valueOf()
     };
+    delete core.text;
     // bootCache = {};
     // $tw.loadTiddlersFromPath($tw.boot.bootPath).forEach(tiddlerFile => {
     //     tiddlerFile.tiddlers.forEach(tiddlerFields => {
@@ -251,8 +254,11 @@ function initPluginLoader() {
             let plugin = $tw.loadPluginFolder(pluginPath);
             if (!plugin)
                 pluginCache[type][name] = "null";
-            else
-                pluginCache[type][name] = { plugin, cacheTime: new Date().valueOf() };
+            else {
+                let text = plugin.text, meta = plugin;
+                delete plugin.text;
+                pluginCache[type][name] = { meta, text, cacheTime: new Date().valueOf() };
+            }
         }
         return pluginCache[type][name];
     };
@@ -272,7 +278,9 @@ function handleTiddlyWikiRoute(state) {
     //number of elements on state.path that are part of the mount path.
     //the zero-based index of the first subpath is the same as the number of elements
     let mountLength = 3;
-    if (['plugins', 'themes', 'languages', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
+    console.log(state.path);
+    if (['plugin', 'theme', 'language', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
+        console.log('throw', state.responseSent);
         state.throw(404);
     }
     else if (state.path[mountLength] === "core") {
@@ -280,6 +288,23 @@ function handleTiddlyWikiRoute(state) {
     }
     else if (state.path[mountLength] === "boot") {
         serveBootFolder.next(state);
+    }
+    else if (!state.path[mountLength]) {
+        const folder = path.join(__dirname, "../tiddlywiki");
+        const folderPaths = [];
+        const processFolder = (dirpath) => {
+            return server_types_1.obs_readdir()(dirpath).mergeMap(([err, files, tag, dirpath]) => {
+                return rx_1.Observable.from(files).mergeMap(file => server_types_1.obs_stat()(path.join(dirpath, file)));
+            }).mergeMap(([err, stat, tag, subpath]) => {
+                folderPaths.push(subpath.slice(folder.length));
+                return stat.isDirectory() ? processFolder(subpath) : rx_1.Observable.empty();
+            });
+        };
+        processFolder(folder).subscribe({
+            complete: () => {
+                state.respond(200).json(folderPaths);
+            }
+        });
     }
     else {
         sendPluginResponse(state, pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1])));
@@ -292,9 +317,10 @@ function sendPluginResponse(state, pluginCache) {
         state.respond(404).empty();
         return;
     }
-    let text = pluginCache.plugin.text;
-    delete pluginCache.plugin.text;
-    let meta = JSON.stringify(pluginCache.plugin);
+    // console.log('pluginCache', pluginCache.plugin.text && pluginCache.plugin.text.length);
+    // let text = pluginCache.plugin.text;
+    // delete pluginCache.plugin.text;
+    let meta = JSON.stringify(pluginCache.meta), text = pluginCache.text;
     // Just an experiment
     // let tiddlersArray = (() => {
     //     let gkeys: string[] = [];
@@ -329,9 +355,11 @@ function sendPluginResponse(state, pluginCache) {
     debug(-3, 'etag %s', etagStr);
     state.setHeader('ETag', etagStr);
     if (bundled_lib_1.fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
+        debug(-1, "client plugin still fresh");
         state.respond(304).empty();
     }
     else {
+        debug(-1, "sending plugin");
         server_types_1.sendResponse(state, body, { doGzip: server_types_1.canAcceptGzip(state.req) });
     }
 }

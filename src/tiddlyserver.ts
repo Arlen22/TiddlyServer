@@ -244,7 +244,6 @@ function handlePUTrequest(state: StateObject) {
 					"Please make sure the backup directory actually exists or else make the " +
 					"backupDirectory key falsy in your settings file (e.g. set it to a " +
 					"zero length string or false, or remove it completely)");
-
 				state.log(3, "Backup could not be saved, see server output").throw(500);
 				fileRead.close();
 				gzip.end();
