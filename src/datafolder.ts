@@ -157,8 +157,6 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: strin
 }
 
 function loadDataFolderType(mount: string, folder: string, reload: string) {
-
-
     obs_readFile()(path.join(folder, "tiddlywiki.info"), 'utf8').subscribe(([err, data]) => {
         const wikiInfo: WikiInfo = tryParseJSON(data);
         if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {

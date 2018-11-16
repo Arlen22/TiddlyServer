@@ -11,7 +11,8 @@
     },
     "files": [
         "./src/server.ts",
-        "./lib/boot-node-async.ts"
+        "./lib/boot-node-async.ts",
+        "./src/_test.ts"
     ],
     "exclude": [
         "node_modules",

@@ -179,6 +179,7 @@ function requestHandler(iface, preflighter) {
             //if so, handle it
             if (route)
                 route(state);
+            //otherwise forward to TiddlyServer
             else
                 tiddlyserver_1.handleTiddlyServerRoute(state);
         }).catch(err => {

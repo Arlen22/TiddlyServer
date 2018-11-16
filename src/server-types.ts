@@ -83,20 +83,56 @@ export function defaultSettings(set: ServerConfig) {
 
 
 }
+export interface NewTreeItem {
+    $element: string;
+    path?: string;
+    $children?: NewTreeItem[]
+}
+export interface NewTreePath extends NewTreeItem {
+    path: string;
+    $children: undefined;
+}
+export function isNewTreeItem(a: any): a is NewTreeItem {
+    return typeof a["$element"] === "string";
+}
+export function isNewTreePath(a: any): a is NewTreePath {
+    return isNewTreeItem(a) && typeof a["path"] === "string";
+}
+
 export function normalizeSettings(set: ServerConfig, settingsFile) {
     const settingsDir = path.dirname(settingsFile);
-
+    function upgradeTree(item, key): NewTreeItem {
+        if (typeof item === "string") {
+            //return an xml element
+            return {
+                $element: key,
+                path: path.resolve(settingsDir, item)
+            };
+        } else if (isNewTreeItem(item)) {
+            //it's already an xml element
+            if (item.path) item.path = path.resolve(settingsDir, item.path);
+            // if (!Array.isArray(item.$children)) item.$children = [];
+            return item;
+        } else if (Array.isArray(item)) {
+            return {
+                $element: key,
+                $children: item.map<NewTreeItem>(upgradeTree)
+            };
+        } else {
+            return {
+                $element: key,
+                $children: keys(item).map(e => upgradeTree(item[e], e))
+            };
+        }
+    }
     defaultSettings(set);
 
-    if (typeof set.tree === "object")
-        (function normalizeTree(item) {
-            keys(item).forEach(e => {
-                if (typeof item[e] === 'string') item[e] = path.resolve(settingsDir, item[e]);
-                else if (typeof item[e] === 'object') normalizeTree(item[e]);
-                else throw 'Invalid item: ' + e.toString() + ': ' + item[e];
-            })
-        })(set.tree);
-    else set.tree = path.resolve(settingsDir, set.tree);
+    let newTree = [];
+
+    set.tree = upgradeTree(set.tree, "tree");
+    // if (typeof set.tree === "object")
+    //     normalizeTree(set.tree);
+    // else set.tree = path.resolve(settingsDir, set.tree);
 
     if (set.backupDirectory) set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
     if (set.logAccess) set.logAccess = path.resolve(settingsDir, set.logAccess);
@@ -547,10 +583,10 @@ export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, Directory
  */
 export function statWalkPath(test: PathResolverResult) {
     // let endStat = false;
-    if (typeof test.item === "object")
-        throw "property item must be a string";
+    if (!isNewTreePath(test.item))
+        throw "property item must be a TreePath";
     let endWalk = false;
-    return Observable.from([test.item].concat(test.filepathPortion)).scan((n, e) => {
+    return Observable.from([test.item.path].concat(test.filepathPortion)).scan((n, e) => {
         return { statpath: path.join(n.statpath, e), index: n.index + 1, endStat: false };
     }, { statpath: "", index: -1, endStat: false }).concatMap(s => {
         if (endWalk) return Observable.empty<never>();
@@ -602,8 +638,44 @@ function getItemType(stat: Stats, infostat: Stats | undefined) {
     return itemtype;
 
 }
+export function treeWalker(tree, reqpath) {
+    var item: NewTreeItem = tree;
+    var ancestry: NewTreeItem[] = [];
+    var folderPathFound = false;
+    for (var end = 0; end < reqpath.length; end++) {
+        let t = item.$children && item.$children.find(e => e.$element === reqpath[end]);
+        if (t) {
+            item = t;
+            let a = Object.assign({}, item);
+            delete a.$children;
+            ancestry.push(a);
+        } else if (item.path) {
+            folderPathFound = true;
+            break;
+        } else break;
 
-export function resolvePath(state: StateObject | string[], tree: TreeObject): PathResolverResult | undefined {
+        // if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
+        //     item = item[reqpath[end]];
+        // } else if (typeof item === "string") {
+        //     folderPathFound = true; break;
+        // } else break;
+    }
+    return { item, end, folderPathFound, ancestry } as TreePathResult;
+}
+export function treeWalkerOld(tree, reqpath) {
+    var item: NewTreeItem = tree;
+    var folderPathFound = false;
+    for (var end = 0; end < reqpath.length; end++) {
+
+        if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
+            item = item[reqpath[end]];
+        } else if (typeof item === "string") {
+            folderPathFound = true; break;
+        } else break;
+    }
+    return { item, end, folderPathFound };
+}
+export function resolvePath(state: StateObject | string[], tree: NewTreeItem): PathResolverResult | undefined {
     var reqpath;
     if (Array.isArray(state)) {
         reqpath = state;
@@ -616,6 +688,7 @@ export function resolvePath(state: StateObject | string[], tree: TreeObject): Pa
     //if we're at root, just return it
     if (reqpath.length === 0) return {
         item: tree,
+        ancestry: [],
         reqpath,
         treepathPortion: [],
         filepathPortion: [],
@@ -624,18 +697,7 @@ export function resolvePath(state: StateObject | string[], tree: TreeObject): Pa
     //check for invalid items (such as ..)
     if (!reqpath.every(a => a !== ".." && a !== ".")) return;
 
-    var result = (function () {
-        var item: any = tree;
-        var folderPathFound = false;
-        for (var end = 0; end < reqpath.length; end++) {
-            if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
-                item = item[reqpath[end]];
-            } else if (typeof item === "string") {
-                folderPathFound = true; break;
-            } else break;
-        }
-        return { item, end, folderPathFound } as TreePathResult;
-    })();
+    var result = treeWalker(tree, reqpath);
 
     if (reqpath.length > result.end && !result.folderPathFound) return;
 
@@ -643,15 +705,15 @@ export function resolvePath(state: StateObject | string[], tree: TreeObject): Pa
     let filepathPortion = reqpath.slice(result.end).map(a => a.trim());
 
     const fullfilepath = (result.folderPathFound)
-        ? path.join(result.item, ...filepathPortion)
-        : (typeof result.item === "string" ? result.item : '');
+        ? path.join(result.item.path, ...filepathPortion)
+        : (typeof result.item.path === "string" ? result.item.path : '');
 
     return {
         item: result.item,
-        reqpath,
+        ancestry: result.ancestry,
         treepathPortion: reqpath.slice(0, result.end),
         filepathPortion,
-        fullfilepath
+        reqpath, fullfilepath
     };
 }
 
@@ -960,7 +1022,7 @@ export class StateObject {
     respond(code: number, message?: string, headers?: http.OutgoingHttpHeaders) {
         if (headers) this.setHeaders(headers);
         if (!message) message = http.STATUS_CODES[code];
-        if(settings._devmode) setTimeout(() => {
+        if (settings._devmode) setTimeout(() => {
             if (!this.responseSent)
                 this.debugLog(3, "Response not sent \n %s", new Error().stack);
         }, 0);
@@ -1083,7 +1145,7 @@ export interface ServerConfig {
     __assetsDir: string;
     _disableLocalHost: boolean;
     _devmode: boolean;
-    tree: any,
+    tree: NewTreeItem,
     types: {
         htmlfile: string[];
         [K: string]: string[]
@@ -1124,8 +1186,10 @@ export interface AccessPathTag {
     filepath: string
 };
 export interface PathResolverResult {
-    //the tree string returned from the path resolver
-    item: string | TreeObject;
+    //the tree item returned from the path resolver
+    item: NewTreeItem;
+    //the ancestors of the tree item for reference
+    ancestry: NewTreeItem[];
     // client request url path
     reqpath: string[];
     // tree part of request url
@@ -1137,11 +1201,11 @@ export interface PathResolverResult {
     // state: StateObject;
 }
 export type TreeObject = { [K: string]: string | TreeObject };
-export type TreePathResultObject<T, U, V> = { item: T, end: U, folderPathFound: V }
+export type TreePathResultObject<T, U, V> = { item: T, end: U, folderPathFound: V, ancestry: T[] }
 export type TreePathResult =
-    TreePathResultObject<TreeObject, number, false>
-    | TreePathResultObject<string, number, false>
-    | TreePathResultObject<string, number, true>;
+    // TreePathResultObject<NewTreeItem, number, false>
+    | TreePathResultObject<NewTreeItem, number, false>
+    | TreePathResultObject<NewTreePath, number, true>;
 export function createHashmapString<T>(keys: string[], values: T[]): { [id: string]: T } {
     if (keys.length !== values.length)
         throw 'keys and values must be the same length';

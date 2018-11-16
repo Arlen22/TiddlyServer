@@ -22,8 +22,13 @@ if(!$tw) {
 $tw.utils = $tw.utils || Object.create(null);
 
 /////////////////////////// Standard node.js libraries
+/** @type {typeof import('fs')} */
+var fs;
+/** @type {typeof import('path')} */
+var path;
+/** @type {typeof import('vm')} */
+var vm;
 
-var fs, path, vm;
 if($tw.node) {
 	fs = require("fs");
 	path = require("path");
@@ -424,10 +429,8 @@ $tw.utils.getTypeEncoding = function(ext) {
 	return typeInfo ? typeInfo.encoding : "utf8";
 };
 
-/*
-Run code globally with specified context variables in scope
-*/
-$tw.utils.evalGlobal = function(code,context,filename) {
+
+$tw.utils.evalMakeModule = function(code,context){
 	var contextCopy = $tw.utils.extend(Object.create(null),context);
 	// Get the context variables as a pair of arrays of names and values
 	var contextNames = [], contextValues = [];
@@ -437,24 +440,31 @@ $tw.utils.evalGlobal = function(code,context,filename) {
 	});
 	// Add the code prologue and epilogue
 	code = "(function(" + contextNames.join(",") + ") {(function(){\n" + code + "\n;})();\nreturn exports;\n})\n";
+	return { code, contextNames, contextValues }
+}
+/*
+Run code globally with specified context variables in scope
+*/
+$tw.utils.evalGlobal = function (innercode, context, filename) {
+	var { code, contextNames, contextValues } = $tw.utils.evalMakeModule(innercode, context);
 	// Compile the code into a function
 	var fn;
-	if($tw.browser) {
-		fn = window["eval"](code + "\n\n//# sourceURL=" + filename);
+	if ($tw.browser) {
+		fn = Function("return " + code + "\n\n//# sourceURL=" + filename)();
 	} else {
-		fn = vm.runInThisContext(code,filename);
+		fn = vm.runInThisContext(code, filename);
 	}
 	// Call the function and return the exports
-	return fn.apply(null,contextValues);
+	return fn.apply(null, contextValues);
 };
 
 /*
 Run code in a sandbox with only the specified context variables in scope
 */
-$tw.utils.evalSandboxed = $tw.browser ? $tw.utils.evalGlobal : function(code,context,filename) {
-	var sandbox = $tw.utils.extend(Object.create(null),context);
-	vm.runInNewContext(code,sandbox,filename);
-	return sandbox.exports;
+var sandboxContext = $tw.browser ? undefined : vm.createContext();
+$tw.utils.evalSandboxed = $tw.browser ? $tw.utils.evalGlobal : function (innercode, context, filename) {
+	var { code, contextNames, contextValues } = $tw.utils.evalMakeModule(innercode, context);
+	return vm.runInContext(code, sandboxContext, filename).apply(null, contextValues).exports;
 };
 
 /*
