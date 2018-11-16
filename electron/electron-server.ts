@@ -18,7 +18,7 @@ process.on("message", (message: string, handle: Socket) => {
 			config = json.config;
 			eventer = initServer({
 				env: "node",
-				preflightRequests: (ev) => {
+				preflighter: (ev) => {
 					return new Promise((resolve) => {
 						if (trustNonce && ev.request.headers["x-tiddlyserver-trust"] === trustNonce)
 							ev.trusted = true;
@@ -30,7 +30,7 @@ process.on("message", (message: string, handle: Socket) => {
 							ev.response.end();
 							ev.handled = true;
 						}
-						
+
 						resolve(ev);
 					})
 				}

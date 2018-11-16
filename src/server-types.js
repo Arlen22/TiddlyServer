@@ -90,22 +90,50 @@ function defaultSettings(set) {
         set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
 }
 exports.defaultSettings = defaultSettings;
+function isNewTreeItem(a) {
+    return typeof a["$element"] === "string";
+}
+exports.isNewTreeItem = isNewTreeItem;
+function isNewTreePath(a) {
+    return isNewTreeItem(a) && typeof a["path"] === "string";
+}
+exports.isNewTreePath = isNewTreePath;
 function normalizeSettings(set, settingsFile) {
     const settingsDir = path.dirname(settingsFile);
+    function upgradeTree(item, key) {
+        if (typeof item === "string") {
+            //return an xml element
+            return {
+                $element: key,
+                path: path.resolve(settingsDir, item)
+            };
+        }
+        else if (isNewTreeItem(item)) {
+            //it's already an xml element
+            if (item.path)
+                item.path = path.resolve(settingsDir, item.path);
+            // if (!Array.isArray(item.$children)) item.$children = [];
+            return item;
+        }
+        else if (Array.isArray(item)) {
+            return {
+                $element: key,
+                $children: item.map(upgradeTree)
+            };
+        }
+        else {
+            return {
+                $element: key,
+                $children: keys(item).map(e => upgradeTree(item[e], e))
+            };
+        }
+    }
     defaultSettings(set);
-    if (typeof set.tree === "object")
-        (function normalizeTree(item) {
-            keys(item).forEach(e => {
-                if (typeof item[e] === 'string')
-                    item[e] = path.resolve(settingsDir, item[e]);
-                else if (typeof item[e] === 'object')
-                    normalizeTree(item[e]);
-                else
-                    throw 'Invalid item: ' + e.toString() + ': ' + item[e];
-            });
-        })(set.tree);
-    else
-        set.tree = path.resolve(settingsDir, set.tree);
+    let newTree = [];
+    set.tree = upgradeTree(set.tree, "tree");
+    // if (typeof set.tree === "object")
+    //     normalizeTree(set.tree);
+    // else set.tree = path.resolve(settingsDir, set.tree);
     if (set.backupDirectory)
         set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
     if (set.logAccess)
@@ -466,6 +494,7 @@ function sendDirectoryIndex([_r, options]) {
         //if this is a category, just return the key
         if (typeof val === "boolean")
             return rx_1.Observable.of({ key });
+        //otherwise return the statPath result
         else
             return statPath(val).then(res => { return { stat: res, key }; });
     }).reduce((n, e) => {
@@ -494,10 +523,10 @@ exports.sendDirectoryIndex = sendDirectoryIndex;
  */
 function statWalkPath(test) {
     // let endStat = false;
-    if (typeof test.item === "object")
-        throw "property item must be a string";
+    if (!isNewTreePath(test.item))
+        throw "property item must be a TreePath";
     let endWalk = false;
-    return rx_1.Observable.from([test.item].concat(test.filepathPortion)).scan((n, e) => {
+    return rx_1.Observable.from([test.item.path].concat(test.filepathPortion)).scan((n, e) => {
         return { statpath: path.join(n.statpath, e), index: n.index + 1, endStat: false };
     }, { statpath: "", index: -1, endStat: false }).concatMap(s => {
         if (endWalk)
@@ -556,6 +585,50 @@ function getItemType(stat, infostat) {
         itemtype = "error";
     return itemtype;
 }
+function treeWalker(tree, reqpath) {
+    var item = tree;
+    var ancestry = [];
+    var folderPathFound = false;
+    for (var end = 0; end < reqpath.length; end++) {
+        let t = item.$children && item.$children.find(e => e.$element === reqpath[end]);
+        if (t) {
+            item = t;
+            let a = Object.assign({}, item);
+            delete a.$children;
+            ancestry.push(a);
+        }
+        else if (item.path) {
+            folderPathFound = true;
+            break;
+        }
+        else
+            break;
+        // if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
+        //     item = item[reqpath[end]];
+        // } else if (typeof item === "string") {
+        //     folderPathFound = true; break;
+        // } else break;
+    }
+    return { item, end, folderPathFound, ancestry };
+}
+exports.treeWalker = treeWalker;
+function treeWalkerOld(tree, reqpath) {
+    var item = tree;
+    var folderPathFound = false;
+    for (var end = 0; end < reqpath.length; end++) {
+        if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
+            item = item[reqpath[end]];
+        }
+        else if (typeof item === "string") {
+            folderPathFound = true;
+            break;
+        }
+        else
+            break;
+    }
+    return { item, end, folderPathFound };
+}
+exports.treeWalkerOld = treeWalkerOld;
 function resolvePath(state, tree) {
     var reqpath;
     if (Array.isArray(state)) {
@@ -569,6 +642,7 @@ function resolvePath(state, tree) {
     if (reqpath.length === 0)
         return {
             item: tree,
+            ancestry: [],
             reqpath,
             treepathPortion: [],
             filepathPortion: [],
@@ -577,35 +651,20 @@ function resolvePath(state, tree) {
     //check for invalid items (such as ..)
     if (!reqpath.every(a => a !== ".." && a !== "."))
         return;
-    var result = (function () {
-        var item = tree;
-        var folderPathFound = false;
-        for (var end = 0; end < reqpath.length; end++) {
-            if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
-                item = item[reqpath[end]];
-            }
-            else if (typeof item === "string") {
-                folderPathFound = true;
-                break;
-            }
-            else
-                break;
-        }
-        return { item, end, folderPathFound };
-    })();
+    var result = treeWalker(tree, reqpath);
     if (reqpath.length > result.end && !result.folderPathFound)
         return;
     //get the remainder of the path
     let filepathPortion = reqpath.slice(result.end).map(a => a.trim());
     const fullfilepath = (result.folderPathFound)
-        ? path.join(result.item, ...filepathPortion)
-        : (typeof result.item === "string" ? result.item : '');
+        ? path.join(result.item.path, ...filepathPortion)
+        : (typeof result.item.path === "string" ? result.item.path : '');
     return {
         item: result.item,
-        reqpath,
+        ancestry: result.ancestry,
         treepathPortion: reqpath.slice(0, result.end),
         filepathPortion,
-        fullfilepath
+        reqpath, fullfilepath
     };
 }
 exports.resolvePath = resolvePath;
@@ -886,8 +945,11 @@ class StateObject {
      */
     recieveBody(errorCB) {
         return rx_1.Observable.fromEvent(this._req, 'data')
+            //only take one since we only need one. this will dispose the listener
             .takeUntil(rx_1.Observable.fromEvent(this._req, 'end').take(1))
+            //accumulate all the chunks until it completes
             .reduce((n, e) => { n.push(e); return n; }, [])
+            //convert to json and return state for next part
             .map(e => {
             this.body = Buffer.concat(e).toString('utf8');
             //console.log(state.body);

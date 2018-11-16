@@ -82,7 +82,7 @@ export function handleTiddlyServerRoute(state: StateObject) {
 		} else if (state.statPath.itemtype === "file") {
 			if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
 				state.send({
-					root: result.item as string,
+					root: result.item.path as string,
 					filepath: result.filepathPortion.join('/'),
 					error: err => {
 						state.log(2, '%s %s', err.status, err.message);
