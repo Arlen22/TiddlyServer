@@ -3,7 +3,7 @@ import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
-	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData, ServerEventEmitter, ER
+	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData, ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -65,7 +65,7 @@ export function handleTiddlyServerRoute(state: StateObject) {
 	Observable.of(state).mergeMap((state: StateObject) => {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
 		if (!result) return state.throw<never>(404);
-		else if (typeof result.item === "object") {
+		else if (isNewTreeGroup(result.item)) {
 			serveDirectoryIndex(result, state);
 			return Observable.empty<never>();
 		} else {
@@ -127,7 +127,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 			mkdir: isFolder && (allow.mkdir),
 			mixFolders: settings.mixFolders
 		};
-		getTreeItemFiles(result, state)
+		getNewTreePathFiles(result, state)
 			.map(e => [e, options] as [typeof e, typeof options])
 			.concatMap(sendDirectoryIndex)
 			.subscribe(res => {

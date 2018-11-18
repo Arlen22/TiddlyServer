@@ -1,4 +1,4 @@
-import { treeWalkerOld, treeWalker, normalizeSettings } from './server-types';
+import { treeWalkerOld, treeWalker, normalizeSettings, statWalkPath, resolvePath } from './server-types';
 
 let settings = {
 	tree: {
@@ -22,3 +22,8 @@ let settings = {
 normalizeSettings(settings as any, __dirname + "/test.json");
 
 console.log(JSON.stringify(settings, null, 2));
+console.log(resolvePath(["dbx-media"], settings.tree as any));
+console.log(resolvePath(["dbx-media", "Hogan-NobleMen-01-SD.mp4"], settings.tree as any));
+console.log(resolvePath(["dbx-media", "THISFILEDOESNOTEXIST"], settings.tree as any));
+console.log(resolvePath(["projects", "fol"], settings.tree as any));
+console.log(resolvePath(["projects", "fol", "test file"], settings.tree as any));

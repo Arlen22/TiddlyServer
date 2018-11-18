@@ -21,3 +21,8 @@ let settings = {
 };
 server_types_1.normalizeSettings(settings, __dirname + "/test.json");
 console.log(JSON.stringify(settings, null, 2));
+console.log(server_types_1.resolvePath(["dbx-media"], settings.tree));
+console.log(server_types_1.resolvePath(["dbx-media", "Hogan-NobleMen-01-SD.mp4"], settings.tree));
+console.log(server_types_1.resolvePath(["dbx-media", "THISFILEDOESNOTEXIST"], settings.tree));
+console.log(server_types_1.resolvePath(["projects", "fol"], settings.tree));
+console.log(server_types_1.resolvePath(["projects", "fol", "test file"], settings.tree));

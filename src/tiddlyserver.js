@@ -40,7 +40,7 @@ function handleTiddlyServerRoute(state) {
         var result = server_types_1.resolvePath(state, settings.tree);
         if (!result)
             return state.throw(404);
-        else if (typeof result.item === "object") {
+        else if (server_types_1.isNewTreeGroup(result.item)) {
             serveDirectoryIndex(result, state);
             return rx_1.Observable.empty();
         }
@@ -113,7 +113,7 @@ function serveDirectoryIndex(result, state) {
             mkdir: isFolder && (allow.mkdir),
             mixFolders: settings.mixFolders
         };
-        server_types_1.getTreeItemFiles(result, state)
+        server_types_1.getNewTreePathFiles(result, state)
             .map(e => [e, options])
             .concatMap(server_types_1.sendDirectoryIndex)
             .subscribe(res => {
