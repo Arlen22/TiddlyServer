@@ -1,5 +1,12 @@
 node_modules/
 /settings.json
+/settings.ts
+/settings.js
+/settings-tree.xml
+/settings-tree.ts
+/settings-tree.js
+/settings-https.ts
+/settings-https.js
 /archive/
 /src/archive/
 /backup/
