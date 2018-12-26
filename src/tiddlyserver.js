@@ -117,7 +117,8 @@ function serveDirectoryIndex(result, state) {
             .map(e => [e, options])
             .concatMap(server_types_1.sendDirectoryIndex)
             .subscribe(res => {
-            state.respond(200, "", { 'content-type': 'text/html' }).string(res);
+            state.respond(200, "", { 'content-type': 'text/html', 'content-encoding': 'utf-8' })
+                .buffer(Buffer.from(res, "utf8"));
         });
     }
     else if (state.req.method === "POST") {

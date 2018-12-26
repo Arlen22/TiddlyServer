@@ -44,7 +44,9 @@ function loadSettings(settingsFile) {
     });
     if (!settingsObj.tree)
         throw "tree is not specified in the settings file";
-    server_types_1.normalizeSettings(settingsObj, settingsFile);
+    let routeKeys = Object.keys(routes);
+    server_types_1.normalizeSettings(settingsObj, settingsFile, routeKeys);
+    let newSettingsObj = server_types_1.ConvertSettings(settingsObj);
     if (["string", "undefined"].indexOf(typeof settingsObj.username) === -1)
         throw "username must be a JSON string if specified";
     if (["string", "undefined"].indexOf(typeof settingsObj.password) === -1)
@@ -155,12 +157,15 @@ function initServer(options) {
 exports.initServer = initServer;
 function requestHandler(iface, preflighter) {
     return (request, response) => {
+        let host = request.headers.host;
+        let addr = request.socket.localAddress;
+        // console.log(host, addr, request.socket.address().address);
         //send the request and response to morgan
         log(request, response).then(() => {
             const ev = {
                 handled: false,
                 trusted: false,
-                interface: iface,
+                interface: { host, addr, iface },
                 request, response
             };
             //send it to the preflighter

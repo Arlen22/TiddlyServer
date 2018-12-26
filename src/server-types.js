@@ -51,7 +51,7 @@ function init(eventer) {
     });
 }
 exports.init = init;
-function defaultSettings(set) {
+function OldDefaultSettings(set) {
     if (!set.port)
         set.port = 8080;
     if (!set.host)
@@ -89,20 +89,106 @@ function defaultSettings(set) {
     if (typeof set.maxAge.tw_plugins !== "number")
         set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
 }
-exports.defaultSettings = defaultSettings;
+exports.OldDefaultSettings = OldDefaultSettings;
+function ConvertSettings(set) {
+    return {
+        tree: set.tree,
+        server: {
+            host: [set.host],
+            port: set.port,
+            logAccess: set.logAccess,
+            logError: set.logError,
+            logColorsToFile: set.logColorsToFile,
+            logToConsoleAlso: set.logToConsoleAlso,
+            _bindLocalhost: set._disableLocalHost === false,
+            _devmode: set._devmode
+        },
+        tiddlyserver: {
+            etag: set.etag,
+            etagWindow: set.etagWindow,
+            useTW5path: set.useTW5path,
+            hostLevelPermissions: {
+                "localhost": set.allowLocalhost,
+                "*": set.allowNetwork
+            }
+        },
+        directoryIndex: {
+            defaultType: "html",
+            icons: set.types,
+            mixFolders: set.mixFolders
+        },
+        EXPERIMENTAL_clientside_datafolders: {
+            enabled: false,
+            alwaysRefreshCache: typeof set.tsa === "object" ? set.tsa.alwaysRefreshCache : true,
+            maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
+        },
+        $schema: "./settings.schema.json"
+    };
+}
+exports.ConvertSettings = ConvertSettings;
+function NewDefaultSettings(set) {
+    let newset = {
+        tree: set.tree,
+        server: Object.assign({
+            host: [],
+            port: 8080,
+            logAccess: "",
+            logError: "",
+            logColorsToFile: false,
+            logToConsoleAlso: true,
+            _bindLocalhost: false,
+            _devmode: false
+        }, set.server),
+        tiddlyserver: Object.assign({
+            etag: "",
+            etagWindow: 3,
+            useTW5path: false,
+            hostLevelPermissions: Object.assign({
+                "localhost": {
+                    writeErrors: true,
+                    mkdir: true,
+                    upload: true,
+                    settings: true,
+                    WARNING_all_settings_WARNING: false
+                },
+                "*": {
+                    writeErrors: true,
+                    mkdir: false,
+                    upload: false,
+                    settings: false,
+                    WARNING_all_settings_WARNING: false
+                }
+            }, set.tiddlyserver.hostLevelPermissions)
+        }, set.tiddlyserver),
+        directoryIndex: Object.assign({
+            defaultType: "html",
+            icons: { "htmlfile": ["htm", "html"] },
+            mixFolders: true
+        }, set.directoryIndex),
+        EXPERIMENTAL_clientside_datafolders: Object.assign({
+            enabled: false,
+            alwaysRefreshCache: true,
+            maxAge_tw_plugins: 0
+        }, set.EXPERIMENTAL_clientside_datafolders)
+    };
+}
+exports.NewDefaultSettings = NewDefaultSettings;
 function isNewTreeItem(a) {
-    return typeof a["$element"] === "string" && (a.$element === "folder" || a.$element === "group");
+    return (typeof a === "object"
+        && typeof a["$element"] === "string"
+        && (a.$element === "folder" || a.$element === "group")
+        || typeof a === "string");
 }
 exports.isNewTreeItem = isNewTreeItem;
 function isNewTreeGroup(a) {
-    return isNewTreeItem(a) && a.$element === "group";
+    return isNewTreeItem(a) && typeof a === "object" && a.$element === "group";
 }
 exports.isNewTreeGroup = isNewTreeGroup;
 function isNewTreePath(a) {
-    return isNewTreeItem(a) && a.$element === "folder";
+    return isNewTreeItem(a) && typeof a === "object" && a.$element === "folder";
 }
 exports.isNewTreePath = isNewTreePath;
-function normalizeSettings(set, settingsFile) {
+function normalizeSettings(set, settingsFile, routeKeys) {
     const settingsDir = path.dirname(settingsFile);
     function upgradeTree(item, key, keypath) {
         if (typeof item === "string") {
@@ -128,18 +214,29 @@ function normalizeSettings(set, settingsFile) {
             };
         }
         else {
+            if (item["$element"] && ["group", "folder"].indexOf(item["$element"]) === -1)
+                throw new Error(util_1.format("invalid $element property under '%s'", keypath.join(', ')));
             return {
                 $element: "group", key,
                 $children: keys(item).map(e => upgradeTree(item[e], e, [...keypath, e]))
             };
         }
     }
-    defaultSettings(set);
-    let newTree = [];
+    OldDefaultSettings(set);
+    if (typeof set.tree === "string" && set.tree.endsWith(".xml")) {
+        //read the xml file and parse it as the tree structure
+    }
     set.tree = upgradeTree(set.tree, "tree", []);
-    // if (typeof set.tree === "object")
-    //     normalizeTree(set.tree);
-    // else set.tree = path.resolve(settingsDir, set.tree);
+    {
+        let conflict = (() => {
+            if (set.tree.$element && set.tree.$element === "group")
+                return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
+            else
+                return [];
+        })();
+        if (conflict.length)
+            console.log("The following tree items are reserved for use by TiddlyServer: %s", conflict.map(e => '"' + e.key + '"').join(', '));
+    }
     if (set.backupDirectory)
         set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
     if (set.logAccess)
@@ -148,13 +245,14 @@ function normalizeSettings(set, settingsFile) {
         set.logError = path.resolve(settingsDir, set.logError);
     set.__dirname = settingsDir;
     set.__filename = settingsFile;
-    if (set.etag === "disabled" && !set.backupDirectory)
+    if (set.etag === "disabled" && !set.backupDirectory) {
         console.log("Etag checking is disabled, but a backup folder is not set. "
             + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
             + "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
             + "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
             + "also set the etagWindow setting to allow files to be modified if not newer than "
             + "so many seconds from the copy being saved.");
+    }
 }
 exports.normalizeSettings = normalizeSettings;
 function getHumanSize(size) {
@@ -1013,6 +1111,7 @@ function recieveBody(state, sendError) {
     return state.recieveBody(sendError);
 }
 exports.recieveBody = recieveBody;
+exports.TestConfig = {};
 ;
 ;
 function createHashmapString(keys, values) {

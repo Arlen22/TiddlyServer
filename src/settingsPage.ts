@@ -1,4 +1,4 @@
-import { ServerConfig, StateObject, Hashmap, obs_stat, serveFileObs, sendResponse, canAcceptGzip, recieveBody, DebugLogger, ServerEventEmitter, tryParseJSON, normalizeSettings, obs_readFile, obs_writeFile, defaultSettings } from "./server-types";
+import { ServerConfig, StateObject, Hashmap, obs_stat, serveFileObs, sendResponse, canAcceptGzip, recieveBody, DebugLogger, ServerEventEmitter, tryParseJSON, normalizeSettings, obs_readFile, obs_writeFile, OldDefaultSettings } from "./server-types";
 import { EventEmitter } from "events";
 import { Observable, Subject } from "../lib/rx";
 import { resolve, join } from "path";
@@ -271,7 +271,7 @@ export function handleSettings(state: StateObject) {
 						state.throwReason(500, "Settings file could not be accessed");
 					})
 					if (typeof curjson !== "undefined") {
-						defaultSettings(curjson);
+						OldDefaultSettings(curjson);
 						let set = {};
 						data.forEach(item => {
 							//don't send sensitive settings unless they are allowed

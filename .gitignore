@@ -13,3 +13,6 @@ uncaughtException.log
 test.js
 *.log
 /tiddlywiki/plugins/danielo515
+newtree.xml
+src/_test.ts
+src/_test.js
