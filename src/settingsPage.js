@@ -253,7 +253,7 @@ function handleSettings(state) {
                         state.throwReason(500, "Settings file could not be accessed");
                     });
                     if (typeof curjson !== "undefined") {
-                        server_types_1.defaultSettings(curjson);
+                        server_types_1.OldDefaultSettings(curjson);
                         let set = {};
                         data.forEach(item => {
                             //don't send sensitive settings unless they are allowed

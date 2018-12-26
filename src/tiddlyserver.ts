@@ -3,7 +3,8 @@ import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
-	sendDirectoryIndex, getTreeItemFiles, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData, ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup
+	sendDirectoryIndex, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData,
+	ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup, NewTreePath
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -82,7 +83,7 @@ export function handleTiddlyServerRoute(state: StateObject) {
 		} else if (state.statPath.itemtype === "file") {
 			if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
 				state.send({
-					root: result.item.path as string,
+					root: (result.item as NewTreePath).path as string,
 					filepath: result.filepathPortion.join('/'),
 					error: err => {
 						state.log(2, '%s %s', err.status, err.message);
@@ -131,7 +132,8 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 			.map(e => [e, options] as [typeof e, typeof options])
 			.concatMap(sendDirectoryIndex)
 			.subscribe(res => {
-				state.respond(200, "", { 'content-type': 'text/html' }).string(res);
+				state.respond(200, "", { 'content-type': 'text/html', 'content-encoding': 'utf-8' })
+					.buffer(Buffer.from(res, "utf8"));
 			});
 	} else if (state.req.method === "POST") {
 		var form = new formidable.IncomingForm();

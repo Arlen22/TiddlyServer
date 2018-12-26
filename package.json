@@ -7,15 +7,16 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "rxjs": "5.4.3",
     "@types/node": ">=6.0.73 <7.0.0",
     "etag": "^1.8.1",
     "formidable": "^1.1.1",
     "fresh": "^0.5.2",
     "morgan": "*",
+    "rxjs": "5.4.3",
     "serve-static": "*",
-    "xml-js": "*",
-    "ws": "*"
+    "ts-json-schema-generator": "^0.38.0",
+    "ws": "*",
+    "xml-js": "*"
   },
   "engines": {
     "node": "^6.11.4"

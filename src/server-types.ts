@@ -11,6 +11,8 @@ import { send } from '../lib/bundled-lib';
 import { Stats, appendFileSync } from 'fs';
 import { gzip } from 'zlib';
 import { Writable, Stream } from 'stream';
+// import { TlsOptions } from 'tls';
+import * as https from "https";
 
 let DEBUGLEVEL = -1;
 let settings: ServerConfig;
@@ -54,7 +56,7 @@ export function init(eventer: ServerEventEmitter) {
 		// const myWritable = new stream.
 	});
 }
-export function defaultSettings(set: ServerConfig) {
+export function OldDefaultSettings(set: ServerConfig) {
 	if (!set.port) set.port = 8080;
 	if (!set.host) set.host = "127.0.0.1";
 	if (!set.types) set.types = {
@@ -80,36 +82,231 @@ export function defaultSettings(set: ServerConfig) {
 	if (!set.maxAge) set.maxAge = {} as any;
 	if (typeof set.maxAge.tw_plugins !== "number")
 		set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
-
-
 }
+
+export function ConvertSettings(set: ServerConfig): NewConfig {
+	type T = NewConfig;
+	type T1 = T["server"];
+	type T2 = T["tiddlyserver"];
+	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
+	return {
+		tree: set.tree,
+		server: {
+			host: [set.host],
+			port: set.port,
+			logAccess: set.logAccess,
+			logError: set.logError,
+			logColorsToFile: set.logColorsToFile,
+			logToConsoleAlso: set.logToConsoleAlso,
+			_bindLocalhost: set._disableLocalHost === false,
+			_devmode: set._devmode
+		},
+		tiddlyserver: {
+			etag: set.etag,
+			etagWindow: set.etagWindow,
+			useTW5path: set.useTW5path,
+			hostLevelPermissions: {
+				"localhost": set.allowLocalhost,
+				"*": set.allowNetwork
+			}
+		},
+		directoryIndex: {
+			defaultType: "html",
+			icons: set.types,
+			mixFolders: set.mixFolders
+		},
+		EXPERIMENTAL_clientside_datafolders: {
+			enabled: false,
+			alwaysRefreshCache: typeof set.tsa === "object" ? set.tsa.alwaysRefreshCache : true,
+			maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
+		},
+		$schema: "./settings.schema.json"
+	}
+}
+export function NewDefaultSettings(set: NewConfig) {
+	type T = NewConfig;
+	type T1 = T["server"];
+	type T2 = T["tiddlyserver"];
+	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
+	let newset = {
+		tree: set.tree,
+		server: Object.assign<T["server"], T["server"]>({
+			host: [],
+			port: 8080,
+			logAccess: "",
+			logError: "",
+			logColorsToFile: false,
+			logToConsoleAlso: true,
+			_bindLocalhost: false,
+			_devmode: false
+		}, set.server),
+		tiddlyserver: Object.assign<T["tiddlyserver"], any>({
+			etag: "",
+			etagWindow: 3,
+			useTW5path: false,
+			hostLevelPermissions: Object.assign<T["tiddlyserver"]["hostLevelPermissions"], any>({
+				"localhost": {
+					writeErrors: true,
+					mkdir: true,
+					upload: true,
+					settings: true,
+					WARNING_all_settings_WARNING: false
+				},
+				"*": {
+					writeErrors: true,
+					mkdir: false,
+					upload: false,
+					settings: false,
+					WARNING_all_settings_WARNING: false
+				}
+			}, set.tiddlyserver.hostLevelPermissions)
+		}, set.tiddlyserver),
+		directoryIndex: Object.assign<T["directoryIndex"], any>({
+			defaultType: "html",
+			icons: { "htmlfile": ["htm", "html"] },
+			mixFolders: true
+		}, set.directoryIndex),
+		EXPERIMENTAL_clientside_datafolders: Object.assign<T["EXPERIMENTAL_clientside_datafolders"], any>({
+			enabled: false,
+			alwaysRefreshCache: true,
+			maxAge_tw_plugins: 0
+		}, set.EXPERIMENTAL_clientside_datafolders)
+	}
+}
+export interface ServerConfigSchema extends ServerConfigBase {
+	/**  */
+	tree: NewTreeHashmapPath | NewTreeHashmapGroupSchema | string
+}
+export interface ServerConfig extends ServerConfigBase {
+	tree: NewTreeItem
+	__dirname: string;
+	__filename: string;
+	__assetsDir: string;
+}
+export interface NewConfigSchema extends NewConfigBase {
+	tree: NewTreeItemSchema
+}
+export interface NewConfig extends NewConfigBase {
+	tree: NewTreeItem
+}
+
+
+export interface NewTreeHashmapGroupSchema {
+	$element: "group";
+	// key: string;
+	/** @default  [{"$element": ""}]  */
+	/** @default  {}  */
+	$children: NewTreeItemSchema[] | NewTreeObjectSchema;
+}
+export interface NewTreeGroupSchema extends NewTreeHashmapGroupSchema {
+	key: string;
+}
+/** @default { "$element": {}} */
+export type NewTreeObjectSchemaItem = NewTreeHashmapGroupSchema | NewTreeHashmapPath | string
+/**
+ * 
+ * @description A hashmap of `group` elements, `folder` elements, and folder paths
+ */
+export interface NewTreeObjectSchema {
+	/**
+	 * The children of a hashmap `group` element which are not
+	 * `group` or `folder` elements
+	 */
+	//@ts-ignore
+	$children?: NewTreePathOptions[]
+	/** 
+	 * @description A hashmap tree element: either a string or a group/folder element without the `key` attribute
+	 * @default { "$element": {}}
+	 * @pattern ^([^$]+)+$ 
+	 */
+	[K: string]: NewTreeObjectSchemaItem
+}
+/**
+ * @default {"$element": ""} 
+ */
+export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePath | string;
 export type NewTreeItem = NewTreeGroup | NewTreePath;
 export interface NewTreeGroup {
 	$element: "group";
 	key: string;
 	$children: NewTreeItem[];
 }
-export interface NewTreePath {
+export interface NewTreeHashmapPath {
 	$element: "folder";
-	key: string;
 	path: string;
 	$children?: NewTreePathOptions[];
+
 }
-export interface NewTreePathOptions {
-	$element: "index" | "auth" | "options"
+export interface NewTreePath extends NewTreeHashmapPath {
+	key: string;
+}
+/** @default { "$element": "" } */
+export type NewTreePathOptions =
+	| NewTreePathOptions_Index
+	| NewTreePathOptions_AuthPassword
+	| NewTreePathOptions_AuthPublicKey;
+
+export interface NewTreePathOptions_Index {
+	/**
+	 * Options related to the directory index (request paths ending in a 
+	 * backslash which do not resolve to a TiddlyWiki data folder).
+	 */
+	$element: "index",
+	/** 
+	 * The format of the index generated if no index file is found, or "403" to 
+	 * return a 403 Access Denied, or "404" to return a 404 Not Found.
+	 */
+	defaultType: "html" | "json" | "403" | "404",
+	/** 
+	 * Look for index files named exactly this or with one of the defaultExts added. 
+	 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","html"] would 
+	 * look for "index.htm", "index.html", in that order. 
+	 */
+	indexFile: string[],
+	/** 
+	 * Extensions to add when looking for an index file. A blank string will set the order 
+	 * to search for the exact indexFile name. The extensions are searched in the order specified. 
+	 */
+	indexExts: string[]
+}
+export interface NewTreePathOptions_AuthPassword {
+	/** Use basic auth for access control */
+	$element: "authPassword"
+	/** Username given to TiddlyWiki data folders and anywhere else it's needed */
+	username: string,
+	/** password encoded in utf8 */
+	password: string,
+	$children: undefined
+}
+export interface NewTreePathOptions_AuthPublicKey {
+	/** use TLS Client Certificates for access control */
+	$element: "authClientKey",
+	/** Username given to TiddlyWiki data folders and anywhere else it's needed */
+	username: string,
+	// /** matches any certificate with this public key */
+	// publicKey?: string,
+	// /** match this certificate */
+	// certificate?: string,
+	/** all certificate authories and self-signed certificates to allow */
+	certificateAuthority: string,
+	/** Reject requests that cannot present a signed certificate */
+	rejectUnauthorized: boolean,
 	$children: undefined;
 }
 export function isNewTreeItem(a: any): a is NewTreeItem {
-	return typeof a["$element"] === "string" && (a.$element === "folder" || a.$element === "group");
+	return (typeof a === "object"
+		&& typeof a["$element"] === "string"
+		&& (a.$element === "folder" || a.$element === "group")
+		|| typeof a === "string");
 }
 export function isNewTreeGroup(a: any): a is NewTreeGroup {
-	return isNewTreeItem(a) && a.$element === "group";
+	return isNewTreeItem(a) && typeof a === "object" && a.$element === "group";
 }
 export function isNewTreePath(a: any): a is NewTreePath {
-	return isNewTreeItem(a) && a.$element === "folder";
+	return isNewTreeItem(a) && typeof a === "object" && a.$element === "folder";
 }
 
-export function normalizeSettings(set: ServerConfig, settingsFile) {
+export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: string[]) {
 	const settingsDir = path.dirname(settingsFile);
 	function upgradeTree(item, key, keypath): NewTreeItem {
 		if (typeof item === "string") {
@@ -139,14 +336,25 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
 			};
 		}
 	}
-	defaultSettings(set);
 
-	let newTree = [];
+	OldDefaultSettings(set);
 
+	if (typeof set.tree === "string" && (set.tree as string).endsWith(".xml")) {
+		//read the xml file and parse it as the tree structure
+	}
 	set.tree = upgradeTree(set.tree, "tree", []);
-	// if (typeof set.tree === "object")
-	//     normalizeTree(set.tree);
-	// else set.tree = path.resolve(settingsDir, set.tree);
+
+	{
+		let conflict = (() => {
+			if (set.tree.$element && set.tree.$element === "group")
+				return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
+			else return [];
+		})()
+		if (conflict.length) console.log(
+			"The following tree items are reserved for use by TiddlyServer: %s",
+			conflict.map(e => '"' + e.key + '"').join(', ')
+		);
+	}
 
 	if (set.backupDirectory) set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
 	if (set.logAccess) set.logAccess = path.resolve(settingsDir, set.logAccess);
@@ -155,14 +363,14 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
 	set.__dirname = settingsDir;
 	set.__filename = settingsFile;
 
-	if (set.etag === "disabled" && !set.backupDirectory)
+	if (set.etag === "disabled" && !set.backupDirectory) {
 		console.log("Etag checking is disabled, but a backup folder is not set. "
 			+ "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
 			+ "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
 			+ "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
 			+ "also set the etagWindow setting to allow files to be modified if not newer than "
 			+ "so many seconds from the copy being saved.");
-
+	}
 }
 
 interface ServerEventsListener<THIS> {
@@ -1179,18 +1387,20 @@ export interface ThrowFunc<T> {
 }
 export interface ServerConfig_AccessOptions {
 	writeErrors: boolean
+	/** allow uploads on the directory index page */
 	upload: boolean
+	/** allow create directory on directory index page */
 	mkdir: boolean
+	/** allow non-critical settings to be modified */
 	settings: boolean
+	/** allow critical settings to be modified */
 	WARNING_all_settings_WARNING: boolean
 }
-export interface ServerConfig {
-	__dirname: string;
-	__filename: string;
-	__assetsDir: string;
+export interface ServerConfigBase {
+
 	_disableLocalHost: boolean;
 	_devmode: boolean;
-	tree: NewTreeItem,
+	// tree: NewTreeItem,
 	types: {
 		htmlfile: string[];
 		[K: string]: string[]
@@ -1214,8 +1424,77 @@ export interface ServerConfig {
 	maxAge: { tw_plugins: number }
 	tsa: { alwaysRefreshCache: boolean; },
 	mixFolders: boolean;
+	/** Schema generated by marcoq.vscode-typescript-to-json-schema VS code plugin */
+	$schema: string;
+}
+export interface SecureServerOptions {
+	/** All private keys as specified in 
+	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
+	 */
+	key: https.ServerOptions;
+	/** The certificate chain for all private keys as specified in 
+	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
+	 */
+	cert: any;
+	/** 
+	 * EITHER: A list of file paths of self-signed certs and certificate authorities to allow for 
+	 * client certificates. OR: Boolean `true`, then the list of Mozilla CAs will be used and 
+	 * self-signed certs will not be possible unless `rejectUnauthorizedCertificate` is false.
+	 */
+	requestClientCertificate: string[] | boolean;
+	/** whether to reject connections which do not have a valid certificate */
+	rejectUnauthorizedCertificate: boolean;
+}
+export interface NewConfigBase {
+	// tree: NewTreeItem;
+	/** generic webserver options */
+	server: {
+		host: string | string[];
+		port: number;
+		logAccess: string | false;
+		logError: string;
+		logColorsToFile: boolean;
+		logToConsoleAlso: boolean;
+		/** 
+		 * https-only options: an object or a string to a `require`-able file (such as .js or .json) 
+		 * which exports the object
+		 */
+		https?: SecureServerOptions | string
+		/** bind a second server instance to 127.0.0.1 in addition to the specified host */
+		_bindLocalhost: boolean;
+		/** enables certain expensive per-request checks */
+		_devmode: boolean;
+	}
+	/** directory index options */
+	directoryIndex: {
+		mixFolders: boolean;
+		defaultType: "html" | "json";
+		icons: { [iconName: string]: string[] }
+	}
+	/** tiddlyserver specific options */
+	tiddlyserver: {
+		/** backup directory for saving SINGLE-FILE wikis only */
+		backupDirectory?: string
+		/** whether to use the etag field, blank string means "if specified" */
+		etag: "required" | "disabled" | ""
+		/** etag does not need to be exact by this many seconds */
+		etagWindow: number
+		/** serve datafolders with a trailing slash */
+		useTW5path: boolean
+		/** permissions based on host address: "localhost", "*" (all others), "192.168.0.0/16" */
+		hostLevelPermissions: { [host: string]: ServerConfig_AccessOptions }
+	}
+	/** client-side data folder loader which loads datafolders directly into the browser */
+	EXPERIMENTAL_clientside_datafolders: {
+		enabled: boolean;
+		maxAge_tw_plugins: number;
+		alwaysRefreshCache: boolean;
+	},
+	/** The JSON schema location for this document */
+	$schema: string;
 }
 
+export const TestConfig: NewConfig = {} as any;
 export interface AccessPathResult<T> {
 	isFullpath: boolean,
 	type: string | NodeJS.ErrnoException,
