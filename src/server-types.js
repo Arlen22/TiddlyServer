@@ -21,10 +21,10 @@ let debugOutput = new stream_1.Writable({
             chunk = chunk.toString('utf8');
         // remove ending linebreaks for consistency
         chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
-        if (settings.logError) {
-            fs_1.appendFileSync(settings.logError, (settings.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n", { encoding: "utf8" });
+        if (settings.server.logError) {
+            fs_1.appendFileSync(settings.server.logError, (settings.server.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n", { encoding: "utf8" });
         }
-        if (!settings.logError || settings.logToConsoleAlso) {
+        if (!settings.server.logError || settings.server.logToConsoleAlso) {
             console.log(chunk);
         }
         callback && callback();
@@ -37,8 +37,8 @@ function init(eventer) {
         // DEBUGLEVEL = set.debugLevel;
         settings = set;
         exports.typeLookup = {};
-        Object.keys(set.types).forEach(type => {
-            set.types[type].forEach(ext => {
+        Object.keys(set.directoryIndex.icons).forEach(type => {
+            set.directoryIndex.icons[type].forEach(ext => {
                 if (!exports.typeLookup[ext]) {
                     exports.typeLookup[ext] = type;
                 }
@@ -184,59 +184,71 @@ function isNewTreeGroup(a) {
     return isNewTreeItem(a) && typeof a === "object" && a.$element === "group";
 }
 exports.isNewTreeGroup = isNewTreeGroup;
+function isNewTreeHashmapGroupSchema(a) {
+    return isNewTreeGroup(a) && !Array.isArray(a.$children) && !a.key;
+}
+exports.isNewTreeHashmapGroupSchema = isNewTreeHashmapGroupSchema;
 function isNewTreePath(a) {
     return isNewTreeItem(a) && typeof a === "object" && a.$element === "folder";
 }
 exports.isNewTreePath = isNewTreePath;
-function normalizeSettings(set, settingsFile, routeKeys) {
-    const settingsDir = path.dirname(settingsFile);
-    function upgradeTree(item, key, keypath) {
-        if (typeof item === "string") {
-            //return an xml element
-            return {
-                $element: "folder", key,
-                path: path.resolve(settingsDir, item)
-            };
-        }
-        else if (isNewTreeItem(item)) {
-            //it's already an xml element
-            if (isNewTreePath(item)) {
-                if (!item.path)
-                    throw new Error(util_1.format("path must be specified for folder item under '%s'", keypath.join(', ')));
-                item.path = path.resolve(settingsDir, item.path);
-            }
-            return item;
-        }
-        else if (Array.isArray(item)) {
-            return {
-                $element: "group", key,
-                $children: item.map(upgradeTree)
-            };
+exports.normalizeTree = (settingsDir) => function upgradeTree(item, key, keypath) {
+    // let t = item as NewTreeObjectSchemaItem;
+    if (typeof item === "string" || item.$element === "folder") {
+        if (typeof item === "string")
+            item = { $element: "folder", path: item };
+        if (!item.path)
+            throw new Error(util_1.format("path must be specified for folder item under '%s'", keypath.join(', ')));
+        item.path = path.resolve(settingsDir, item.path);
+        key = key || path.basename(item.path);
+        //the hashmap key overrides the key attribute if available
+        return Object.assign({}, item, { key });
+    }
+    else if (item.$element === "group") {
+        if (((a) => !a.key)(item)) {
+            if (!key)
+                throw new Error("No key specified for group element under " + keypath.join(', '));
         }
         else {
-            if (item["$element"] && ["group", "folder"].indexOf(item["$element"]) === -1)
-                throw new Error(util_1.format("invalid $element property under '%s'", keypath.join(', ')));
-            return {
-                $element: "group", key,
-                $children: keys(item).map(e => upgradeTree(item[e], e, [...keypath, e]))
-            };
+            key = item.key;
         }
+        //at this point we only need the TreeHashmapGroup type since we already extracted the key
+        let t = item;
+        let tc = t.$children;
+        if (typeof tc !== "object")
+            throw new Error("Invalid $children under " + keypath.join(', '));
+        return ({
+            $element: "group", key,
+            $children: Array.isArray(tc)
+                ? tc.map(e => upgradeTree(e, undefined, keypath))
+                : Object.keys(tc)
+                    .filter(k => k !== "$children")
+                    .map(k => upgradeTree(tc[k], k, [...keypath, k]))
+                    .concat(tc.$children || [])
+        });
     }
-    OldDefaultSettings(set);
+    else {
+        return item;
+    }
+};
+function normalizeSettings(set, settingsFile, routeKeys) {
+    const settingsDir = path.dirname(settingsFile);
+    NewDefaultSettings(set);
     if (typeof set.tree === "string" && set.tree.endsWith(".xml")) {
         //read the xml file and parse it as the tree structure
     }
-    set.tree = upgradeTree(set.tree, "tree", []);
-    {
-        let conflict = (() => {
-            if (set.tree.$element && set.tree.$element === "group")
-                return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
-            else
-                return [];
-        })();
-        if (conflict.length)
-            console.log("The following tree items are reserved for use by TiddlyServer: %s", conflict.map(e => '"' + e.key + '"').join(', '));
-    }
+    set.tree = exports.normalizeTree(settingsDir)(set.tree, "tree", []);
+    // {
+    // 	let conflict = (() => {
+    // 		if (set.tree.$element && set.tree.$element === "group")
+    // 			return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
+    // 		else return [];
+    // 	})()
+    // 	if (conflict.length) console.log(
+    // 		"The following tree items are reserved for use by TiddlyServer: %s",
+    // 		conflict.map(e => '"' + e.key + '"').join(', ')
+    // 	);
+    // }
     if (set.backupDirectory)
         set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
     if (set.logAccess)
