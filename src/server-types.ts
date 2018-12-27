@@ -24,14 +24,14 @@ let debugOutput: Writable = new Writable({
 		// remove ending linebreaks for consistency
 		chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
 
-		if (settings.logError) {
+		if (settings.server.logError) {
 			appendFileSync(
-				settings.logError,
-				(settings.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
+				settings.server.logError,
+				(settings.server.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
 				{ encoding: "utf8" }
 			);
 		}
-		if (!settings.logError || settings.logToConsoleAlso) {
+		if (!settings.server.logError || settings.server.logToConsoleAlso) {
 			console.log(chunk);
 		}
 		callback && callback();
@@ -44,8 +44,8 @@ export function init(eventer: ServerEventEmitter) {
 		// DEBUGLEVEL = set.debugLevel;
 		settings = set;
 		typeLookup = {};
-		Object.keys(set.types).forEach(type => {
-			set.types[type].forEach(ext => {
+		Object.keys(set.directoryIndex.icons).forEach(type => {
+			set.directoryIndex.icons[type].forEach(ext => {
 				if (!typeLookup[ext]) {
 					typeLookup[ext] = type;
 				} else {
@@ -56,7 +56,7 @@ export function init(eventer: ServerEventEmitter) {
 		// const myWritable = new stream.
 	});
 }
-export function OldDefaultSettings(set: ServerConfig) {
+export function OldDefaultSettings(set: OldServerConfig) {
 	if (!set.port) set.port = 8080;
 	if (!set.host) set.host = "127.0.0.1";
 	if (!set.types) set.types = {
@@ -84,12 +84,15 @@ export function OldDefaultSettings(set: ServerConfig) {
 		set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
 }
 
-export function ConvertSettings(set: ServerConfig): NewConfig {
-	type T = NewConfig;
+export function ConvertSettings(set: OldServerConfig): ServerConfig {
+	type T = ServerConfig;
 	type T1 = T["server"];
 	type T2 = T["tiddlyserver"];
 	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
 	return {
+		__assetsDir: set.__assetsDir,
+		__dirname: set.__dirname,
+		__filename: set.__filename,
 		tree: set.tree,
 		server: {
 			host: [set.host],
@@ -123,8 +126,8 @@ export function ConvertSettings(set: ServerConfig): NewConfig {
 		$schema: "./settings.schema.json"
 	}
 }
-export function NewDefaultSettings(set: NewConfig) {
-	type T = NewConfig;
+export function NewDefaultSettings(set: ServerConfig) {
+	type T = ServerConfig;
 	type T1 = T["server"];
 	type T2 = T["tiddlyserver"];
 	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
@@ -133,6 +136,7 @@ export function NewDefaultSettings(set: NewConfig) {
 		server: Object.assign<T["server"], T["server"]>({
 			host: [],
 			port: 8080,
+			debugLevel: 0,
 			logAccess: "",
 			logError: "",
 			logColorsToFile: false,
@@ -173,21 +177,25 @@ export function NewDefaultSettings(set: NewConfig) {
 		}, set.EXPERIMENTAL_clientside_datafolders)
 	}
 }
+export interface OldServerConfigSchema extends OldServerConfigBase {
+	tree: NewTreeObjectSchemaItem
+}
+export interface OldServerConfig extends OldServerConfigBase {
+	tree: NewTreeItem
+	__dirname: string;
+	__filename: string;
+	__assetsDir: string;
+}
+// export type ServerConfig = NewConfig;
+// export type ServerConfigSchema = NewConfigSchema;
 export interface ServerConfigSchema extends ServerConfigBase {
-	/**  */
-	tree: NewTreeHashmapPath | NewTreeHashmapGroupSchema | string
+	tree: NewTreeObjectSchemaItem
 }
 export interface ServerConfig extends ServerConfigBase {
 	tree: NewTreeItem
 	__dirname: string;
 	__filename: string;
 	__assetsDir: string;
-}
-export interface NewConfigSchema extends NewConfigBase {
-	tree: NewTreeItemSchema
-}
-export interface NewConfig extends NewConfigBase {
-	tree: NewTreeItem
 }
 
 
@@ -202,7 +210,6 @@ export interface NewTreeGroupSchema extends NewTreeHashmapGroupSchema {
 	key: string;
 }
 /** @default { "$element": {}} */
-export type NewTreeObjectSchemaItem = NewTreeHashmapGroupSchema | NewTreeHashmapPath | string
 /**
  * 
  * @description A hashmap of `group` elements, `folder` elements, and folder paths
@@ -213,7 +220,7 @@ export interface NewTreeObjectSchema {
 	 * `group` or `folder` elements
 	 */
 	//@ts-ignore
-	$children?: NewTreePathOptions[]
+	$children?: NewTreeOptions[]
 	/** 
 	 * @description A hashmap tree element: either a string or a group/folder element without the `key` attribute
 	 * @default { "$element": {}}
@@ -221,27 +228,31 @@ export interface NewTreeObjectSchema {
 	 */
 	[K: string]: NewTreeObjectSchemaItem
 }
+export type NewTreeObjectSchemaItem = NewTreeHashmapGroupSchema | NewTreeHashmapPath | string
 /**
  * @default {"$element": ""} 
  */
-export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePath | string;
-export type NewTreeItem = NewTreeGroup | NewTreePath;
+export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePathSchema | string;
+export type NewTreeItem = NewTreeGroup | NewTreePath | NewTreeOptions;
 export interface NewTreeGroup {
 	$element: "group";
 	key: string;
-	$children: NewTreeItem[];
+	$children: (NewTreeItem | NewTreeOptions)[];
 }
 export interface NewTreeHashmapPath {
 	$element: "folder";
 	path: string;
-	$children?: NewTreePathOptions[];
+	$children?: NewTreeOptions[];
 
+}
+export interface NewTreePathSchema extends NewTreeHashmapPath {
+	key?: string;
 }
 export interface NewTreePath extends NewTreeHashmapPath {
 	key: string;
 }
 /** @default { "$element": "" } */
-export type NewTreePathOptions =
+export type NewTreeOptions =
 	| NewTreePathOptions_Index
 	| NewTreePathOptions_AuthPassword
 	| NewTreePathOptions_AuthPublicKey;
@@ -275,8 +286,7 @@ export interface NewTreePathOptions_AuthPassword {
 	/** Username given to TiddlyWiki data folders and anywhere else it's needed */
 	username: string,
 	/** password encoded in utf8 */
-	password: string,
-	$children: undefined
+	password: string
 }
 export interface NewTreePathOptions_AuthPublicKey {
 	/** use TLS Client Certificates for access control */
@@ -291,7 +301,7 @@ export interface NewTreePathOptions_AuthPublicKey {
 	certificateAuthority: string,
 	/** Reject requests that cannot present a signed certificate */
 	rejectUnauthorized: boolean,
-	$children: undefined;
+	// $children: undefined;
 }
 export function isNewTreeItem(a: any): a is NewTreeItem {
 	return (typeof a === "object"
@@ -302,68 +312,76 @@ export function isNewTreeItem(a: any): a is NewTreeItem {
 export function isNewTreeGroup(a: any): a is NewTreeGroup {
 	return isNewTreeItem(a) && typeof a === "object" && a.$element === "group";
 }
+export function isNewTreeHashmapGroupSchema(a: any): a is NewTreeHashmapGroupSchema {
+	return isNewTreeGroup(a) && !Array.isArray(a.$children) && !a.key;
+}
 export function isNewTreePath(a: any): a is NewTreePath {
 	return isNewTreeItem(a) && typeof a === "object" && a.$element === "folder";
 }
-
+export const normalizeTree = (settingsDir: string) => function upgradeTree(item: NewTreeObjectSchemaItem | NewTreeOptions | NewTreeItem, key: string | undefined, keypath): NewTreeItem {
+	// let t = item as NewTreeObjectSchemaItem;
+	if (typeof item === "string" || item.$element === "folder") {
+		if (typeof item === "string") item = { $element: "folder", path: item } as NewTreePath;
+		if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
+		item.path = path.resolve(settingsDir, item.path);
+		key = key || path.basename(item.path);
+		//the hashmap key overrides the key attribute if available
+		return { ...item, key } as NewTreePath;
+	} else if (item.$element === "group") {
+		if (((a: any): a is NewTreeHashmapGroupSchema => !a.key)(item)) {
+			if (!key) throw new Error("No key specified for group element under " + keypath.join(', '));
+		} else {
+			key = item.key;
+		}
+		//at this point we only need the TreeHashmapGroup type since we already extracted the key
+		let t = item as NewTreeHashmapGroupSchema;
+		let tc = t.$children;
+		if (typeof tc !== "object") throw new Error("Invalid $children under " + keypath.join(', '));
+		return ({
+			$element: "group", key,
+			$children: Array.isArray(tc)
+				? tc.map(e => upgradeTree(e, undefined, keypath))
+				: Object.keys(tc)
+					.filter(k => k !== "$children")
+					.map(k => upgradeTree(tc[k], k, [...keypath, k]))
+					.concat(tc.$children || [])
+		})
+	} else {
+		return item;
+	}
+}
 export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: string[]) {
 	const settingsDir = path.dirname(settingsFile);
-	function upgradeTree(item, key, keypath): NewTreeItem {
-		if (typeof item === "string") {
-			//return an xml element
-			return {
-				$element: "folder", key,
-				path: path.resolve(settingsDir, item)
-			};
-		} else if (isNewTreeItem(item)) {
-			//it's already an xml element
-			if (isNewTreePath(item)) {
-				if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
-				item.path = path.resolve(settingsDir, item.path)
-			}
-			return item;
-		} else if (Array.isArray(item)) {
-			return {
-				$element: "group", key,
-				$children: item.map<NewTreeItem>(upgradeTree)
-			};
-		} else {
-			if (item["$element"] && ["group", "folder"].indexOf(item["$element"]) === -1)
-				throw new Error(format("invalid $element property under '%s'", keypath.join(', ')))
-			return {
-				$element: "group", key,
-				$children: keys(item).map(e => upgradeTree(item[e], e, [...keypath, e]))
-			};
-		}
-	}
 
-	OldDefaultSettings(set);
+
+
+	NewDefaultSettings(set);
 
 	if (typeof set.tree === "string" && (set.tree as string).endsWith(".xml")) {
 		//read the xml file and parse it as the tree structure
 	}
-	set.tree = upgradeTree(set.tree, "tree", []);
+	set.tree = normalizeTree(settingsDir)(set.tree, "tree", []);
 
-	{
-		let conflict = (() => {
-			if (set.tree.$element && set.tree.$element === "group")
-				return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
-			else return [];
-		})()
-		if (conflict.length) console.log(
-			"The following tree items are reserved for use by TiddlyServer: %s",
-			conflict.map(e => '"' + e.key + '"').join(', ')
-		);
-	}
+	// {
+	// 	let conflict = (() => {
+	// 		if (set.tree.$element && set.tree.$element === "group")
+	// 			return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
+	// 		else return [];
+	// 	})()
+	// 	if (conflict.length) console.log(
+	// 		"The following tree items are reserved for use by TiddlyServer: %s",
+	// 		conflict.map(e => '"' + e.key + '"').join(', ')
+	// 	);
+	// }
 
-	if (set.backupDirectory) set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
-	if (set.logAccess) set.logAccess = path.resolve(settingsDir, set.logAccess);
-	if (set.logError) set.logError = path.resolve(settingsDir, set.logError);
+	if (set.tiddlyserver.backupDirectory) set.tiddlyserver.backupDirectory = path.resolve(settingsDir, set.tiddlyserver.backupDirectory);
+	if (set.server.logAccess) set.server.logAccess = path.resolve(settingsDir, set.server.logAccess);
+	if (set.server.logError) set.server.logError = path.resolve(settingsDir, set.server.logError);
 
 	set.__dirname = settingsDir;
 	set.__filename = settingsFile;
 
-	if (set.etag === "disabled" && !set.backupDirectory) {
+	if (set.tiddlyserver.etag === "disabled" && !set.tiddlyserver.backupDirectory) {
 		console.log("Etag checking is disabled, but a backup folder is not set. "
 			+ "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
 			+ "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
@@ -564,7 +582,7 @@ export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.Errn
 export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
 	//if(prefix.startsWith("V:")) return function(){};
 	return function (msgLevel: number, ...args: any[]) {
-		if (!ignoreLevel && settings.debugLevel > msgLevel) return;
+		if (!ignoreLevel && settings.server.debugLevel > msgLevel) return;
 		if (isError(args[0])) {
 			let err = args[0];
 			args = [];
@@ -1396,7 +1414,7 @@ export interface ServerConfig_AccessOptions {
 	/** allow critical settings to be modified */
 	WARNING_all_settings_WARNING: boolean
 }
-export interface ServerConfigBase {
+export interface OldServerConfigBase {
 
 	_disableLocalHost: boolean;
 	_devmode: boolean;
@@ -1445,7 +1463,7 @@ export interface SecureServerOptions {
 	/** whether to reject connections which do not have a valid certificate */
 	rejectUnauthorizedCertificate: boolean;
 }
-export interface NewConfigBase {
+export interface ServerConfigBase {
 	// tree: NewTreeItem;
 	/** generic webserver options */
 	server: {
@@ -1455,6 +1473,18 @@ export interface NewConfigBase {
 		logError: string;
 		logColorsToFile: boolean;
 		logToConsoleAlso: boolean;
+		/**
+		 *  4 - Errors that require the process to exit for restart
+		 *  3 - Major errors that are handled and do not require a server restart
+		 *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+		 *  1 - Info - Most startup messages
+		 *  0 - Normal debug messages and all software and request-side error messages
+		 * -1 - Detailed debug messages from high level apis
+		 * -2 - Response status messages and error response data
+		 * -3 - Request and response data for all messages (verbose)
+		 * -4 - Protocol details and full data dump (such as encryption steps and keys)
+		 */
+		debugLevel: 0;
 		/** 
 		 * https-only options: an object or a string to a `require`-able file (such as .js or .json) 
 		 * which exports the object
