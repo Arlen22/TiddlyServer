@@ -13,3 +13,5 @@ uncaughtException.log
 test.js
 *.log
 /tiddlywiki/plugins/danielo515
+old-settings.json
+newtree.xml
