@@ -97,10 +97,12 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 		server: {
 			host: [set.host],
 			port: set.port,
+			bindWildcardIP: set.host === "0.0.0.0",
 			logAccess: set.logAccess,
 			logError: set.logError,
 			logColorsToFile: set.logColorsToFile,
 			logToConsoleAlso: set.logToConsoleAlso,
+			debugLevel: set.debugLevel,
 			_bindLocalhost: set._disableLocalHost === false,
 			_devmode: set._devmode
 		},
@@ -135,6 +137,7 @@ export function NewDefaultSettings(set: ServerConfig) {
 		tree: set.tree,
 		server: Object.assign<T["server"], T["server"]>({
 			host: [],
+			bindWildcardIP: true,
 			port: 8080,
 			debugLevel: 0,
 			logAccess: "",
@@ -1293,7 +1296,7 @@ export class StateObject {
 	respond(code: number, message?: string, headers?: http.OutgoingHttpHeaders) {
 		if (headers) this.setHeaders(headers);
 		if (!message) message = http.STATUS_CODES[code];
-		if (settings._devmode) setTimeout(() => {
+		if (settings.server._devmode) setTimeout(() => {
 			if (!this.responseSent)
 				this.debugLog(3, "Response not sent \n %s", new Error().stack);
 		}, 0);
@@ -1449,7 +1452,7 @@ export interface SecureServerOptions {
 	/** All private keys as specified in 
 	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
 	 */
-	key: https.ServerOptions;
+	key: any;
 	/** The certificate chain for all private keys as specified in 
 	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
 	 */
@@ -1467,11 +1470,35 @@ export interface ServerConfigBase {
 	// tree: NewTreeItem;
 	/** generic webserver options */
 	server: {
+		/** 
+		 * One IP address or an array of IP addresses to accept requests on. 
+		 * This may include a subnet mask (/32 is assumed if none specified). 
+		 * If a subnet mask is specified, TiddlyServer will attempt to bind to
+		 * ALL matching interface IP addresses. 0.0.0.0/0 will bind ALL IP addresses
+		 * assigned to ALL network interfaces on the machine. Any string which does
+		 * not match the format x.x.x.x/x will be passed directly to the NodeJS HTTP
+		 * or HTTPS server instance. Adding a minus sign in front of the string will
+		 * blacklist that IP address or range from accepting requests, unless it matches
+		 * another IP address or range further down the array.
+		 */
 		host: string | string[];
+		/**
+		 * Whether to bind the wildcard IP (0.0.0.0) and filter requests based 
+		 * on the local IP address of the request. This will result in only one
+		 * server instance being started instead of one per matching IP address.
+		 * In many cases this is preferred, however Android does not support
+		 * this for some reason. The default is true.
+		 */
+		bindWildcardIP: boolean;
+		/** port to listen on */
 		port: number;
+		/** access log file */
 		logAccess: string | false;
+		/** error log file */
 		logError: string;
+		/** write the console color markers to file, useful if you read the logs by printing them to a terminal */
 		logColorsToFile: boolean;
+		/** print access and error events to the console regardless of whether they are logged to a file */
 		logToConsoleAlso: boolean;
 		/**
 		 *  4 - Errors that require the process to exit for restart
@@ -1484,21 +1511,27 @@ export interface ServerConfigBase {
 		 * -3 - Request and response data for all messages (verbose)
 		 * -4 - Protocol details and full data dump (such as encryption steps and keys)
 		 */
-		debugLevel: 0;
+		debugLevel: number;
 		/** 
 		 * https-only options: an object or a string to a `require`-able file (such as .js or .json) 
 		 * which exports the object
 		 */
 		https?: SecureServerOptions | string
-		/** bind a second server instance to 127.0.0.1 in addition to the specified host */
+		/** always bind a separate server instance to 127.0.0.1 regardless of any other settings */
 		_bindLocalhost: boolean;
 		/** enables certain expensive per-request checks */
 		_devmode: boolean;
 	}
 	/** directory index options */
 	directoryIndex: {
+		/** sort folder and files together rather than separated */
 		mixFolders: boolean;
+		/** default format for the directory index */
 		defaultType: "html" | "json";
+		/** 
+		 * Hashmap of type { "icon_name": ["ext", "ext"]} where ext represents the extensions to use this icon for. 
+		 * Icons are in the TiddlyServer/assets/icons folder.
+		 */
 		icons: { [iconName: string]: string[] }
 	}
 	/** tiddlyserver specific options */
@@ -1516,15 +1549,29 @@ export interface ServerConfigBase {
 	}
 	/** client-side data folder loader which loads datafolders directly into the browser */
 	EXPERIMENTAL_clientside_datafolders: {
+		/** temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder) */
 		enabled: boolean;
+		/** how long to cache tw_plugins on the server side */
 		maxAge_tw_plugins: number;
+		/** refresh cache whenever ?refresh=true is called */
 		alwaysRefreshCache: boolean;
 	},
-	/** The JSON schema location for this document */
+	/** 
+	 * The JSON schema location for this document. This schema is generated 
+	 * directly from the TypeScript interfaces
+	 * used in TiddlyServer. A text-editor with autocomplete, such as VS code, 
+	 * will make editing this file much simpler. 
+	 * Most fields include a description like this one. 
+	 * 
+	 * All relative paths in this file are resolved relative to this file, so 
+	 * `./settings-tree.xml` refers to an XML file in the same folder as this file. 
+	 * All relative paths in included files (such as the XML file) are resolved 
+	 * relative to the included file. 
+	 */
 	$schema: string;
 }
 
-export const TestConfig: NewConfig = {} as any;
+export const TestConfig: ServerConfig = {} as any;
 export interface AccessPathResult<T> {
 	isFullpath: boolean,
 	type: string | NodeJS.ErrnoException,
