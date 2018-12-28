@@ -13,7 +13,8 @@ import { gzip } from 'zlib';
 import { Writable, Stream } from 'stream';
 // import { TlsOptions } from 'tls';
 import * as https from "https";
-
+import { networkInterfaces, NetworkInterfaceInfo } from 'os';
+import * as ipcalc from "./ipcalc";
 let DEBUGLEVEL = -1;
 let settings: ServerConfig;
 const colorsRegex = /\x1b\[[0-9]+m/gi
@@ -95,9 +96,11 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 		__filename: set.__filename,
 		tree: set.tree,
 		server: {
-			host: [set.host],
+			bindAddress: [set.host],
+			filterBindAddress: false,
+			enableIPv6: false,
 			port: set.port,
-			bindWildcardIP: set.host === "0.0.0.0",
+			bindWildcard: set.host === "0.0.0.0",
 			logAccess: set.logAccess,
 			logError: set.logError,
 			logColorsToFile: set.logColorsToFile,
@@ -136,8 +139,10 @@ export function NewDefaultSettings(set: ServerConfig) {
 	let newset = {
 		tree: set.tree,
 		server: Object.assign<T["server"], T["server"]>({
-			host: [],
-			bindWildcardIP: true,
+			bindAddress: [],
+			bindWildcard: true,
+			enableIPv6: false,
+			filterBindAddress: false,
 			port: 8080,
 			debugLevel: 0,
 			logAccess: "",
@@ -177,8 +182,10 @@ export function NewDefaultSettings(set: ServerConfig) {
 			enabled: false,
 			alwaysRefreshCache: true,
 			maxAge_tw_plugins: 0
-		}, set.EXPERIMENTAL_clientside_datafolders)
+		}, set.EXPERIMENTAL_clientside_datafolders),
+		$schema: "./settings.schema.json"
 	}
+	return newset;
 }
 export interface OldServerConfigSchema extends OldServerConfigBase {
 	tree: NewTreeObjectSchemaItem
@@ -355,27 +362,21 @@ export const normalizeTree = (settingsDir: string) => function upgradeTree(item:
 }
 export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: string[]) {
 	const settingsDir = path.dirname(settingsFile);
-
-
-
+	
 	NewDefaultSettings(set);
+	((tree: ServerConfigSchema["tree"]) => {
+		if (typeof tree === "string" && tree.endsWith(".xml")) {
+			//read the xml file and parse it as the tree structure
 
-	if (typeof set.tree === "string" && (set.tree as string).endsWith(".xml")) {
-		//read the xml file and parse it as the tree structure
-	}
-	set.tree = normalizeTree(settingsDir)(set.tree, "tree", []);
-
-	// {
-	// 	let conflict = (() => {
-	// 		if (set.tree.$element && set.tree.$element === "group")
-	// 			return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
-	// 		else return [];
-	// 	})()
-	// 	if (conflict.length) console.log(
-	// 		"The following tree items are reserved for use by TiddlyServer: %s",
-	// 		conflict.map(e => '"' + e.key + '"').join(', ')
-	// 	);
-	// }
+		} else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
+			//require the json or js file and use it directly
+			let filepath = path.resolve(settingsDir, tree);
+			set.tree = normalizeTree(path.dirname(filepath))(require(filepath), "tree", []);
+		} else {
+			//otherwise just assume we're using the value itself
+			set.tree = normalizeTree(settingsDir)(tree, "tree", []);
+		}
+	})(set.tree as any)
 
 	if (set.tiddlyserver.backupDirectory) set.tiddlyserver.backupDirectory = path.resolve(settingsDir, set.tiddlyserver.backupDirectory);
 	if (set.server.logAccess) set.server.logAccess = path.resolve(settingsDir, set.server.logAccess);
@@ -400,7 +401,8 @@ interface ServerEventsListener<THIS> {
 	(event: "settings", listener: (settings: ServerConfig) => void): THIS;
 	(event: "stateError", listener: (state: StateObject) => void): THIS;
 	(event: "stateDebug", listener: (state: StateObject) => void): THIS;
-	(event: "serverClose", listener: (iface: "localhost" | "network") => void): THIS;
+	(event: "serverOpen", listener: (iface: string) => void): THIS;
+	(event: "serverClose", listener: (iface: string) => void): THIS;
 }
 type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
 export interface ServerEventEmitter extends EventEmitter {
@@ -409,7 +411,8 @@ export interface ServerEventEmitter extends EventEmitter {
 	emit(event: "settings", settings: ServerConfig): boolean;
 	emit(event: "stateError", state: StateObject): boolean;
 	emit(event: "stateDebug", state: StateObject): boolean;
-	emit(event: "serverClose", iface: "localhost" | "network"): boolean;
+	emit(event: "serverOpen", serverList: any[], https: boolean): boolean;
+	emit(event: "serverClose", iface: string): boolean;
 
 	addListener: ServerEventsListener<this>;
 	on: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
@@ -1138,6 +1141,8 @@ export class StateObject {
 	}
 
 	get allow(): ServerConfig_AccessOptions {
+		let isLocalhost = testAddress(this._req.socket.localAddress, "127.0.0.1", 8);
+
 		switch (this.trustLevel) {
 			case "trusted": return {
 				mkdir: true,
@@ -1146,7 +1151,7 @@ export class StateObject {
 				WARNING_all_settings_WARNING: true,
 				writeErrors: true
 			};
-			case "localhost": return settings.allowLocalhost;
+
 			case "network": return settings.allowNetwork;
 		}
 	}
@@ -1468,28 +1473,41 @@ export interface SecureServerOptions {
 }
 export interface ServerConfigBase {
 	// tree: NewTreeItem;
-	/** generic webserver options */
+	/** 
+	 * Generic webserver options. 
+	 */
 	server: {
 		/** 
-		 * One IP address or an array of IP addresses to accept requests on. 
-		 * This may include a subnet mask (/32 is assumed if none specified). 
-		 * If a subnet mask is specified, TiddlyServer will attempt to bind to
-		 * ALL matching interface IP addresses. 0.0.0.0/0 will bind ALL IP addresses
-		 * assigned to ALL network interfaces on the machine. Any string which does
-		 * not match the format x.x.x.x/x will be passed directly to the NodeJS HTTP
-		 * or HTTPS server instance. Adding a minus sign in front of the string will
-		 * blacklist that IP address or range from accepting requests, unless it matches
-		 * another IP address or range further down the array.
+		 * An array of IP addresses to accept requests on. Can be any IP address
+		 * assigned to the machine. Default is "127.0.0.1".
+		 * 
+		 * If `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens
+		 * on the specified IP addresses and accepts all connections from the operating system. If an IP address
+		 * cannot be bound, the server skips it unless `--bindAddressRequired` is specified
+		 * 
+		 * If `filterBindAddress` is true, IPv4 addresses may include a subnet mask,
+		 * (e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) 
+		 * to block requests incoming to that IP address or range.
 		 */
-		host: string | string[];
+		bindAddress: string[];
 		/**
-		 * Whether to bind the wildcard IP (0.0.0.0) and filter requests based 
-		 * on the local IP address of the request. This will result in only one
-		 * server instance being started instead of one per matching IP address.
-		 * In many cases this is preferred, however Android does not support
-		 * this for some reason. The default is true.
+		 * IPv4 addresses may include a subnet mask,
+		 * (e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) 
+		 * to block requests incoming to that IP address or range.
 		 */
-		bindWildcardIP: boolean;
+		filterBindAddress: boolean;
+		/**
+		 * Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.
+		 * The default is `true`. In many cases this is preferred, however 
+		 * Android does not support this for some reason. On Android, set this to
+		 * `false` and set host to `["0.0.0.0/0"]` to bind to all IPv4 addresses.
+		 */
+		bindWildcard: true | false;
+		/** 
+		 * Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests
+		 * incoming to IPv6 addresses if not explicitly denied.
+		 */
+		enableIPv6: boolean;
 		/** port to listen on */
 		port: number;
 		/** access log file */
@@ -1648,3 +1666,84 @@ export function getError(...args: string[]) {
 }
 
 
+/**
+ *
+ *
+ * @param {string} ip x.x.x.x
+ * @param {string} range x.x.x.x
+ * @param {number} netmask 0-32
+ */
+export function testAddress(ip: string, range: string, netmask: number) {
+	let netmaskBinStr = ipcalc.IPv4_bitsNM_to_binstrNM(netmask);
+	let addressBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(ip));
+	let netaddrBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(range))
+	let netaddrBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(netaddrBinStr, netmaskBinStr);
+	let addressBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(addressBinStr, netmaskBinStr);
+	return netaddrBinStrMasked === addressBinStrMasked;
+	// 	this.addressInteger = IPv4_dotquadA_to_intA( this.addressDotQuad );
+	// //	this.addressDotQuad  = IPv4_intA_to_dotquadA( this.addressInteger );
+	// 	this.addressBinStr  = IPv4_intA_to_binstrA( this.addressInteger );
+
+	// 	this.netmaskBinStr  = IPv4_bitsNM_to_binstrNM( this.netmaskBits );
+	// 	this.netmaskInteger = IPv4_binstrA_to_intA( this.netmaskBinStr );
+	// 	this.netmaskDotQuad  = IPv4_intA_to_dotquadA( this.netmaskInteger );
+
+	// 	this.netaddressBinStr = IPv4_Calc_netaddrBinStr( this.addressBinStr, this.netmaskBinStr );
+	// 	this.netaddressInteger = IPv4_binstrA_to_intA( this.netaddressBinStr );
+	// 	this.netaddressDotQuad  = IPv4_intA_to_dotquadA( this.netaddressInteger );
+
+	// 	this.netbcastBinStr = IPv4_Calc_netbcastBinStr( this.addressBinStr, this.netmaskBinStr );
+	// 	this.netbcastInteger = IPv4_binstrA_to_intA( this.netbcastBinStr );
+	// 	this.netbcastDotQuad  = IPv4_intA_to_dotquadA( this.netbcastInteger );
+}
+let hostIPv4reg = /^(\-?)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/i;
+
+export function parseHostList(hosts: string[]) {
+	let hostTests = hosts.map(e => hostIPv4reg.exec(e) || e);
+	return (addr: string) => {
+		let usable = false;
+		hostTests.forEach(test => {
+			if (Array.isArray(test)) {
+				let allow = !test[1];
+				let ip = test[2];
+				let netmask = +test[3];
+				if (netmask < 0 || netmask > 32) console.log("Host %s has an invalid netmask", test[0]);
+				if (testAddress(addr, ip, netmask)) usable = allow;
+			} else {
+				let ip = test.startsWith('-') ? test.slice(1) : test;
+				let deny = test.startsWith('-');
+				if (ip === addr) usable = !deny;
+			}
+		});
+		return usable;
+	}
+}
+export function getUsableAddresses(hosts: string[]) {
+	let reg = /^(\-?)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/i;
+	let hostTests = hosts.map(e => reg.exec(e) || e);
+	var ifaces = networkInterfaces();
+	let addresses = Object.keys(ifaces).reduce(
+		(n, k) => n.concat(ifaces[k].filter(e => e.family === "IPv4")),
+		[] as NetworkInterfaceInfo[]
+	);
+	let usableArray = addresses.filter(addr => {
+		let usable = false;
+		hostTests.forEach(test => {
+			if (Array.isArray(test)) {
+				//we can't match IPv6 interface addresses so just go to the next one
+				if (addr.family === "IPv6") return;
+				let allow = !test[1];
+				let ip = test[2];
+				let netmask = +test[3];
+				if (netmask < 0 || netmask > 32) console.log("Host %s has an invalid netmask", test[0]);
+				if (testAddress(addr.address, ip, netmask)) usable = allow;
+			} else {
+				let ip = test.startsWith('-') ? test.slice(1) : test;
+				let deny = test.startsWith('-');
+				if (ip === addr.address) usable = !deny;
+			}
+		});
+		return usable;
+	})
+	return usableArray;
+}

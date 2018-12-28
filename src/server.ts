@@ -1,6 +1,6 @@
 require("../lib/source-map-support-lib");
 
-import { send, ws } from '../lib/bundled-lib';
+import { send, ws, ajv } from '../lib/bundled-lib';
 const sendOptions = {};
 
 
@@ -19,7 +19,7 @@ import {
 	serveFolder,
 	serveFile,
 	ConvertSettings,
-	NewConfig
+	parseHostList,
 } from "./server-types";
 
 import * as http from 'http'
@@ -28,6 +28,8 @@ import * as path from 'path';
 import * as url from 'url';
 import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
+import * as ipcalc from './ipcalc';
+
 // import { parse as jsonParse } from 'jsonlint';
 
 // import send = require('../lib/send-lib');
@@ -59,6 +61,7 @@ import { handleTiddlyServerRoute, init as initTiddlyServer, handleTiddlyWikiRout
 import { handleSettings, initSettings } from './settingsPage';
 
 import { ServerResponse } from 'http';
+import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 
 initServerTypes(eventer);
 initTiddlyServer(eventer);
@@ -77,21 +80,35 @@ export function loadSettings(settingsFile: string) {
 	console.log("Settings file: %s", settingsFile);
 
 	const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
+
+	var schema = require("../settings.schema.json");
+	var schemaChecker = new ajv({
+		allErrors: true,
+		async: false
+	});
+	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
+	var validate = schemaChecker.compile(schema);
+	var valid = validate(settingsString, settingsFile);
+	if (!valid) console.log(validate.errors);
+
 	let settingsObj: ServerConfig = tryParseJSON<ServerConfig>(settingsString, (e) => {
 		console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
 		console.error(e.errorPosition);
 		throw "The settings file could not be parsed: Invalid JSON";
 	});
 
+
+
 	if (!settingsObj.tree) throw "tree is not specified in the settings file";
 	let routeKeys = Object.keys(routes);
 	normalizeSettings(settingsObj, settingsFile, routeKeys);
-	let newSettingsObj: NewConfig = ConvertSettings(settingsObj);
+	// let newSettingsObj: NewConfig = ConvertSettings(settingsObj);
 
-	if (["string", "undefined"].indexOf(typeof settingsObj.username) === -1) throw "username must be a JSON string if specified";
-	if (["string", "undefined"].indexOf(typeof settingsObj.password) === -1) throw "password must be a JSON string if specified";
+	// if (["string", "undefined"].indexOf(typeof settingsObj.username) === -1) throw "username must be a JSON string if specified";
+	// if (["string", "undefined"].indexOf(typeof settingsObj.password) === -1) throw "password must be a JSON string if specified";
 
-	if (process.env.TiddlyServer_disableLocalHost || settingsObj._disableLocalHost) ENV.disableLocalHost = true;
+	// if (process.env.TiddlyServer_disableLocalHost || settingsObj._disableLocalHost)
+	// 	ENV.disableLocalHost = true;
 
 	settingsObj.__assetsDir = assets;
 
@@ -115,11 +132,11 @@ export function loadSettings(settingsFile: string) {
 const morgan = require('../lib/morgan.js');
 function setLog() {
 	const logger: Function = morgan.handler({
-		logFile: settings.logAccess || undefined,
-		logToConsole: !settings.logAccess || settings.logToConsoleAlso,
-		logColorsToFile: settings.logColorsToFile
+		logFile: settings.server.logAccess || undefined,
+		logToConsole: !settings.server.logAccess || settings.server.logToConsoleAlso,
+		logColorsToFile: settings.server.logColorsToFile
 	});
-	return settings.logAccess === false
+	return settings.server.logAccess === false
 		? ((...args: any[]) => Promise.resolve([]))
 		: (...args: any[]) => new Promise(resolve => {
 			args.push((...args2: any[]) => resolve(args2));
@@ -129,8 +146,8 @@ function setLog() {
 let log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<{}>;
 eventer.on('settings', () => { log = setLog(); });
 eventer.on('settingsChanged', (keys) => {
-	let watch: (keyof ServerConfig)[] = ["logAccess", "logToConsoleAlso", "logColorsToFile"];
-	if (watch.some(e => keys.indexOf(e) > -1)) log = setLog();
+	// let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];
+	// if (watch.some(e => keys.indexOf(e) > -1)) log = setLog();
 })
 
 // === Setup static routes
@@ -145,7 +162,7 @@ interface RequestEvent {
 	handled: boolean; //allows the preflighter to mark the request as handled
 	trusted: boolean; //allows the preflighter to upgrade the request to trusted
 	/** iface: the server listener type, host: the host header, addr: socket.localAddress */
-	interface: { iface: "localhost" | "network", host: string | undefined, addr: string };
+	interface: { iface: string, host: string | undefined, addr: string };
 	request: http.IncomingMessage;
 	response: http.ServerResponse;
 }
@@ -157,14 +174,18 @@ export function initServer(options: {
 	settings: ServerConfig;
 }) {
 	settings = options.settings;
-	eventer.emit('settings', options.settings);
 	const { preflighter, env, listenCB } = options;
-	const serverLocalHost = http.createServer();
-	const serverNetwork = http.createServer();
-
-	const addListeners = (server: http.Server, iface: "localhost" | "network") => {
+	eventer.emit('settings', settings);
+	const hosts: string[] = [];
+	const bindWildcard = settings.server.bindWildcard;
+	//always match localhost
+	const tester = parseHostList([...settings.server.bindAddress, "-127.0.0.0/8"])
+	const localhostTester = parseHostList(["127.0.0.0/8"]);
+	const addListeners = (server: http.Server, iface: string) => {
 		let closing = false;
-
+		if (bindWildcard) server.on('connection', (socket) => {
+			if (!tester(socket.localAddress) && !localhostTester(socket.localAddress)) socket.end();
+		})
 		server.on('request', requestHandler(iface, preflighter));
 		server.on('listening', () => {
 			debug(1, "server %s listening", iface);
@@ -173,7 +194,6 @@ export function initServer(options: {
 			debug(4, "server %s error: %s", iface, err.message);
 			debug(4, "server %s stack: %s", iface, err.stack);
 			server.close();
-			process.exitCode = 2;
 			eventer.emit('serverClose', iface);
 		})
 		server.on('close', () => {
@@ -181,12 +201,6 @@ export function initServer(options: {
 			debug(4, "server %s closed", iface);
 			closing = true;
 		});
-		eventer.on('serverClose', (closingiface) => {
-			if (closingiface !== iface && !closing) {
-				closing = true;
-				server.close();
-			}
-		})
 
 		const wss = new WebSocketServer({ server });
 		wss.on('connection', (client: WebSocket, request: http.IncomingMessage) => {
@@ -197,29 +211,33 @@ export function initServer(options: {
 		});
 	}
 
-	addListeners(serverLocalHost, "localhost");
-	addListeners(serverNetwork, "network");
-
-	const cb = function (...args: any[]) {
-		if (listenCB) listenCB(settings.host, settings.port, ENV.disableLocalHost);
-		serverListenCB.apply(this, args);
+	if (settings.server.bindWildcard) {
+		hosts.push('0.0.0.0');
+		if (settings.server.enableIPv6) hosts.push('::');
+	} else if (Array.isArray(settings.server.bindAddress)) {
+		let ifaces = networkInterfaces();
+		let addresses = Object.keys(ifaces)
+			.reduce((n, k) => n.concat(ifaces[k]), [] as NetworkInterfaceInfo[])
+			.filter(e => (settings.server.enableIPv6 || e.family === "IPv4") && tester(e.address))
+			.map(e => e.address);
+		hosts.push(...addresses);
 	}
-	if (ENV.disableLocalHost) {
-		serverNetwork.listen(settings.port, settings.host, cb);
-	} else {
-		serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
-			if (settings.host !== "127.0.0.1") {
-				serverNetwork.listen(settings.port, settings.host, cb);
-			} else {
-				cb(err, res);
-			}
-		});
-	}
+	if (settings.server._bindLocalhost) hosts.push('localhost');
+	let servers: http.Server[] = [];
+	Observable.from(hosts).concatMap(host => {
+		let server = http.createServer();
+		addListeners(server, host);
+		servers.push(server);
+		return new Observable(subs => {
+			server.listen(settings.server.port, host, undefined, () => { subs.complete(); });
+		})
+	}).subscribe(item => { }, x => { }, () => {
+		eventer.emit("serverOpen", servers, false);
+	});
 
 	return eventer;
 }
-
-function requestHandler(iface: "localhost" | "network", preflighter?: (ev: RequestEvent) => Promise<RequestEvent>) {
+function requestHandler(iface: string, preflighter?: (ev: RequestEvent) => Promise<RequestEvent>) {
 	return (request: http.IncomingMessage, response: http.ServerResponse) => {
 		let host = request.headers.host;
 		let addr = request.socket.localAddress;

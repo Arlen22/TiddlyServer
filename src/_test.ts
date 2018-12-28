@@ -1,5 +1,6 @@
-import { treeWalkerOld, treeWalker, normalizeSettings, statWalkPath, resolvePath, ServerConfig, tryParseJSON, colors, NewTreeGroup, NewTreeItem, NewTreeOptions, NewConfigSchema, NewTreeItemSchema, NewTreePath, NewTreeGroupSchema, NewTreePathSchema, NewTreeObjectSchema, NewTreeHashmapPath, NewTreeHashmapGroupSchema, normalizeTree } from './server-types';
+import { treeWalkerOld, treeWalker, normalizeSettings, statWalkPath, resolvePath, ServerConfig, tryParseJSON, colors, NewTreeGroup, NewTreeItem, NewTreeOptions, NewConfigSchema, NewTreeItemSchema, NewTreePath, NewTreeGroupSchema, NewTreePathSchema, NewTreeObjectSchema, NewTreeHashmapPath, NewTreeHashmapGroupSchema, normalizeTree, getUsableAddresses, parseHostList } from './server-types';
 import * as fs from 'fs';
+import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 let testFolderChildren: NewTreeOptions[] = [
 	{ $element: "authPassword", username: "testuser", password: "********" }
 ]
@@ -73,5 +74,14 @@ function buildHTML(tree: TreeItem, indent: number = 0) {
 	let attrs = Object.keys(tree).filter(e => !e.startsWith("$")).sort().map(k => k + "=\"" + tree[k] + "\"").join(' ');
 	return str("  ", indent) + `<${tree.$element} ${attrs}${tree.$children && (">\n" + tree.$children.map(e => buildHTML(e, indent + 1)).join("") + str("  ", indent)) + `</${tree.$element}>` || " />"}\n`
 }
-console.log(buildHTML(tree1normal));
-console.log(buildHTML(tree2normal));
+// console.log(buildHTML(tree1normal));
+// console.log(buildHTML(tree2normal));
+
+// console.log(getUsableAddresses(["0.0.0.0/0", "::"]));
+let tester = parseHostList([process.argv[2], "-127.0.0.0/8"])
+let ifaces = networkInterfaces();
+let addresses = Object.keys(ifaces)
+	.reduce((n, k) => n.concat(ifaces[k]), [] as NetworkInterfaceInfo[])
+	.filter(e => (e.family === "IPv4") && tester(e.address))
+	.map(e => e.address);
+console.log(addresses);
