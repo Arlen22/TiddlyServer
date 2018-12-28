@@ -126,7 +126,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		const options = {
 			upload: isFolder && (allow.upload),
 			mkdir: isFolder && (allow.mkdir),
-			mixFolders: settings.mixFolders
+			mixFolders: settings.directoryIndex.mixFolders
 		};
 		getNewTreePathFiles(result, state)
 			.map(e => [e, options] as [typeof e, typeof options])
@@ -219,7 +219,7 @@ function handlePUTrequest(state: StateObject) {
 	const mtime = Date.parse(state.statPath.stat.mtime as any);
 	const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
 	const ifmatchStr: string = first(state.req.headers['if-match']) || '';
-	if (settings.etag !== "disabled" && (ifmatchStr || settings.etag === "required") && (ifmatchStr !== etag)) {
+	if (settings.tiddlyserver.etag !== "disabled" && (ifmatchStr || settings.tiddlyserver.etag === "required") && (ifmatchStr !== etag)) {
 		const ifmatch = JSON.parse(ifmatchStr).split('-');
 		const _etag = JSON.parse(etag).split('-');
 		console.log('412 ifmatch %s', ifmatchStr);
@@ -230,15 +230,15 @@ function handlePUTrequest(state: StateObject) {
 		let headTime = +ifmatch[2];
 		let diskTime = mtime;
 		// console.log(settings.etagWindow, diskTime, headTime);
-		if (!settings.etagWindow || diskTime - (settings.etagWindow * 1000) > headTime)
+		if (!settings.tiddlyserver.etagWindow || diskTime - (settings.tiddlyserver.etagWindow * 1000) > headTime)
 			return state.throw(412);
-		console.log('412 prevented by etagWindow of %s seconds', settings.etagWindow);
+		console.log('412 prevented by etagWindow of %s seconds', settings.tiddlyserver.etagWindow);
 	}
 	new Observable((subscriber) => {
-		if (settings.backupDirectory) {
+		if (settings.tiddlyserver.backupDirectory) {
 			const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
 			const ext = path.extname(backupFile);
-			const backupWrite = fs.createWriteStream(path.join(settings.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
+			const backupWrite = fs.createWriteStream(path.join(settings.tiddlyserver.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
 			const fileRead = fs.createReadStream(fullpath);
 			const gzip = zlib.createGzip();
 			const pipeError = (err) => {

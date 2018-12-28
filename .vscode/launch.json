@@ -6,9 +6,10 @@
     "configurations": [
         {
             "type": "node",
-            "request": "launch",
+						"request": "launch",
+						// "preLaunchTask": "Compile",
             "name": "Launch Server",
-            "program": "${workspaceRoot}/src/server.ts",
+            "program": "${workspaceRoot}/server.js",
             "outFiles": [
                 "${workspaceRoot}/**/*.js"
             ],
@@ -16,55 +17,10 @@
         },
         {
             "type": "node",
-            "request": "launch",
+						"request": "launch",
+						"preLaunchTask": "tsc",
             "name": "Launch Server (skip libs)",
-            "program": "${workspaceRoot}/src/server.ts",
-            "smartStep": true,
-            "outFiles": [
-                "${workspaceRoot}/**/*.js"
-            ],
-            "sourceMaps": true,
-            "skipFiles": [
-                "<node_internals>/**/*.js",
-                "${workspaceRoot}/node_modules/**/*.js",
-                "${workspaceRoot}/lib/rxjs/**/*.js",
-                "${workspaceRoot}/operators/**/*.js"
-            ],
-            "protocol": "inspector"
-        },
-        {
-            "type": "chrome",
-            "request": "launch",
-            "name": "Launch Server (skip libs)(Chrome)",
-            "program": "${workspaceRoot}/server.ts",
-            "smartStep": true,
-            "outFiles": [
-                "${workspaceRoot}/**/*.js"
-            ],
-            "sourceMaps": true,
-            "skipFiles": [
-                "<node_internals>/**/*.js",
-                "${workspaceRoot}/node_modules/**/*.js",
-                "${workspaceRoot}/lib/rxjs/**/*.js",
-                "${workspaceRoot}/operators/**/*.js"
-            ],
-            "protocol": "inspector"
-        },
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "Launch Tiddly",
-            "program": "${workspaceRoot}/tiddly.ts",
-            "outFiles": [
-                "${workspaceRoot}/**/*.js"
-            ],
-            "sourceMaps": true
-        },
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "Launch Tiddly (skip libs)",
-            "program": "${workspaceRoot}/tiddly.ts",
+            "program": "${workspaceRoot}/server.js",
             "smartStep": true,
             "outFiles": [
                 "${workspaceRoot}/**/*.js"
