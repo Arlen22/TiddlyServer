@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 require("../lib/source-map-support-lib");
 const bundled_lib_1 = require("../lib/bundled-lib");
 const sendOptions = {};
+const rx_1 = require("../lib/rx");
 const server_types_1 = require("./server-types");
 const http = require("http");
 const fs = require("fs");
@@ -27,6 +28,7 @@ var settings;
 //import and init api-access
 const tiddlyserver_1 = require("./tiddlyserver");
 const settingsPage_1 = require("./settingsPage");
+const os_1 = require("os");
 server_types_1.init(exports.eventer);
 tiddlyserver_1.init(exports.eventer);
 settingsPage_1.initSettings(exports.eventer);
@@ -37,6 +39,16 @@ const stylesheet = path.resolve(__dirname, '../assets/directory.css');
 function loadSettings(settingsFile) {
     console.log("Settings file: %s", settingsFile);
     const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
+    var schema = require("../settings.schema.json");
+    var schemaChecker = new bundled_lib_1.ajv({
+        allErrors: true,
+        async: false
+    });
+    schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
+    var validate = schemaChecker.compile(schema);
+    var valid = validate(settingsString, settingsFile);
+    if (!valid)
+        console.log(validate.errors);
     let settingsObj = server_types_1.tryParseJSON(settingsString, (e) => {
         console.error(/*colors.BgWhite + */ server_types_1.colors.FgRed + "The settings file could not be parsed: %s" + server_types_1.colors.Reset, e.originalError.message);
         console.error(e.errorPosition);
@@ -46,13 +58,11 @@ function loadSettings(settingsFile) {
         throw "tree is not specified in the settings file";
     let routeKeys = Object.keys(routes);
     server_types_1.normalizeSettings(settingsObj, settingsFile, routeKeys);
-    let newSettingsObj = server_types_1.ConvertSettings(settingsObj);
-    if (["string", "undefined"].indexOf(typeof settingsObj.username) === -1)
-        throw "username must be a JSON string if specified";
-    if (["string", "undefined"].indexOf(typeof settingsObj.password) === -1)
-        throw "password must be a JSON string if specified";
-    if (process.env.TiddlyServer_disableLocalHost || settingsObj._disableLocalHost)
-        ENV.disableLocalHost = true;
+    // let newSettingsObj: NewConfig = ConvertSettings(settingsObj);
+    // if (["string", "undefined"].indexOf(typeof settingsObj.username) === -1) throw "username must be a JSON string if specified";
+    // if (["string", "undefined"].indexOf(typeof settingsObj.password) === -1) throw "password must be a JSON string if specified";
+    // if (process.env.TiddlyServer_disableLocalHost || settingsObj._disableLocalHost)
+    // 	ENV.disableLocalHost = true;
     settingsObj.__assetsDir = assets;
     if (typeof settingsObj.tree === "object") {
         let keys = Object.keys(settingsObj.tree);
@@ -68,11 +78,11 @@ exports.loadSettings = loadSettings;
 const morgan = require('../lib/morgan.js');
 function setLog() {
     const logger = morgan.handler({
-        logFile: settings.logAccess || undefined,
-        logToConsole: !settings.logAccess || settings.logToConsoleAlso,
-        logColorsToFile: settings.logColorsToFile
+        logFile: settings.server.logAccess || undefined,
+        logToConsole: !settings.server.logAccess || settings.server.logToConsoleAlso,
+        logColorsToFile: settings.server.logColorsToFile
     });
-    return settings.logAccess === false
+    return settings.server.logAccess === false
         ? ((...args) => Promise.resolve([]))
         : (...args) => new Promise(resolve => {
             args.push((...args2) => resolve(args2));
@@ -82,9 +92,8 @@ function setLog() {
 let log;
 exports.eventer.on('settings', () => { log = setLog(); });
 exports.eventer.on('settingsChanged', (keys) => {
-    let watch = ["logAccess", "logToConsoleAlso", "logColorsToFile"];
-    if (watch.some(e => keys.indexOf(e) > -1))
-        log = setLog();
+    // let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];
+    // if (watch.some(e => keys.indexOf(e) > -1)) log = setLog();
 });
 // === Setup static routes
 const routes = {
@@ -95,12 +104,20 @@ const routes = {
 };
 function initServer(options) {
     settings = options.settings;
-    exports.eventer.emit('settings', options.settings);
     const { preflighter, env, listenCB } = options;
-    const serverLocalHost = http.createServer();
-    const serverNetwork = http.createServer();
+    exports.eventer.emit('settings', settings);
+    const hosts = [];
+    const bindWildcard = settings.server.bindWildcard;
+    //always match localhost
+    const tester = server_types_1.parseHostList([...settings.server.bindAddress, "-127.0.0.0/8"]);
+    const localhostTester = server_types_1.parseHostList(["127.0.0.0/8"]);
     const addListeners = (server, iface) => {
         let closing = false;
+        if (bindWildcard)
+            server.on('connection', (socket) => {
+                if (!tester(socket.localAddress) && !localhostTester(socket.localAddress))
+                    socket.end();
+            });
         server.on('request', requestHandler(iface, preflighter));
         server.on('listening', () => {
             debug(1, "server %s listening", iface);
@@ -109,7 +126,6 @@ function initServer(options) {
             debug(4, "server %s error: %s", iface, err.message);
             debug(4, "server %s stack: %s", iface, err.stack);
             server.close();
-            process.exitCode = 2;
             exports.eventer.emit('serverClose', iface);
         });
         server.on('close', () => {
@@ -117,12 +133,6 @@ function initServer(options) {
                 exports.eventer.emit('serverClose', iface);
             debug(4, "server %s closed", iface);
             closing = true;
-        });
-        exports.eventer.on('serverClose', (closingiface) => {
-            if (closingiface !== iface && !closing) {
-                closing = true;
-                server.close();
-            }
         });
         const wss = new WebSocketServer({ server });
         wss.on('connection', (client, request) => {
@@ -132,26 +142,32 @@ function initServer(options) {
             debug(-2, 'WS-ERROR %s', util_1.inspect(error));
         });
     };
-    addListeners(serverLocalHost, "localhost");
-    addListeners(serverNetwork, "network");
-    const cb = function (...args) {
-        if (listenCB)
-            listenCB(settings.host, settings.port, ENV.disableLocalHost);
-        serverListenCB.apply(this, args);
-    };
-    if (ENV.disableLocalHost) {
-        serverNetwork.listen(settings.port, settings.host, cb);
+    if (settings.server.bindWildcard) {
+        hosts.push('0.0.0.0');
+        if (settings.server.enableIPv6)
+            hosts.push('::');
     }
-    else {
-        serverLocalHost.listen(settings.port, "127.0.0.1", (err, res) => {
-            if (settings.host !== "127.0.0.1") {
-                serverNetwork.listen(settings.port, settings.host, cb);
-            }
-            else {
-                cb(err, res);
-            }
+    else if (Array.isArray(settings.server.bindAddress)) {
+        let ifaces = os_1.networkInterfaces();
+        let addresses = Object.keys(ifaces)
+            .reduce((n, k) => n.concat(ifaces[k]), [])
+            .filter(e => (settings.server.enableIPv6 || e.family === "IPv4") && tester(e.address))
+            .map(e => e.address);
+        hosts.push(...addresses);
+    }
+    if (settings.server._bindLocalhost)
+        hosts.push('localhost');
+    let servers = [];
+    rx_1.Observable.from(hosts).concatMap(host => {
+        let server = http.createServer();
+        addListeners(server, host);
+        servers.push(server);
+        return new rx_1.Observable(subs => {
+            server.listen(settings.server.port, host, undefined, () => { subs.complete(); });
         });
-    }
+    }).subscribe(item => { }, x => { }, () => {
+        exports.eventer.emit("serverOpen", servers, false);
+    });
     return exports.eventer;
 }
 exports.initServer = initServer;

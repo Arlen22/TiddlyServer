@@ -91,9 +91,9 @@ function handleDataFolderRequest(result, state) {
     //set the trailing slash correctly if this is the actual page load
     //redirect ?reload=true requests to the same, to prevent it being 
     //reloaded multiple times for the same page load.
-    if (isFullpath && (!settings.useTW5path !== !state.url.pathname.endsWith("/"))
+    if (isFullpath && (!settings.tiddlyserver.useTW5path !== !state.url.pathname.endsWith("/"))
         || state.url.query.reload) {
-        let redirect = mount + (settings.useTW5path ? "/" : "");
+        let redirect = mount + (settings.tiddlyserver.useTW5path ? "/" : "");
         state.respond(302, "", {
             'Location': redirect
         }).empty();
@@ -344,8 +344,9 @@ function sendPluginResponse(state, pluginCache) {
     // })();
     const body = meta + '\n\n' + text;
     var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1000; //1 year
-    var maxAge = Math.min(Math.max(0, settings.maxAge.tw_plugins), MAX_MAXAGE);
-    var cacheControl = 'public, max-age=' + Math.floor(settings.maxAge.tw_plugins / 1000);
+    var maxageSetting = settings.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins;
+    var maxAge = Math.min(Math.max(0, maxageSetting), MAX_MAXAGE);
+    var cacheControl = 'public, max-age=' + Math.floor(maxageSetting / 1000);
     debug(-3, 'cache-control %s', cacheControl);
     state.setHeader('Cache-Control', cacheControl);
     var modified = new Date(pluginCache.cacheTime).toUTCString();

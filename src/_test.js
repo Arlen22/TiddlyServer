@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const server_types_1 = require("./server-types");
 const fs = require("fs");
+const os_1 = require("os");
 let testFolderChildren = [
     { $element: "authPassword", username: "testuser", password: "********" }
 ];
@@ -30,8 +31,8 @@ let TreeItemObjectChildObject = {
     "test6_2": { $element: "folder", path: "test/test6/child2", $children: testFolderChildren }
 };
 let TreeItemObject = strong({
-    test1: "test/test1",
-    test2: "test/test2",
+    test1: "test/test1string",
+    test2: "test/test2string",
     test3: { $element: "folder", path: "test/test3" },
     test4: { $element: "folder", path: "test/test4", $children: testFolderChildren },
     test5: { $element: "group", $children: TreeItemArray },
@@ -55,21 +56,6 @@ let tree2 = {
         test5: { $element: "group", $children: TreeItemArray },
         test6: { $element: "group", $children: TreeItemObject },
     }
-    // 	...strong<NewTreePathSchema[]>([
-    // 	{ $element: "folder", key: "test1_named", path: "test/test1" },
-    // 	{ $element: "folder", path: "test/test1" },
-    // 	{ $element: "folder", key: "test2_named", path: "test/test2", $children: testFolderChildren },
-    // 	{ $element: "folder", path: "test/test2", $children: testFolderChildren }
-    // ]),
-    // ...strong<NewTreeGroupSchema[]>([{
-    // 	$element: "group", key: "test/group1", $children: [
-    // 		{ $element: "folder", path: "test/test5" },
-    // 		{ $element: "folder", path: "test/test6", $children: testFolderChildren },
-    // 		{ $element: "folder", key: "test1_named", path: "test/test5" },
-    // 		{ $element: "folder", key: "test2_named", path: "test/test6", $children: testFolderChildren },
-    // 	]
-    // }])
-    // ]
 };
 // tryParseJSON<ServerConfig>(settingsString, (e) => {
 // 	console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
@@ -87,5 +73,13 @@ function buildHTML(tree, indent = 0) {
     let attrs = Object.keys(tree).filter(e => !e.startsWith("$")).sort().map(k => k + "=\"" + tree[k] + "\"").join(' ');
     return str("  ", indent) + `<${tree.$element} ${attrs}${tree.$children && (">\n" + tree.$children.map(e => buildHTML(e, indent + 1)).join("") + str("  ", indent)) + `</${tree.$element}>` || " />"}\n`;
 }
-console.log(buildHTML(tree1normal));
-console.log(buildHTML(tree2normal));
+// console.log(buildHTML(tree1normal));
+// console.log(buildHTML(tree2normal));
+// console.log(getUsableAddresses(["0.0.0.0/0", "::"]));
+let tester = server_types_1.parseHostList([process.argv[2], "-127.0.0.0/8"]);
+let ifaces = os_1.networkInterfaces();
+let addresses = Object.keys(ifaces)
+    .reduce((n, k) => n.concat(ifaces[k]), [])
+    .filter(e => (e.family === "IPv4") && tester(e.address))
+    .map(e => e.address);
+console.log(addresses);

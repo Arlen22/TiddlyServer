@@ -11,6 +11,8 @@ const bundled_lib_1 = require("../lib/bundled-lib");
 const fs_1 = require("fs");
 const zlib_1 = require("zlib");
 const stream_1 = require("stream");
+const os_1 = require("os");
+const ipcalc = require("./ipcalc");
 let DEBUGLEVEL = -1;
 let settings;
 const colorsRegex = /\x1b\[[0-9]+m/gi;
@@ -92,14 +94,21 @@ function OldDefaultSettings(set) {
 exports.OldDefaultSettings = OldDefaultSettings;
 function ConvertSettings(set) {
     return {
+        __assetsDir: set.__assetsDir,
+        __dirname: set.__dirname,
+        __filename: set.__filename,
         tree: set.tree,
         server: {
-            host: [set.host],
+            bindAddress: [set.host],
+            filterBindAddress: false,
+            enableIPv6: false,
             port: set.port,
+            bindWildcard: set.host === "0.0.0.0",
             logAccess: set.logAccess,
             logError: set.logError,
             logColorsToFile: set.logColorsToFile,
             logToConsoleAlso: set.logToConsoleAlso,
+            debugLevel: set.debugLevel,
             _bindLocalhost: set._disableLocalHost === false,
             _devmode: set._devmode
         },
@@ -130,8 +139,12 @@ function NewDefaultSettings(set) {
     let newset = {
         tree: set.tree,
         server: Object.assign({
-            host: [],
+            bindAddress: [],
+            bindWildcard: true,
+            enableIPv6: false,
+            filterBindAddress: false,
             port: 8080,
+            debugLevel: 0,
             logAccess: "",
             logError: "",
             logColorsToFile: false,
@@ -169,8 +182,10 @@ function NewDefaultSettings(set) {
             enabled: false,
             alwaysRefreshCache: true,
             maxAge_tw_plugins: 0
-        }, set.EXPERIMENTAL_clientside_datafolders)
+        }, set.EXPERIMENTAL_clientside_datafolders),
+        $schema: "./settings.schema.json"
     };
+    return newset;
 }
 exports.NewDefaultSettings = NewDefaultSettings;
 function isNewTreeItem(a) {
@@ -234,30 +249,29 @@ exports.normalizeTree = (settingsDir) => function upgradeTree(item, key, keypath
 function normalizeSettings(set, settingsFile, routeKeys) {
     const settingsDir = path.dirname(settingsFile);
     NewDefaultSettings(set);
-    if (typeof set.tree === "string" && set.tree.endsWith(".xml")) {
-        //read the xml file and parse it as the tree structure
-    }
-    set.tree = exports.normalizeTree(settingsDir)(set.tree, "tree", []);
-    // {
-    // 	let conflict = (() => {
-    // 		if (set.tree.$element && set.tree.$element === "group")
-    // 			return set.tree.$children.filter(e => routeKeys.indexOf(e.key || isNewTreePath(e) && path.basename(e.path) || "") > -1);
-    // 		else return [];
-    // 	})()
-    // 	if (conflict.length) console.log(
-    // 		"The following tree items are reserved for use by TiddlyServer: %s",
-    // 		conflict.map(e => '"' + e.key + '"').join(', ')
-    // 	);
-    // }
-    if (set.backupDirectory)
-        set.backupDirectory = path.resolve(settingsDir, set.backupDirectory);
-    if (set.logAccess)
-        set.logAccess = path.resolve(settingsDir, set.logAccess);
-    if (set.logError)
-        set.logError = path.resolve(settingsDir, set.logError);
+    ((tree) => {
+        if (typeof tree === "string" && tree.endsWith(".xml")) {
+            //read the xml file and parse it as the tree structure
+        }
+        else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
+            //require the json or js file and use it directly
+            let filepath = path.resolve(settingsDir, tree);
+            set.tree = exports.normalizeTree(path.dirname(filepath))(require(filepath), "tree", []);
+        }
+        else {
+            //otherwise just assume we're using the value itself
+            set.tree = exports.normalizeTree(settingsDir)(tree, "tree", []);
+        }
+    })(set.tree);
+    if (set.tiddlyserver.backupDirectory)
+        set.tiddlyserver.backupDirectory = path.resolve(settingsDir, set.tiddlyserver.backupDirectory);
+    if (set.server.logAccess)
+        set.server.logAccess = path.resolve(settingsDir, set.server.logAccess);
+    if (set.server.logError)
+        set.server.logError = path.resolve(settingsDir, set.server.logError);
     set.__dirname = settingsDir;
     set.__filename = settingsFile;
-    if (set.etag === "disabled" && !set.backupDirectory) {
+    if (set.tiddlyserver.etag === "disabled" && !set.tiddlyserver.backupDirectory) {
         console.log("Etag checking is disabled, but a backup folder is not set. "
             + "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
             + "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
@@ -391,7 +405,7 @@ exports.isErrnoException = isErrnoException;
 function DebugLogger(prefix, ignoreLevel) {
     //if(prefix.startsWith("V:")) return function(){};
     return function (msgLevel, ...args) {
-        if (!ignoreLevel && settings.debugLevel > msgLevel)
+        if (!ignoreLevel && settings.server.debugLevel > msgLevel)
             return;
         if (isError(args[0])) {
             let err = args[0];
@@ -952,6 +966,7 @@ class StateObject {
         };
     }
     get allow() {
+        let isLocalhost = testAddress(this._req.socket.localAddress, "127.0.0.1", 8);
         switch (this.trustLevel) {
             case "trusted": return {
                 mkdir: true,
@@ -960,7 +975,6 @@ class StateObject {
                 WARNING_all_settings_WARNING: true,
                 writeErrors: true
             };
-            case "localhost": return settings.allowLocalhost;
             case "network": return settings.allowNetwork;
         }
     }
@@ -1023,7 +1037,7 @@ class StateObject {
             this.setHeaders(headers);
         if (!message)
             message = http.STATUS_CODES[code];
-        if (settings._devmode)
+        if (settings.server._devmode)
             setTimeout(() => {
                 if (!this.responseSent)
                     this.debugLog(3, "Response not sent \n %s", new Error().stack);
@@ -1161,3 +1175,89 @@ function getError(...args) {
     return { code: code, message: util_1.format.apply(null, args) };
 }
 exports.getError = getError;
+/**
+ *
+ *
+ * @param {string} ip x.x.x.x
+ * @param {string} range x.x.x.x
+ * @param {number} netmask 0-32
+ */
+function testAddress(ip, range, netmask) {
+    let netmaskBinStr = ipcalc.IPv4_bitsNM_to_binstrNM(netmask);
+    let addressBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(ip));
+    let netaddrBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(range));
+    let netaddrBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(netaddrBinStr, netmaskBinStr);
+    let addressBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(addressBinStr, netmaskBinStr);
+    return netaddrBinStrMasked === addressBinStrMasked;
+    // 	this.addressInteger = IPv4_dotquadA_to_intA( this.addressDotQuad );
+    // //	this.addressDotQuad  = IPv4_intA_to_dotquadA( this.addressInteger );
+    // 	this.addressBinStr  = IPv4_intA_to_binstrA( this.addressInteger );
+    // 	this.netmaskBinStr  = IPv4_bitsNM_to_binstrNM( this.netmaskBits );
+    // 	this.netmaskInteger = IPv4_binstrA_to_intA( this.netmaskBinStr );
+    // 	this.netmaskDotQuad  = IPv4_intA_to_dotquadA( this.netmaskInteger );
+    // 	this.netaddressBinStr = IPv4_Calc_netaddrBinStr( this.addressBinStr, this.netmaskBinStr );
+    // 	this.netaddressInteger = IPv4_binstrA_to_intA( this.netaddressBinStr );
+    // 	this.netaddressDotQuad  = IPv4_intA_to_dotquadA( this.netaddressInteger );
+    // 	this.netbcastBinStr = IPv4_Calc_netbcastBinStr( this.addressBinStr, this.netmaskBinStr );
+    // 	this.netbcastInteger = IPv4_binstrA_to_intA( this.netbcastBinStr );
+    // 	this.netbcastDotQuad  = IPv4_intA_to_dotquadA( this.netbcastInteger );
+}
+exports.testAddress = testAddress;
+let hostIPv4reg = /^(\-?)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/i;
+function parseHostList(hosts) {
+    let hostTests = hosts.map(e => hostIPv4reg.exec(e) || e);
+    return (addr) => {
+        let usable = false;
+        hostTests.forEach(test => {
+            if (Array.isArray(test)) {
+                let allow = !test[1];
+                let ip = test[2];
+                let netmask = +test[3];
+                if (netmask < 0 || netmask > 32)
+                    console.log("Host %s has an invalid netmask", test[0]);
+                if (testAddress(addr, ip, netmask))
+                    usable = allow;
+            }
+            else {
+                let ip = test.startsWith('-') ? test.slice(1) : test;
+                let deny = test.startsWith('-');
+                if (ip === addr)
+                    usable = !deny;
+            }
+        });
+        return usable;
+    };
+}
+exports.parseHostList = parseHostList;
+function getUsableAddresses(hosts) {
+    let reg = /^(\-?)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/i;
+    let hostTests = hosts.map(e => reg.exec(e) || e);
+    var ifaces = os_1.networkInterfaces();
+    let addresses = Object.keys(ifaces).reduce((n, k) => n.concat(ifaces[k].filter(e => e.family === "IPv4")), []);
+    let usableArray = addresses.filter(addr => {
+        let usable = false;
+        hostTests.forEach(test => {
+            if (Array.isArray(test)) {
+                //we can't match IPv6 interface addresses so just go to the next one
+                if (addr.family === "IPv6")
+                    return;
+                let allow = !test[1];
+                let ip = test[2];
+                let netmask = +test[3];
+                if (netmask < 0 || netmask > 32)
+                    console.log("Host %s has an invalid netmask", test[0]);
+                if (testAddress(addr.address, ip, netmask))
+                    usable = allow;
+            }
+            else {
+                let ip = test.startsWith('-') ? test.slice(1) : test;
+                let deny = test.startsWith('-');
+                if (ip === addr.address)
+                    usable = !deny;
+            }
+        });
+        return usable;
+    });
+    return usableArray;
+}
+exports.getUsableAddresses = getUsableAddresses;

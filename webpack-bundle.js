@@ -5,3 +5,4 @@ exports["fresh"] = require("fresh")
 exports["formidable"] = require("formidable");
 exports["xmljs"] = require('xml-js');
 exports["ws"] = require('ws');
+exports["ajv"] = require('ajv');

@@ -64,8 +64,8 @@ import * as fresh from "fresh";
 import * as formidable from "formidable";
 import * as xmljs from "xml-js";
 import * as ws from "ws";
-
-export { morgan, send, etag, fresh, formidable, xmljs, ws };
+import * as ajv from "ajv";
+export { morgan, send, etag, fresh, formidable, xmljs, ws, ajv };
 
 
 

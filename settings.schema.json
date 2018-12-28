@@ -7,23 +7,28 @@
 				"server": {
 					"type": "object",
 					"properties": {
-						"host": {
-							"anyOf": [
-								{
-									"type": "string"
-								},
-								{
-									"type": "array",
-									"items": {
-										"type": "string"
-									}
-								}
-							],
-							"description": "One IP address or an array of IP addresses to accept requests on. \r\nThis may include a subnet mask (/32 is assumed if none specified). \r\nIf a subnet mask is specified, TiddlyServer will attempt to bind to\r\nALL matching interface IP addresses. 0.0.0.0/0 will bind ALL IP addresses\r\nassigned to ALL network interfaces on the machine. Any string which does\r\nnot match the format x.x.x.x/x will be passed directly to the NodeJS HTTP\r\nor HTTPS server instance. Adding a minus sign in front of the string will\r\nblacklist that IP address or range from accepting requests, unless it matches\r\nanother IP address or range further down the array."
+						"bindAddress": {
+							"type": "array",
+							"items": {
+								"type": "string"
+							},
+							"description": "An array of IP addresses to accept requests on. Can be any IP address\r\nassigned to the machine. Default is \"127.0.0.1\".\r\n\r\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\r\non the specified IP addresses and accepts all connections from the operating system. If an IP address\r\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\r\n\r\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\r\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) \r\nto block requests incoming to that IP address or range."
 						},
-						"bindWildcardIP": {
+						"filterBindAddress": {
 							"type": "boolean",
-							"description": "Whether to bind the wildcard IP (0.0.0.0) and filter requests based \r\non the local IP address of the request. This will result in only one\r\nserver instance being started instead of one per matching IP address.\r\nIn many cases this is preferred, however Android does not support\r\nthis for some reason. The default is true."
+							"description": "IPv4 addresses may include a subnet mask,\r\n(e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) \r\nto block requests incoming to that IP address or range."
+						},
+						"bindWildcard": {
+							"type": "boolean",
+							"enum": [
+								true,
+								false
+							],
+							"description": "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.\r\nThe default is `true`. In many cases this is preferred, however \r\nAndroid does not support this for some reason. On Android, set this to\r\n`false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses."
+						},
+						"enableIPv6": {
+							"type": "boolean",
+							"description": "Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests\r\nincoming to IPv6 addresses if not explicitly denied."
 						},
 						"port": {
 							"type": "number",
@@ -80,8 +85,10 @@
 						}
 					},
 					"required": [
-						"host",
-						"bindWildcardIP",
+						"bindAddress",
+						"filterBindAddress",
+						"bindWildcard",
+						"enableIPv6",
 						"port",
 						"logAccess",
 						"logError",
@@ -92,7 +99,7 @@
 						"_devmode"
 					],
 					"additionalProperties": false,
-					"description": "generic webserver options"
+					"description": "Generic webserver options."
 				},
 				"directoryIndex": {
 					"type": "object",

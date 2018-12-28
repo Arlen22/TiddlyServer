@@ -1,5 +1,9 @@
+### 2.1
 
-
+* `_disableLocalhost` is removed from settings
+* Host parameter handling is changed
+* Settings format is changed. Run `node upgrade-settings old-file.json new-file.json` to upgrade to the new format.
+* Tree format has changed
 ### 2.0.13
 
 #### Breaking changes
