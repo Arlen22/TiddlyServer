@@ -1,4 +1,4 @@
-require("../lib/source-map-support-lib");
+
 
 import { send, ws, ajv } from '../lib/bundled-lib';
 const sendOptions = {};
@@ -81,39 +81,36 @@ export function loadSettings(settingsFile: string) {
 
 	const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
 
-	var schema = require("../settings.schema.json");
-	var schemaChecker = new ajv({
-		allErrors: true,
-		async: false
-	});
-	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
-	var validate = schemaChecker.compile(schema);
-	var valid = validate(settingsString, settingsFile);
-	if (!valid) console.log(validate.errors);
-
 	let settingsObj: ServerConfig = tryParseJSON<ServerConfig>(settingsString, (e) => {
 		console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
 		console.error(e.errorPosition);
 		throw "The settings file could not be parsed: Invalid JSON";
 	});
 
-
+	var schemaChecker = new ajv({ allErrors: true, async: false });
+	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
+	var validate = schemaChecker.compile(require("../settings.schema.json"));
+	var valid = validate(settingsObj, "settings");
+	var validationErrors = validate.errors;
+	if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
 
 	if (!settingsObj.tree) throw "tree is not specified in the settings file";
 	let routeKeys = Object.keys(routes);
+
 	normalizeSettings(settingsObj, settingsFile, routeKeys);
-	// let newSettingsObj: NewConfig = ConvertSettings(settingsObj);
-
-	// if (["string", "undefined"].indexOf(typeof settingsObj.username) === -1) throw "username must be a JSON string if specified";
-	// if (["string", "undefined"].indexOf(typeof settingsObj.password) === -1) throw "password must be a JSON string if specified";
-
-	// if (process.env.TiddlyServer_disableLocalHost || settingsObj._disableLocalHost)
-	// 	ENV.disableLocalHost = true;
 
 	settingsObj.__assetsDir = assets;
 
+
 	if (typeof settingsObj.tree === "object") {
-		let keys = Object.keys(settingsObj.tree);
+		let keys: string[] = [];
+		if (settingsObj.tree.$element === "group") {
+			keys = settingsObj.tree.$children
+				.map(e => (e.$element === "group" || e.$element === "folder") && e.key)
+				.filter<string>((e): e is string => !!e)
+		} else if (settingsObj.tree.$element === "folder") {
+			keys = fs.readdirSync(settingsObj.tree.path, { encoding: "utf8" })
+		}
 		let routeKeys = Object.keys(routes);
 		let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
 		if (conflict.length) console.log(
@@ -183,8 +180,8 @@ export function initServer(options: {
 	const localhostTester = parseHostList(["127.0.0.0/8"]);
 	const addListeners = (server: http.Server, iface: string) => {
 		let closing = false;
-		if (bindWildcard) server.on('connection', (socket) => {
-			if (!tester(socket.localAddress) && !localhostTester(socket.localAddress)) socket.end();
+		if (bindWildcard && settings.server.filterBindAddress) server.on('connection', (socket) => {
+			if (!tester(socket.localAddress).usable && !localhostTester(socket.localAddress).usable) socket.end();
 		})
 		server.on('request', requestHandler(iface, preflighter));
 		server.on('listening', () => {
@@ -211,16 +208,18 @@ export function initServer(options: {
 		});
 	}
 
-	if (settings.server.bindWildcard) {
+	if (bindWildcard) {
 		hosts.push('0.0.0.0');
 		if (settings.server.enableIPv6) hosts.push('::');
-	} else if (Array.isArray(settings.server.bindAddress)) {
+	} else if (settings.server.filterBindAddress) {
 		let ifaces = networkInterfaces();
 		let addresses = Object.keys(ifaces)
 			.reduce((n, k) => n.concat(ifaces[k]), [] as NetworkInterfaceInfo[])
-			.filter(e => (settings.server.enableIPv6 || e.family === "IPv4") && tester(e.address))
+			.filter(e => (settings.server.enableIPv6 || e.family === "IPv4") && tester(e.address).usable)
 			.map(e => e.address);
 		hosts.push(...addresses);
+	} else {
+		hosts.push(...settings.server.bindAddress);
 	}
 	if (settings.server._bindLocalhost) hosts.push('localhost');
 	let servers: http.Server[] = [];
@@ -232,7 +231,21 @@ export function initServer(options: {
 			server.listen(settings.server.port, host, undefined, () => { subs.complete(); });
 		})
 	}).subscribe(item => { }, x => { }, () => {
-		eventer.emit("serverOpen", servers, false);
+		eventer.emit("serverOpen", servers, hosts, false);
+		let ifaces = networkInterfaces();
+		console.log('Open your browser and type in one of the following:\n' +
+			(settings.server.bindWildcard
+				? Object.keys(ifaces)
+					.reduce(
+						(n, k) => n.concat(ifaces[k]),
+						[] as NetworkInterfaceInfo[]
+					).filter(e =>
+						(settings.server.enableIPv6 || e.family === "IPv4")
+						&& (!settings.server.filterBindAddress || tester(e.address).usable)
+					).map(e => e.address)
+				: hosts
+			).join('\n')
+		);
 	});
 
 	return eventer;
@@ -256,9 +269,9 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEvent) => Promi
 			// check if the preflighter handled it
 			if (ev.handled) return;
 			//create the state object
-			const state = new StateObject(ev.request, ev.response, debug, eventer, ev.trusted ? "trusted" : iface);
+			const state = new StateObject(ev.request, ev.response, debug, eventer);
 			//handle basic auth
-			if (!handleBasicAuth(state)) return;
+			// if (!handleBasicAuth(state)) return;
 			//check for static routes
 			const route = routes[state.path[1]];
 			//if so, handle it
@@ -300,29 +313,6 @@ function handleAdminRoute(state: StateObject) {
 		case "settings": handleSettings(state); break;
 		default: state.throw(404);
 	}
-}
-function serverListenCB(err: any, res: any) {
-
-	if (err) { console.error('error on app.listen', err); return; }
-
-	console.log('Open your browser and type in one of the following:');
-
-	if (!settings.host || settings.host === '0.0.0.0') {
-		var os = require('os');
-		var ifaces = os.networkInterfaces();
-		for (var dev in ifaces) {
-			var alias = 0;
-			ifaces[dev].forEach(function (details: any) {
-				if (details.family == 'IPv4' && details.internal === false) {
-					console.log(details.address + (settings.port !== 80 ? ':' + settings.port : ''));
-					++alias;
-				}
-			});
-		}
-	} else {
-		console.log(settings.host + (settings.port !== 80 ? ':' + settings.port : ''));
-	}
-
 }
 
 

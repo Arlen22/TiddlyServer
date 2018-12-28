@@ -1,4 +1,4 @@
-import { treeWalkerOld, treeWalker, normalizeSettings, statWalkPath, resolvePath, ServerConfig, tryParseJSON, colors, NewTreeGroup, NewTreeItem, NewTreeOptions, NewConfigSchema, NewTreeItemSchema, NewTreePath, NewTreeGroupSchema, NewTreePathSchema, NewTreeObjectSchema, NewTreeHashmapPath, NewTreeHashmapGroupSchema, normalizeTree, getUsableAddresses, parseHostList } from './server-types';
+import { treeWalkerOld, treeWalker, normalizeSettings, statWalkPath, resolvePath, ServerConfig, tryParseJSON, colors, NewTreeGroup, NewTreeItem, NewTreeOptions, NewTreeItemSchema, NewTreePath, NewTreeGroupSchema, NewTreePathSchema, NewTreeObjectSchema, NewTreeHashmapPath, NewTreeHashmapGroupSchema, normalizeTree, getUsableAddresses, parseHostList, ServerConfigSchema } from './server-types';
 import * as fs from 'fs';
 import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 let testFolderChildren: NewTreeOptions[] = [
@@ -40,11 +40,11 @@ let TreeItemObject = strong<NewTreeObjectSchema>({
 const settingsString = fs.readFileSync(__dirname + "/../settings.json", 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
 const folderTag = "folder";
 const groupTag = "group"
-let tree1: NewConfigSchema["tree"] = {
+let tree1: ServerConfigSchema["tree"] = {
 	$element: "group",
 	$children: TreeItemArray
 }
-let tree2: NewConfigSchema["tree"] = {
+let tree2: ServerConfigSchema["tree"] = {
 	$element: "group",
 	$children: {
 		test1: "test/test1",
@@ -61,8 +61,8 @@ let tree2: NewConfigSchema["tree"] = {
 // 	console.error(e.errorPosition);
 // 	throw "The settings file could not be parsed: Invalid JSON";
 // });
-let tree1normal = normalizeTree(__dirname)(tree1, "tree1", []);
-let tree2normal = normalizeTree(__dirname)(tree2, "tree2", []);
+let tree1normal = normalizeTree(__dirname,tree1, "tree1", []);
+let tree2normal = normalizeTree(__dirname,tree2, "tree2", []);
 
 function str(char: string, len: number) {
 	for (var i = 0, s = ""; i < len; i++) s += char;

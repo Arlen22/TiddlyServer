@@ -191,7 +191,7 @@ export interface OldServerConfigSchema extends OldServerConfigBase {
 	tree: NewTreeObjectSchemaItem
 }
 export interface OldServerConfig extends OldServerConfigBase {
-	tree: NewTreeItem
+	tree: NewTreeGroup | NewTreePath
 	__dirname: string;
 	__filename: string;
 	__assetsDir: string;
@@ -202,7 +202,7 @@ export interface ServerConfigSchema extends ServerConfigBase {
 	tree: NewTreeObjectSchemaItem
 }
 export interface ServerConfig extends ServerConfigBase {
-	tree: NewTreeItem
+	tree: NewTreeGroup | NewTreePath
 	__dirname: string;
 	__filename: string;
 	__assetsDir: string;
@@ -314,21 +314,21 @@ export interface NewTreePathOptions_AuthPublicKey {
 	// $children: undefined;
 }
 export function isNewTreeItem(a: any): a is NewTreeItem {
-	return (typeof a === "object"
-		&& typeof a["$element"] === "string"
-		&& (a.$element === "folder" || a.$element === "group")
-		|| typeof a === "string");
+	return (typeof a === "object" && typeof a["$element"] === "string");
 }
 export function isNewTreeGroup(a: any): a is NewTreeGroup {
-	return isNewTreeItem(a) && typeof a === "object" && a.$element === "group";
+	return isNewTreeItem(a) && a.$element === "group";
 }
 export function isNewTreeHashmapGroupSchema(a: any): a is NewTreeHashmapGroupSchema {
 	return isNewTreeGroup(a) && !Array.isArray(a.$children) && !a.key;
 }
 export function isNewTreePath(a: any): a is NewTreePath {
-	return isNewTreeItem(a) && typeof a === "object" && a.$element === "folder";
+	return isNewTreeItem(a) && a.$element === "folder";
 }
-export const normalizeTree = (settingsDir: string) => function upgradeTree(item: NewTreeObjectSchemaItem | NewTreeOptions | NewTreeItem, key: string | undefined, keypath): NewTreeItem {
+export function isNewTreeMountItem(a: any): a is NewTreeGroup | NewTreePath {
+	return isNewTreeItem(a) && (a.$element === "group" || a.$element === "folder");
+}
+export function normalizeTree(settingsDir: string, item: NewTreeObjectSchemaItem | NewTreeOptions | NewTreeItem, key: string | undefined, keypath): NewTreeItem {
 	// let t = item as NewTreeObjectSchemaItem;
 	if (typeof item === "string" || item.$element === "folder") {
 		if (typeof item === "string") item = { $element: "folder", path: item } as NewTreePath;
@@ -350,10 +350,9 @@ export const normalizeTree = (settingsDir: string) => function upgradeTree(item:
 		return ({
 			$element: "group", key,
 			$children: Array.isArray(tc)
-				? tc.map(e => upgradeTree(e, undefined, keypath))
-				: Object.keys(tc)
-					.filter(k => k !== "$children")
-					.map(k => upgradeTree(tc[k], k, [...keypath, k]))
+				? tc.map(e => normalizeTree(settingsDir, e, undefined, keypath))
+				: Object.keys(tc).filter(k => k !== "$children")
+					.map(k => normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
 					.concat(tc.$children || [])
 		})
 	} else {
@@ -362,7 +361,7 @@ export const normalizeTree = (settingsDir: string) => function upgradeTree(item:
 }
 export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: string[]) {
 	const settingsDir = path.dirname(settingsFile);
-	
+
 	NewDefaultSettings(set);
 	((tree: ServerConfigSchema["tree"]) => {
 		if (typeof tree === "string" && tree.endsWith(".xml")) {
@@ -371,10 +370,10 @@ export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: st
 		} else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
 			//require the json or js file and use it directly
 			let filepath = path.resolve(settingsDir, tree);
-			set.tree = normalizeTree(path.dirname(filepath))(require(filepath), "tree", []);
+			set.tree = normalizeTree(path.dirname(filepath), require(filepath), "tree", []) as any;
 		} else {
 			//otherwise just assume we're using the value itself
-			set.tree = normalizeTree(settingsDir)(tree, "tree", []);
+			set.tree = normalizeTree(settingsDir, tree, "tree", []) as any;
 		}
 	})(set.tree as any)
 
@@ -401,7 +400,7 @@ interface ServerEventsListener<THIS> {
 	(event: "settings", listener: (settings: ServerConfig) => void): THIS;
 	(event: "stateError", listener: (state: StateObject) => void): THIS;
 	(event: "stateDebug", listener: (state: StateObject) => void): THIS;
-	(event: "serverOpen", listener: (iface: string) => void): THIS;
+	(event: "serverOpen", listener: (serverList: any[], hosts: string[], https: boolean) => void): THIS;
 	(event: "serverClose", listener: (iface: string) => void): THIS;
 }
 type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
@@ -411,7 +410,7 @@ export interface ServerEventEmitter extends EventEmitter {
 	emit(event: "settings", settings: ServerConfig): boolean;
 	emit(event: "stateError", state: StateObject): boolean;
 	emit(event: "stateDebug", state: StateObject): boolean;
-	emit(event: "serverOpen", serverList: any[], https: boolean): boolean;
+	emit(event: "serverOpen", serverList: any[], hosts: string[], https: boolean): boolean;
 	emit(event: "serverClose", iface: string): boolean;
 
 	addListener: ServerEventsListener<this>;
@@ -773,9 +772,10 @@ export function getNewTreePathFiles(result: PathResolverResult, state: StateObje
 	].filter(e => e).join('/')
 	let type = isNewTreeGroup(result.item) ? "category" : "folder";
 	if (isNewTreeGroup(result.item)) {
-		const keys = result.item.$children.map(e => e.key);
+		let $c = result.item.$children.filter(isNewTreeMountItem);
+		const keys = $c.map(e => e.key);
 		// const keys = Object.keys(result.item);
-		const paths = result.item.$children.map(e =>
+		const paths = $c.map(e =>
 			isNewTreePath(e) ? e.path : true
 		);
 		return Observable.of({ keys, paths, dirpath, type });
@@ -918,8 +918,8 @@ function getItemType(stat: Stats, infostat: Stats | undefined) {
 	return itemtype;
 
 }
-export function treeWalker(tree, reqpath) {
-	var item: NewTreeItem = tree;
+export function treeWalker(tree: NewTreeGroup | NewTreePath, reqpath) {
+	var item = tree;
 	var ancestry: NewTreeItem[] = [];
 	var folderPathFound = false;
 	for (var end = 0; end < reqpath.length; end++) {
@@ -927,7 +927,9 @@ export function treeWalker(tree, reqpath) {
 			folderPathFound = true;
 			break;
 		}
-		let t = item.$children.find(e => e.key === reqpath[end]);
+		let t = item.$children.find((e): e is NewTreeGroup | NewTreePath =>
+			isNewTreeMountItem(e) && e.key === reqpath[end]
+		);
 		if (isNewTreeGroup(item) && t) {
 			item = t;
 			let a = Object.assign({}, item);
@@ -952,7 +954,7 @@ export function treeWalkerOld(tree, reqpath) {
 	}
 	return { item, end, folderPathFound };
 }
-export function resolvePath(state: StateObject | string[], tree: NewTreeItem): PathResolverResult | undefined {
+export function resolvePath(state: StateObject | string[], tree: NewTreeGroup | NewTreePath): PathResolverResult | undefined {
 	var reqpath;
 	if (Array.isArray(state)) {
 		reqpath = state;
@@ -1141,18 +1143,16 @@ export class StateObject {
 	}
 
 	get allow(): ServerConfig_AccessOptions {
-		let isLocalhost = testAddress(this._req.socket.localAddress, "127.0.0.1", 8);
-
-		switch (this.trustLevel) {
-			case "trusted": return {
-				mkdir: true,
-				settings: true,
-				upload: true,
-				WARNING_all_settings_WARNING: true,
-				writeErrors: true
-			};
-
-			case "network": return settings.allowNetwork;
+		let localAddress = this._req.socket.localAddress;
+		let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
+		let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
+		let matches = parseHostList(keys)(localAddress);
+		if (isLocalhost) {
+			return settings.tiddlyserver.hostLevelPermissions["localhost"];
+		} else if (matches.lastMatch > -1) {
+			return settings.tiddlyserver.hostLevelPermissions[keys[matches.lastMatch]]
+		} else {
+			return settings.tiddlyserver.hostLevelPermissions["*"]
 		}
 	}
 
@@ -1205,8 +1205,7 @@ export class StateObject {
 		private _req: http.IncomingMessage,
 		private _res: http.ServerResponse,
 		private debugLog: typeof DebugLog,
-		private eventer: ServerEventEmitter,
-		public readonly trustLevel: "trusted" | "localhost" | "network" = "network"
+		private eventer: ServerEventEmitter
 	) {
 		this.startTime = process.hrtime();
 		this.req = _req;
@@ -1702,20 +1701,21 @@ export function parseHostList(hosts: string[]) {
 	let hostTests = hosts.map(e => hostIPv4reg.exec(e) || e);
 	return (addr: string) => {
 		let usable = false;
-		hostTests.forEach(test => {
+		let lastMatch = -1;
+		hostTests.forEach((test, i) => {
 			if (Array.isArray(test)) {
 				let allow = !test[1];
 				let ip = test[2];
 				let netmask = +test[3];
 				if (netmask < 0 || netmask > 32) console.log("Host %s has an invalid netmask", test[0]);
-				if (testAddress(addr, ip, netmask)) usable = allow;
+				if (testAddress(addr, ip, netmask)) { usable = allow; lastMatch = i }
 			} else {
 				let ip = test.startsWith('-') ? test.slice(1) : test;
 				let deny = test.startsWith('-');
-				if (ip === addr) usable = !deny;
+				if (ip === addr) { usable = !deny; lastMatch = i }
 			}
 		});
-		return usable;
+		return { usable, lastMatch };
 	}
 }
 export function getUsableAddresses(hosts: string[]) {

@@ -7,7 +7,7 @@
         "noImplicitAny": false,
         "strictNullChecks": true,
         "sourceMap": false,
-        "inlineSourceMap": false
+        "inlineSourceMap": true
     },
     "files": [
         "./src/server.ts",

@@ -1,4 +1,4 @@
-
+require("./lib/source-map-support-lib");
 const fs = require('fs');
 const path = require('path');
 const { inspect } = require('util');
@@ -32,6 +32,6 @@ process.on('uncaughtException', err => {
 process.on('beforeExit', () => {
 	if (process.exitCode) return;
 	console.log('The process was about to close with exitCode 0 -- restarting server');
-	server.initServer({ env: "node", settings });
+	// server.initServer({ env: "node", settings });
 })
 
