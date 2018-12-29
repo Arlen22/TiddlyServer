@@ -1,9 +1,11 @@
 ### 2.1
 
-* `_disableLocalhost` is removed from settings
-* Host parameter handling is changed
 * Settings format is changed. Run `node upgrade-settings old-file.json new-file.json` to upgrade to the new format.
-* Tree format has changed
+  * To find out exactly how the old format maps to the new format, find the `ConvertSettings` function in `server-types.ts`.
+  * The tree format has changed significantly to allow better control over individual directories. The upgrade script will modify the tree to make it compatible with the new version. Folder as root is still supported.
+	* The host parameter has been replaced with several parameters in the `server` section.
+  * `useTW5path` is set to `true` during the upgrade. If you prefer to access data folders without the trailing slash, you need to set this to false. This affects relative links.
+	* The settings file now includes a JSON Schema, which editors such as VS Code can use to provide descriptions and intellisense. 
 ### 2.0.13
 
 #### Breaking changes

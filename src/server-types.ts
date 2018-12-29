@@ -96,11 +96,11 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 		__filename: set.__filename,
 		tree: set.tree,
 		server: {
-			bindAddress: [set.host],
+			bindAddress: (set.host === "0.0.0.0" || set.host === "::") ? [] : [set.host],
 			filterBindAddress: false,
-			enableIPv6: false,
+			enableIPv6: set.host === "::",
 			port: set.port,
-			bindWildcard: set.host === "0.0.0.0",
+			bindWildcard: set.host === "0.0.0.0" || set.host === "::",
 			logAccess: set.logAccess,
 			logError: set.logError,
 			logColorsToFile: set.logColorsToFile,
@@ -152,26 +152,11 @@ export function NewDefaultSettings(set: ServerConfig) {
 			_bindLocalhost: false,
 			_devmode: false
 		}, set.server),
-		tiddlyserver: Object.assign<T["tiddlyserver"], any>({
+		tiddlyserver: Object.assign<T["tiddlyserver"], T["tiddlyserver"]>({
 			etag: "",
 			etagWindow: 3,
-			useTW5path: false,
-			hostLevelPermissions: Object.assign<T["tiddlyserver"]["hostLevelPermissions"], any>({
-				"localhost": {
-					writeErrors: true,
-					mkdir: true,
-					upload: true,
-					settings: true,
-					WARNING_all_settings_WARNING: false
-				},
-				"*": {
-					writeErrors: true,
-					mkdir: false,
-					upload: false,
-					settings: false,
-					WARNING_all_settings_WARNING: false
-				}
-			}, set.tiddlyserver.hostLevelPermissions)
+			useTW5path: true,
+			hostLevelPermissions: {}
 		}, set.tiddlyserver),
 		directoryIndex: Object.assign<T["directoryIndex"], any>({
 			defaultType: "html",
@@ -185,6 +170,23 @@ export function NewDefaultSettings(set: ServerConfig) {
 		}, set.EXPERIMENTAL_clientside_datafolders),
 		$schema: "./settings.schema.json"
 	}
+	// set second level object defaults
+	newset.tiddlyserver.hostLevelPermissions = Object.assign<T["tiddlyserver"]["hostLevelPermissions"], any>({
+		"localhost": {
+			writeErrors: true,
+			mkdir: true,
+			upload: true,
+			settings: true,
+			WARNING_all_settings_WARNING: false
+		},
+		"*": {
+			writeErrors: true,
+			mkdir: false,
+			upload: false,
+			settings: false,
+			WARNING_all_settings_WARNING: false
+		}
+	}, set.tiddlyserver.hostLevelPermissions);
 	return newset;
 }
 export interface OldServerConfigSchema extends OldServerConfigBase {
