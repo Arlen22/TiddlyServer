@@ -33,11 +33,11 @@ export function init(e: ServerEventEmitter) {
         settings = set;
     })
     eventer.on('settingsChanged', (keys) => {
-        if (keys.indexOf("username") > -1) {
-            debug(1, "The username will not be updated on currently loaded data folders. " +
-                "To apply the new username you will need to reload the data folders or restart the server."
-            );
-        }
+        // if (keys.indexOf("username") > -1) {
+        //     debug(1, "The username will not be updated on currently loaded data folders. " +
+        //         "To apply the new username you will need to reload the data folders or restart the server."
+        //     );
+        // }
     })
     eventer.on('websocket-connection', function (client: WebSocket, request: http.IncomingMessage) {
         let pathname = parse(request.url as string).pathname as string;// new URL(request.url as string);
@@ -204,7 +204,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
         var server = new server({
             wiki: $tw.wiki,
             variables: {
-                "username": settings.username, //TODO
+                // "username": settings.username, //TODO
                 "path-prefix": mount
             }
         });
