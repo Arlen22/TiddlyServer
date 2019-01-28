@@ -7,7 +7,7 @@ import { format } from "util";
 import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
-import { send } from '../lib/bundled-lib';
+import { send, ajv } from '../lib/bundled-lib';
 import { Stats, appendFileSync } from 'fs';
 import { gzip } from 'zlib';
 import { Writable, Stream } from 'stream';
@@ -15,6 +15,51 @@ import { Writable, Stream } from 'stream';
 import * as https from "https";
 import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 import * as ipcalc from "./ipcalc";
+import {
+	NewTreeGroup,
+	NewTreeGroupSchema,
+	NewTreeHashmapGroupSchema,
+	NewTreeHashmapPath,
+	NewTreeItem,
+	NewTreeItemSchema,
+	NewTreeObjectSchema,
+	NewTreeObjectSchemaItem,
+	NewTreeOptions,
+	NewTreePath,
+	NewTreePathOptions_Auth,
+	NewTreePathOptions_Index,
+	NewTreePathSchema,
+	SecureServerOptions,
+	ServerConfig,
+	ServerConfigBase,
+	ServerConfigSchema,
+	ServerConfig_AccessOptions,
+	ServerConfig_AuthClientKey,
+	ServerConfig_AuthPassword,
+	SecureServerOptionsSchema
+} from "./server-config";
+export {
+	NewTreeGroup,
+	NewTreeGroupSchema,
+	NewTreeHashmapGroupSchema,
+	NewTreeHashmapPath,
+	NewTreeItem,
+	NewTreeItemSchema,
+	NewTreeObjectSchema,
+	NewTreeObjectSchemaItem,
+	NewTreeOptions,
+	NewTreePath,
+	NewTreePathOptions_Auth,
+	NewTreePathOptions_Index,
+	NewTreePathSchema,
+	SecureServerOptions,
+	ServerConfig,
+	ServerConfigBase,
+	ServerConfigSchema,
+	ServerConfig_AccessOptions,
+	ServerConfig_AuthClientKey,
+	ServerConfig_AuthPassword
+}
 let DEBUGLEVEL = -1;
 let settings: ServerConfig;
 const colorsRegex = /\x1b\[[0-9]+m/gi
@@ -107,17 +152,18 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 			logToConsoleAlso: set.logToConsoleAlso,
 			debugLevel: set.debugLevel,
 			_bindLocalhost: set._disableLocalHost === false,
-			_devmode: set._devmode
+			_devmode: set._devmode,
+			https: false
 		},
 		tiddlyserver: {
 			etag: set.etag,
 			etagWindow: set.etagWindow,
-			useTW5path: set.useTW5path,
 			hostLevelPermissions: {
 				"localhost": set.allowLocalhost,
 				"*": set.allowNetwork
 			}
 		},
+		authAccounts: {},
 		directoryIndex: {
 			defaultType: "html",
 			icons: set.types,
@@ -137,6 +183,9 @@ export function NewDefaultSettings(set: ServerConfig) {
 	type T2 = T["tiddlyserver"];
 	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
 	let newset = {
+		__dirname: "",
+		__filename: "",
+		__assetsDir: "",
 		tree: set.tree,
 		server: Object.assign<T["server"], T["server"]>({
 			bindAddress: [],
@@ -150,12 +199,13 @@ export function NewDefaultSettings(set: ServerConfig) {
 			logColorsToFile: false,
 			logToConsoleAlso: true,
 			_bindLocalhost: false,
-			_devmode: false
+			_devmode: false,
+			https: false
 		}, set.server),
+		authAccounts: set.authAccounts || {},
 		tiddlyserver: Object.assign<T["tiddlyserver"], T["tiddlyserver"]>({
 			etag: "",
 			etagWindow: 3,
-			useTW5path: true,
 			hostLevelPermissions: {}
 		}, set.tiddlyserver),
 		directoryIndex: Object.assign<T["directoryIndex"], any>({
@@ -177,16 +227,18 @@ export function NewDefaultSettings(set: ServerConfig) {
 			mkdir: true,
 			upload: true,
 			settings: true,
-			WARNING_all_settings_WARNING: false
+			WARNING_all_settings_WARNING: false,
+			websockets: true
 		},
 		"*": {
 			writeErrors: true,
 			mkdir: false,
 			upload: false,
 			settings: false,
-			WARNING_all_settings_WARNING: false
+			WARNING_all_settings_WARNING: false,
+			websockets: true
 		}
-	}, set.tiddlyserver.hostLevelPermissions);
+	}, set.tiddlyserver && set.tiddlyserver.hostLevelPermissions);
 	return newset;
 }
 export interface OldServerConfigSchema extends OldServerConfigBase {
@@ -200,121 +252,7 @@ export interface OldServerConfig extends OldServerConfigBase {
 }
 // export type ServerConfig = NewConfig;
 // export type ServerConfigSchema = NewConfigSchema;
-export interface ServerConfigSchema extends ServerConfigBase {
-	tree: NewTreeObjectSchemaItem
-}
-export interface ServerConfig extends ServerConfigBase {
-	tree: NewTreeGroup | NewTreePath
-	__dirname: string;
-	__filename: string;
-	__assetsDir: string;
-}
 
-
-export interface NewTreeHashmapGroupSchema {
-	$element: "group";
-	// key: string;
-	/** @default  [{"$element": ""}]  */
-	/** @default  {}  */
-	$children: NewTreeItemSchema[] | NewTreeObjectSchema;
-}
-export interface NewTreeGroupSchema extends NewTreeHashmapGroupSchema {
-	key: string;
-}
-/** @default { "$element": {}} */
-/**
- * 
- * @description A hashmap of `group` elements, `folder` elements, and folder paths
- */
-export interface NewTreeObjectSchema {
-	/**
-	 * The children of a hashmap `group` element which are not
-	 * `group` or `folder` elements
-	 */
-	//@ts-ignore
-	$children?: NewTreeOptions[]
-	/** 
-	 * @description A hashmap tree element: either a string or a group/folder element without the `key` attribute
-	 * @default { "$element": {}}
-	 * @pattern ^([^$]+)+$ 
-	 */
-	[K: string]: NewTreeObjectSchemaItem
-}
-export type NewTreeObjectSchemaItem = NewTreeHashmapGroupSchema | NewTreeHashmapPath | string
-/**
- * @default {"$element": ""} 
- */
-export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePathSchema | string;
-export type NewTreeItem = NewTreeGroup | NewTreePath | NewTreeOptions;
-export interface NewTreeGroup {
-	$element: "group";
-	key: string;
-	$children: (NewTreeItem | NewTreeOptions)[];
-}
-export interface NewTreeHashmapPath {
-	$element: "folder";
-	path: string;
-	$children?: NewTreeOptions[];
-
-}
-export interface NewTreePathSchema extends NewTreeHashmapPath {
-	key?: string;
-}
-export interface NewTreePath extends NewTreeHashmapPath {
-	key: string;
-}
-/** @default { "$element": "" } */
-export type NewTreeOptions =
-	| NewTreePathOptions_Index
-	| NewTreePathOptions_AuthPassword
-	| NewTreePathOptions_AuthPublicKey;
-
-export interface NewTreePathOptions_Index {
-	/**
-	 * Options related to the directory index (request paths ending in a 
-	 * backslash which do not resolve to a TiddlyWiki data folder).
-	 */
-	$element: "index",
-	/** 
-	 * The format of the index generated if no index file is found, or "403" to 
-	 * return a 403 Access Denied, or "404" to return a 404 Not Found.
-	 */
-	defaultType: "html" | "json" | "403" | "404",
-	/** 
-	 * Look for index files named exactly this or with one of the defaultExts added. 
-	 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","html"] would 
-	 * look for "index.htm", "index.html", in that order. 
-	 */
-	indexFile: string[],
-	/** 
-	 * Extensions to add when looking for an index file. A blank string will set the order 
-	 * to search for the exact indexFile name. The extensions are searched in the order specified. 
-	 */
-	indexExts: string[]
-}
-export interface NewTreePathOptions_AuthPassword {
-	/** Use basic auth for access control */
-	$element: "authPassword"
-	/** Username given to TiddlyWiki data folders and anywhere else it's needed */
-	username: string,
-	/** password encoded in utf8 */
-	password: string
-}
-export interface NewTreePathOptions_AuthPublicKey {
-	/** use TLS Client Certificates for access control */
-	$element: "authClientKey",
-	/** Username given to TiddlyWiki data folders and anywhere else it's needed */
-	username: string,
-	// /** matches any certificate with this public key */
-	// publicKey?: string,
-	// /** match this certificate */
-	// certificate?: string,
-	/** all certificate authories and self-signed certificates to allow */
-	certificateAuthority: string,
-	/** Reject requests that cannot present a signed certificate */
-	rejectUnauthorized: boolean,
-	// $children: undefined;
-}
 export function isNewTreeItem(a: any): a is NewTreeItem {
 	return (typeof a === "object" && typeof a["$element"] === "string");
 }
@@ -361,10 +299,10 @@ export function normalizeTree(settingsDir: string, item: NewTreeObjectSchemaItem
 		return item;
 	}
 }
-export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: string[]) {
+export function normalizeSettings(set: ServerConfig, settingsFile) {
 	const settingsDir = path.dirname(settingsFile);
 
-	NewDefaultSettings(set);
+	set = NewDefaultSettings(set);
 	((tree: ServerConfigSchema["tree"]) => {
 		if (typeof tree === "string" && tree.endsWith(".xml")) {
 			//read the xml file and parse it as the tree structure
@@ -377,7 +315,32 @@ export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: st
 			//otherwise just assume we're using the value itself
 			set.tree = normalizeTree(settingsDir, tree, "tree", []) as any;
 		}
-	})(set.tree as any)
+	})(set.tree as any);
+	set.server.https = ((https: SecureServerOptionsSchema | string): SecureServerOptions | undefined => {
+		if (!https)
+			return undefined;
+		else if (typeof https === "string")
+			return require(https) as SecureServerOptions;
+		else {
+			const mapkey = (e): SecureServerOptions["key"][0] => {
+				let passphrase = typeof e === "string" ? "" : e.passphrase, filepath = typeof e === "string" ? e : e.path;
+				return {
+					buff: fs.readFileSync(path.resolve(settingsDir, filepath)), passphrase, path: path.resolve(settingsDir, filepath)
+				}
+			};
+			const mapcert = (e): SecureServerOptions["cert"][0] => ({
+				buff: fs.readFileSync(path.resolve(settingsDir, e)), path: path.resolve(settingsDir, e)
+			});
+			return {
+				key: https.key.map(mapkey),
+				cert: https.cert.map(mapcert),
+				pfx: https.cert.map(mapkey),
+				passphrase: https.passphrase,
+				rejectUnauthorizedCertificate: https.rejectUnauthorizedCertificate,
+				requestClientCertificate: https.requestClientCertificate
+			};
+		}
+	})(set.server.https as any) as any;
 
 	if (set.tiddlyserver.backupDirectory) set.tiddlyserver.backupDirectory = path.resolve(settingsDir, set.tiddlyserver.backupDirectory);
 	if (set.server.logAccess) set.server.logAccess = path.resolve(settingsDir, set.server.logAccess);
@@ -394,7 +357,68 @@ export function normalizeSettings(set: ServerConfig, settingsFile, routeKeys: st
 			+ "also set the etagWindow setting to allow files to be modified if not newer than "
 			+ "so many seconds from the copy being saved.");
 	}
+	return set;
 }
+
+
+const assets = path.resolve(__dirname, '../assets');
+const favicon = path.resolve(__dirname, '../assets/favicon.ico');
+const stylesheet = path.resolve(__dirname, '../assets/directory.css');
+
+
+export function loadSettings(settingsFile: string, routeKeys: string[]) {
+
+
+	console.log("Settings file: %s", settingsFile);
+
+	const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
+
+	let settingsObj: ServerConfig = tryParseJSON<ServerConfig>(settingsString, (e) => {
+		console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
+		console.error(e.errorPosition);
+		throw "The settings file could not be parsed: Invalid JSON";
+	});
+
+	if (!settingsObj.$schema) throw "The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new"
+
+	var schemaChecker = new ajv({ allErrors: true, async: false });
+	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
+	var validate = schemaChecker.compile(require("../settings.schema.json"));
+	var valid = validate(settingsObj, "settings");
+	var validationErrors = validate.errors;
+	if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
+
+	if (!settingsObj.tree) throw "tree is not specified in the settings file";
+	// let routeKeys = Object.keys(routes);
+
+	settingsObj = normalizeSettings(settingsObj, settingsFile);
+
+	settingsObj.__assetsDir = assets;
+
+	if (typeof settingsObj.tree === "object") {
+		let keys: string[] = [];
+		if (settingsObj.tree.$element === "group") {
+			keys = settingsObj.tree.$children
+				.map(e => (e.$element === "group" || e.$element === "folder") && e.key)
+				.filter<string>((e): e is string => !!e)
+		} else if (settingsObj.tree.$element === "folder") {
+			keys = fs.readdirSync(settingsObj.tree.path, { encoding: "utf8" })
+		}
+		// let routeKeys = Object.keys(routes);
+		let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
+		if (conflict.length) console.log(
+			"The following tree items are reserved for use by TiddlyServer: %s",
+			conflict.map(e => '"' + e + '"').join(', ')
+		);
+	}
+	//remove the https settings and return them separately
+	let settingshttps = settingsObj.server.https as any as SecureServerOptions;
+	settingsObj.server.https = !!settingsObj.server.https;
+	return { settings: settingsObj, settingshttps };
+
+}
+
+
 
 interface ServerEventsListener<THIS> {
 	(event: "websocket-connection", listener: (client: WebSocket, request: http.IncomingMessage) => void): THIS;
@@ -772,7 +796,7 @@ export function getNewTreePathFiles(result: PathResolverResult, state: StateObje
 		result.treepathPortion.join('/'),
 		result.filepathPortion.join('/')
 	].filter(e => e).join('/')
-	let type = isNewTreeGroup(result.item) ? "category" : "folder";
+	const type = isNewTreeGroup(result.item) ? "group" : "folder";
 	if (isNewTreeGroup(result.item)) {
 		let $c = result.item.$children.filter(isNewTreeMountItem);
 		const keys = $c.map(e => e.key);
@@ -780,7 +804,7 @@ export function getNewTreePathFiles(result: PathResolverResult, state: StateObje
 		const paths = $c.map(e =>
 			isNewTreePath(e) ? e.path : true
 		);
-		return Observable.of({ keys, paths, dirpath, type });
+		return Observable.of({ keys, paths, dirpath, type: type as "group" | "folder" });
 	} else {
 		return obs_readdir()(result.fullfilepath).map(([err, keys]) => {
 			if (err) {
@@ -789,7 +813,7 @@ export function getNewTreePathFiles(result: PathResolverResult, state: StateObje
 				return;
 			}
 			const paths = keys.map(k => path.join(result.fullfilepath, k));
-			return { keys, paths, dirpath, type };
+			return { keys, paths, dirpath, type: type as "group" | "folder" };
 		}).filter(obsTruthy);
 	}
 }
@@ -805,7 +829,7 @@ export function getNewTreePathFiles(result: PathResolverResult, state: StateObje
 // 		result.treepathPortion.join('/'),
 // 		result.filepathPortion.join('/')
 // 	].filter(e => e).join('/')
-// 	let type = typeof result.item === "object" ? "category" : "folder";
+// 	let type = typeof result.item === "object" ? "group" : "folder";
 // 	if (typeof result.item === "object") {
 // 		const keys = Object.keys(result.item);
 // 		const paths = keys.map(k => 
@@ -828,13 +852,13 @@ export function getNewTreePathFiles(result: PathResolverResult, state: StateObje
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
 const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
-export type DirectoryIndexData = { keys: string[], paths: (string | boolean)[], dirpath: string, type: string };
+export type DirectoryIndexData = { keys: string[], paths: (string | boolean)[], dirpath: string, type: "group" | "folder" };
 export type DirectoryIndexOptions = { upload: boolean, mkdir: boolean, format: "json" | "html", mixFolders: boolean }
 export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
 	let { keys, paths, dirpath, type } = _r;
 	let pairs = keys.map((k, i) => [k, paths[i]]);
 	return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
-		//if this is a category, just return the key
+		//if this is a group, just return the key
 		if (typeof val === "boolean") return Observable.of({ key })
 		//otherwise return the statPath result
 		else return statPath(val).then(res => { return { stat: res, key }; });
@@ -843,7 +867,7 @@ export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, Directory
 		n.push({
 			name: e.key,
 			path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
-			type: (!e.stat ? "category" : (e.stat.itemtype === "file"
+			type: (!e.stat ? "group" : (e.stat.itemtype === "file"
 				? typeLookup[e.key.split('.').pop() as string] || 'other'
 				: e.stat.itemtype as string)),
 			size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
@@ -921,9 +945,12 @@ function getItemType(stat: Stats, infostat: Stats | undefined) {
 
 }
 export function treeWalker(tree: NewTreeGroup | NewTreePath, reqpath) {
+	function getAncesterEntry(a) {
+		return Object.assign({}, a, { $children: (a.$children || []).filter(e => !isNewTreeMountItem(e)) })
+	}
 	var item = tree;
 	var ancestry: NewTreeItem[] = [];
-	var folderPathFound = false;
+	var folderPathFound = isNewTreePath(item);
 	for (var end = 0; end < reqpath.length; end++) {
 		if (isNewTreePath(item)) {
 			folderPathFound = true;
@@ -932,30 +959,28 @@ export function treeWalker(tree: NewTreeGroup | NewTreePath, reqpath) {
 		let t = item.$children.find((e): e is NewTreeGroup | NewTreePath =>
 			isNewTreeMountItem(e) && e.key === reqpath[end]
 		);
-		if (isNewTreeGroup(item) && t) {
+		if (t) {
+			ancestry.push(getAncesterEntry(item));
 			item = t;
-			let a = Object.assign({}, item);
-			delete a.$children;
-			ancestry.push(a);
 		} else {
 			break;
 		}
 	}
 	return { item, end, folderPathFound, ancestry } as TreePathResult;
 }
-export function treeWalkerOld(tree, reqpath) {
-	var item: NewTreeItem = tree;
-	var folderPathFound = false;
-	for (var end = 0; end < reqpath.length; end++) {
+// export function treeWalkerOld(tree, reqpath) {
+// 	var item: NewTreeItem = tree;
+// 	var folderPathFound = false;
+// 	for (var end = 0; end < reqpath.length; end++) {
 
-		if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
-			item = item[reqpath[end]];
-		} else if (typeof item === "string") {
-			folderPathFound = true; break;
-		} else break;
-	}
-	return { item, end, folderPathFound };
-}
+// 		if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
+// 			item = item[reqpath[end]];
+// 		} else if (typeof item === "string") {
+// 			folderPathFound = true; break;
+// 		} else break;
+// 	}
+// 	return { item, end, folderPathFound };
+// }
 export function resolvePath(state: StateObject | string[], tree: NewTreeGroup | NewTreePath): PathResolverResult | undefined {
 	var reqpath;
 	if (Array.isArray(state)) {
@@ -967,14 +992,14 @@ export function resolvePath(state: StateObject | string[], tree: NewTreeGroup | 
 	reqpath = decodeURI(reqpath.slice().filter(a => a).join('/')).split('/').filter(a => a);
 
 	//if we're at root, just return it
-	if (reqpath.length === 0) return {
-		item: tree,
-		ancestry: [],
-		reqpath,
-		treepathPortion: [],
-		filepathPortion: [],
-		fullfilepath: typeof tree === "string" ? tree : ''
-	}
+	// if (reqpath.length === 0) return {
+	// 	item: tree,
+	// 	ancestry: [],
+	// 	reqpath,
+	// 	treepathPortion: [],
+	// 	filepathPortion: [],
+	// 	fullfilepath: isNewTreePath(tree) ? tree.path : ''
+	// }
 	//check for invalid items (such as ..)
 	if (!reqpath.every(a => a !== ".." && a !== ".")) return;
 
@@ -1145,17 +1170,19 @@ export class StateObject {
 	}
 
 	get allow(): ServerConfig_AccessOptions {
-		let localAddress = this._req.socket.localAddress;
-		let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
-		let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
-		let matches = parseHostList(keys)(localAddress);
-		if (isLocalhost) {
-			return settings.tiddlyserver.hostLevelPermissions["localhost"];
-		} else if (matches.lastMatch > -1) {
-			return settings.tiddlyserver.hostLevelPermissions[keys[matches.lastMatch]]
-		} else {
-			return settings.tiddlyserver.hostLevelPermissions["*"]
-		}
+		return settings.tiddlyserver.hostLevelPermissions[this.hostLevelPermissionsKey];
+
+		// let localAddress = this._req.socket.localAddress;
+		// let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
+		// let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
+		// let matches = parseHostList(keys)(localAddress);
+		// if (isLocalhost) {
+		// 	return settings.tiddlyserver.hostLevelPermissions["localhost"];
+		// } else if (matches.lastMatch > -1) {
+		// 	return settings.tiddlyserver.hostLevelPermissions[keys[matches.lastMatch]]
+		// } else {
+		// 	return settings.tiddlyserver.hostLevelPermissions["*"]
+		// }
 	}
 
 	// req: http.IncomingMessage;
@@ -1182,6 +1209,12 @@ export class StateObject {
 
 	expressNext: ((err?: any) => void) | false;
 
+	pathOptions: {
+		noTrailingSlash: boolean;
+	} = {
+		noTrailingSlash: false
+	}
+
 	// req: {
 	//     url: string;
 	//     headers: { [K: string]: any; };
@@ -1207,7 +1240,9 @@ export class StateObject {
 		private _req: http.IncomingMessage,
 		private _res: http.ServerResponse,
 		private debugLog: typeof DebugLog,
-		private eventer: ServerEventEmitter
+		private eventer: ServerEventEmitter,
+		private hostLevelPermissionsKey: string,
+		private authAccountsKey: string
 	) {
 		this.startTime = process.hrtime();
 		this.req = _req;
@@ -1412,17 +1447,7 @@ export function recieveBody(state: StateObject, sendError?: true | ((e: JsonErro
 export interface ThrowFunc<T> {
 	throw(statusCode: number, reason?: string, str?: string, ...args: any[]): Observable<T>;
 }
-export interface ServerConfig_AccessOptions {
-	writeErrors: boolean
-	/** allow uploads on the directory index page */
-	upload: boolean
-	/** allow create directory on directory index page */
-	mkdir: boolean
-	/** allow non-critical settings to be modified */
-	settings: boolean
-	/** allow critical settings to be modified */
-	WARNING_all_settings_WARNING: boolean
-}
+
 export interface OldServerConfigBase {
 
 	_disableLocalHost: boolean;
@@ -1454,141 +1479,6 @@ export interface OldServerConfigBase {
 	/** Schema generated by marcoq.vscode-typescript-to-json-schema VS code plugin */
 	$schema: string;
 }
-export interface SecureServerOptions {
-	/** All private keys as specified in 
-	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
-	 */
-	key: any;
-	/** The certificate chain for all private keys as specified in 
-	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
-	 */
-	cert: any;
-	/** 
-	 * EITHER: A list of file paths of self-signed certs and certificate authorities to allow for 
-	 * client certificates. OR: Boolean `true`, then the list of Mozilla CAs will be used and 
-	 * self-signed certs will not be possible unless `rejectUnauthorizedCertificate` is false.
-	 */
-	requestClientCertificate: string[] | boolean;
-	/** whether to reject connections which do not have a valid certificate */
-	rejectUnauthorizedCertificate: boolean;
-}
-export interface ServerConfigBase {
-	// tree: NewTreeItem;
-	/** 
-	 * Generic webserver options. 
-	 */
-	server: {
-		/** 
-		 * An array of IP addresses to accept requests on. Can be any IP address
-		 * assigned to the machine. Default is "127.0.0.1".
-		 * 
-		 * If `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens
-		 * on the specified IP addresses and accepts all connections from the operating system. If an IP address
-		 * cannot be bound, the server skips it unless `--bindAddressRequired` is specified
-		 * 
-		 * If `filterBindAddress` is true, IPv4 addresses may include a subnet mask,
-		 * (e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) 
-		 * to block requests incoming to that IP address or range.
-		 */
-		bindAddress: string[];
-		/**
-		 * IPv4 addresses may include a subnet mask,
-		 * (e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) 
-		 * to block requests incoming to that IP address or range.
-		 */
-		filterBindAddress: boolean;
-		/**
-		 * Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.
-		 * The default is `true`. In many cases this is preferred, however 
-		 * Android does not support this for some reason. On Android, set this to
-		 * `false` and set host to `["0.0.0.0/0"]` to bind to all IPv4 addresses.
-		 */
-		bindWildcard: true | false;
-		/** 
-		 * Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests
-		 * incoming to IPv6 addresses if not explicitly denied.
-		 */
-		enableIPv6: boolean;
-		/** port to listen on */
-		port: number;
-		/** access log file */
-		logAccess: string | false;
-		/** error log file */
-		logError: string;
-		/** write the console color markers to file, useful if you read the logs by printing them to a terminal */
-		logColorsToFile: boolean;
-		/** print access and error events to the console regardless of whether they are logged to a file */
-		logToConsoleAlso: boolean;
-		/**
-		 *  4 - Errors that require the process to exit for restart
-		 *  3 - Major errors that are handled and do not require a server restart
-		 *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
-		 *  1 - Info - Most startup messages
-		 *  0 - Normal debug messages and all software and request-side error messages
-		 * -1 - Detailed debug messages from high level apis
-		 * -2 - Response status messages and error response data
-		 * -3 - Request and response data for all messages (verbose)
-		 * -4 - Protocol details and full data dump (such as encryption steps and keys)
-		 */
-		debugLevel: number;
-		/** 
-		 * https-only options: an object or a string to a `require`-able file (such as .js or .json) 
-		 * which exports the object
-		 */
-		https?: SecureServerOptions | string
-		/** always bind a separate server instance to 127.0.0.1 regardless of any other settings */
-		_bindLocalhost: boolean;
-		/** enables certain expensive per-request checks */
-		_devmode: boolean;
-	}
-	/** directory index options */
-	directoryIndex: {
-		/** sort folder and files together rather than separated */
-		mixFolders: boolean;
-		/** default format for the directory index */
-		defaultType: "html" | "json";
-		/** 
-		 * Hashmap of type { "icon_name": ["ext", "ext"]} where ext represents the extensions to use this icon for. 
-		 * Icons are in the TiddlyServer/assets/icons folder.
-		 */
-		icons: { [iconName: string]: string[] }
-	}
-	/** tiddlyserver specific options */
-	tiddlyserver: {
-		/** backup directory for saving SINGLE-FILE wikis only */
-		backupDirectory?: string
-		/** whether to use the etag field, blank string means "if specified" */
-		etag: "required" | "disabled" | ""
-		/** etag does not need to be exact by this many seconds */
-		etagWindow: number
-		/** serve datafolders with a trailing slash */
-		useTW5path: boolean
-		/** permissions based on host address: "localhost", "*" (all others), "192.168.0.0/16" */
-		hostLevelPermissions: { [host: string]: ServerConfig_AccessOptions }
-	}
-	/** client-side data folder loader which loads datafolders directly into the browser */
-	EXPERIMENTAL_clientside_datafolders: {
-		/** temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder) */
-		enabled: boolean;
-		/** how long to cache tw_plugins on the server side */
-		maxAge_tw_plugins: number;
-		/** refresh cache whenever ?refresh=true is called */
-		alwaysRefreshCache: boolean;
-	},
-	/** 
-	 * The JSON schema location for this document. This schema is generated 
-	 * directly from the TypeScript interfaces
-	 * used in TiddlyServer. A text-editor with autocomplete, such as VS code, 
-	 * will make editing this file much simpler. 
-	 * Most fields include a description like this one. 
-	 * 
-	 * All relative paths in this file are resolved relative to this file, so 
-	 * `./settings-tree.xml` refers to an XML file in the same folder as this file. 
-	 * All relative paths in included files (such as the XML file) are resolved 
-	 * relative to the included file. 
-	 */
-	$schema: string;
-}
 
 export const TestConfig: ServerConfig = {} as any;
 export interface AccessPathResult<T> {
@@ -1607,9 +1497,9 @@ export interface AccessPathTag {
 };
 export interface PathResolverResult {
 	//the tree item returned from the path resolver
-	item: NewTreeItem;
+	item: NewTreePath | NewTreeGroup;
 	//the ancestors of the tree item for reference
-	ancestry: NewTreeItem[];
+	ancestry: (NewTreePath | NewTreeGroup)[];
 	// client request url path
 	reqpath: string[];
 	// tree part of request url
@@ -1624,7 +1514,7 @@ export type TreeObject = { [K: string]: string | TreeObject };
 export type TreePathResultObject<T, U, V> = { item: T, end: U, folderPathFound: V, ancestry: T[] }
 export type TreePathResult =
 	// TreePathResultObject<NewTreeItem, number, false>
-	| TreePathResultObject<NewTreeItem, number, false>
+	| TreePathResultObject<NewTreeGroup, number, false>
 	| TreePathResultObject<NewTreePath, number, true>;
 export function createHashmapString<T>(keys: string[], values: T[]): { [id: string]: T } {
 	if (keys.length !== values.length)

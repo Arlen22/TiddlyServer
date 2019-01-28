@@ -1,6 +1,6 @@
 import {
-    StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger,
-    PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath, obs_stat,
+	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger,
+	PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath, obs_stat,
 } from "./server-types";
 import { Observable, Subject } from "../lib/rx";
 
@@ -28,220 +28,220 @@ const clientsList: { [k: string]: WebSocket[] } = {};
 let eventer: ServerEventEmitter;
 
 export function init(e: ServerEventEmitter) {
-    eventer = e;
-    eventer.on('settings', function (set: ServerConfig) {
-        settings = set;
-    })
-    eventer.on('settingsChanged', (keys) => {
-        // if (keys.indexOf("username") > -1) {
-        //     debug(1, "The username will not be updated on currently loaded data folders. " +
-        //         "To apply the new username you will need to reload the data folders or restart the server."
-        //     );
-        // }
-    })
-    eventer.on('websocket-connection', function (client: WebSocket, request: http.IncomingMessage) {
-        let pathname = parse(request.url as string).pathname as string;// new URL(request.url as string);
+	eventer = e;
+	eventer.on('settings', function (set: ServerConfig) {
+		settings = set;
+	})
+	eventer.on('settingsChanged', (keys) => {
+		// if (keys.indexOf("username") > -1) {
+		//     debug(1, "The username will not be updated on currently loaded data folders. " +
+		//         "To apply the new username you will need to reload the data folders or restart the server."
+		//     );
+		// }
+	})
+	eventer.on('websocket-connection', function (client: WebSocket, request: http.IncomingMessage) {
+		let pathname = parse(request.url as string).pathname as string;// new URL(request.url as string);
 
-        var result = resolvePath(pathname.split('/'), settings.tree) as PathResolverResult
-        if (!result) return client.close(404);
+		var result = resolvePath(pathname.split('/'), settings.tree) as PathResolverResult
+		if (!result) return client.close(404);
 
-        statWalkPath(result).subscribe(statPath => {
-            //if this is a datafolder, we hand the client and request off directly to it
-            //otherwise we stick it in its own section
-            if (statPath.itemtype === "datafolder") {
-                //trigger the datafolder to load in case it isn't
-                const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '');
-                const subpath = pathname.slice(mount.length);
-                //event to give the client to the data folder
-                const loadClient = () => {
-                    debug(-1, 'ws-client-connect %s', mount);
-                    loadedFolders[mount].events.emit('ws-client-connect', client, request, subpath);
-                };
-                //if the data folder is still loading, we wait, otherwise give immediately
-                if (Array.isArray(loadedFolders[mount].handler)) {
-                    loadedFolders[mount].events.once('ws-client-preload', loadClient)
-                } else {
-                    loadClient();
-                }
-            } else {
-                client.addEventListener('message', (event) => {
-                    console.log('message', event);
-                    debug(-3, 'WS-MESSAGE %s', inspect(event));
-                    clientsList[pathname].forEach(e => {
-                        if (e !== client) e.send(event.data);
-                    })
-                });
+		statWalkPath(result).subscribe(statPath => {
+			//if this is a datafolder, we hand the client and request off directly to it
+			//otherwise we stick it in its own section
+			if (statPath.itemtype === "datafolder") {
+				//trigger the datafolder to load in case it isn't
+				const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '');
+				const subpath = pathname.slice(mount.length);
+				//event to give the client to the data folder
+				const loadClient = () => {
+					debug(-1, 'ws-client-connect %s', mount);
+					loadedFolders[mount].events.emit('ws-client-connect', client, request, subpath);
+				};
+				//if the data folder is still loading, we wait, otherwise give immediately
+				if (Array.isArray(loadedFolders[mount].handler)) {
+					loadedFolders[mount].events.once('ws-client-preload', loadClient)
+				} else {
+					loadClient();
+				}
+			} else {
+				client.addEventListener('message', (event) => {
+					console.log('message', event);
+					debug(-3, 'WS-MESSAGE %s', inspect(event));
+					clientsList[pathname].forEach(e => {
+						if (e !== client) e.send(event.data);
+					})
+				});
 
-                client.addEventListener('error', (event) => {
-                    debug(-2, 'WS-ERROR %s %s', pathname, event.type)
-                    var index = clientsList[pathname].indexOf(client);
-                    if (index > -1) clientsList[pathname].splice(index, 1);
-                    client.close();
-                })
+				client.addEventListener('error', (event) => {
+					debug(-2, 'WS-ERROR %s %s', pathname, event.type)
+					var index = clientsList[pathname].indexOf(client);
+					if (index > -1) clientsList[pathname].splice(index, 1);
+					client.close();
+				})
 
-                client.addEventListener('close', (event) => {
-                    debug(-2, 'WS-CLOSE %s %s %s', pathname, event.code, event.reason);
-                    var index = clientsList[pathname].indexOf(client);
-                    if (index > -1) clientsList[pathname].splice(index, 1);
-                })
+				client.addEventListener('close', (event) => {
+					debug(-2, 'WS-CLOSE %s %s %s', pathname, event.code, event.reason);
+					var index = clientsList[pathname].indexOf(client);
+					if (index > -1) clientsList[pathname].splice(index, 1);
+				})
 
-                if (!clientsList[pathname]) clientsList[pathname] = [];
-                clientsList[pathname].push(client);
-            }
-        });
-    })
+				if (!clientsList[pathname]) clientsList[pathname] = [];
+				clientsList[pathname].push(client);
+			}
+		});
+	})
 }
 
 type FolderData = {
-    mount: string,
-    folder: string,
-    handler: ((state: StateObject) => void) | StateObject[];
-    events: EventEmitter;
+	mount: string,
+	folder: string,
+	handler: ((state: StateObject) => void) | StateObject[];
+	events: EventEmitter;
 };
 
 function quickArrayCheck(obj: any): obj is Array<any> {
-    return typeof obj.length === 'number';
+	return typeof obj.length === 'number';
 }
 
 export function handleDataFolderRequest(result: PathResolverResult, state: StateObject) {
 
-    const { mount, folder } = loadDataFolderTrigger(result,
-        state.statPath, state.url.pathname, state.url.query.reload);
+	const { mount, folder } = loadDataFolderTrigger(result,
+		state.statPath, state.url.pathname, state.url.query.reload as any || "");
 
 
-    const isFullpath = result.filepathPortion.length === state.statPath.index;
-    //set the trailing slash correctly if this is the actual page load
-    //redirect ?reload=true requests to the same, to prevent it being 
-    //reloaded multiple times for the same page load.
-    if (isFullpath && (!settings.tiddlyserver.useTW5path !== !state.url.pathname.endsWith("/"))
-        || state.url.query.reload) {
-        let redirect = mount + (settings.tiddlyserver.useTW5path ? "/" : "");
-        state.respond(302, "", {
-            'Location': redirect
-        }).empty();
-        return;
-        // return Observable.empty();
-    }
+	const isFullpath = result.filepathPortion.length === state.statPath.index;
+	//set the trailing slash correctly if this is the actual page load
+	//redirect ?reload requests to the same, to prevent it being 
+	//reloaded multiple times for the same page load.
+	if (isFullpath && (state.pathOptions.noTrailingSlash !== !state.url.pathname.endsWith("/"))
+		|| state.url.query.reload) {
+		let redirect = mount + (!state.pathOptions.noTrailingSlash ? "/" : "");
+		state.respond(302, "", {
+			'Location': redirect
+		}).empty();
+		return;
+		// return Observable.empty();
+	}
 
-    const load = loadedFolders[mount];
-    if (Array.isArray(load.handler)) {
-        load.handler.push(state);
-    } else {
-        load.handler(state);
-    }
+	const load = loadedFolders[mount];
+	if (Array.isArray(load.handler)) {
+		load.handler.push(state);
+	} else {
+		load.handler(state);
+	}
 }
-function loadDataFolderTrigger(result, statPath, pathname: string, reload: string) {
-    let filepathPrefix = result.filepathPortion.slice(0, statPath.index).join('/');
-    //get the tree path, and add the file path (none if the tree path is a datafolder)
-    let fullPrefix = ["", result.treepathPortion.join('/')];
-    if (statPath.index > 0) fullPrefix.push(filepathPrefix);
-    //join the parts and split into an array
-    fullPrefix = fullPrefix.join('/').split('/');
-    //use the unaltered path in the url as the tiddlywiki prefix
-    let mount = pathname.split('/').slice(0, fullPrefix.length).join('/');
-    //get the full path to the folder as specified in the tree
-    let folder = statPath.statpath;
+function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true" | "force" | "") {
+	let filepathPrefix = result.filepathPortion.slice(0, statPath.index).join('/');
+	//get the tree path, and add the file path (none if the tree path is a datafolder)
+	let fullPrefix = ["", result.treepathPortion.join('/')];
+	if (statPath.index > 0) fullPrefix.push(filepathPrefix);
+	//join the parts and split into an array
+	fullPrefix = fullPrefix.join('/').split('/');
+	//use the unaltered path in the url as the tiddlywiki prefix
+	let mount = pathname.split('/').slice(0, fullPrefix.length).join('/');
+	//get the full path to the folder as specified in the tree
+	let folder = statPath.statpath;
 
-    // reload the plugin cache if requested
-    // if (reload === "plugins") initPluginLoader();
+	// reload the plugin cache if requested
+	// if (reload === "plugins") initPluginLoader();
 
-    //initialize the tiddlywiki instance
-    if (!loadedFolders[mount] || reload === "true") {
-        loadedFolders[mount] = { mount, folder, events: new EventEmitter(), handler: [] };
-        loadDataFolderType(mount, folder, reload);
-        // loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
-        // loadTiddlyWiki(prefixURI, folder);
-    }
+	//initialize the tiddlywiki instance
+	if (!loadedFolders[mount] || reload === "true") {
+		loadedFolders[mount] = { mount, folder, events: new EventEmitter(), handler: [] };
+		loadDataFolderType(mount, folder, reload);
+		// loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
+		// loadTiddlyWiki(prefixURI, folder);
+	}
 
-    return { mount, folder };
+	return { mount, folder };
 }
 
 function loadDataFolderType(mount: string, folder: string, reload: string) {
-    obs_readFile()(path.join(folder, "tiddlywiki.info"), 'utf8').subscribe(([err, data]) => {
-        const wikiInfo: WikiInfo = tryParseJSON(data);
-        if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-            loadDataFolderTiddlyWiki(mount, folder, reload);
-        } else if (wikiInfo.type === "tiddlyserver") {
-            // loadTiddlyServerAdapter(mount, folder, reload)
-        }
-    })
+	obs_readFile()(path.join(folder, "tiddlywiki.info"), 'utf8').subscribe(([err, data]) => {
+		const wikiInfo: WikiInfo = tryParseJSON(data);
+		if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
+			loadDataFolderTiddlyWiki(mount, folder, reload);
+		} else if (wikiInfo.type === "tiddlyserver") {
+			// loadTiddlyServerAdapter(mount, folder, reload)
+		}
+	})
 }
 function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string) {
-    console.time('twboot-' + folder);
-    const target = "../tiddlywiki";
-    const $tw = require(target + "/boot/boot.js").TiddlyWiki(
-        require(target + "/boot/bootprefix.js").bootprefix({
-            packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, target + '/package.json'), 'utf8'))
-        })
-    );
-    $tw.boot.argv = [folder];
-    $tw.preloadTiddler({
-        "text": "$protocol$//$host$" + mount + "/",
-        "title": "$:/config/tiddlyweb/host"
-    });
-    try {
-        $tw.boot.boot(() => {
-            complete(null, $tw);
-        });
-    } catch (err) {
-        complete(err, null);
-    }
+	console.time('twboot-' + folder);
+	const target = "../tiddlywiki";
+	const $tw = require(target + "/boot/boot.js").TiddlyWiki(
+		require(target + "/boot/bootprefix.js").bootprefix({
+			packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, target + '/package.json'), 'utf8'))
+		})
+	);
+	$tw.boot.argv = [folder];
+	$tw.preloadTiddler({
+		"text": "$protocol$//$host$" + mount + "/",
+		"title": "$:/config/tiddlyweb/host"
+	});
+	try {
+		$tw.boot.boot(() => {
+			complete(null, $tw);
+		});
+	} catch (err) {
+		complete(err, null);
+	}
 
-    function complete(err, $tw) {
-        console.timeEnd('twboot-' + folder);
-        if (err) {
-            return doError(mount, folder, err);
-        }
+	function complete(err, $tw) {
+		console.timeEnd('twboot-' + folder);
+		if (err) {
+			return doError(mount, folder, err);
+		}
 
-        //we use $tw.modules.execute so that the module has its respective $tw variable.
-        var server;
-        try {
-            server = $tw.modules.execute('$:/core/modules/server/server.js').Server;
-        } catch (e) {
-            doError(mount, folder, e);
-            return;
-        }
-        var server = new server({
-            wiki: $tw.wiki,
-            variables: {
-                // "username": settings.username, //TODO
-                "path-prefix": mount
-            }
-        });
+		//we use $tw.modules.execute so that the module has its respective $tw variable.
+		var server;
+		try {
+			server = $tw.modules.execute('$:/core/modules/server/server.js').Server;
+		} catch (e) {
+			doError(mount, folder, e);
+			return;
+		}
+		var server = new server({
+			wiki: $tw.wiki,
+			variables: {
+				// "username": settings.username, //TODO
+				"path-prefix": mount
+			}
+		});
 
-        //invoke the server start hook so plugins can extend the server or attach to the event handler
-        $tw.hooks.invokeHook('th-server-command-post-start', server, loadedFolders[mount].events, "tiddlyserver");
-        //add the event emitter to the $tw variable
-        $tw.wss = loadedFolders[mount].events;
-        //set the request handler, indicating we are now ready to recieve requests
-        const requests = loadedFolders[mount].handler as StateObject[];
-        loadedFolders[mount].handler = (state: StateObject) => {
-            //pretend to the handler like the path really has a trailing slash
-            let req = new Object(state.req) as http.IncomingMessage;
-            req.url += ((state.url.pathname === mount && !state.url.pathname.endsWith("/")) ? "/" : "");
-            server.requestHandler(state.req, state.res)
-        };
-        //send queued websocket clients to the event emitter
-        loadedFolders[mount].events.emit('ws-client-preload');
-        //send the queued requests to the handler
-        requests.forEach(e => (loadedFolders[mount].handler as Function)(e));
-    }
+		//invoke the server start hook so plugins can extend the server or attach to the event handler
+		$tw.hooks.invokeHook('th-server-command-post-start', server, loadedFolders[mount].events, "tiddlyserver");
+		//add the event emitter to the $tw variable
+		$tw.wss = loadedFolders[mount].events;
+		//set the request handler, indicating we are now ready to recieve requests
+		const requests = loadedFolders[mount].handler as StateObject[];
+		loadedFolders[mount].handler = (state: StateObject) => {
+			//pretend to the handler like the path really has a trailing slash
+			let req = new Object(state.req) as http.IncomingMessage;
+			req.url += ((state.url.pathname === mount && !state.url.pathname.endsWith("/")) ? "/" : "");
+			server.requestHandler(state.req, state.res)
+		};
+		//send queued websocket clients to the event emitter
+		loadedFolders[mount].events.emit('ws-client-preload');
+		//send the queued requests to the handler
+		requests.forEach(e => (loadedFolders[mount].handler as Function)(e));
+	}
 };
 
 function doError(mount, folder, err) {
-    debug(3, 'error starting %s at %s: %s', mount, folder, err.stack);
-    const requests = loadedFolders[mount].handler as any[];
-    loadedFolders[mount] = {
-        handler: function (state: StateObject) {
-            state.respond(500, "TW5 data folder failed").string(
-                "The Tiddlywiki data folder failed to load. The error has been logged to the " +
-                "terminal with priority level 2. " +
-                "To try again, use ?reload=true after making any necessary corrections.");
-        }
-    } as any;
-    requests.forEach(([req, res]) => {
-        (loadedFolders[mount] as { handler: any }).handler(req, res);
-    })
+	debug(3, 'error starting %s at %s: %s', mount, folder, err.stack);
+	const requests = loadedFolders[mount].handler as any[];
+	loadedFolders[mount] = {
+		handler: function (state: StateObject) {
+			state.respond(500, "TW5 data folder failed").string(
+				"The Tiddlywiki data folder failed to load. The error has been logged to the " +
+				"terminal with priority level 2. " +
+				"To try again, use ?reload=true after making any necessary corrections.");
+		}
+	} as any;
+	requests.forEach(([req, res]) => {
+		(loadedFolders[mount] as { handler: any }).handler(req, res);
+	})
 
 }
 
@@ -251,9 +251,9 @@ function doError(mount, folder, err) {
 
 
 interface PluginCache {
-    meta: PluginInfo
-    text: string
-    cacheTime: number
+	meta: PluginInfo
+	text: string
+	cacheTime: number
 }
 
 let pluginCache: { [K: string]: { [K: string]: PluginCache | "null" } };
@@ -263,170 +263,170 @@ let pluginLoader;
 let global_tw;
 
 function initPluginLoader() {
-    pluginCache = {};
+	pluginCache = {};
 
-    const $tw = global_tw = TiddlyWiki.loadCore();
+	const $tw = global_tw = TiddlyWiki.loadCore();
 
-    const pluginConfig = {
-        plugin: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
-        theme: [$tw.config.themesPath, $tw.config.themesEnvVar],
-        language: [$tw.config.languagesPath, $tw.config.languagesEnvVar]
-    };
+	const pluginConfig = {
+		plugin: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
+		theme: [$tw.config.themesPath, $tw.config.themesEnvVar],
+		language: [$tw.config.languagesPath, $tw.config.languagesEnvVar]
+	};
 
-    Object.keys(pluginConfig).forEach(type => {
-        pluginCache[type] = {};
-    });
+	Object.keys(pluginConfig).forEach(type => {
+		pluginCache[type] = {};
+	});
 
-    let core = $tw.loadPluginFolder($tw.boot.corePath);
+	let core = $tw.loadPluginFolder($tw.boot.corePath);
 
-    coreCache = {
-        text: core.text,
-        meta: core,
-        cacheTime: new Date().valueOf()
-    };
+	coreCache = {
+		text: core.text,
+		meta: core,
+		cacheTime: new Date().valueOf()
+	};
 
-    delete core.text;
+	delete core.text;
 
-    // bootCache = {};
-    // $tw.loadTiddlersFromPath($tw.boot.bootPath).forEach(tiddlerFile => {
-    //     tiddlerFile.tiddlers.forEach(tiddlerFields => {
-    //         bootCache[tiddlerFields.title] = tiddlerFields;
-    //     })
-    // });
+	// bootCache = {};
+	// $tw.loadTiddlersFromPath($tw.boot.bootPath).forEach(tiddlerFile => {
+	//     tiddlerFile.tiddlers.forEach(tiddlerFields => {
+	//         bootCache[tiddlerFields.title] = tiddlerFields;
+	//     })
+	// });
 
-    // $tw.loadTiddlersFromPath($tw.boot.bootPath) as { tiddlers: any[] }[];
+	// $tw.loadTiddlersFromPath($tw.boot.bootPath) as { tiddlers: any[] }[];
 
-    pluginLoader = function getPlugin(type, name): PluginCache | "null" {
-        if (!pluginCache[type][name]) {
-            const typeInfo = pluginConfig[type];
-            var paths = $tw.getLibraryItemSearchPaths(typeInfo[0], typeInfo[1]);
-            let pluginPath = $tw.findLibraryItem(name, paths);
-            let plugin = $tw.loadPluginFolder(pluginPath);
-            if (!plugin) pluginCache[type][name] = "null";
-            else {
-                let text = plugin.text,
-                    meta = plugin;
-                delete plugin.text;
-                pluginCache[type][name] = { meta, text, cacheTime: new Date().valueOf() };
-            }
-        }
-        return pluginCache[type][name];
-    }
+	pluginLoader = function getPlugin(type, name): PluginCache | "null" {
+		if (!pluginCache[type][name]) {
+			const typeInfo = pluginConfig[type];
+			var paths = $tw.getLibraryItemSearchPaths(typeInfo[0], typeInfo[1]);
+			let pluginPath = $tw.findLibraryItem(name, paths);
+			let plugin = $tw.loadPluginFolder(pluginPath);
+			if (!plugin) pluginCache[type][name] = "null";
+			else {
+				let text = plugin.text,
+					meta = plugin;
+				delete plugin.text;
+				pluginCache[type][name] = { meta, text, cacheTime: new Date().valueOf() };
+			}
+		}
+		return pluginCache[type][name];
+	}
 
 
-    // return function (wikiInfo: WikiInfo) {
-    //     return ['plugins', 'themes', 'languages'].map(type => {
-    //         var pluginList = wikiInfo[type];
-    //         if (!Array.isArray(pluginList)) return [] as never;
-    //         else return pluginList.map(name => getPlugin(type, name));
-    //     }).reduce((n, e) => n.concat(e), [] as PluginCache[]);
-    // }
+	// return function (wikiInfo: WikiInfo) {
+	//     return ['plugins', 'themes', 'languages'].map(type => {
+	//         var pluginList = wikiInfo[type];
+	//         if (!Array.isArray(pluginList)) return [] as never;
+	//         else return pluginList.map(name => getPlugin(type, name));
+	//     }).reduce((n, e) => n.concat(e), [] as PluginCache[]);
+	// }
 }
 initPluginLoader();
 // mounted at /tiddlywiki
 const serveBootFolder = new Subject<StateObject>();
 serveFolderObs(
-    serveBootFolder.asObservable(),
-    '/assets/tiddlywiki/boot',
-    path.join(__dirname, "../tiddlywiki/boot"),
-    serveFolderIndex({ type: 'json' })
+	serveBootFolder.asObservable(),
+	'/assets/tiddlywiki/boot',
+	path.join(__dirname, "../tiddlywiki/boot"),
+	serveFolderIndex({ type: 'json' })
 );
 
 export function handleTiddlyWikiRoute(state: StateObject) {
-    //number of elements on state.path that are part of the mount path.
-    //the zero-based index of the first subpath is the same as the number of elements
-    let mountLength = 3;
-    console.log(state.path);
-    if (['plugin', 'theme', 'language', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
-        console.log('throw', state.responseSent);
-        state.throw(404);
-    } else if (state.path[mountLength] === "core") {
-        sendPluginResponse(state, coreCache);
-    } else if (state.path[mountLength] === "boot") {
-        serveBootFolder.next(state);
-    } else if (!state.path[mountLength]) {
-        const folder = path.join(__dirname, "../tiddlywiki");
-        const folderPaths: string[] = [];
-        const processFolder = (dirpath: string): Observable<never> => {
-            return obs_readdir()(dirpath).mergeMap(([err, files, tag, dirpath]) => {
-                return Observable.from(files).mergeMap(file => obs_stat()(path.join(dirpath, file)))
-            }).mergeMap(([err, stat, tag, subpath]) => {
-                folderPaths.push(subpath.slice(folder.length));
-                return stat.isDirectory() ? processFolder(subpath) : Observable.empty<never>();
-            });
-        }
-        processFolder(folder).subscribe({
-            complete: () => {
-                state.respond(200).json(folderPaths);
-            }
-        })
+	//number of elements on state.path that are part of the mount path.
+	//the zero-based index of the first subpath is the same as the number of elements
+	let mountLength = 3;
+	console.log(state.path);
+	if (['plugin', 'theme', 'language', 'core', 'boot'].indexOf(state.path[mountLength]) === -1) {
+		console.log('throw', state.responseSent);
+		state.throw(404);
+	} else if (state.path[mountLength] === "core") {
+		sendPluginResponse(state, coreCache);
+	} else if (state.path[mountLength] === "boot") {
+		serveBootFolder.next(state);
+	} else if (!state.path[mountLength]) {
+		const folder = path.join(__dirname, "../tiddlywiki");
+		const folderPaths: string[] = [];
+		const processFolder = (dirpath: string): Observable<never> => {
+			return obs_readdir()(dirpath).mergeMap(([err, files, tag, dirpath]) => {
+				return Observable.from(files).mergeMap(file => obs_stat()(path.join(dirpath, file)))
+			}).mergeMap(([err, stat, tag, subpath]) => {
+				folderPaths.push(subpath.slice(folder.length));
+				return stat.isDirectory() ? processFolder(subpath) : Observable.empty<never>();
+			});
+		}
+		processFolder(folder).subscribe({
+			complete: () => {
+				state.respond(200).json(folderPaths);
+			}
+		})
 
-    } else {
-        sendPluginResponse(state,
-            pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1]))
-        );
-    }
+	} else {
+		sendPluginResponse(state,
+			pluginLoader(state.path[mountLength], decodeURIComponent(state.path[mountLength + 1]))
+		);
+	}
 
 }
 
 function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null") {
-    // const { req, res } = state;
-    if (pluginCache === "null") {
-        state.respond(404).empty();
-        return;
-    }
-    // console.log('pluginCache', pluginCache.plugin.text && pluginCache.plugin.text.length);
-    // let text = pluginCache.plugin.text;
-    // delete pluginCache.plugin.text;
-    let meta = JSON.stringify(pluginCache.meta), text = pluginCache.text;
+	// const { req, res } = state;
+	if (pluginCache === "null") {
+		state.respond(404).empty();
+		return;
+	}
+	// console.log('pluginCache', pluginCache.plugin.text && pluginCache.plugin.text.length);
+	// let text = pluginCache.plugin.text;
+	// delete pluginCache.plugin.text;
+	let meta = JSON.stringify(pluginCache.meta), text = pluginCache.text;
 
-    // Just an experiment
-    // let tiddlersArray = (() => {
-    //     let gkeys: string[] = [];
-    //     let { tiddlers } = JSON.parse(text1);
-    //     let keys = Object.keys(tiddlers);
-    //     let tiddlersArray = keys.map(k => {
-    //         let tkeys = Object.keys(tiddlers[k]);
-    //         let vals = {};
-    //         tkeys.forEach(tk => {
-    //             let index = gkeys.indexOf(tk);
-    //             if (index === -1) {
-    //                 vals[gkeys.length] = tiddlers[k][tk];
-    //                 gkeys.push(tk);
-    //             } else {
-    //                 vals[index] = tiddlers[k][tk];
-    //             }
-    //         });
-    //         return vals;
-    //     });
-    //     return { keys: gkeys, vals: tiddlersArray };
-    // })();
+	// Just an experiment
+	// let tiddlersArray = (() => {
+	//     let gkeys: string[] = [];
+	//     let { tiddlers } = JSON.parse(text1);
+	//     let keys = Object.keys(tiddlers);
+	//     let tiddlersArray = keys.map(k => {
+	//         let tkeys = Object.keys(tiddlers[k]);
+	//         let vals = {};
+	//         tkeys.forEach(tk => {
+	//             let index = gkeys.indexOf(tk);
+	//             if (index === -1) {
+	//                 vals[gkeys.length] = tiddlers[k][tk];
+	//                 gkeys.push(tk);
+	//             } else {
+	//                 vals[index] = tiddlers[k][tk];
+	//             }
+	//         });
+	//         return vals;
+	//     });
+	//     return { keys: gkeys, vals: tiddlersArray };
+	// })();
 
-    const body = meta + '\n\n' + text;
+	const body = meta + '\n\n' + text;
 
-		var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1000; //1 year
-		var maxageSetting = settings.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins;
-    var maxAge = Math.min(Math.max(0, maxageSetting), MAX_MAXAGE)
+	var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1000; //1 year
+	var maxageSetting = settings.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins;
+	var maxAge = Math.min(Math.max(0, maxageSetting), MAX_MAXAGE)
 
-    var cacheControl = 'public, max-age=' + Math.floor(maxageSetting / 1000)
-    debug(-3, 'cache-control %s', cacheControl)
-    state.setHeader('Cache-Control', cacheControl)
+	var cacheControl = 'public, max-age=' + Math.floor(maxageSetting / 1000)
+	debug(-3, 'cache-control %s', cacheControl)
+	state.setHeader('Cache-Control', cacheControl)
 
-    var modified = new Date(pluginCache.cacheTime).toUTCString()
-    debug(-3, 'modified %s', modified)
-    state.setHeader('Last-Modified', modified)
+	var modified = new Date(pluginCache.cacheTime).toUTCString()
+	debug(-3, 'modified %s', modified)
+	state.setHeader('Last-Modified', modified)
 
-    var etagStr = etag(body);
-    debug(-3, 'etag %s', etagStr)
-    state.setHeader('ETag', etagStr)
+	var etagStr = etag(body);
+	debug(-3, 'etag %s', etagStr)
+	state.setHeader('ETag', etagStr)
 
-    if (fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
-        debug(-1, "client plugin still fresh")
-        state.respond(304).empty();
-    } else {
-        debug(-1, "sending plugin")
-        sendResponse(state, body, { doGzip: canAcceptGzip(state.req) });
-    }
+	if (fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
+		debug(-1, "client plugin still fresh")
+		state.respond(304).empty();
+	} else {
+		debug(-1, "sending plugin")
+		sendResponse(state, body, { doGzip: canAcceptGzip(state.req) });
+	}
 }
 
 
