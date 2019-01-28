@@ -1,3 +1,4 @@
+//@ts-check
 require("./lib/source-map-support-lib");
 const fs = require('fs');
 const path = require('path');
@@ -12,8 +13,17 @@ const settingsFile = path.normalize(
 );
 
 const server = require('./src/server');
-const settings = server.loadSettings(settingsFile);
-const eventer = server.initServer({ env: "node", settings });
+const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
+// console.log(settings);
+server.eventer.emit("settings", settings);
+server.initServer({
+	// env: "node",
+	settingshttps,
+	preflighter: fs.existsSync(__dirname + "/preflighter.js")
+		//@ts-ignore
+		? require("./preflighter.js")
+		: undefined
+});
 
 process.on('uncaughtException', err => {
 	process.exitCode = 1;
@@ -23,7 +33,7 @@ process.on('uncaughtException', err => {
 		new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n", (err) => {
 			if (err) console.log('Could not write to uncaughtException.log');
 		});
-	eventer.emit('serverClose', "all");
+	server.eventer.emit('serverClose', "all");
 	//hold it open because all other listeners should close
 	if (args.indexOf("--close-on-error") === -1)
 		setInterval(function () { }, 1000);
@@ -31,7 +41,7 @@ process.on('uncaughtException', err => {
 
 process.on('beforeExit', () => {
 	if (process.exitCode) return;
-	console.log('The process was about to close with exitCode 0 -- restarting server');
+	// console.log('The process was about to close with exitCode 0 -- restarting server');
 	// server.initServer({ env: "node", settings });
 })
 

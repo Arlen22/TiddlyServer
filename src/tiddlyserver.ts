@@ -4,7 +4,7 @@ import {
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
 	sendDirectoryIndex, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData,
-	ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup, NewTreePath
+	ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup, NewTreePath, NewTreeItem, NewTreeGroup
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -59,14 +59,19 @@ export function init(eventer: ServerEventEmitter) {
 }
 
 type apiListRouteState = [[string, string], string | any, StateObject]
-
+export function handleRouteAuthentication(state: StateObject, route: (NewTreePath | NewTreeGroup)[]){
+	
+}
 export function handleTiddlyServerRoute(state: StateObject) {
 
 	// const resolvePath = (settings.tree);
 	Observable.of(state).mergeMap((state: StateObject) => {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
 		if (!result) return state.throw<never>(404);
-		else if (isNewTreeGroup(result.item)) {
+		//handle route authentication
+		handleRouteAuthentication(state, result.ancestry.concat(result.item));
+		console.log(result.ancestry, result.reqpath.length);
+		if (isNewTreeGroup(result.item)) {
 			serveDirectoryIndex(result, state);
 			return Observable.empty<never>();
 		} else {
@@ -122,7 +127,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 	if (!state.url.pathname.endsWith("/")) {
 		state.redirect(state.url.pathname + "/");
 	} else if (state.req.method === "GET") {
-		const isFolder = typeof result.item === "string";
+		const isFolder = result.item.$element === "folder";
 		const options = {
 			upload: isFolder && (allow.upload),
 			mkdir: isFolder && (allow.mkdir),
@@ -140,7 +145,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		// console.log(state.url);
 		if (state.url.query.formtype === "upload") {
 
-			if (typeof result.item !== "string")
+			if (isNewTreeGroup(result.item))
 				return state.throwReason(400, "upload is not possible for tree items");
 			if (!allow.upload)
 				return state.throwReason(403, "upload is not allowed over the network")
@@ -164,7 +169,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				});
 			});
 		} else if (state.url.query.formtype === "mkdir") {
-			if (typeof result.item !== "string")
+			if (isNewTreeGroup(result.item))
 				return state.throwReason(400, "mkdir is not possible for tree items");
 			if (!allow.mkdir)
 				return state.throwReason(403, "mkdir is not allowed over the network")

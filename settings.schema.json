@@ -6,7 +6,19 @@
 			"properties": {
 				"server": {
 					"type": "object",
+					"additionalProperties": false,
 					"properties": {
+						"https": {
+							"anyOf": [
+								{
+									"type": "string"
+								},
+								{
+									"$ref": "#/definitions/SecureServerOptionsSchema"
+								}
+							],
+							"description": "https-only options: an object or a string to a `require`-able file (such as .js or .json) \r\nwhich exports the object"
+						},
 						"bindAddress": {
 							"type": "array",
 							"items": {
@@ -32,7 +44,7 @@
 						},
 						"port": {
 							"type": "number",
-							"description": "port to listen on"
+							"description": "port to listen on, default is 8080 for http and 8443 for https"
 						},
 						"logAccess": {
 							"anyOf": [
@@ -64,17 +76,6 @@
 							"type": "number",
 							"description": "4 - Errors that require the process to exit for restart\r\n3 - Major errors that are handled and do not require a server restart\r\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\r\n1 - Info - Most startup messages\r\n0 - Normal debug messages and all software and request-side error messages\r\n-1 - Detailed debug messages from high level apis\r\n-2 - Response status messages and error response data\r\n-3 - Request and response data for all messages (verbose)\r\n-4 - Protocol details and full data dump (such as encryption steps and keys)"
 						},
-						"https": {
-							"anyOf": [
-								{
-									"$ref": "#/definitions/SecureServerOptions"
-								},
-								{
-									"type": "string"
-								}
-							],
-							"description": "https-only options: an object or a string to a `require`-able file (such as .js or .json) \r\nwhich exports the object"
-						},
 						"_bindLocalhost": {
 							"type": "boolean",
 							"description": "always bind a separate server instance to 127.0.0.1 regardless of any other settings"
@@ -85,20 +86,19 @@
 						}
 					},
 					"required": [
-						"bindAddress",
-						"filterBindAddress",
-						"bindWildcard",
-						"enableIPv6",
-						"port",
-						"logAccess",
-						"logError",
-						"logColorsToFile",
-						"logToConsoleAlso",
-						"debugLevel",
 						"_bindLocalhost",
-						"_devmode"
+						"_devmode",
+						"bindAddress",
+						"bindWildcard",
+						"debugLevel",
+						"enableIPv6",
+						"filterBindAddress",
+						"logAccess",
+						"logColorsToFile",
+						"logError",
+						"logToConsoleAlso",
+						"port"
 					],
-					"additionalProperties": false,
 					"description": "Generic webserver options."
 				},
 				"directoryIndex": {
@@ -155,10 +155,6 @@
 							"type": "number",
 							"description": "etag does not need to be exact by this many seconds"
 						},
-						"useTW5path": {
-							"type": "boolean",
-							"description": "serve datafolders with a trailing slash"
-						},
 						"hostLevelPermissions": {
 							"type": "object",
 							"additionalProperties": {
@@ -170,11 +166,55 @@
 					"required": [
 						"etag",
 						"etagWindow",
-						"useTW5path",
 						"hostLevelPermissions"
 					],
 					"additionalProperties": false,
 					"description": "tiddlyserver specific options"
+				},
+				"authAccounts": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "object",
+							"additionalProperties": {
+								"type": "object",
+								"properties": {
+									"credentials": {
+										"anyOf": [
+											{
+												"$ref": "#/definitions/ServerConfig_AuthPassword"
+											},
+											{
+												"$ref": "#/definitions/ServerConfig_AuthClientKey"
+											},
+											{
+												"type": "boolean",
+												"enum": [
+													false
+												]
+											}
+										],
+										"description": "credentials to use for this account, or false to create a \"group\""
+									},
+									"permissions": {
+										"$ref": "#/definitions/ServerConfig_AccessOptions",
+										"description": "override hostLevelPermissions for this account (optional)"
+									},
+									"inheritPermissions": {
+										"type": "string",
+										"description": "inherit permissions from another key in authAccounts (optional)"
+									}
+								},
+								"required": [
+									"credentials"
+								],
+								"additionalProperties": false
+							}
+						}
+					],
+					"description": "The Hashmap of accounts which may authenticate on this server.\r\nTakes either an object or a string to a `require`-able file (such as .js or .json) \r\nwhich exports the object"
 				},
 				"EXPERIMENTAL_clientside_datafolders": {
 					"type": "object",
@@ -211,46 +251,11 @@
 			"required": [
 				"$schema",
 				"EXPERIMENTAL_clientside_datafolders",
+				"authAccounts",
 				"directoryIndex",
 				"server",
 				"tiddlyserver",
 				"tree"
-			],
-			"additionalProperties": false
-		},
-		"SecureServerOptions": {
-			"type": "object",
-			"properties": {
-				"key": {
-					"description": "All private keys as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
-				},
-				"cert": {
-					"description": "The certificate chain for all private keys as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
-				},
-				"requestClientCertificate": {
-					"anyOf": [
-						{
-							"type": "array",
-							"items": {
-								"type": "string"
-							}
-						},
-						{
-							"type": "boolean"
-						}
-					],
-					"description": "EITHER: A list of file paths of self-signed certs and certificate authorities to allow for \r\nclient certificates. OR: Boolean `true`, then the list of Mozilla CAs will be used and \r\nself-signed certs will not be possible unless `rejectUnauthorizedCertificate` is false."
-				},
-				"rejectUnauthorizedCertificate": {
-					"type": "boolean",
-					"description": "whether to reject connections which do not have a valid certificate"
-				}
-			},
-			"required": [
-				"key",
-				"cert",
-				"requestClientCertificate",
-				"rejectUnauthorizedCertificate"
 			],
 			"additionalProperties": false
 		},
@@ -275,6 +280,10 @@
 				"WARNING_all_settings_WARNING": {
 					"type": "boolean",
 					"description": "allow critical settings to be modified"
+				},
+				"websockets": {
+					"type": "boolean",
+					"description": "allow websocket connections (default true)"
 				}
 			},
 			"required": [
@@ -282,9 +291,81 @@
 				"upload",
 				"mkdir",
 				"settings",
-				"WARNING_all_settings_WARNING"
+				"WARNING_all_settings_WARNING",
+				"websockets"
 			],
 			"additionalProperties": false
+		},
+		"ServerConfig_AuthPassword": {
+			"type": "object",
+			"properties": {
+				"type": {
+					"type": "string",
+					"enum": [
+						"password"
+					],
+					"description": "basic auth or cookie"
+				},
+				"username": {
+					"type": "string",
+					"description": "Username given to TiddlyWiki data folders and anywhere else it's needed"
+				},
+				"password": {
+					"type": "string",
+					"description": "password encoded in utf8"
+				}
+			},
+			"required": [
+				"type",
+				"username",
+				"password"
+			],
+			"additionalProperties": false
+		},
+		"ServerConfig_AuthClientKey": {
+			"type": "object",
+			"properties": {
+				"type": {
+					"type": "string",
+					"enum": [
+						"clientKey"
+					],
+					"description": "client certificate"
+				},
+				"username": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "boolean",
+							"enum": [
+								true
+							]
+						}
+					],
+					"description": "Username given to TiddlyWiki data folders and anywhere else it's needed. If true, \r\nthe common name of the certificate presented is used instead."
+				},
+				"certificateAuthority": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "All certificate authories and self-signed certificates to allow for this auth entry.\r\nMay be any authority in the certificate chain. If `requestClientCertificate` is a string array\r\nand `rejectUnauthorizedCertificate` is true,"
+				},
+				"usernameMustMatch": {
+					"type": "boolean",
+					"description": "Require the certificate common name to match the username. Default is true. Has no effect if \r\n`username` is also true as the username is taken directly from the common name in that case."
+				}
+			},
+			"required": [
+				"type",
+				"username",
+				"certificateAuthority",
+				"usernameMustMatch"
+			],
+			"additionalProperties": false,
+			"description": "Use client certificate authentication, requires HTTPS"
 		},
 		"NewTreeObjectSchemaItem": {
 			"anyOf": [
@@ -389,7 +470,12 @@
 					]
 				},
 				"path": {
-					"type": "string"
+					"type": "string",
+					"description": "Path relative to this file or any absolute path NodeJS can stat"
+				},
+				"noTrailingSlash": {
+					"type": "boolean",
+					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file."
 				},
 				"$children": {
 					"type": "array",
@@ -413,10 +499,7 @@
 					"$ref": "#/definitions/NewTreePathOptions_Index"
 				},
 				{
-					"$ref": "#/definitions/NewTreePathOptions_AuthPassword"
-				},
-				{
-					"$ref": "#/definitions/NewTreePathOptions_AuthPublicKey"
+					"$ref": "#/definitions/NewTreePathOptions_Auth"
 				}
 			],
 			"default": {
@@ -466,60 +549,27 @@
 			],
 			"additionalProperties": false
 		},
-		"NewTreePathOptions_AuthPassword": {
+		"NewTreePathOptions_Auth": {
 			"type": "object",
 			"properties": {
 				"$element": {
 					"type": "string",
 					"enum": [
-						"authPassword"
+						"auth"
 					],
-					"description": "Use basic auth for access control"
+					"description": "Authenticate"
 				},
-				"username": {
-					"type": "string",
-					"description": "Username given to TiddlyWiki data folders and anywhere else it's needed"
-				},
-				"password": {
-					"type": "string",
-					"description": "password encoded in utf8"
+				"authList": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "list of keys from the auth list that can access this resource"
 				}
 			},
 			"required": [
 				"$element",
-				"username",
-				"password"
-			],
-			"additionalProperties": false
-		},
-		"NewTreePathOptions_AuthPublicKey": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"authClientKey"
-					],
-					"description": "use TLS Client Certificates for access control"
-				},
-				"username": {
-					"type": "string",
-					"description": "Username given to TiddlyWiki data folders and anywhere else it's needed"
-				},
-				"certificateAuthority": {
-					"type": "string",
-					"description": "all certificate authories and self-signed certificates to allow"
-				},
-				"rejectUnauthorized": {
-					"type": "boolean",
-					"description": "Reject requests that cannot present a signed certificate"
-				}
-			},
-			"required": [
-				"$element",
-				"username",
-				"certificateAuthority",
-				"rejectUnauthorized"
+				"authList"
 			],
 			"additionalProperties": false
 		},
@@ -557,7 +607,12 @@
 					]
 				},
 				"path": {
-					"type": "string"
+					"type": "string",
+					"description": "Path relative to this file or any absolute path NodeJS can stat"
+				},
+				"noTrailingSlash": {
+					"type": "boolean",
+					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file."
 				},
 				"$children": {
 					"type": "array",
@@ -569,6 +624,101 @@
 			"required": [
 				"$element",
 				"path"
+			],
+			"additionalProperties": false
+		},
+		"SecureServerOptionsSchema": {
+			"type": "object",
+			"properties": {
+				"key": {
+					"type": "array",
+					"items": {
+						"anyOf": [
+							{
+								"type": "string"
+							},
+							{
+								"type": "object",
+								"properties": {
+									"path": {
+										"type": "string"
+									},
+									"passphrase": {
+										"type": "string"
+									}
+								},
+								"required": [
+									"path",
+									"passphrase"
+								],
+								"additionalProperties": false
+							}
+						]
+					},
+					"description": "************************************************************************************ \r\nAll private keys in PEM format as specified in  \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
+				},
+				"cert": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "************************************************************************************\r\nThe certificate chain for all private keys in PEM format as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
+				},
+				"pfx": {
+					"type": "array",
+					"items": {
+						"anyOf": [
+							{
+								"type": "string"
+							},
+							{
+								"type": "object",
+								"properties": {
+									"path": {
+										"type": "string"
+									},
+									"passphrase": {
+										"type": "string"
+									}
+								},
+								"required": [
+									"path",
+									"passphrase"
+								],
+								"additionalProperties": false
+							}
+						]
+					},
+					"description": "************************************************************************************\r\nPrivate keys with their certs in a PFX or PKCS12 as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
+				},
+				"passphrase": {
+					"type": "string",
+					"description": "Passphrase to use for password protected keys if none is specificed \r\nfor that key, as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
+				},
+				"requestClientCertificate": {
+					"anyOf": [
+						{
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						{
+							"type": "boolean"
+						}
+					]
+				},
+				"rejectUnauthorizedCertificate": {
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"key",
+				"cert",
+				"pfx",
+				"passphrase",
+				"requestClientCertificate",
+				"rejectUnauthorizedCertificate"
 			],
 			"additionalProperties": false
 		}

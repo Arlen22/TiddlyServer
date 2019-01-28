@@ -20,9 +20,13 @@ import {
 	serveFile,
 	ConvertSettings,
 	parseHostList,
+	testAddress,
+	SecureServerOptions,
+	loadSettings
 } from "./server-types";
 
 import * as http from 'http'
+import * as https from 'https'
 import * as fs from 'fs';
 import * as path from 'path';
 import * as url from 'url';
@@ -52,7 +56,7 @@ namespace ENV {
 
 var settings: ServerConfig;
 
-
+export { loadSettings };
 
 
 
@@ -66,63 +70,8 @@ import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 initServerTypes(eventer);
 initTiddlyServer(eventer);
 initSettings(eventer);
-
+eventer.on("settings", (set) => { settings = set });
 //emit settings to everyone (I know, this could be an observable)
-
-const assets = path.resolve(__dirname, '../assets');
-const favicon = path.resolve(__dirname, '../assets/favicon.ico');
-const stylesheet = path.resolve(__dirname, '../assets/directory.css');
-
-
-export function loadSettings(settingsFile: string) {
-
-
-	console.log("Settings file: %s", settingsFile);
-
-	const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
-
-	let settingsObj: ServerConfig = tryParseJSON<ServerConfig>(settingsString, (e) => {
-		console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
-		console.error(e.errorPosition);
-		throw "The settings file could not be parsed: Invalid JSON";
-	});
-
-	var schemaChecker = new ajv({ allErrors: true, async: false });
-	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
-	var validate = schemaChecker.compile(require("../settings.schema.json"));
-	var valid = validate(settingsObj, "settings");
-	var validationErrors = validate.errors;
-	if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
-
-	if (!settingsObj.tree) throw "tree is not specified in the settings file";
-	let routeKeys = Object.keys(routes);
-
-	normalizeSettings(settingsObj, settingsFile, routeKeys);
-
-	settingsObj.__assetsDir = assets;
-
-
-	if (typeof settingsObj.tree === "object") {
-		let keys: string[] = [];
-		if (settingsObj.tree.$element === "group") {
-			keys = settingsObj.tree.$children
-				.map(e => (e.$element === "group" || e.$element === "folder") && e.key)
-				.filter<string>((e): e is string => !!e)
-		} else if (settingsObj.tree.$element === "folder") {
-			keys = fs.readdirSync(settingsObj.tree.path, { encoding: "utf8" })
-		}
-		let routeKeys = Object.keys(routes);
-		let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
-		if (conflict.length) console.log(
-			"The following tree items are reserved for use by TiddlyServer: %s",
-			conflict.map(e => '"' + e + '"').join(', ')
-		);
-	}
-
-	return settingsObj;
-
-}
-
 
 
 // === Setup Logging
@@ -151,87 +100,191 @@ eventer.on('settingsChanged', (keys) => {
 const routes = {
 	'admin': state => handleAdminRoute(state),
 	'assets': state => handleAssetsRoute(state),
-	'favicon.ico': state => serveFile(state, 'favicon.ico', assets),
-	'directory.css': state => serveFile(state, 'directory.css', assets),
+	'favicon.ico': state => serveFile(state, 'favicon.ico', settings.__assetsDir),
+	'directory.css': state => serveFile(state, 'directory.css', settings.__assetsDir),
 };
+//we make it a separate line because typescript loses the const if I export
+export { routes };
 
-interface RequestEvent {
-	handled: boolean; //allows the preflighter to mark the request as handled
-	trusted: boolean; //allows the preflighter to upgrade the request to trusted
-	/** iface: the server listener type, host: the host header, addr: socket.localAddress */
+export interface RequestEvent {
+	/** 
+	 * Allows the preflighter to mark the request as handled, indicating it should not be processed further, 
+	 * in which case, the preflighter takes full responsibility for the request, including calling end or close. 
+	 * This is useful in case the preflighter wants to reject the request or initiate authentication, or wants to 
+	 * handle a request using some other routing module. Do not override the /assets path or certain static assets will not be available.
+	 */
+	handled: boolean;
+	/** auth account key to be applied to this request */
+	authAccountKey: string;
+	/** hostLevelPermissions key to be applied to this request */
+	hostLevelPermissionsKey: string;
+	/** 
+	 * @argument iface HTTP server "host" option for this request, 
+	 * @argument host the host header, 
+	 * @argument addr socket.localAddress 
+	 */
 	interface: { iface: string, host: string | undefined, addr: string };
-	request: http.IncomingMessage;
-	response: http.ServerResponse;
-}
 
-export function initServer(options: {
-	env: "electron" | "node",
-	preflighter?: (ev: RequestEvent) => Promise<RequestEvent>;
-	listenCB?(host: string, port: number, _disableLocalHost: boolean): void;
-	settings: ServerConfig;
+	request: http.IncomingMessage;
+}
+interface RequestEventHTTP extends RequestEvent { response: http.ServerResponse; }
+interface RequestEventWS extends RequestEvent { client: WebSocket; }
+
+/**
+ * Adds all the listeners required for tiddlyserver to operate. 
+ *
+ * @export
+ * @param {(https.Server | http.Server)} server The server instance to initialize
+ * @param {string} iface A marker string which is only used for certain debug messages and 
+ * is passed into the preflighter as `ev.iface`.
+ * @param {*} preflighter A preflighter function which may modify data about the request before
+ * it is handed off to the router for processing.
+ */
+export function addRequestHandlers(server: https.Server | http.Server, iface: string, preflighter) {
+	// const addListeners = () => {
+	let closing = false;
+
+	server.on('request', requestHandler(iface, preflighter));
+	server.on('listening', () => {
+		debug(1, "server %s listening", iface);
+	})
+	server.on('error', (err) => {
+		debug(4, "server %s error: %s", iface, err.message);
+		debug(4, "server %s stack: %s", iface, err.stack);
+		server.close();
+		eventer.emit('serverClose', iface);
+	})
+	server.on('close', () => {
+		if (!closing) eventer.emit('serverClose', iface);
+		debug(4, "server %s closed", iface);
+		closing = true;
+	});
+
+	const wss = new WebSocketServer({ server });
+	wss.on('connection', (client: WebSocket, request: http.IncomingMessage) => {
+		let host = request.headers.host;
+		let addr = request.socket.localAddress;
+		//check host level permissions and the preflighter
+		let ev: RequestEventWS = {
+			handled: false,
+			hostLevelPermissionsKey: "",
+			interface: { host, addr, iface },
+			authAccountKey: "",
+			request,
+			client
+		};
+		requestHandlerHostLevelChecks(ev, preflighter).then(ev2 => {
+			if (!ev2.handled) {
+				// we give the preflighter the option to handle the websocket on its own
+				if (settings.tiddlyserver.hostLevelPermissions[ev2.hostLevelPermissionsKey].websockets === false) client.close();
+				else eventer.emit('websocket-connection', client, request);
+			}
+		});
+	});
+	wss.on('error', (error) => {
+		debug(-2, 'WS-ERROR %s', inspect(error));
+	});
+
+}
+/**
+ * All this function does is create the servers and start listening. The settings object is emitted 
+ * on the eventer and addListeners is called to add the listeners to each server before 
+ * it is started. If another project wanted to provide its own server instances, it should 
+ * first emit the settings event with a valid settings object as the only argument, then call
+ * addListeners with each server instance, then call listen on each instance. 
+ *
+ * @export
+ * @param {<T extends RequestEvent>(ev: T) => Promise<T>} preflighter
+ * @param {(SecureServerOptions | ((host: string) => https.ServerOptions)) | undefined} settingshttps
+ * Either an object containing the settings.server.https from settings.json or a function that
+ * takes the host string and returns an https.createServer options object. Undefined if not using https.
+ * @returns
+ */
+export function initServer({ preflighter, settingshttps }: {
+	// env: "electron" | "node",
+	preflighter: <T extends RequestEvent>(ev: T) => Promise<T>,
+	// listenCB: (host: string, port: number) => void,
+	settingshttps: SecureServerOptions | ((host: string) => https.ServerOptions) | undefined
 }) {
-	settings = options.settings;
-	const { preflighter, env, listenCB } = options;
-	eventer.emit('settings', settings);
+	// settings = options.settings;
+	if (!settings) throw "The settings object must be emitted on eventer before starting the server";
+	// const { preflighter, env, listenCB, settingshttps } = options;
+	// eventer.emit('settings', settings);
 	const hosts: string[] = [];
 	const bindWildcard = settings.server.bindWildcard;
-	//always match localhost
 	const tester = parseHostList([...settings.server.bindAddress, "-127.0.0.0/8"])
 	const localhostTester = parseHostList(["127.0.0.0/8"]);
-	const addListeners = (server: http.Server, iface: string) => {
-		let closing = false;
-		if (bindWildcard && settings.server.filterBindAddress) server.on('connection', (socket) => {
-			if (!tester(socket.localAddress).usable && !localhostTester(socket.localAddress).usable) socket.end();
-		})
-		server.on('request', requestHandler(iface, preflighter));
-		server.on('listening', () => {
-			debug(1, "server %s listening", iface);
-		})
-		server.on('error', (err) => {
-			debug(4, "server %s error: %s", iface, err.message);
-			debug(4, "server %s stack: %s", iface, err.stack);
-			server.close();
-			eventer.emit('serverClose', iface);
-		})
-		server.on('close', () => {
-			if (!closing) eventer.emit('serverClose', iface);
-			debug(4, "server %s closed", iface);
-			closing = true;
-		});
 
-		const wss = new WebSocketServer({ server });
-		wss.on('connection', (client: WebSocket, request: http.IncomingMessage) => {
-			eventer.emit('websocket-connection', client, request);
-		});
-		wss.on('error', (error) => {
-			debug(-2, 'WS-ERROR %s', inspect(error));
-		});
-	}
 
 	if (bindWildcard) {
+		//bind to everything and filter elsewhere if needed
 		hosts.push('0.0.0.0');
 		if (settings.server.enableIPv6) hosts.push('::');
 	} else if (settings.server.filterBindAddress) {
+		//bind to all interfaces that match the specified addresses
 		let ifaces = networkInterfaces();
 		let addresses = Object.keys(ifaces)
 			.reduce((n, k) => n.concat(ifaces[k]), [] as NetworkInterfaceInfo[])
-			.filter(e => (settings.server.enableIPv6 || e.family === "IPv4") && tester(e.address).usable)
+			.filter(e => settings.server.enableIPv6 || e.family === "IPv4" && tester(e.address).usable)
 			.map(e => e.address);
 		hosts.push(...addresses);
 	} else {
+		//bind to all specified addresses
 		hosts.push(...settings.server.bindAddress);
 	}
 	if (settings.server._bindLocalhost) hosts.push('localhost');
-	let servers: http.Server[] = [];
+	if (hosts.length === 0) {
+		let { filterBindAddress, bindAddress, bindWildcard, _bindLocalhost, enableIPv6 } = settings.server;
+		console.log(`"No IP addresses will be listened on. This is probably a mistake.
+bindWildcard is ${(bindWildcard ? "true" : "false")}
+filterBindAddress is ${filterBindAddress ? "true" : "false"}
+_bindLocalhost is ${_bindLocalhost ? "true" : "false"}
+enableIPv6 is ${enableIPv6 ? "true" : "false"}
+bindAddress is ${JSON.stringify(bindAddress, null, 2)}
+`);
+	}
+	let servers: (http.Server | https.Server)[] = [];
 	Observable.from(hosts).concatMap(host => {
-		let server = http.createServer();
-		addListeners(server, host);
+		let server;
+		if (typeof settingshttps === "function") {
+			server = https.createServer(settingshttps(host));
+		} else if (settingshttps) {
+			const httpsOptions: https.ServerOptions = {};
+			let { requestClientCertificate, rejectUnauthorizedCertificate, key, cert, pfx } = settingshttps;
+			if (requestClientCertificate) {
+				if (typeof requestClientCertificate === "object")
+					httpsOptions.ca = requestClientCertificate;
+				httpsOptions.requestCert = !!requestClientCertificate;
+				httpsOptions.rejectUnauthorized = !!rejectUnauthorizedCertificate;
+			}
+			if ((!key || !cert) && !pfx) throw "key+cert or pfx are required in `settings.server.https` for https to work correctly";
+			//just use both if provided and let node sort it out
+			if (key && cert) {
+				httpsOptions.key = key && key.map(({ buff, passphrase }) => passphrase ? { pem: buff, passphrase } : buff);
+				httpsOptions.cert = cert && cert.map(({ buff }) => buff)
+			}
+			if (pfx) {
+				httpsOptions.pfx = pfx && pfx.map(({ buff, passphrase }) => passphrase ? { buf: buff, passphrase } : buff);
+			}
+			httpsOptions.passphrase = settingshttps.passphrase;
+
+			server = https.createServer(httpsOptions);
+		} else {
+			server = http.createServer();
+		}
+
+		// let server = settingshttps ? https.createServer(httpsOptions) : http.createServer();
+		addRequestHandlers(server, host, preflighter);
+		//this one we add here because it is related to the host property rather than just listening
+		if (bindWildcard && settings.server.filterBindAddress) server.on('connection', (socket) => {
+			if (!tester(socket.localAddress).usable && !localhostTester(socket.localAddress).usable) socket.end();
+		})
 		servers.push(server);
 		return new Observable(subs => {
 			server.listen(settings.server.port, host, undefined, () => { subs.complete(); });
 		})
 	}).subscribe(item => { }, x => { }, () => {
-		eventer.emit("serverOpen", servers, hosts, false);
+		eventer.emit("serverOpen", servers, hosts, !!settingshttps);
 		let ifaces = networkInterfaces();
 		console.log('Open your browser and type in one of the following:\n' +
 			(settings.server.bindWildcard
@@ -250,26 +303,77 @@ export function initServer(options: {
 
 	return eventer;
 }
-function requestHandler(iface: string, preflighter?: (ev: RequestEvent) => Promise<RequestEvent>) {
+/** 
+ * handles all checks that apply to the entire server, including 
+ *  - auth accounts key
+ *  - host level permissions key (based on socket.localAddress)
+ */
+function requestHandlerHostLevelChecks<T extends RequestEvent>(
+	ev: T,
+	preflighter?: (ev: T) => Promise<T>
+) {
+	//connections to the wrong IP address are already filtered out by the connection event listener on the server.
+	//determine hostLevelPermissions to be applied
+	let localAddress = ev.request.socket.localAddress;
+	let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
+	let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
+	let matches = parseHostList(keys)(localAddress);
+	if (isLocalhost) {
+		ev.hostLevelPermissionsKey = "localhost";
+	} else if (matches.lastMatch > -1) {
+		ev.hostLevelPermissionsKey = keys[matches.lastMatch];
+	} else {
+		ev.hostLevelPermissionsKey = "*";
+	}
+	//determine authAccount to be applied
+	let basicAuth = ((request) => {
+		const first = (header?: string | string[]) =>
+			Array.isArray(header) ? header[0] : header;
+		var header = first(request.headers['authorization']) || '',  // get the header
+			token = header.split(/\s+/).pop() || '',                   // and the encoded auth token
+			auth = new Buffer(token, 'base64').toString(),             // convert from base64
+			parts = auth.split(/:/),                                   // split on colon
+			username = parts[0],
+			password = parts[1];
+		if (username && password) debug(-3, "Basic Auth recieved");
+		return { username, password };
+	})(ev.request);
+	let cookies = ((request) => {
+		if (!request.headers.cookie) return;
+		var list = {}, rc = request.headers.cookie as string;
+		rc.split(';').forEach(function (cookie) {
+			var parts = cookie.split('=');
+			list[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
+		});
+		return list;
+	})(ev.request);
+	let clientCert = ((request) => {
+		request
+	})(ev.request);
+	//send the data to the preflighter
+	return preflighter ? preflighter(ev) : Promise.resolve(ev);
+}
+function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => Promise<RequestEventHTTP>) {
 	return (request: http.IncomingMessage, response: http.ServerResponse) => {
 		let host = request.headers.host;
 		let addr = request.socket.localAddress;
 		// console.log(host, addr, request.socket.address().address);
 		//send the request and response to morgan
 		log(request, response).then(() => {
-			const ev = {
+			const ev: RequestEventHTTP = {
 				handled: false,
-				trusted: false,
+				hostLevelPermissionsKey: "",
+				authAccountKey: "",
 				interface: { host, addr, iface },
 				request, response
 			};
 			//send it to the preflighter
-			return preflighter ? preflighter(ev) : Promise.resolve(ev);
+			return requestHandlerHostLevelChecks(ev, preflighter);
 		}).then(ev => {
 			// check if the preflighter handled it
 			if (ev.handled) return;
 			//create the state object
-			const state = new StateObject(ev.request, ev.response, debug, eventer);
+			const state = new StateObject(ev.request, ev.response, debug, eventer, ev.hostLevelPermissionsKey, ev.authAccountKey);
 			//handle basic auth
 			// if (!handleBasicAuth(state)) return;
 			//check for static routes
@@ -301,8 +405,8 @@ eventer.on("stateDebug", (state) => {
 
 function handleAssetsRoute(state: StateObject) {
 	switch (state.path[2]) {
-		case "static": serveFolder(state, '/assets/static', path.join(assets, "static")); break;
-		case "icons": serveFolder(state, '/assets/icons', path.join(assets, "icons")); break;
+		case "static": serveFolder(state, '/assets/static', path.join(settings.__assetsDir, "static")); break;
+		case "icons": serveFolder(state, '/assets/icons', path.join(settings.__assetsDir, "icons")); break;
 		case "tiddlywiki": handleTiddlyWikiRoute(state); break;
 		default: state.throw(404);
 	}
@@ -317,7 +421,7 @@ function handleAdminRoute(state: StateObject) {
 
 
 
-function handleBasicAuth(state: StateObject): boolean {
+function handleBasicAuth(state: StateObject, settings: { username: string, password: string }): boolean {
 	//check authentication and do sanity/security checks
 	//https://github.com/hueniverse/iron
 	//auth headers =====================

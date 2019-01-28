@@ -13,8 +13,8 @@ let newSettings = ConvertSettings(oldSettings);
 newSettings = JSON.parse(JSON.stringify(newSettings));
 newSettings = NewDefaultSettings(newSettings);
 //override some settings during the upgrade
-newSettings.tiddlyserver.useTW5path = true;
-
+// newSettings.tiddlyserver.useTW5path = true;
+console.log("useTW5path is now set to true")
 
 function convertTree(tree) {
 	if (typeof tree === "string") {
