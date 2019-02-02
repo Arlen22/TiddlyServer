@@ -11,19 +11,24 @@ const settingsFile = path.normalize(
 		? path.resolve(args.shift())
 		: path.join(__dirname, './settings.json')
 );
+const settingsPath = path.dirname(settingsFile);
 
 const server = require('./src/server');
-const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
-// console.log(settings);
-server.eventer.emit("settings", settings);
-server.initServer({
-	// env: "node",
-	settingshttps,
-	preflighter: fs.existsSync(__dirname + "/preflighter.js")
-		//@ts-ignore
-		? require("./preflighter.js")
-		: undefined
-});
+server.libsReady.then(() => {
+	const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
+	// console.log(settings);
+	server.eventer.emit("settings", settings);
+	let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;
+
+	server.initServer({
+		// env: "node",
+		settingshttps: httpsSettingsFile && require(httpsSettingsFile),
+		preflighter: fs.existsSync(__dirname + "/preflighter.js")
+			//@ts-ignore
+			? require("./preflighter.js")
+			: undefined
+	});
+})
 
 process.on('uncaughtException', err => {
 	process.exitCode = 1;

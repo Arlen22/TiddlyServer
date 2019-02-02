@@ -4,7 +4,7 @@ import {
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
 	sendDirectoryIndex, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData,
-	ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup, NewTreePath, NewTreeItem, NewTreeGroup
+	ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup, NewTreePath, NewTreeItem, NewTreeGroup, NewTreePathOptions_Auth, StandardResponseHeaders
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -28,6 +28,7 @@ import { AnonymousSubscription } from "rxjs/Subscription";
 
 import { send, formidable } from '../lib/bundled-lib';
 import { Stats } from "fs";
+import { last } from "rxjs/operator/last";
 
 const debug = DebugLogger("SER-API");
 __dirname = path.dirname(module.filename || process.execPath);
@@ -59,8 +60,15 @@ export function init(eventer: ServerEventEmitter) {
 }
 
 type apiListRouteState = [[string, string], string | any, StateObject]
-export function handleRouteAuthentication(state: StateObject, route: (NewTreePath | NewTreeGroup)[]){
-	
+export function checkRouteAllowed(state: StateObject, result: PathResolverResult) {
+	type CC = (NewTreeGroup["$children"][0] | NewTreePath["$children"][0]);
+	let lastAuth: NewTreePathOptions_Auth | undefined;
+	result.ancestry.concat(result.item).forEach((e) => {
+		lastAuth = Array.isArray(e.$children)
+			&& (e.$children as CC[]).find((f): f is NewTreePathOptions_Auth => f.$element === "auth")
+			|| lastAuth;
+	});
+	return !lastAuth || lastAuth.authList.indexOf(state.authAccountsKey) !== -1;
 }
 export function handleTiddlyServerRoute(state: StateObject) {
 
@@ -69,8 +77,10 @@ export function handleTiddlyServerRoute(state: StateObject) {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
 		if (!result) return state.throw<never>(404);
 		//handle route authentication
-		handleRouteAuthentication(state, result.ancestry.concat(result.item));
-		console.log(result.ancestry, result.reqpath.length);
+		if (!checkRouteAllowed(state, result)) {
+			return state.throw<never>(403);
+		}
+		// console.log(result.ancestry, result.reqpath.length);
 		if (isNewTreeGroup(result.item)) {
 			serveDirectoryIndex(result, state);
 			return Observable.empty<never>();
@@ -137,7 +147,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 			.map(e => [e, options] as [typeof e, typeof options])
 			.concatMap(sendDirectoryIndex)
 			.subscribe(res => {
-				state.respond(200, "", { 'content-type': 'text/html', 'content-encoding': 'utf-8' })
+				state.respond(200, "", { 'Content-Type': 'text/html', "Content-Encoding": 'utf-8' })
 					.buffer(Buffer.from(res, "utf8"));
 			});
 	} else if (state.req.method === "POST") {
