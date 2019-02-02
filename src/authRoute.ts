@@ -109,18 +109,19 @@ export function handleAuthRoute(state: StateObject) {
 		state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", "", false, 0));
 	}
 	/* Create cookie for authentication. Can only be secured with HTTPS, otherwise anyone can "borrow" it */{
-		const { crypto_generichash_BYTES, crypto_sign_keypair, crypto_sign, crypto_sign_open, crypto_generichash } = libsodium;
+		const { crypto_generichash_BYTES, crypto_sign_keypair, crypto_sign_detached, crypto_sign_verify_detached, crypto_generichash, from_base64 } = libsodium;
 		let keys = crypto_sign_keypair("uint8array");
 		// Never use the public key included in a message to check its signature.
 		let publicHash = crypto_generichash(crypto_generichash_BYTES, keys.publicKey, undefined, "base64");
-		let message = JSON.stringify({ username: "hello world", timestamp: new Date().toISOString(), publicKey: publicHash });
-		let signed = crypto_sign(message, keys.privateKey, "base64");
+		let cookie = ["key", "my username", new Date().toISOString(), publicHash];
+		let signed = crypto_sign_detached(cookie[0] + cookie[1] + cookie[2], keys.privateKey, "base64");
+		cookie.push(signed);
 		let request = {
-			setCookie: signed,
+			setCookie: JSON.stringify(signed),
 			publicKey: keys.publicKey
 		}
 		//check the cookie on the server to make sure it is valid
-		let valid = crypto_sign_open(signed, keys.publicKey, "text");
+		let valid = crypto_sign_verify_detached(from_base64(signed), cookie[0] + cookie[1] + cookie[2], keys.publicKey);
 	}
 
 	/* create secure channel for transferring private key */{
@@ -131,9 +132,9 @@ export function handleAuthRoute(state: StateObject) {
 
 		let senderKeys = crypto_kx_keypair("uint8array");
 		let senderPublicKey = to_base64(senderKeys.publicKey);
-		
+
 		//exchange the public keys here
-		
+
 		let clientSession = crypto_kx_client_session_keys(clientKeys.publicKey, clientKeys.privateKey, from_base64(senderPublicKey), "uint8array");
 		let clientCheck = libsodium.crypto_generichash(
 			Math.max(libsodium.crypto_generichash_BYTES_MIN, 8),
@@ -151,7 +152,7 @@ export function handleAuthRoute(state: StateObject) {
 		);
 
 		// compare the two checks, they should be exactly the same
-		if(senderCheck !== clientCheck) throw "aghhhh!! someone messed with our key!!";
+		if (senderCheck !== clientCheck) throw "aghhhh!! someone messed with our key!!";
 
 		//encrypt the auth key on the sender
 		let nonce = randombytes_buf(16);
