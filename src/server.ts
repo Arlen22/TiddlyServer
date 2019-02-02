@@ -1,6 +1,6 @@
 
 
-import { send, ws, ajv } from '../lib/bundled-lib';
+import { send, ws as WebSocket, ajv, libsodium } from '../lib/bundled-lib';
 const sendOptions = {};
 
 
@@ -22,7 +22,8 @@ import {
 	parseHostList,
 	testAddress,
 	SecureServerOptions,
-	loadSettings
+	loadSettings,
+	NodePromise
 } from "./server-types";
 
 import * as http from 'http'
@@ -33,12 +34,12 @@ import * as url from 'url';
 import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 import * as ipcalc from './ipcalc';
-
+import * as x509 from "@fidm/x509";
 // import { parse as jsonParse } from 'jsonlint';
 
 // import send = require('../lib/send-lib');
 
-const { Server: WebSocketServer } = ws;
+const { Server: WebSocketServer } = WebSocket;
 
 __dirname = path.dirname(module.filename || process.execPath);
 
@@ -58,19 +59,20 @@ var settings: ServerConfig;
 
 export { loadSettings };
 
-
-
 //import and init api-access
 import { handleTiddlyServerRoute, init as initTiddlyServer, handleTiddlyWikiRoute } from './tiddlyserver';
-import { handleSettings, initSettings } from './settingsPage';
+// import { handleSettings, initSettings } from './settingsPage';
+import { handleAuthRoute, initAuthRoute } from "./authRoute";
 
 import { ServerResponse } from 'http';
 import { networkInterfaces, NetworkInterfaceInfo } from 'os';
+import { TLSSocket } from 'tls';
 
 initServerTypes(eventer);
 initTiddlyServer(eventer);
-initSettings(eventer);
-eventer.on("settings", (set) => { settings = set });
+initAuthRoute(eventer);
+// initSettings(eventer);
+// eventer.on("settings", (set) => { settings = set });
 //emit settings to everyone (I know, this could be an observable)
 
 
@@ -90,7 +92,55 @@ function setLog() {
 		});
 }
 let log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<{}>;
-eventer.on('settings', () => { log = setLog(); });
+
+//setup auth checkers
+let checkCookieAuth: (request: http.IncomingMessage) => string;
+/**
+Authentication could be done several ways, but the most convenient and secure method is 
+probably to specify a public key instead of a certificate, and then use that public key
+to verify the signiture of the cookie. The cookie would consist of two parts, the first 
+being an info packet containing the desired username and the key fingerprint, the 
+second being the signature of the first using the private key. The info packet should also 
+contain the signature time and should probably be sent to the server in a post request so 
+the server can set it as an HTTP only cookie. Directory Index would display the current user
+info so the user can logout if desired. Data folders would be given the username from the 
+cookie with the request. The private key could be pasted in during login and stored using 
+crypto.subtle. 
+ */
+const setAuth = () => {
+	let ca: Record<string, x509.Certificate[]> = {};
+	let up: [string, string, string][] = [] as any;
+	let prom = Promise.all(Object.keys(settings.authAccounts).map(k => {
+		let cred = settings.authAccounts[k].credentials;
+		if (cred.type === "clientKey") {
+			return Promise.all(cred.certificateAuthority.map(e => NodePromise<Buffer>(cb => fs.readFile(e, cb))))
+				.then(res => res.reduce((n, e) => n.concat(x509.Certificate.fromPEMs(e)), [] as x509.Certificate[]))
+				.then(certs => { ca[k] = certs });
+		} else if (cred.type === "password") {
+			up.push([k, cred.username, cred.password]);
+			return Promise.resolve();
+		} else return Promise.resolve();
+	}));
+
+	checkCookieAuth = (request: http.IncomingMessage) => {
+		if (!request.headers.cookie) return "";
+		var cookies = {}, rc = request.headers.cookie as string;
+		rc.split(';').forEach(function (cookie) {
+			var parts = cookie.split('=');
+			cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
+		});
+		let auth = cookies["TiddlyServerAuth"];
+		if (!auth) return "";
+		else return "";
+	};
+
+}
+
+eventer.on('settings', (set) => {
+	settings = set;
+	log = setLog();
+	setAuth();
+});
 eventer.on('settingsChanged', (keys) => {
 	// let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];
 	// if (watch.some(e => keys.indexOf(e) > -1)) log = setLog();
@@ -103,8 +153,10 @@ const routes = {
 	'favicon.ico': state => serveFile(state, 'favicon.ico', settings.__assetsDir),
 	'directory.css': state => serveFile(state, 'directory.css', settings.__assetsDir),
 };
+const libsReady = Promise.all([libsodium.ready]);
+
 //we make it a separate line because typescript loses the const if I export
-export { routes };
+export { routes, libsReady };
 
 export interface RequestEvent {
 	/** 
@@ -200,11 +252,11 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
  * takes the host string and returns an https.createServer options object. Undefined if not using https.
  * @returns
  */
-export function initServer({ preflighter, settingshttps }: {
+export async function initServer({ preflighter, settingshttps }: {
 	// env: "electron" | "node",
 	preflighter: <T extends RequestEvent>(ev: T) => Promise<T>,
 	// listenCB: (host: string, port: number) => void,
-	settingshttps: SecureServerOptions | ((host: string) => https.ServerOptions) | undefined
+	settingshttps: ((host: string) => https.ServerOptions) | undefined
 }) {
 	// settings = options.settings;
 	if (!settings) throw "The settings object must be emitted on eventer before starting the server";
@@ -215,6 +267,7 @@ export function initServer({ preflighter, settingshttps }: {
 	const tester = parseHostList([...settings.server.bindAddress, "-127.0.0.0/8"])
 	const localhostTester = parseHostList(["127.0.0.0/8"]);
 
+	await libsodium.ready;
 
 	if (bindWildcard) {
 		//bind to everything and filter elsewhere if needed
@@ -247,28 +300,13 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 	Observable.from(hosts).concatMap(host => {
 		let server;
 		if (typeof settingshttps === "function") {
-			server = https.createServer(settingshttps(host));
-		} else if (settingshttps) {
-			const httpsOptions: https.ServerOptions = {};
-			let { requestClientCertificate, rejectUnauthorizedCertificate, key, cert, pfx } = settingshttps;
-			if (requestClientCertificate) {
-				if (typeof requestClientCertificate === "object")
-					httpsOptions.ca = requestClientCertificate;
-				httpsOptions.requestCert = !!requestClientCertificate;
-				httpsOptions.rejectUnauthorized = !!rejectUnauthorizedCertificate;
+			try {
+				server = https.createServer(settingshttps(host));
+			} catch (e) {
+				console.log("settingshttps function threw for host " + host);
+				console.log(e);
+				throw e;
 			}
-			if ((!key || !cert) && !pfx) throw "key+cert or pfx are required in `settings.server.https` for https to work correctly";
-			//just use both if provided and let node sort it out
-			if (key && cert) {
-				httpsOptions.key = key && key.map(({ buff, passphrase }) => passphrase ? { pem: buff, passphrase } : buff);
-				httpsOptions.cert = cert && cert.map(({ buff }) => buff)
-			}
-			if (pfx) {
-				httpsOptions.pfx = pfx && pfx.map(({ buff, passphrase }) => passphrase ? { buf: buff, passphrase } : buff);
-			}
-			httpsOptions.passphrase = settingshttps.passphrase;
-
-			server = https.createServer(httpsOptions);
 		} else {
 			server = http.createServer();
 		}
@@ -283,7 +321,10 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 		return new Observable(subs => {
 			server.listen(settings.server.port, host, undefined, () => { subs.complete(); });
 		})
-	}).subscribe(item => { }, x => { }, () => {
+	}).subscribe(item => { }, x => {
+		console.log("Error thrown while starting server");
+		console.log(x);
+	}, () => {
 		eventer.emit("serverOpen", servers, hosts, !!settingshttps);
 		let ifaces = networkInterfaces();
 		console.log('Open your browser and type in one of the following:\n' +
@@ -325,31 +366,10 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	} else {
 		ev.hostLevelPermissionsKey = "*";
 	}
-	//determine authAccount to be applied
-	let basicAuth = ((request) => {
-		const first = (header?: string | string[]) =>
-			Array.isArray(header) ? header[0] : header;
-		var header = first(request.headers['authorization']) || '',  // get the header
-			token = header.split(/\s+/).pop() || '',                   // and the encoded auth token
-			auth = new Buffer(token, 'base64').toString(),             // convert from base64
-			parts = auth.split(/:/),                                   // split on colon
-			username = parts[0],
-			password = parts[1];
-		if (username && password) debug(-3, "Basic Auth recieved");
-		return { username, password };
-	})(ev.request);
-	let cookies = ((request) => {
-		if (!request.headers.cookie) return;
-		var list = {}, rc = request.headers.cookie as string;
-		rc.split(';').forEach(function (cookie) {
-			var parts = cookie.split('=');
-			list[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
-		});
-		return list;
-	})(ev.request);
-	let clientCert = ((request) => {
-		request
-	})(ev.request);
+
+	ev.authAccountKey = checkCookieAuth(ev.request);
+
+
 	//send the data to the preflighter
 	return preflighter ? preflighter(ev) : Promise.resolve(ev);
 }
@@ -414,12 +434,26 @@ function handleAssetsRoute(state: StateObject) {
 
 function handleAdminRoute(state: StateObject) {
 	switch (state.path[2]) {
-		case "settings": handleSettings(state); break;
+		// case "settings": handleSettings(state); break;
+		case "authenticate": handleAuthRoute(state); break;
 		default: state.throw(404);
 	}
 }
 
-
+// function checkBasicAuth(request: http.IncomingMessage): string {
+// 	//determine authAccount to be applied
+// 	const first = (header?: string | string[]) =>
+// 		Array.isArray(header) ? header[0] : header;
+// 	var header = first(request.headers['authorization']) || '',  // get the header
+// 		token = header.split(/\s+/).pop() || '',                   // and the encoded auth token
+// 		auth = new Buffer(token, 'base64').toString(),             // convert from base64
+// 		parts = auth.split(/:/),                                   // split on colon
+// 		username = parts[0],
+// 		password = parts[1];
+// 	if (username && password) debug(-3, "Basic Auth recieved");
+// 	throw "DEV ERROR: we didn't check if the basic auth is valid";
+// 	return username;
+// }
 
 function handleBasicAuth(state: StateObject, settings: { username: string, password: string }): boolean {
 	//check authentication and do sanity/security checks

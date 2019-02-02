@@ -7,7 +7,7 @@ import { format } from "util";
 import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
-import { send, ajv } from '../lib/bundled-lib';
+import { send, ajv, ws as WebSocket } from '../lib/bundled-lib';
 import { Stats, appendFileSync } from 'fs';
 import { gzip } from 'zlib';
 import { Writable, Stream } from 'stream';
@@ -161,7 +161,8 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 			hostLevelPermissions: {
 				"localhost": set.allowLocalhost,
 				"*": set.allowNetwork
-			}
+			},
+			authCookieAge: 2592000
 		},
 		authAccounts: {},
 		directoryIndex: {
@@ -177,70 +178,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 		$schema: "./settings.schema.json"
 	}
 }
-export function NewDefaultSettings(set: ServerConfig) {
-	type T = ServerConfig;
-	type T1 = T["server"];
-	type T2 = T["tiddlyserver"];
-	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
-	let newset = {
-		__dirname: "",
-		__filename: "",
-		__assetsDir: "",
-		tree: set.tree,
-		server: Object.assign<T["server"], T["server"]>({
-			bindAddress: [],
-			bindWildcard: true,
-			enableIPv6: false,
-			filterBindAddress: false,
-			port: 8080,
-			debugLevel: 0,
-			logAccess: "",
-			logError: "",
-			logColorsToFile: false,
-			logToConsoleAlso: true,
-			_bindLocalhost: false,
-			_devmode: false,
-			https: false
-		}, set.server),
-		authAccounts: set.authAccounts || {},
-		tiddlyserver: Object.assign<T["tiddlyserver"], T["tiddlyserver"]>({
-			etag: "",
-			etagWindow: 3,
-			hostLevelPermissions: {}
-		}, set.tiddlyserver),
-		directoryIndex: Object.assign<T["directoryIndex"], any>({
-			defaultType: "html",
-			icons: { "htmlfile": ["htm", "html"] },
-			mixFolders: true
-		}, set.directoryIndex),
-		EXPERIMENTAL_clientside_datafolders: Object.assign<T["EXPERIMENTAL_clientside_datafolders"], any>({
-			enabled: false,
-			alwaysRefreshCache: true,
-			maxAge_tw_plugins: 0
-		}, set.EXPERIMENTAL_clientside_datafolders),
-		$schema: "./settings.schema.json"
-	}
-	// set second level object defaults
-	newset.tiddlyserver.hostLevelPermissions = Object.assign<T["tiddlyserver"]["hostLevelPermissions"], any>({
-		"localhost": {
-			writeErrors: true,
-			mkdir: true,
-			upload: true,
-			settings: true,
-			WARNING_all_settings_WARNING: false,
-			websockets: true
-		},
-		"*": {
-			writeErrors: true,
-			mkdir: false,
-			upload: false,
-			settings: false,
-			WARNING_all_settings_WARNING: false,
-			websockets: true
-		}
-	}, set.tiddlyserver && set.tiddlyserver.hostLevelPermissions);
-	return newset;
-}
+
 export interface OldServerConfigSchema extends OldServerConfigBase {
 	tree: NewTreeObjectSchemaItem
 }
@@ -299,57 +237,128 @@ export function normalizeTree(settingsDir: string, item: NewTreeObjectSchemaItem
 		return item;
 	}
 }
-export function normalizeSettings(set: ServerConfig, settingsFile) {
+export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
+	if (typeof tree === "string" && tree.endsWith(".xml")) {
+		//read the xml file and parse it as the tree structure
+
+	} else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
+		//require the json or js file and use it directly
+		let filepath = path.resolve(settingsDir, tree);
+		return normalizeTree(path.dirname(filepath), require(filepath), "tree", []) as any;
+	} else {
+		//otherwise just assume we're using the value itself
+		return normalizeTree(settingsDir, tree, "tree", []) as any;
+	}
+}
+export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
+	if (!auth) return {};
+	let newAuth: ServerConfig["authAccounts"] = {};
+	Object.keys(auth).forEach(k => {
+		let key = k;
+		auth[key].credentials;
+		let perm: ServerConfig_AccessOptions = (auth[k].permissions || {}) as any;
+		while (auth[key].inheritPermissions) {
+			key = auth[key].inheritPermissions as string;
+			perm = { ...(auth[key].permissions || {}), ...perm }
+		}
+		return perm;
+	});
+	return newAuth;
+}
+export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 	const settingsDir = path.dirname(settingsFile);
 
-	set = NewDefaultSettings(set);
-	((tree: ServerConfigSchema["tree"]) => {
-		if (typeof tree === "string" && tree.endsWith(".xml")) {
-			//read the xml file and parse it as the tree structure
+	type T = ServerConfig;
+	type T1 = T["server"];
+	type T2 = T["tiddlyserver"];
+	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
+	let newset: ServerConfig = {
+		__dirname: "",
+		__filename: "",
+		__assetsDir: "",
+		tree: normalizeSettingsTree(settingsDir, set.tree),
+		server: {
+			...{
+				bindAddress: [],
+				bindWildcard: true,
+				enableIPv6: false,
+				filterBindAddress: false,
+				port: 8080,
+				debugLevel: 0,
+				logAccess: "",
+				logError: "",
+				logColorsToFile: false,
+				logToConsoleAlso: true,
+				_bindLocalhost: false,
+				_devmode: false,
+				https: false
+			},
+			...set.server,
+			...{
+				https: !!set.server.https
+			}
+		},
+		authAccounts: normalizeSettingsAuthAccounts(set.authAccounts),
+		tiddlyserver: {
+			...{
+				etag: "",
+				etagWindow: 3,
+				hostLevelPermissions: {},
+				authCookieAge: 2592000
+			},
+			...set.tiddlyserver
+		},
+		directoryIndex: {
+			...{
+				defaultType: "html",
+				icons: { "htmlfile": ["htm", "html"] },
+				mixFolders: true
+			},
+			...set.directoryIndex
+		},
+		EXPERIMENTAL_clientside_datafolders: {
+			...{
+				enabled: false,
+				alwaysRefreshCache: true,
+				maxAge_tw_plugins: 0
+			},
+			...set.EXPERIMENTAL_clientside_datafolders
+		},
+		$schema: "./settings.schema.json"
+	}
+	// set second level object defaults
+	newset.tiddlyserver.hostLevelPermissions = {
+		...{
+			"localhost": {
+				writeErrors: true,
+				mkdir: true,
+				upload: true,
+				settings: true,
+				WARNING_all_settings_WARNING: false,
+				websockets: true
+			},
+			"*": {
+				writeErrors: true,
+				mkdir: false,
+				upload: false,
+				settings: false,
+				WARNING_all_settings_WARNING: false,
+				websockets: true
+			}
+		},
+		...set.tiddlyserver && set.tiddlyserver.hostLevelPermissions
+	};
 
-		} else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
-			//require the json or js file and use it directly
-			let filepath = path.resolve(settingsDir, tree);
-			set.tree = normalizeTree(path.dirname(filepath), require(filepath), "tree", []) as any;
-		} else {
-			//otherwise just assume we're using the value itself
-			set.tree = normalizeTree(settingsDir, tree, "tree", []) as any;
-		}
-	})(set.tree as any);
-	set.server.https = ((https: SecureServerOptionsSchema | string): SecureServerOptions | undefined => {
-		if (!https)
-			return undefined;
-		else if (typeof https === "string")
-			return require(https) as SecureServerOptions;
-		else {
-			const mapkey = (e): SecureServerOptions["key"][0] => {
-				let passphrase = typeof e === "string" ? "" : e.passphrase, filepath = typeof e === "string" ? e : e.path;
-				return {
-					buff: fs.readFileSync(path.resolve(settingsDir, filepath)), passphrase, path: path.resolve(settingsDir, filepath)
-				}
-			};
-			const mapcert = (e): SecureServerOptions["cert"][0] => ({
-				buff: fs.readFileSync(path.resolve(settingsDir, e)), path: path.resolve(settingsDir, e)
-			});
-			return {
-				key: https.key.map(mapkey),
-				cert: https.cert.map(mapcert),
-				pfx: https.cert.map(mapkey),
-				passphrase: https.passphrase,
-				rejectUnauthorizedCertificate: https.rejectUnauthorizedCertificate,
-				requestClientCertificate: https.requestClientCertificate
-			};
-		}
-	})(set.server.https as any) as any;
 
-	if (set.tiddlyserver.backupDirectory) set.tiddlyserver.backupDirectory = path.resolve(settingsDir, set.tiddlyserver.backupDirectory);
-	if (set.server.logAccess) set.server.logAccess = path.resolve(settingsDir, set.server.logAccess);
-	if (set.server.logError) set.server.logError = path.resolve(settingsDir, set.server.logError);
 
-	set.__dirname = settingsDir;
-	set.__filename = settingsFile;
+	if (newset.tiddlyserver.backupDirectory) newset.tiddlyserver.backupDirectory = path.resolve(settingsDir, newset.tiddlyserver.backupDirectory);
+	if (newset.server.logAccess) newset.server.logAccess = path.resolve(settingsDir, newset.server.logAccess);
+	if (newset.server.logError) newset.server.logError = path.resolve(settingsDir, newset.server.logError);
 
-	if (set.tiddlyserver.etag === "disabled" && !set.tiddlyserver.backupDirectory) {
+	newset.__dirname = settingsDir;
+	newset.__filename = settingsFile;
+
+	if (newset.tiddlyserver.etag === "disabled" && !newset.tiddlyserver.backupDirectory) {
 		console.log("Etag checking is disabled, but a backup folder is not set. "
 			+ "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
 			+ "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
@@ -357,7 +366,7 @@ export function normalizeSettings(set: ServerConfig, settingsFile) {
 			+ "also set the etagWindow setting to allow files to be modified if not newer than "
 			+ "so many seconds from the copy being saved.");
 	}
-	return set;
+	return newset;
 }
 
 
@@ -373,25 +382,25 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 
 	const settingsString = fs.readFileSync(settingsFile, 'utf8').replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
 
-	let settingsObj: ServerConfig = tryParseJSON<ServerConfig>(settingsString, (e) => {
+	let settingsObjSource: ServerConfigSchema = tryParseJSON<ServerConfigSchema>(settingsString, (e) => {
 		console.error(/*colors.BgWhite + */colors.FgRed + "The settings file could not be parsed: %s" + colors.Reset, e.originalError.message);
 		console.error(e.errorPosition);
 		throw "The settings file could not be parsed: Invalid JSON";
 	});
 
-	if (!settingsObj.$schema) throw "The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new"
+	if (!settingsObjSource.$schema) throw "The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new"
 
 	var schemaChecker = new ajv({ allErrors: true, async: false });
 	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
 	var validate = schemaChecker.compile(require("../settings.schema.json"));
-	var valid = validate(settingsObj, "settings");
+	var valid = validate(settingsObjSource, "settings");
 	var validationErrors = validate.errors;
 	if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
 
-	if (!settingsObj.tree) throw "tree is not specified in the settings file";
+	if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
 	// let routeKeys = Object.keys(routes);
-
-	settingsObj = normalizeSettings(settingsObj, settingsFile);
+	let settingshttps: ServerConfigSchema["server"]["https"] = settingsObjSource.server && settingsObjSource.server.https;
+	let settingsObj = normalizeSettings(settingsObjSource, settingsFile);
 
 	settingsObj.__assetsDir = assets;
 
@@ -404,7 +413,6 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 		} else if (settingsObj.tree.$element === "folder") {
 			keys = fs.readdirSync(settingsObj.tree.path, { encoding: "utf8" })
 		}
-		// let routeKeys = Object.keys(routes);
 		let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
 		if (conflict.length) console.log(
 			"The following tree items are reserved for use by TiddlyServer: %s",
@@ -412,8 +420,6 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 		);
 	}
 	//remove the https settings and return them separately
-	let settingshttps = settingsObj.server.https as any as SecureServerOptions;
-	settingsObj.server.https = !!settingsObj.server.https;
 	return { settings: settingsObj, settingshttps };
 
 }
@@ -483,7 +489,9 @@ export interface Directory {
 // export function tryParseJSON(str: string, errObj?: { error?: JsonError }): any;
 // export function tryParseJSON(str: string, errObj?: ((e: JsonError) => T | void)): T;
 /**
- * Calls the onerror handler if there is a JSON error.  
+ * Calls the onerror handler if there is a JSON error. Returns whatever the error handler 
+ * returns. If there is no error handler, nothing is returned. 
+ * The string "undefined" is not a valid JSON document.
  */
 export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => never)): T;
 export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => T)): T;
@@ -960,7 +968,7 @@ export function treeWalker(tree: NewTreeGroup | NewTreePath, reqpath) {
 			isNewTreeMountItem(e) && e.key === reqpath[end]
 		);
 		if (t) {
-			ancestry.push(getAncesterEntry(item));
+			ancestry.push(item);
 			item = t;
 		} else {
 			break;
@@ -1146,7 +1154,107 @@ export interface StateObjectUrl {
 	search: string,
 	href: string
 }
-
+type StandardResponseHeaderValue = number | string | string[] | undefined;
+export interface StandardResponseHeaders {
+	/** Specifying which web sites can participate in cross-origin resource sharing */
+	"Access-Control-Allow-Origin"?: string;
+	/** Specifying which web sites can participate in cross-origin resource sharing */
+	"Access-Control-Allow-Credentials"?: string;
+	/** Specifying which web sites can participate in cross-origin resource sharing */
+	"Access-Control-Expose-Headers"?: string;
+	/** Specifying which web sites can participate in cross-origin resource sharing */
+	"Access-Control-Max-Age"?: string;
+	/** Specifying which web sites can participate in cross-origin resource sharing */
+	"Access-Control-Allow-Methods"?: string;
+	/** Specifying which web sites can participate in cross-origin resource sharing */
+	"Access-Control-Allow-Headers"?: string;
+	/** Specifies which patch document formats this server supports */
+	"Accept-Patch"?: string;
+	/** What partial content range types this server supports via byte serving */
+	"Accept-Ranges"?: string;
+	/** The age the object has been in a proxy cachein seconds */
+	"Age"?: string;
+	/** Valid methods for a specified resource. To be used for a 405 Method not allowed */
+	"Allow"?: string;
+	/** 
+	 * A server uses "Alt-Svc" header (meaning Alternative Services) to indicate that its resources can also be accessed at a different
+	 * When using HTTP/2, servers should instead send an ALTSVC frame. [45] 
+	 */
+	"Alt-Svc"?: string;
+	/** Tells all caching mechanisms from server to client whether they may cache this object. It is measured in seconds */
+	"Cache-Control"?: string;
+	/** Control options for the current connection and list of hop-by-hop response fields.[12] Must not be used with HTTP/2.[13] */
+	"Connection"?: string;
+	/** An opportunity to raise a "File Download" dialogue box for a known MIME type with binary format or suggest a filename for dynami */
+	"Content-Disposition"?: string;
+	/** The type of encoding used on the data. See HTTP compression. */
+	"Content-Encoding"?: string;
+	/** The natural language or languages of the intended audience for the enclosed content[47] */
+	"Content-Language"?: string;
+	/** The length of the response body in octets (8-bit bytes) */
+	"Content-Length"?: string;
+	/** An alternate location for the returned data */
+	"Content-Location"?: string;
+	/** A Base64-encoded binary MD5 sum of the content of the response */
+	"Content-MD5"?: string;
+	/** Where in a full body message this partial message belongs */
+	"Content-Range"?: string;
+	/** The MIME type of this content */
+	"Content-Type"?: string;
+	/** The date and time that the message was sent (in "HTTP-date" format as defined by RFC 7231) [48] */
+	"Date"?: string;
+	/** Specifies the delta-encoding entity tag of the response[10]. */
+	"Delta-Base"?: string;
+	/** An identifier for a specific version of a resource, often a message digest */
+	"ETag"?: string;
+	/** Gives the date/time after which the response is considered stale (in "HTTP-date" format as defined by RFC 7231) */
+	"Expires"?: string;
+	/** Instance-manipulations applied to the response[10]. */
+	"IM"?: string;
+	/** The last modified date for the requested object (in "HTTP-date" format as defined by RFC 7231) */
+	"Last-Modified"?: string;
+	/** Used to express a typed relationship with another resource, where the relation type is defined by RFC 5988 */
+	"Link"?: string;
+	/** Used in redirection, or when a new resource has been created. */
+	"Location"?: string;
+	/** This field is supposed to set P3P policy, in the form of P3P:CP="your_compact_policy". However, P3P did not take off,[50] most b*/
+	"P3P"?: string;
+	/** Implementation-specific fields that may have various effects anywhere along the request-response chain. */
+	"Pragma"?: string;
+	/** Request authentication to access the proxy. */
+	"Proxy-Authenticate"?: string;
+	/** HTTP Public Key Pinning, announces hash of website's authentic TLS certificate */
+	"Public-Key-Pins"?: string;
+	/** If an entity is temporarily unavailable, this instructs the client to try again later. Value could be a specified period of time*/
+	"Retry-After"?: string;
+	/** A name for the server */
+	"Server"?: string;
+	/** An HTTP cookie */
+	"Set-Cookie"?: string[];
+	/** A HSTS Policy informing the HTTP client how long to cache the HTTPS only policy and whether this applies to subdomains. */
+	"Strict-Transport-Security"?: string;
+	/** The Trailer general field value indicates that the given set of header fields is present in the trailer of a message encoded wit */
+	"Trailer"?: string;
+	/** The form of encoding used to safely transfer the entity to the user. Currently defined methods are: chunked, compress, deflate, */
+	"Transfer-Encoding"?: string;
+	/** Tracking Status header, value suggested to be sent in response to a DNT(do-not-track), possible values: */
+	"Tk"?: string;
+	/** Ask the client to upgrade to another protocol. */
+	"Upgrade"?: string;
+	/** Tells downstream proxies how to match future request headers to decide whether the cached response can be used rather than reque */
+	"Vary"?: string;
+	/** Informs the client of proxies through which the response was sent. */
+	"Via"?: string;
+	/** A general warning about possible problems with the entity body. */
+	"Warning"?: string;
+	/** Indicates the authentication scheme that should be used to access the requested entity. */
+	"WWW-Authenticate"?: string;
+	/** Clickjacking protection: deny - no rendering within a frame, sameorigin - no rendering if origin mismatch, allow-from - allow fr */
+	"X-Frame-Options"?: string;
+	'x-api-access-type'?: string;
+	"dav"?: string;
+	"etag"?: string;
+}
 export class StateObject {
 	static parseURL(str: string): StateObjectUrl {
 		let item = url.parse(str, true);
@@ -1170,8 +1278,13 @@ export class StateObject {
 	}
 
 	get allow(): ServerConfig_AccessOptions {
-		return settings.tiddlyserver.hostLevelPermissions[this.hostLevelPermissionsKey];
+		if (this.authAccountsKey) {
+			return settings.authAccounts[this.authAccountsKey].permissions;
 
+
+		} else {
+			return settings.tiddlyserver.hostLevelPermissions[this.hostLevelPermissionsKey];
+		}
 		// let localAddress = this._req.socket.localAddress;
 		// let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
 		// let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
@@ -1195,6 +1308,8 @@ export class StateObject {
 
 	statPath: StatPathResult;
 
+	ancestry: NewTreeGroup | NewTreePath;
+
 	url: StateObjectUrl;
 
 	path: string[];
@@ -1212,28 +1327,13 @@ export class StateObject {
 	pathOptions: {
 		noTrailingSlash: boolean;
 	} = {
-		noTrailingSlash: false
-	}
-
-	// req: {
-	//     url: string;
-	//     headers: { [K: string]: any; };
-	//     method: string;
-	//     pipe: Stream["pipe"]
-	// }
-	// res(
-	//     statusCode: number,
-	//     body: string | Buffer,
-	//     headers: Hashmap<string>,
-	//     isBase64Encoded: boolean
-	// ) {
-
-	// }
+			noTrailingSlash: false
+		}
 
 	req: http.IncomingMessage;
 	res: http.ServerResponse;
 
-	responseHeaders: http.OutgoingHttpHeaders = {};
+	responseHeaders: StandardResponseHeaders = {} as any;
 	responseSent: boolean = false;
 
 	constructor(
@@ -1241,18 +1341,13 @@ export class StateObject {
 		private _res: http.ServerResponse,
 		private debugLog: typeof DebugLog,
 		private eventer: ServerEventEmitter,
-		private hostLevelPermissionsKey: string,
-		private authAccountsKey: string
+		public hostLevelPermissionsKey: string,
+		public authAccountsKey: string,
+		public settings: ServerConfig
 	) {
 		this.startTime = process.hrtime();
 		this.req = _req;
 		this.res = _res;
-		// this.req = {
-		//     method: _req.method as string,
-		//     url: _req.url as string,
-		//     headers: _req.headers,
-		//     pipe: _req.pipe.bind(_req)
-		// }
 		//parse the url and store in state.
 		this.url = StateObject.parseURL(this.req.url as string);
 		//parse the path for future use
@@ -1310,10 +1405,10 @@ export class StateObject {
 	 * if the client is allowed to recieve error info, sends `message`, otherwise sends `reason`.
 	 * `reason` is always sent as the status header.
 	 */
-	throwError<T = StateObject>(statusCode: number, error: ER, headers?: Hashmap<string>) {
+	throwError<T = StateObject>(statusCode: number, error: ER, headers?: StandardResponseHeaders) {
 		return this.throwReason(statusCode, this.allow.writeErrors ? error.message : error.reason, headers);
 	}
-	throwReason<T = StateObject>(statusCode: number, reason: string, headers?: Hashmap<string>) {
+	throwReason<T = StateObject>(statusCode: number, reason: string, headers?: StandardResponseHeaders) {
 		if (!this.responseSent) {
 			var res = this.respond(statusCode, reason, headers)
 			//don't write 204 reason
@@ -1321,20 +1416,22 @@ export class StateObject {
 		}
 		return Observable.empty<T>();
 	}
-	throw<T = StateObject>(statusCode: number, headers?: Hashmap<string>) {
+	throw<T = StateObject>(statusCode: number, headers?: StandardResponseHeaders) {
 		if (!this.responseSent) {
 			if (headers) this.setHeaders(headers);
 			this.respond(statusCode).empty();
 		}
 		return Observable.empty<T>();
 	}
-	setHeader(key: string, val: string) {
-		this.responseHeaders[key] = val;
+	setHeader(key: keyof StandardResponseHeaders, val: string) {
+		this.setHeaders({ [key]: val } as any);
 	}
-	setHeaders(headers: http.OutgoingHttpHeaders) {
-		Object.assign(this.responseHeaders, headers);
+	setHeaders(headers: StandardResponseHeaders) {
+		Object.assign(this.responseHeaders, headers, headers["Set-Cookie"] ? {
+			"Set-Cookie": (this.responseHeaders["Set-Cookie"] || []).concat(headers["Set-Cookie"] || [])
+		} : {});
 	}
-	respond(code: number, message?: string, headers?: http.OutgoingHttpHeaders) {
+	respond(code: number, message?: string, headers?: StandardResponseHeaders) {
 		if (headers) this.setHeaders(headers);
 		if (!message) message = http.STATUS_CODES[code];
 		if (settings.server._devmode) setTimeout(() => {
@@ -1343,24 +1440,26 @@ export class StateObject {
 		}, 0);
 		var subthis = {
 			json: (data: any) => {
+				this.setHeader("Content-Type", "application/json");
 				subthis.string(JSON.stringify(data));
 			},
 			string: (data: string) => {
 				subthis.buffer(Buffer.from(data, 'utf8'));
 			},
 			stream: (data: Stream) => {
-				this._res.writeHead(code, message, this.responseHeaders);
+				this._res.writeHead(code, message, this.responseHeaders as any);
 				data.pipe(this._res);
 				this.responseSent = true;
 			},
 			buffer: (data: Buffer) => {
-				this._res.writeHead(code, message, this.responseHeaders);
+				this.setHeader("Content-Length", data.byteLength.toString());
+				this._res.writeHead(code, message, this.responseHeaders as any);
 				this._res.write(data);
 				this._res.end();
 				this.responseSent = true;
 			},
 			empty: () => {
-				this._res.writeHead(code, message, this.responseHeaders);
+				this._res.writeHead(code, message, this.responseHeaders as any);
 				this._res.end();
 				this.responseSent = true;
 			}
@@ -1413,8 +1512,8 @@ export class StateObject {
 			.takeUntil(Observable.fromEvent(this._req, 'end').take(1))
 			//accumulate all the chunks until it completes
 			.reduce<Buffer>((n, e) => { n.push(e); return n; }, [])
-			//convert to json and return state for next part
-			.map(e => {
+			//convert to json
+			.forEach((e) => {
 				this.body = Buffer.concat(e).toString('utf8');
 				//console.log(state.body);
 				if (this.body.length === 0)
@@ -1427,8 +1526,9 @@ export class StateObject {
 				} : errorCB;
 
 				this.json = tryParseJSON<any>(this.body, catchHandler);
-				return this;
-			});
+			})
+			//returns a promise with the state
+			.then(() => this);
 	}
 
 }
@@ -1511,7 +1611,11 @@ export interface PathResolverResult {
 	// state: StateObject;
 }
 export type TreeObject = { [K: string]: string | TreeObject };
-export type TreePathResultObject<T, U, V> = { item: T, end: U, folderPathFound: V, ancestry: T[] }
+export type TreePathResultObject<T, U, V> = {
+	item: T, end: U, folderPathFound: V,
+	/** The array of mount items in the path. Redundant, but easy to iterate quickly. */
+	ancestry: T[]
+}
 export type TreePathResult =
 	// TreePathResultObject<NewTreeItem, number, false>
 	| TreePathResultObject<NewTreeGroup, number, false>
@@ -1638,4 +1742,10 @@ export function getUsableAddresses(hosts: string[]) {
 		return usable;
 	})
 	return usableArray;
+}
+
+export function NodePromise<T>(body: ((cb: (err: NodeJS.ErrnoException, data: T) => void) => void)) {
+	return new Promise<T>((resolve, reject) => {
+		body((err, data) => err ? reject(err) : resolve(data));
+	})
 }

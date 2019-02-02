@@ -6,13 +6,19 @@
     "tiddlyserver": "./server.js"
   },
   "dependencies": {
-    "ajv": "^6.6.2"
+    "@types/ws": "^6.0.1"
   },
   "devDependencies": {
+    "@fidm/x509": "^1.2.0",
+    "@types/libsodium-wrappers": "^0.7.5",
     "@types/node": ">=6.0.73 <7.0.0",
+    "ajv": "^6.6.2",
+    "asn1.js": "^5.0.1",
     "etag": "^1.8.1",
     "formidable": "^1.1.1",
     "fresh": "^0.5.2",
+    "libsodium": "^0.7.4",
+    "libsodium-wrappers": "^0.7.4",
     "morgan": "*",
     "rxjs": "5.4.3",
     "serve-static": "*",
