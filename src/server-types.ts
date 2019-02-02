@@ -29,14 +29,11 @@ import {
 	NewTreePathOptions_Auth,
 	NewTreePathOptions_Index,
 	NewTreePathSchema,
-	SecureServerOptions,
 	ServerConfig,
 	ServerConfigBase,
 	ServerConfigSchema,
 	ServerConfig_AccessOptions,
-	ServerConfig_AuthClientKey,
-	ServerConfig_AuthPassword,
-	SecureServerOptionsSchema
+	ServerConfig_Server,
 } from "./server-config";
 export {
 	NewTreeGroup,
@@ -52,13 +49,10 @@ export {
 	NewTreePathOptions_Auth,
 	NewTreePathOptions_Index,
 	NewTreePathSchema,
-	SecureServerOptions,
 	ServerConfig,
 	ServerConfigBase,
 	ServerConfigSchema,
 	ServerConfig_AccessOptions,
-	ServerConfig_AuthClientKey,
-	ServerConfig_AuthPassword
 }
 let DEBUGLEVEL = -1;
 let settings: ServerConfig;
@@ -253,16 +247,7 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
 export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
 	if (!auth) return {};
 	let newAuth: ServerConfig["authAccounts"] = {};
-	Object.keys(auth).forEach(k => {
-		let key = k;
-		auth[key].credentials;
-		let perm: ServerConfig_AccessOptions = (auth[k].permissions || {}) as any;
-		while (auth[key].inheritPermissions) {
-			key = auth[key].inheritPermissions as string;
-			perm = { ...(auth[key].permissions || {}), ...perm }
-		}
-		return perm;
-	});
+
 	return newAuth;
 }
 export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
@@ -298,7 +283,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 				https: !!set.server.https
 			}
 		},
-		authAccounts: normalizeSettingsAuthAccounts(set.authAccounts),
+		authAccounts: set.authAccounts,
 		tiddlyserver: {
 			...{
 				etag: "",
@@ -335,7 +320,8 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 				upload: true,
 				settings: true,
 				WARNING_all_settings_WARNING: false,
-				websockets: true
+				websockets: true,
+				registerNotice: true
 			},
 			"*": {
 				writeErrors: true,
@@ -343,7 +329,8 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 				upload: false,
 				settings: false,
 				WARNING_all_settings_WARNING: false,
-				websockets: true
+				websockets: true,
+				registerNotice: false
 			}
 		},
 		...set.tiddlyserver && set.tiddlyserver.hostLevelPermissions
@@ -493,9 +480,10 @@ export interface Directory {
  * returns. If there is no error handler, nothing is returned. 
  * The string "undefined" is not a valid JSON document.
  */
-export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => never)): T;
-export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => T)): T;
-export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => void)): T | undefined;
+export function tryParseJSON<T = any>(str: string, onerror: ((e: JsonError) => never)): T;
+export function tryParseJSON<T = any>(str: string, onerror: ((e: JsonError) => T)): T;
+export function tryParseJSON<T = any>(str: string, onerror: ((e: JsonError) => void)): T | undefined;
+export function tryParseJSON<T = any>(str: string, onerror?: undefined): T | undefined;
 export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => T)): T | undefined {
 	function findJSONError(message: string, json: string) {
 		const res: string[] = [];
@@ -1279,11 +1267,9 @@ export class StateObject {
 
 	get allow(): ServerConfig_AccessOptions {
 		if (this.authAccountsKey) {
-			return settings.authAccounts[this.authAccountsKey].permissions;
-
-
+			return this.settings.authAccounts[this.authAccountsKey].permissions;
 		} else {
-			return settings.tiddlyserver.hostLevelPermissions[this.hostLevelPermissionsKey];
+			return this.settings.tiddlyserver.hostLevelPermissions[this.hostLevelPermissionsKey];
 		}
 		// let localAddress = this._req.socket.localAddress;
 		// let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
@@ -1434,7 +1420,7 @@ export class StateObject {
 	respond(code: number, message?: string, headers?: StandardResponseHeaders) {
 		if (headers) this.setHeaders(headers);
 		if (!message) message = http.STATUS_CODES[code];
-		if (settings.server._devmode) setTimeout(() => {
+		if (this.settings.server._devmode) setTimeout(() => {
 			if (!this.responseSent)
 				this.debugLog(3, "Response not sent \n %s", new Error().stack);
 		}, 0);
@@ -1525,7 +1511,7 @@ export class StateObject {
 					}).string(e.errorPosition);
 				} : errorCB;
 
-				this.json = tryParseJSON<any>(this.body, catchHandler);
+				this.json = catchHandler ? tryParseJSON<any>(this.body, catchHandler) : tryParseJSON(this.body);
 			})
 			//returns a promise with the state
 			.then(() => this);

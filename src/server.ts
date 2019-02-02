@@ -21,7 +21,6 @@ import {
 	ConvertSettings,
 	parseHostList,
 	testAddress,
-	SecureServerOptions,
 	loadSettings,
 	NodePromise
 } from "./server-types";
@@ -110,17 +109,24 @@ crypto.subtle.
 const setAuth = () => {
 	let ca: Record<string, x509.Certificate[]> = {};
 	let up: [string, string, string][] = [] as any;
-	let prom = Promise.all(Object.keys(settings.authAccounts).map(k => {
-		let cred = settings.authAccounts[k].credentials;
-		if (cred.type === "clientKey") {
-			return Promise.all(cred.certificateAuthority.map(e => NodePromise<Buffer>(cb => fs.readFile(e, cb))))
-				.then(res => res.reduce((n, e) => n.concat(x509.Certificate.fromPEMs(e)), [] as x509.Certificate[]))
-				.then(certs => { ca[k] = certs });
-		} else if (cred.type === "password") {
-			up.push([k, cred.username, cred.password]);
-			return Promise.resolve();
-		} else return Promise.resolve();
-	}));
+	let publicKeyLookup: Record<string, string> = {};
+	let passwordLookup: Record<string, string> = {};
+	const { crypto_generichash, crypto_generichash_BYTES, crypto_sign_SECRETKEYBYTES, crypto_sign_keypair, crypto_sign_open, from_base64, crypto_sign_verify_detached, randombytes_buf } = libsodium;
+	let passwordKey = crypto_sign_keypair("uint8array");
+	Object.keys(settings.authAccounts).forEach(k => {
+		Object.keys(settings.authAccounts[k].clientKeys).forEach(u => {
+			const publicKey = settings.authAccounts[k].clientKeys[u];
+			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
+			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = k;
+			else throw "publicKey+username combination is used for more than one authAccount";
+		})
+		Object.keys(settings.authAccounts[k].passwords).forEach(u => {
+			const password = settings.authAccounts[k].passwords[u];
+			let passHash = crypto_generichash(crypto_generichash_BYTES, password, undefined, "base64");
+			if (!passwordLookup[u]) passwordLookup[u] = k;
+			else throw "username is used for more than one authAccount password list";
+		})
+	})
 
 	checkCookieAuth = (request: http.IncomingMessage) => {
 		if (!request.headers.cookie) return "";
@@ -129,9 +135,19 @@ const setAuth = () => {
 			var parts = cookie.split('=');
 			cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
 		});
-		let auth = cookies["TiddlyServerAuth"];
+		let auth = cookies["TiddlyServerAuth"] as string;
 		if (!auth) return "";
-		else return "";
+		let json = tryParseJSON<["pw" | "key", string, string, string, string]>(auth);
+		if (!json) return "";
+
+		let [type, username, timestamp, hash, sig] = json;
+		let valid = crypto_sign_verify_detached(from_base64(sig),
+			username + timestamp + hash,
+			type === "key" ? from_base64(publicKeyLookup[hash + username]) : passwordKey.publicKey
+		);
+		if (!valid) return "";
+		return username;
+
 	};
 
 }
@@ -393,7 +409,15 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 			// check if the preflighter handled it
 			if (ev.handled) return;
 			//create the state object
-			const state = new StateObject(ev.request, ev.response, debug, eventer, ev.hostLevelPermissionsKey, ev.authAccountKey);
+			const state = new StateObject(
+				ev.request,
+				ev.response,
+				debug,
+				eventer,
+				ev.hostLevelPermissionsKey,
+				ev.authAccountKey,
+				settings
+			);
 			//handle basic auth
 			// if (!handleBasicAuth(state)) return;
 			//check for static routes

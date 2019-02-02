@@ -8,35 +8,12 @@ export interface ServerConfigSchema extends ServerConfigBase {
  		 */
 		https?: string;
 	}
-	/** 
-	 * The Hashmap of accounts which may authenticate on this server.
-	 * Takes either an object or a string to a `require`-able file (such as .js or .json) 
-	 * which exports the object
-	 */
-	authAccounts?: {
-		[K: string]: {
-			/** credentials to use for this account, or false to create a "group" */
-			credentials: ServerConfig_AuthPassword | ServerConfig_AuthClientKey | false,
-			/** override hostLevelPermissions for this account (optional) */
-			permissions?: ServerConfig_AccessOptions,
-			/** inherit permissions from another key in authAccounts (optional)  */
-			inheritPermissions?: string;
-		}
-	}
 }
 
 export interface ServerConfig extends ServerConfigBase {
 	tree: NewTreeGroup | NewTreePath
 	server: ServerConfigBase["server"] & {
 		https: boolean;
-	}
-	authAccounts: {
-		[K: string]: {
-			/** credentials to use for this account, or false to create a "group" */
-			credentials: ServerConfig_AuthPassword | ServerConfig_AuthClientKey
-			/** override hostLevelPermissions for this account (optional) */
-			permissions: ServerConfig_AccessOptions
-		}
 	}
 	__dirname: string;
 	__filename: string;
@@ -149,108 +126,31 @@ export interface NewTreePathOptions_Auth {
 	/** list of keys from authAccounts (that have credentials) that can access this resource */
 	authList: string[];
 }
-export interface SecureServerOptionsSchema {
 
-	/************************************************************************************** 
-	 * All private keys in PEM format as specified in  
-	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options
-	 */
-	key: (string | { path: string, passphrase: string })[];
-
-	/**************************************************************************************
-	 * The certificate chain for all private keys in PEM format as specified in 
-	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
-	 */
-	cert: string[];
-
-	/**************************************************************************************
-	 * Private keys with their certs in a PFX or PKCS12 as specified in 
-	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
-	 */
-	pfx: (string | { path: string, passphrase: string })[];
-
-	/** 
-	 * Passphrase to use for password protected keys if none is specificed 
-	 * for that key, as specified in 
-	 * https://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options 
-	 */
-	passphrase: string;
-	/** 
-	 * @summary Request Client Certificate
-	 * 
-	 * EITHER: A list of file paths of self-signed certs and certificate authorities to allow for 
-	 * client certificates. OR: Boolean `true` in which case the list of Mozilla CAs will be used and 
-	 * self-signed certs will NOT be possible IF `rejectUnauthorizedCertificate` is ALSO true.
-	 */
-	requestClientCertificate: string[] | boolean;
-	/** 
-	 * @summary Reject Unauthorized Clients
-	 * 
-	 * Whether to reject connections which do not have a valid certificate. If this is set to true,
-	 * then ALL requests that do not match `requestClientCertificate` will be rejected during the TLS 
-	 * handshake, even if they are specified in the authAccounts hashmap.
-	 */
-	rejectUnauthorizedCertificate: boolean;
-}
-export interface SecureServerOptions {
-	key: { path: string, passphrase: string, buff: Buffer }[];
-	cert: { path: string, buff: Buffer }[];
-	pfx: { path: string, passphrase: string, buff: Buffer }[];
-	passphrase: string;
-	requestClientCertificate: string[] | boolean;
-	rejectUnauthorizedCertificate: boolean;
-}
-export interface ServerConfig_AuthPassword {
-	/** basic auth or cookie */
-	type: "password",
-	/** Username given to TiddlyWiki data folders and anywhere else it's needed */
-	username: string,
-	/** password encoded in utf8 */
-	password: string
-}
-/** Use client certificate authentication, requires HTTPS */
-export interface ServerConfig_AuthClientKey {
-	/** client certificate */
-	type: "clientKey",
-	/** 
-	 * Username given to TiddlyWiki data folders and anywhere else it's needed. If true, 
-	 * the user is allowed to specify the username they want to use.
-	 */
-	username: string | true,
-	/** The public key string for this authAccount */
-	publicKey: string;
-}
-// /** 
-//  * All certificate authories and self-signed certificates to allow for this auth entry.
-//  * May be any authority in the certificate chain. This does not change the server https
-//  * options, so requests will only be checked here if the server accepts the connection.
-//  * 
-//  * If multiple authAccount entries match a certificate, the order is as follows.
-//  * - First, the closer one in the chain takes priority.
-//  * - Second, the one with `username` set to true takes priority.
-//  * - Third (if both are string), `usernameMustMmatch` set to true takes priority.
-//  * - Third (if both are true), the shortest `certificateAuthority` array takes priority.
-//  * - Fourth, the first in the order returned by `Object.keys()` takes priority and 
-//  *   a debug message level 2 (warning) is logged for the request.
-//  */
-// publicKey: string;
-// /**
-//  * Require the certificate common name to match the username. Default is true. Has no effect if 
-//  * `username` is also true as the username is taken directly from the common name in that case.
-//  */
-// usernameMustMatch: boolean;
 export interface ServerConfigBase {
-	/** 
-	 * Generic webserver options. 
-	 */
+	/** Generic webserver options */
 	server: ServerConfig_Server
 	/** directory index options */
 	directoryIndex: ServerConfig_DirectoryIndex
 	/** tiddlyserver specific options */
 	tiddlyserver: ServerConfig_TiddlyServer
-
+	/** 
+	 * The Hashmap of accounts which may authenticate on this server.
+	 * Takes either an object or a string to a `require`-able file (such as .js or .json) 
+	 * which exports the object
+	 */
+	authAccounts: {
+		[K: string]: {
+			/** Record[username] = password */
+			passwords: Record<string, string>,
+			/** Record[username] = public key */
+			clientKeys: Record<string, string>,
+			/** override hostLevelPermissions for this account */
+			permissions: ServerConfig_AccessOptions
+		}
+	}
 	/** client-side data folder loader which loads datafolders directly into the browser */
-	EXPERIMENTAL_clientside_datafolders: {
+	EXPERIMENTAL_clientside_datafolders?: {
 		/** temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder) */
 		enabled: boolean;
 		/** how long to cache tw_plugins on the server side */
