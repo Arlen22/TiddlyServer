@@ -150,7 +150,7 @@ export interface ServerConfigBase {
 		}
 	}
 	/** client-side data folder loader which loads datafolders directly into the browser */
-	EXPERIMENTAL_clientside_datafolders?: {
+	EXPERIMENTAL_clientside_datafolders: {
 		/** temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder) */
 		enabled: boolean;
 		/** how long to cache tw_plugins on the server side */

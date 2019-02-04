@@ -34,6 +34,10 @@ import { format, inspect } from 'util';
 import { EventEmitter } from 'events';
 import * as ipcalc from './ipcalc';
 import * as x509 from "@fidm/x509";
+import { ServerResponse } from 'http';
+import { networkInterfaces, NetworkInterfaceInfo } from 'os';
+import { TLSSocket } from 'tls';
+
 // import { parse as jsonParse } from 'jsonlint';
 
 // import send = require('../lib/send-lib');
@@ -60,12 +64,9 @@ export { loadSettings };
 
 //import and init api-access
 import { handleTiddlyServerRoute, init as initTiddlyServer, handleTiddlyWikiRoute } from './tiddlyserver';
-// import { handleSettings, initSettings } from './settingsPage';
-import { handleAuthRoute, initAuthRoute } from "./authRoute";
+// typescript retains the object reference here ()`authroute_1.checkCookieAuth`)
+import { handleAuthRoute, initAuthRoute, checkCookieAuth } from "./authRoute";
 
-import { ServerResponse } from 'http';
-import { networkInterfaces, NetworkInterfaceInfo } from 'os';
-import { TLSSocket } from 'tls';
 
 initServerTypes(eventer);
 initTiddlyServer(eventer);
@@ -93,7 +94,7 @@ function setLog() {
 let log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<{}>;
 
 //setup auth checkers
-let checkCookieAuth: (request: http.IncomingMessage) => string;
+// let checkCookieAuth: (request: http.IncomingMessage) => string;
 /**
 Authentication could be done several ways, but the most convenient and secure method is 
 probably to specify a public key instead of a certificate, and then use that public key
@@ -106,56 +107,10 @@ info so the user can logout if desired. Data folders would be given the username
 cookie with the request. The private key could be pasted in during login and stored using 
 crypto.subtle. 
  */
-const setAuth = () => {
-	let ca: Record<string, x509.Certificate[]> = {};
-	let up: [string, string, string][] = [] as any;
-	let publicKeyLookup: Record<string, string> = {};
-	let passwordLookup: Record<string, string> = {};
-	const { crypto_generichash, crypto_generichash_BYTES, crypto_sign_SECRETKEYBYTES, crypto_sign_keypair, crypto_sign_open, from_base64, crypto_sign_verify_detached, randombytes_buf } = libsodium;
-	let passwordKey = crypto_sign_keypair("uint8array");
-	Object.keys(settings.authAccounts).forEach(k => {
-		Object.keys(settings.authAccounts[k].clientKeys).forEach(u => {
-			const publicKey = settings.authAccounts[k].clientKeys[u];
-			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
-			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = k;
-			else throw "publicKey+username combination is used for more than one authAccount";
-		})
-		Object.keys(settings.authAccounts[k].passwords).forEach(u => {
-			const password = settings.authAccounts[k].passwords[u];
-			let passHash = crypto_generichash(crypto_generichash_BYTES, password, undefined, "base64");
-			if (!passwordLookup[u]) passwordLookup[u] = k;
-			else throw "username is used for more than one authAccount password list";
-		})
-	})
-
-	checkCookieAuth = (request: http.IncomingMessage) => {
-		if (!request.headers.cookie) return "";
-		var cookies = {}, rc = request.headers.cookie as string;
-		rc.split(';').forEach(function (cookie) {
-			var parts = cookie.split('=');
-			cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
-		});
-		let auth = cookies["TiddlyServerAuth"] as string;
-		if (!auth) return "";
-		let json = tryParseJSON<["pw" | "key", string, string, string, string]>(auth);
-		if (!json) return "";
-
-		let [type, username, timestamp, hash, sig] = json;
-		let valid = crypto_sign_verify_detached(from_base64(sig),
-			username + timestamp + hash,
-			type === "key" ? from_base64(publicKeyLookup[hash + username]) : passwordKey.publicKey
-		);
-		if (!valid) return "";
-		return username;
-
-	};
-
-}
 
 eventer.on('settings', (set) => {
 	settings = set;
 	log = setLog();
-	setAuth();
 });
 eventer.on('settingsChanged', (keys) => {
 	// let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];

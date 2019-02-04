@@ -1,20 +1,73 @@
-import { StateObject, ServerEventEmitter, tryParseJSON, ER } from "./server-types";
+import { StateObject, ServerEventEmitter, tryParseJSON, ER, ServerConfig } from "./server-types";
 import { EventEmitter } from "events";
 import * as crypto from "crypto";
 import { libsodium, ws as WebSocket } from "../lib/bundled-lib";
 import { TLSSocket } from "tls";
+import * as http from "http";
 
 const sockets: WebSocket[] = [];
 const state: {}[] = [];
+export let checkCookieAuth: (request: http.IncomingMessage) => string;
+/** if the cookie is valid it returns the username, otherwise an empty string */
+export let validateCookie: (json: ["pw" | "key", string, string, string, string]) => string;
+const setAuth = (settings: ServerConfig) => {
+	// let ca: Record<string, x509.Certificate[]> = {};
+	// let up: [string, string, string][] = [] as any;
+	let publicKeyLookup: Record<string, string> = {};
+	let passwordLookup: Record<string, string> = {};
+	const { crypto_generichash, crypto_generichash_BYTES, crypto_sign_SECRETKEYBYTES, crypto_sign_keypair, crypto_sign_open, from_base64, crypto_sign_verify_detached, randombytes_buf } = libsodium;
+	let passwordKey = crypto_sign_keypair("uint8array");
+	Object.keys(settings.authAccounts).forEach(k => {
+		let e = settings.authAccounts[k];
+		if(e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
+			const publicKey = e.clientKeys[u];
+			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
+			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = k;
+			else throw "publicKey+username combination is used for more than one authAccount";
+		})
+		if(e.passwords) Object.keys(e.passwords).forEach(u => {
+			const password = e.passwords[u];
+			let passHash = crypto_generichash(crypto_generichash_BYTES, password, undefined, "base64");
+			if (!passwordLookup[u]) passwordLookup[u] = k;
+			else throw "username is used for more than one authAccount password list";
+		})
+	})
 
+	checkCookieAuth = (request: http.IncomingMessage) => {
+		if (!request.headers.cookie) return "";
+		var cookies = {}, rc = request.headers.cookie as string;
+		rc.split(';').forEach(function (cookie) {
+			var parts = cookie.split('=');
+			cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
+		});
+		let auth = cookies["TiddlyServerAuth"] as string;
+		if (!auth) return "";
+		let json = tryParseJSON<["pw" | "key", string, string, string, string]>(auth);
+		if (!json) return "";
+		return validateCookie(json);
+	};
+	validateCookie = (json: ["pw" | "key", string, string, string, string]) => {
+		let [type, username, timestamp, hash, sig] = json;
+		let valid = crypto_sign_verify_detached(from_base64(sig),
+			username + timestamp + hash,
+			type === "key" ? from_base64(publicKeyLookup[hash + username]) : passwordKey.publicKey
+		);
+		return valid ? username : "";
+	}
+
+}
 export function initAuthRoute(eventer: ServerEventEmitter) {
 	eventer.on("websocket-connection", (client, request) => {
 		if (request.url === "/admin/authenticate") {
 			sockets.push(client);
 			client.on("message", handleSocketMessage);
 		}
+	});
+	eventer.on("settings", (set) => {
+		setAuth(set);
 	})
 }
+
 // type actions = "sendKey" | "recieveKey";
 function handleSocketMessage(this: WebSocket, data: WebSocket.Data) {
 	if (typeof data === "string") {
@@ -102,8 +155,19 @@ export function handleAuthRoute(state: StateObject) {
 		state.respond(200).json({ pendingPin: key });
 	} else if (state.path[3] === "login") {
 		state.recieveBody(true).then(() => {
-			state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie, false, state.settings.tiddlyserver.authCookieAge));
-			state.redirect("/");
+			if (state.body.length && !state.json) return;
+			else if (!state.body.length) return state.throwReason(400, "Empty request body");
+			let json = tryParseJSON<any>(state.json.setCookie, (err) => {
+				state.throwError(400, new ER("Invalid JSON in setCookie", err.errorPosition));
+			});
+			let username = validateCookie(json);
+			if (username) {
+				state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie, false, state.settings.tiddlyserver.authCookieAge));
+				state.respond(200).empty();
+				// state.redirect("/");
+			} else {
+				state.throwReason(400, "Invalid cookie in setCookie");
+			}
 		})
 	} else if (state.path[3] === "logout") {
 		state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", "", false, 0));

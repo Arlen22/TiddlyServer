@@ -16,7 +16,7 @@ import { inspect } from "util";
 import { gzip } from 'zlib';
 
 import { TiddlyWiki, TiddlyServer, PluginInfo, WikiInfo } from './boot-startup';
-import { fresh, etag } from '../lib/bundled-lib';
+import { fresh, etag, ws as WebSocket } from '../lib/bundled-lib';
 
 var settings: ServerConfig = {} as any;
 
@@ -158,7 +158,7 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true
 
 function loadDataFolderType(mount: string, folder: string, reload: string) {
 	obs_readFile()(path.join(folder, "tiddlywiki.info"), 'utf8').subscribe(([err, data]) => {
-		const wikiInfo: WikiInfo = tryParseJSON(data);
+		const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
 		if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
 			loadDataFolderTiddlyWiki(mount, folder, reload);
 		} else if (wikiInfo.type === "tiddlyserver") {
