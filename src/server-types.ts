@@ -520,7 +520,9 @@ export interface JsonErrorContainer {
 export class JsonError {
 	public filePath: string = "";
 	constructor(
+		/** The full JSON string showing the position of the error */
 		public errorPosition: string,
+		/** The original error return by JSON.parse */
 		public originalError: Error
 	) {
 
@@ -1392,13 +1394,17 @@ export class StateObject {
 	 * `reason` is always sent as the status header.
 	 */
 	throwError<T = StateObject>(statusCode: number, error: ER, headers?: StandardResponseHeaders) {
-		return this.throwReason(statusCode, this.allow.writeErrors ? error.message : error.reason, headers);
+		return this.throwReason(statusCode, this.allow.writeErrors ? error : error.reason, headers);
 	}
-	throwReason<T = StateObject>(statusCode: number, reason: string, headers?: StandardResponseHeaders) {
+	throwReason<T = StateObject>(statusCode: number, reason: string | ER, headers?: StandardResponseHeaders) {
 		if (!this.responseSent) {
-			var res = this.respond(statusCode, reason, headers)
-			//don't write 204 reason
-			if (statusCode !== 204 && reason) res.string(reason.toString());
+			if (typeof reason === "string") {
+				let res = this.respond(statusCode, reason, headers)
+				if (statusCode !== 204) res.string(reason);
+			} else {
+				let res = this.respond(statusCode, reason.reason, headers)
+				if (statusCode !== 204) res.string(reason.message);
+			}
 		}
 		return Observable.empty<T>();
 	}
