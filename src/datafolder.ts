@@ -169,9 +169,18 @@ function loadDataFolderType(mount: string, folder: string, reload: string) {
 function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string) {
 	console.time('twboot-' + folder);
 	const target = "../tiddlywiki";
+	let _wiki = undefined;
 	const $tw = require(target + "/boot/boot.js").TiddlyWiki(
 		require(target + "/boot/bootprefix.js").bootprefix({
-			packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, target + '/package.json'), 'utf8'))
+			packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, target + '/package.json'), 'utf8')),
+			// get wiki(){
+			// 	console.log((new Error().stack as string).split('\n')[2]);
+			// 	return _wiki;
+			// },
+			// set wiki(v){
+			// 	console.log((new Error().stack as string).split('\n')[2]);
+			// 	_wiki = v;
+			// }
 		})
 	);
 	$tw.boot.argv = [folder];
@@ -205,7 +214,8 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 			wiki: $tw.wiki,
 			variables: {
 				// "username": settings.username, //TODO
-				"path-prefix": mount
+				"path-prefix": mount,
+				"root-tiddler": "$:/core/save/all-external-js"
 			}
 		});
 

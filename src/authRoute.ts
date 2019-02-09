@@ -162,7 +162,7 @@ export function handleAuthRoute(state: StateObject) {
 			});
 			let username = validateCookie(json);
 			if (username) {
-				state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie, false, state.settings.tiddlyserver.authCookieAge));
+				state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie, false, state.settings.authCookieAge));
 				state.respond(200).empty();
 				// state.redirect("/");
 			} else {

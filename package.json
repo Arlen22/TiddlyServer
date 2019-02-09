@@ -6,7 +6,8 @@
     "tiddlyserver": "./server.js"
   },
   "dependencies": {
-    "@types/ws": "^6.0.1"
+    "@types/ws": "^6.0.1",
+    "path": "^0.12.7"
   },
   "devDependencies": {
     "@fidm/x509": "^1.2.0",

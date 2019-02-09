@@ -80,11 +80,11 @@ initAuthRoute(eventer);
 const morgan = require('../lib/morgan.js');
 function setLog() {
 	const logger: Function = morgan.handler({
-		logFile: settings.server.logAccess || undefined,
-		logToConsole: !settings.server.logAccess || settings.server.logToConsoleAlso,
-		logColorsToFile: settings.server.logColorsToFile
+		logFile: settings.logging.logAccess || undefined,
+		logToConsole: !settings.logging.logAccess || settings.logging.logToConsoleAlso,
+		logColorsToFile: settings.logging.logColorsToFile
 	});
-	return settings.server.logAccess === false
+	return settings.logging.logAccess === false
 		? ((...args: any[]) => Promise.resolve([]))
 		: (...args: any[]) => new Promise(resolve => {
 			args.push((...args2: any[]) => resolve(args2));
@@ -199,7 +199,7 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 		requestHandlerHostLevelChecks(ev, preflighter).then(ev2 => {
 			if (!ev2.handled) {
 				// we give the preflighter the option to handle the websocket on its own
-				if (settings.tiddlyserver.hostLevelPermissions[ev2.hostLevelPermissionsKey].websockets === false) client.close();
+				if (settings.bindInfo.hostLevelPermissions[ev2.hostLevelPermissionsKey].websockets === false) client.close();
 				else eventer.emit('websocket-connection', client, request);
 			}
 		});
@@ -234,8 +234,8 @@ export async function initServer({ preflighter, settingshttps }: {
 	// const { preflighter, env, listenCB, settingshttps } = options;
 	// eventer.emit('settings', settings);
 	const hosts: string[] = [];
-	const bindWildcard = settings.server.bindWildcard;
-	const tester = parseHostList([...settings.server.bindAddress, "-127.0.0.0/8"])
+	const bindWildcard = settings.bindInfo.bindWildcard;
+	const tester = parseHostList([...settings.bindInfo.bindAddress, "-127.0.0.0/8"])
 	const localhostTester = parseHostList(["127.0.0.0/8"]);
 
 	await libsodium.ready;
@@ -243,22 +243,22 @@ export async function initServer({ preflighter, settingshttps }: {
 	if (bindWildcard) {
 		//bind to everything and filter elsewhere if needed
 		hosts.push('0.0.0.0');
-		if (settings.server.enableIPv6) hosts.push('::');
-	} else if (settings.server.filterBindAddress) {
+		if (settings.bindInfo.enableIPv6) hosts.push('::');
+	} else if (settings.bindInfo.filterBindAddress) {
 		//bind to all interfaces that match the specified addresses
 		let ifaces = networkInterfaces();
 		let addresses = Object.keys(ifaces)
 			.reduce((n, k) => n.concat(ifaces[k]), [] as NetworkInterfaceInfo[])
-			.filter(e => settings.server.enableIPv6 || e.family === "IPv4" && tester(e.address).usable)
+			.filter(e => settings.bindInfo.enableIPv6 || e.family === "IPv4" && tester(e.address).usable)
 			.map(e => e.address);
 		hosts.push(...addresses);
 	} else {
 		//bind to all specified addresses
-		hosts.push(...settings.server.bindAddress);
+		hosts.push(...settings.bindInfo.bindAddress);
 	}
-	if (settings.server._bindLocalhost) hosts.push('localhost');
+	if (settings.bindInfo._bindLocalhost) hosts.push('localhost');
 	if (hosts.length === 0) {
-		let { filterBindAddress, bindAddress, bindWildcard, _bindLocalhost, enableIPv6 } = settings.server;
+		let { filterBindAddress, bindAddress, bindWildcard, _bindLocalhost, enableIPv6 } = settings.bindInfo;
 		console.log(`"No IP addresses will be listened on. This is probably a mistake.
 bindWildcard is ${(bindWildcard ? "true" : "false")}
 filterBindAddress is ${filterBindAddress ? "true" : "false"}
@@ -285,12 +285,12 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 		// let server = settingshttps ? https.createServer(httpsOptions) : http.createServer();
 		addRequestHandlers(server, host, preflighter);
 		//this one we add here because it is related to the host property rather than just listening
-		if (bindWildcard && settings.server.filterBindAddress) server.on('connection', (socket) => {
+		if (bindWildcard && settings.bindInfo.filterBindAddress) server.on('connection', (socket) => {
 			if (!tester(socket.localAddress).usable && !localhostTester(socket.localAddress).usable) socket.end();
 		})
 		servers.push(server);
 		return new Observable(subs => {
-			server.listen(settings.server.port, host, undefined, () => { subs.complete(); });
+			server.listen(settings.bindInfo.port, host, undefined, () => { subs.complete(); });
 		})
 	}).subscribe(item => { }, x => {
 		console.log("Error thrown while starting server");
@@ -299,14 +299,14 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 		eventer.emit("serverOpen", servers, hosts, !!settingshttps);
 		let ifaces = networkInterfaces();
 		console.log('Open your browser and type in one of the following:\n' +
-			(settings.server.bindWildcard
+			(settings.bindInfo.bindWildcard
 				? Object.keys(ifaces)
 					.reduce(
 						(n, k) => n.concat(ifaces[k]),
 						[] as NetworkInterfaceInfo[]
 					).filter(e =>
-						(settings.server.enableIPv6 || e.family === "IPv4")
-						&& (!settings.server.filterBindAddress || tester(e.address).usable)
+						(settings.bindInfo.enableIPv6 || e.family === "IPv4")
+						&& (!settings.bindInfo.filterBindAddress || tester(e.address).usable)
 					).map(e => e.address)
 				: hosts
 			).join('\n')
@@ -327,7 +327,7 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	//connections to the wrong IP address are already filtered out by the connection event listener on the server.
 	//determine hostLevelPermissions to be applied
 	let localAddress = ev.request.socket.localAddress;
-	let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
+	let keys = Object.keys(settings.bindInfo.hostLevelPermissions);
 	let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
 	let matches = parseHostList(keys)(localAddress);
 	if (isLocalhost) {
