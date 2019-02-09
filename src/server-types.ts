@@ -33,7 +33,9 @@ import {
 	ServerConfigBase,
 	ServerConfigSchema,
 	ServerConfig_AccessOptions,
-	ServerConfig_Server,
+	ServerConfig_BindInfo,
+	normalizeSettings,
+	ConvertSettings
 } from "./server-config";
 export {
 	NewTreeGroup,
@@ -53,6 +55,8 @@ export {
 	ServerConfigBase,
 	ServerConfigSchema,
 	ServerConfig_AccessOptions,
+	normalizeSettings,
+	ConvertSettings
 }
 let DEBUGLEVEL = -1;
 let settings: ServerConfig;
@@ -64,14 +68,14 @@ let debugOutput: Writable = new Writable({
 		// remove ending linebreaks for consistency
 		chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
 
-		if (settings.server.logError) {
+		if (settings.logging.logError) {
 			appendFileSync(
-				settings.server.logError,
-				(settings.server.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
+				settings.logging.logError,
+				(settings.logging.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
 				{ encoding: "utf8" }
 			);
 		}
-		if (!settings.server.logError || settings.server.logToConsoleAlso) {
+		if (!settings.logging.logError || settings.logging.logToConsoleAlso) {
 			console.log(chunk);
 		}
 		callback && callback();
@@ -96,92 +100,8 @@ export function init(eventer: ServerEventEmitter) {
 		// const myWritable = new stream.
 	});
 }
-export function OldDefaultSettings(set: OldServerConfig) {
-	if (!set.port) set.port = 8080;
-	if (!set.host) set.host = "127.0.0.1";
-	if (!set.types) set.types = {
-		"htmlfile": ["htm", "html"]
-	}
-	if (!set.etag) set.etag = "";
-	if (!set.etagWindow) set.etagWindow = 0;
-	if (!set.useTW5path) set.useTW5path = false;
-	if (typeof set.debugLevel !== "number") set.debugLevel = -1;
 
-	["allowNetwork", "allowLocalhost"].forEach((key: string) => {
-		if (!set[key]) set[key] = {} as any;
-		if (!set[key].mkdir) set[key].mkdir = false;
-		if (!set[key].upload) set[key].upload = false;
-		if (!set[key].settings) set[key].settings = false;
-		if (!set[key].WARNING_all_settings_WARNING)
-			set[key].WARNING_all_settings_WARNING = false;
-	});
 
-	if (!set.logColorsToFile) set.logColorsToFile = false;
-	if (!set.logToConsoleAlso) set.logToConsoleAlso = false;
-
-	if (!set.maxAge) set.maxAge = {} as any;
-	if (typeof set.maxAge.tw_plugins !== "number")
-		set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
-}
-
-export function ConvertSettings(set: OldServerConfig): ServerConfig {
-	type T = ServerConfig;
-	type T1 = T["server"];
-	type T2 = T["tiddlyserver"];
-	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
-	return {
-		__assetsDir: set.__assetsDir,
-		__dirname: set.__dirname,
-		__filename: set.__filename,
-		tree: set.tree,
-		server: {
-			bindAddress: (set.host === "0.0.0.0" || set.host === "::") ? [] : [set.host],
-			filterBindAddress: false,
-			enableIPv6: set.host === "::",
-			port: set.port,
-			bindWildcard: set.host === "0.0.0.0" || set.host === "::",
-			logAccess: set.logAccess,
-			logError: set.logError,
-			logColorsToFile: set.logColorsToFile,
-			logToConsoleAlso: set.logToConsoleAlso,
-			debugLevel: set.debugLevel,
-			_bindLocalhost: set._disableLocalHost === false,
-			_devmode: set._devmode,
-			https: false
-		},
-		tiddlyserver: {
-			etag: set.etag,
-			etagWindow: set.etagWindow,
-			hostLevelPermissions: {
-				"localhost": set.allowLocalhost,
-				"*": set.allowNetwork
-			},
-			authCookieAge: 2592000
-		},
-		authAccounts: {},
-		directoryIndex: {
-			defaultType: "html",
-			icons: set.types,
-			mixFolders: set.mixFolders
-		},
-		EXPERIMENTAL_clientside_datafolders: {
-			enabled: false,
-			alwaysRefreshCache: typeof set.tsa === "object" ? set.tsa.alwaysRefreshCache : true,
-			maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
-		},
-		$schema: "./settings.schema.json"
-	}
-}
-
-export interface OldServerConfigSchema extends OldServerConfigBase {
-	tree: NewTreeObjectSchemaItem
-}
-export interface OldServerConfig extends OldServerConfigBase {
-	tree: NewTreeGroup | NewTreePath
-	__dirname: string;
-	__filename: string;
-	__assetsDir: string;
-}
 // export type ServerConfig = NewConfig;
 // export type ServerConfigSchema = NewConfigSchema;
 
@@ -200,161 +120,8 @@ export function isNewTreePath(a: any): a is NewTreePath {
 export function isNewTreeMountItem(a: any): a is NewTreeGroup | NewTreePath {
 	return isNewTreeItem(a) && (a.$element === "group" || a.$element === "folder");
 }
-export function normalizeTree(settingsDir: string, item: NewTreeObjectSchemaItem | NewTreeOptions | NewTreeItem, key: string | undefined, keypath): NewTreeItem {
-	// let t = item as NewTreeObjectSchemaItem;
-	if (typeof item === "string" || item.$element === "folder") {
-		if (typeof item === "string") item = { $element: "folder", path: item } as NewTreePath;
-		if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
-		item.path = path.resolve(settingsDir, item.path);
-		key = key || path.basename(item.path);
-		//the hashmap key overrides the key attribute if available
-		return { ...item, key } as NewTreePath;
-	} else if (item.$element === "group") {
-		if (((a: any): a is NewTreeHashmapGroupSchema => !a.key)(item)) {
-			if (!key) throw new Error("No key specified for group element under " + keypath.join(', '));
-		} else {
-			key = item.key;
-		}
-		//at this point we only need the TreeHashmapGroup type since we already extracted the key
-		let t = item as NewTreeHashmapGroupSchema;
-		let tc = t.$children;
-		if (typeof tc !== "object") throw new Error("Invalid $children under " + keypath.join(', '));
-		return ({
-			$element: "group", key,
-			$children: Array.isArray(tc)
-				? tc.map(e => normalizeTree(settingsDir, e, undefined, keypath))
-				: Object.keys(tc).filter(k => k !== "$children")
-					.map(k => normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
-					.concat(tc.$children || [])
-		})
-	} else {
-		return item;
-	}
-}
-export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
-	if (typeof tree === "string" && tree.endsWith(".xml")) {
-		//read the xml file and parse it as the tree structure
-
-	} else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
-		//require the json or js file and use it directly
-		let filepath = path.resolve(settingsDir, tree);
-		return normalizeTree(path.dirname(filepath), require(filepath), "tree", []) as any;
-	} else {
-		//otherwise just assume we're using the value itself
-		return normalizeTree(settingsDir, tree, "tree", []) as any;
-	}
-}
-export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
-	if (!auth) return {};
-	let newAuth: ServerConfig["authAccounts"] = {};
-
-	return newAuth;
-}
-export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
-	const settingsDir = path.dirname(settingsFile);
-
-	type T = ServerConfig;
-	type T1 = T["server"];
-	type T2 = T["tiddlyserver"];
-	type T21 = T["tiddlyserver"]["hostLevelPermissions"];
-	let newset: ServerConfig = {
-		__dirname: "",
-		__filename: "",
-		__assetsDir: "",
-		tree: normalizeSettingsTree(settingsDir, set.tree),
-		server: {
-			...{
-				bindAddress: [],
-				bindWildcard: true,
-				enableIPv6: false,
-				filterBindAddress: false,
-				port: 8080,
-				debugLevel: 0,
-				logAccess: "",
-				logError: "",
-				logColorsToFile: false,
-				logToConsoleAlso: true,
-				_bindLocalhost: false,
-				_devmode: false,
-				https: false
-			},
-			...set.server,
-			...{
-				https: !!set.server.https
-			}
-		},
-		authAccounts: set.authAccounts,
-		tiddlyserver: {
-			...{
-				etag: "",
-				etagWindow: 3,
-				hostLevelPermissions: {},
-				authCookieAge: 2592000
-			},
-			...set.tiddlyserver
-		},
-		directoryIndex: {
-			...{
-				defaultType: "html",
-				icons: { "htmlfile": ["htm", "html"] },
-				mixFolders: true
-			},
-			...set.directoryIndex
-		},
-		EXPERIMENTAL_clientside_datafolders: {
-			...{
-				enabled: false,
-				alwaysRefreshCache: true,
-				maxAge_tw_plugins: 0
-			},
-			...set.EXPERIMENTAL_clientside_datafolders
-		},
-		$schema: "./settings.schema.json"
-	}
-	// set second level object defaults
-	newset.tiddlyserver.hostLevelPermissions = {
-		...{
-			"localhost": {
-				writeErrors: true,
-				mkdir: true,
-				upload: true,
-				settings: true,
-				WARNING_all_settings_WARNING: false,
-				websockets: true,
-				registerNotice: true
-			},
-			"*": {
-				writeErrors: true,
-				mkdir: false,
-				upload: false,
-				settings: false,
-				WARNING_all_settings_WARNING: false,
-				websockets: true,
-				registerNotice: false
-			}
-		},
-		...set.tiddlyserver && set.tiddlyserver.hostLevelPermissions
-	};
 
 
-
-	if (newset.tiddlyserver.backupDirectory) newset.tiddlyserver.backupDirectory = path.resolve(settingsDir, newset.tiddlyserver.backupDirectory);
-	if (newset.server.logAccess) newset.server.logAccess = path.resolve(settingsDir, newset.server.logAccess);
-	if (newset.server.logError) newset.server.logError = path.resolve(settingsDir, newset.server.logError);
-
-	newset.__dirname = settingsDir;
-	newset.__filename = settingsFile;
-
-	if (newset.tiddlyserver.etag === "disabled" && !newset.tiddlyserver.backupDirectory) {
-		console.log("Etag checking is disabled, but a backup folder is not set. "
-			+ "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
-			+ "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
-			+ "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can "
-			+ "also set the etagWindow setting to allow files to be modified if not newer than "
-			+ "so many seconds from the copy being saved.");
-	}
-	return newset;
-}
 
 
 const assets = path.resolve(__dirname, '../assets');
@@ -386,7 +153,7 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 
 	if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
 	// let routeKeys = Object.keys(routes);
-	let settingshttps: ServerConfigSchema["server"]["https"] = settingsObjSource.server && settingsObjSource.server.https;
+	let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;
 	let settingsObj = normalizeSettings(settingsObjSource, settingsFile);
 
 	settingsObj.__assetsDir = assets;
@@ -611,7 +378,7 @@ export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.Errn
 export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
 	//if(prefix.startsWith("V:")) return function(){};
 	return function (msgLevel: number, ...args: any[]) {
-		if (!ignoreLevel && settings.server.debugLevel > msgLevel) return;
+		if (!ignoreLevel && settings.logging.debugLevel > msgLevel) return;
 		if (isError(args[0])) {
 			let err = args[0];
 			args = [];
@@ -1271,7 +1038,7 @@ export class StateObject {
 		if (this.authAccountsKey) {
 			return this.settings.authAccounts[this.authAccountsKey].permissions;
 		} else {
-			return this.settings.tiddlyserver.hostLevelPermissions[this.hostLevelPermissionsKey];
+			return this.settings.bindInfo.hostLevelPermissions[this.hostLevelPermissionsKey];
 		}
 		// let localAddress = this._req.socket.localAddress;
 		// let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
@@ -1426,7 +1193,7 @@ export class StateObject {
 	respond(code: number, message?: string, headers?: StandardResponseHeaders) {
 		if (headers) this.setHeaders(headers);
 		if (!message) message = http.STATUS_CODES[code];
-		if (this.settings.server._devmode) setTimeout(() => {
+		if (this.settings._devmode) setTimeout(() => {
 			if (!this.responseSent)
 				this.debugLog(3, "Response not sent \n %s", new Error().stack);
 		}, 0);
@@ -1540,37 +1307,7 @@ export interface ThrowFunc<T> {
 	throw(statusCode: number, reason?: string, str?: string, ...args: any[]): Observable<T>;
 }
 
-export interface OldServerConfigBase {
 
-	_disableLocalHost: boolean;
-	_devmode: boolean;
-	// tree: NewTreeItem,
-	types: {
-		htmlfile: string[];
-		[K: string]: string[]
-	}
-	username?: string,
-	password?: string,
-	host: string,
-	port: number | 8080,
-	backupDirectory?: string,
-	etag: "required" | "disabled" | "", //otherwise if present
-	etagWindow: number,
-	useTW5path: boolean,
-	debugLevel: number,
-	allowNetwork: ServerConfig_AccessOptions,
-	allowLocalhost: ServerConfig_AccessOptions,
-	logAccess: string | false,
-	logError: string,
-	logColorsToFile: boolean,
-	logToConsoleAlso: boolean;
-	/** cache max age in milliseconds for different types of data */
-	maxAge: { tw_plugins: number }
-	tsa: { alwaysRefreshCache: boolean; },
-	mixFolders: boolean;
-	/** Schema generated by marcoq.vscode-typescript-to-json-schema VS code plugin */
-	$schema: string;
-}
 
 export const TestConfig: ServerConfig = {} as any;
 export interface AccessPathResult<T> {

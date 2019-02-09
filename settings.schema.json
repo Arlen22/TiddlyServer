@@ -4,20 +4,20 @@
 		"ServerConfigSchema": {
 			"type": "object",
 			"properties": {
-				"server": {
+				"_devmode": {
+					"type": "boolean",
+					"description": "enables certain expensive per-request checks"
+				},
+				"tree": {
+					"$ref": "#/definitions/NewTreeObjectSchemaItem"
+				},
+				"bindInfo": {
 					"type": "object",
 					"additionalProperties": false,
 					"properties": {
 						"https": {
-							"anyOf": [
-								{
-									"type": "string"
-								},
-								{
-									"$ref": "#/definitions/SecureServerOptionsSchema"
-								}
-							],
-							"description": "https-only options: an object or a string to a `require`-able file (such as .js or .json) \r\nwhich exports the object"
+							"type": "string",
+							"description": "https-only options: a string to a JavaScript file which exports a function of type\r\n`(iface:string) => https.ServerOptions`. Note that the initServer function will \r\nchange this to a boolean value indicating whether https is in use once inside TiddlyServer."
 						},
 						"bindAddress": {
 							"type": "array",
@@ -46,326 +46,66 @@
 							"type": "number",
 							"description": "port to listen on, default is 8080 for http and 8443 for https"
 						},
-						"logAccess": {
-							"anyOf": [
-								{
-									"type": "string"
-								},
-								{
-									"type": "boolean",
-									"enum": [
-										false
-									]
-								}
-							],
-							"description": "access log file"
-						},
-						"logError": {
-							"type": "string",
-							"description": "error log file"
-						},
-						"logColorsToFile": {
-							"type": "boolean",
-							"description": "write the console color markers to file, useful if you read the logs by printing them to a terminal"
-						},
-						"logToConsoleAlso": {
-							"type": "boolean",
-							"description": "print access and error events to the console regardless of whether they are logged to a file"
-						},
-						"debugLevel": {
-							"type": "number",
-							"description": "4 - Errors that require the process to exit for restart\r\n3 - Major errors that are handled and do not require a server restart\r\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\r\n1 - Info - Most startup messages\r\n0 - Normal debug messages and all software and request-side error messages\r\n-1 - Detailed debug messages from high level apis\r\n-2 - Response status messages and error response data\r\n-3 - Request and response data for all messages (verbose)\r\n-4 - Protocol details and full data dump (such as encryption steps and keys)"
-						},
-						"_bindLocalhost": {
-							"type": "boolean",
-							"description": "always bind a separate server instance to 127.0.0.1 regardless of any other settings"
-						},
-						"_devmode": {
-							"type": "boolean",
-							"description": "enables certain expensive per-request checks"
-						}
-					},
-					"required": [
-						"_bindLocalhost",
-						"_devmode",
-						"bindAddress",
-						"bindWildcard",
-						"debugLevel",
-						"enableIPv6",
-						"filterBindAddress",
-						"logAccess",
-						"logColorsToFile",
-						"logError",
-						"logToConsoleAlso",
-						"port"
-					],
-					"description": "Generic webserver options."
-				},
-				"directoryIndex": {
-					"type": "object",
-					"properties": {
-						"mixFolders": {
-							"type": "boolean",
-							"description": "sort folder and files together rather than separated"
-						},
-						"defaultType": {
-							"type": "string",
-							"enum": [
-								"html",
-								"json"
-							],
-							"description": "default format for the directory index"
-						},
-						"icons": {
-							"type": "object",
-							"additionalProperties": {
-								"type": "array",
-								"items": {
-									"type": "string"
-								}
-							},
-							"description": "Hashmap of type { \"icon_name\": [\"ext\", \"ext\"]} where ext represents the extensions to use this icon for. \r\nIcons are in the TiddlyServer/assets/icons folder."
-						}
-					},
-					"required": [
-						"mixFolders",
-						"defaultType",
-						"icons"
-					],
-					"additionalProperties": false,
-					"description": "directory index options"
-				},
-				"tiddlyserver": {
-					"type": "object",
-					"properties": {
-						"backupDirectory": {
-							"type": "string",
-							"description": "backup directory for saving SINGLE-FILE wikis only"
-						},
-						"etag": {
-							"type": "string",
-							"enum": [
-								"required",
-								"disabled",
-								""
-							],
-							"description": "whether to use the etag field, blank string means \"if specified\""
-						},
-						"etagWindow": {
-							"type": "number",
-							"description": "etag does not need to be exact by this many seconds"
-						},
 						"hostLevelPermissions": {
 							"type": "object",
 							"additionalProperties": {
 								"$ref": "#/definitions/ServerConfig_AccessOptions"
 							},
 							"description": "permissions based on host address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\""
+						},
+						"_bindLocalhost": {
+							"type": "boolean",
+							"description": "always bind a separate server instance to 127.0.0.1 regardless of any other settings"
 						}
 					},
 					"required": [
-						"etag",
-						"etagWindow",
-						"hostLevelPermissions"
+						"_bindLocalhost",
+						"bindAddress",
+						"bindWildcard",
+						"enableIPv6",
+						"filterBindAddress",
+						"hostLevelPermissions",
+						"port"
 					],
-					"additionalProperties": false,
+					"description": "bind address and port info"
+				},
+				"logging": {
+					"$ref": "#/definitions/ServerConfig_Logging",
+					"description": "logging"
+				},
+				"directoryIndex": {
+					"$ref": "#/definitions/ServerConfig_DirectoryIndex",
+					"description": "directory index options"
+				},
+				"putsaver": {
+					"$ref": "#/definitions/ServerConfig_TiddlyServer",
 					"description": "tiddlyserver specific options"
 				},
 				"authAccounts": {
-					"anyOf": [
-						{
-							"type": "string"
-						},
-						{
-							"type": "object",
-							"additionalProperties": {
-								"type": "object",
-								"properties": {
-									"credentials": {
-										"anyOf": [
-											{
-												"$ref": "#/definitions/ServerConfig_AuthPassword"
-											},
-											{
-												"$ref": "#/definitions/ServerConfig_AuthClientKey"
-											},
-											{
-												"type": "boolean",
-												"enum": [
-													false
-												]
-											}
-										],
-										"description": "credentials to use for this account, or false to create a \"group\""
-									},
-									"permissions": {
-										"$ref": "#/definitions/ServerConfig_AccessOptions",
-										"description": "override hostLevelPermissions for this account (optional)"
-									},
-									"inheritPermissions": {
-										"type": "string",
-										"description": "inherit permissions from another key in authAccounts (optional)"
-									}
-								},
-								"required": [
-									"credentials"
-								],
-								"additionalProperties": false
-							}
-						}
-					],
+					"type": "object",
+					"additionalProperties": {
+						"$ref": "#/definitions/ServerConfig_AuthAccountsValue"
+					},
 					"description": "The Hashmap of accounts which may authenticate on this server.\r\nTakes either an object or a string to a `require`-able file (such as .js or .json) \r\nwhich exports the object"
 				},
 				"EXPERIMENTAL_clientside_datafolders": {
-					"type": "object",
-					"properties": {
-						"enabled": {
-							"type": "boolean",
-							"description": "temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder)"
-						},
-						"maxAge_tw_plugins": {
-							"type": "number",
-							"description": "how long to cache tw_plugins on the server side"
-						},
-						"alwaysRefreshCache": {
-							"type": "boolean",
-							"description": "refresh cache whenever ?refresh=true is called"
-						}
-					},
-					"required": [
-						"enabled",
-						"maxAge_tw_plugins",
-						"alwaysRefreshCache"
-					],
-					"additionalProperties": false,
+					"$ref": "#/definitions/ServerConfig_ClientsideDatafolders",
 					"description": "client-side data folder loader which loads datafolders directly into the browser"
+				},
+				"authCookieAge": {
+					"type": "number",
+					"description": "Age to set for the auth cookie (default is 30 days)\r\n- 24 hours: `86400`\r\n- 7 days: `604800`\r\n- 30 days: `2592000`\r\n- 60 days: `5184000`\r\n- 90 days: `7776000`\r\n- 120 days: `10368000`\r\n- 150 days: `12950000`\r\n- 180 days: `15552000`"
 				},
 				"$schema": {
 					"type": "string",
 					"description": "The JSON schema location for this document. This schema is generated \r\ndirectly from the TypeScript interfaces\r\nused in TiddlyServer. A text-editor with autocomplete, such as VS code, \r\nwill make editing this file much simpler. \r\nMost fields include a description like this one. \r\n\r\nAll relative paths in this file are resolved relative to this file, so \r\n`./settings-tree.xml` refers to an XML file in the same folder as this file. \r\nAll relative paths in included files (such as the XML file) are resolved \r\nrelative to the included file."
-				},
-				"tree": {
-					"$ref": "#/definitions/NewTreeObjectSchemaItem"
 				}
 			},
 			"required": [
-				"$schema",
-				"EXPERIMENTAL_clientside_datafolders",
-				"authAccounts",
-				"directoryIndex",
-				"server",
-				"tiddlyserver",
-				"tree"
+				"tree",
+				"$schema"
 			],
 			"additionalProperties": false
-		},
-		"ServerConfig_AccessOptions": {
-			"type": "object",
-			"properties": {
-				"writeErrors": {
-					"type": "boolean"
-				},
-				"upload": {
-					"type": "boolean",
-					"description": "allow uploads on the directory index page"
-				},
-				"mkdir": {
-					"type": "boolean",
-					"description": "allow create directory on directory index page"
-				},
-				"settings": {
-					"type": "boolean",
-					"description": "allow non-critical settings to be modified"
-				},
-				"WARNING_all_settings_WARNING": {
-					"type": "boolean",
-					"description": "allow critical settings to be modified"
-				},
-				"websockets": {
-					"type": "boolean",
-					"description": "allow websocket connections (default true)"
-				}
-			},
-			"required": [
-				"writeErrors",
-				"upload",
-				"mkdir",
-				"settings",
-				"WARNING_all_settings_WARNING",
-				"websockets"
-			],
-			"additionalProperties": false
-		},
-		"ServerConfig_AuthPassword": {
-			"type": "object",
-			"properties": {
-				"type": {
-					"type": "string",
-					"enum": [
-						"password"
-					],
-					"description": "basic auth or cookie"
-				},
-				"username": {
-					"type": "string",
-					"description": "Username given to TiddlyWiki data folders and anywhere else it's needed"
-				},
-				"password": {
-					"type": "string",
-					"description": "password encoded in utf8"
-				}
-			},
-			"required": [
-				"type",
-				"username",
-				"password"
-			],
-			"additionalProperties": false
-		},
-		"ServerConfig_AuthClientKey": {
-			"type": "object",
-			"properties": {
-				"type": {
-					"type": "string",
-					"enum": [
-						"clientKey"
-					],
-					"description": "client certificate"
-				},
-				"username": {
-					"anyOf": [
-						{
-							"type": "string"
-						},
-						{
-							"type": "boolean",
-							"enum": [
-								true
-							]
-						}
-					],
-					"description": "Username given to TiddlyWiki data folders and anywhere else it's needed. If true, \r\nthe common name of the certificate presented is used instead."
-				},
-				"certificateAuthority": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "All certificate authories and self-signed certificates to allow for this auth entry.\r\nMay be any authority in the certificate chain. If `requestClientCertificate` is a string array\r\nand `rejectUnauthorizedCertificate` is true,"
-				},
-				"usernameMustMatch": {
-					"type": "boolean",
-					"description": "Require the certificate common name to match the username. Default is true. Has no effect if \r\n`username` is also true as the username is taken directly from the common name in that case."
-				}
-			},
-			"required": [
-				"type",
-				"username",
-				"certificateAuthority",
-				"usernameMustMatch"
-			],
-			"additionalProperties": false,
-			"description": "Use client certificate authentication, requires HTTPS"
 		},
 		"NewTreeObjectSchemaItem": {
 			"anyOf": [
@@ -489,6 +229,7 @@
 			},
 			"additionalProperties": false,
 			"required": [
+				"$children",
 				"$element",
 				"path"
 			]
@@ -557,14 +298,14 @@
 					"enum": [
 						"auth"
 					],
-					"description": "Authenticate"
+					"description": "Only allow requests using these authAccounts. This affects all descendants under \r\nthis item unless another auth element is found further down. Each auth element stands alone and \r\ncompletely overrides the auth elements above them, so a more restrictive auth element\r\ncan be overridden by a less restrictive auth element below it. \r\n\r\nAnonymous requests are ALWAYS denied if an auth element applies to the requested path. \r\n\r\nNote that this does not change server authentication procedures. \r\nData folders are always given the authenticated username\r\nregardless of whether there are auth elements in the tree."
 				},
 				"authList": {
 					"type": "array",
 					"items": {
 						"type": "string"
 					},
-					"description": "list of keys from the auth list that can access this resource"
+					"description": "list of keys from authAccounts (that have credentials) that can access this resource"
 				}
 			},
 			"required": [
@@ -623,102 +364,195 @@
 			},
 			"required": [
 				"$element",
-				"path"
+				"path",
+				"$children"
 			],
 			"additionalProperties": false
 		},
-		"SecureServerOptionsSchema": {
+		"ServerConfig_AccessOptions": {
 			"type": "object",
 			"properties": {
-				"key": {
-					"type": "array",
-					"items": {
-						"anyOf": [
-							{
-								"type": "string"
-							},
-							{
-								"type": "object",
-								"properties": {
-									"path": {
-										"type": "string"
-									},
-									"passphrase": {
-										"type": "string"
-									}
-								},
-								"required": [
-									"path",
-									"passphrase"
-								],
-								"additionalProperties": false
-							}
-						]
-					},
-					"description": "************************************************************************************ \r\nAll private keys in PEM format as specified in  \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
-				},
-				"cert": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "************************************************************************************\r\nThe certificate chain for all private keys in PEM format as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
-				},
-				"pfx": {
-					"type": "array",
-					"items": {
-						"anyOf": [
-							{
-								"type": "string"
-							},
-							{
-								"type": "object",
-								"properties": {
-									"path": {
-										"type": "string"
-									},
-									"passphrase": {
-										"type": "string"
-									}
-								},
-								"required": [
-									"path",
-									"passphrase"
-								],
-								"additionalProperties": false
-							}
-						]
-					},
-					"description": "************************************************************************************\r\nPrivate keys with their certs in a PFX or PKCS12 as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
-				},
-				"passphrase": {
-					"type": "string",
-					"description": "Passphrase to use for password protected keys if none is specificed \r\nfor that key, as specified in \r\nhttps://nodejs.org/docs/latest-v8.x/api/tls.html#tls_tls_createsecurecontext_options"
-				},
-				"requestClientCertificate": {
-					"anyOf": [
-						{
-							"type": "array",
-							"items": {
-								"type": "string"
-							}
-						},
-						{
-							"type": "boolean"
-						}
-					]
-				},
-				"rejectUnauthorizedCertificate": {
+				"writeErrors": {
 					"type": "boolean"
+				},
+				"upload": {
+					"type": "boolean",
+					"description": "allow uploads on the directory index page"
+				},
+				"mkdir": {
+					"type": "boolean",
+					"description": "allow create directory on directory index page"
+				},
+				"websockets": {
+					"type": "boolean",
+					"description": "allow websocket connections (default true)"
+				},
+				"registerNotice": {
+					"type": "boolean",
+					"description": "login attempts for a public/private key pair which has not been \r\nregistered will be logged at debug level 2 with the full public key\r\nwhich can be copied into an authAccounts entry."
 				}
 			},
 			"required": [
-				"key",
-				"cert",
-				"pfx",
-				"passphrase",
-				"requestClientCertificate",
-				"rejectUnauthorizedCertificate"
+				"writeErrors",
+				"upload",
+				"mkdir",
+				"websockets",
+				"registerNotice"
+			],
+			"additionalProperties": false
+		},
+		"ServerConfig_Logging": {
+			"type": "object",
+			"properties": {
+				"logAccess": {
+					"anyOf": [
+						{
+							"type": "string"
+						},
+						{
+							"type": "boolean",
+							"enum": [
+								false
+							]
+						}
+					],
+					"description": "access log file"
+				},
+				"logError": {
+					"type": "string",
+					"description": "error log file"
+				},
+				"logColorsToFile": {
+					"type": "boolean",
+					"description": "write the console color markers to file, useful if you read the logs by printing them to a terminal"
+				},
+				"logToConsoleAlso": {
+					"type": "boolean",
+					"description": "print access and error events to the console regardless of whether they are logged to a file"
+				},
+				"debugLevel": {
+					"type": "number",
+					"description": "4 - Errors that require the process to exit for restart\r\n3 - Major errors that are handled and do not require a server restart\r\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\r\n1 - Info - Most startup messages\r\n0 - Normal debug messages and all software and request-side error messages\r\n-1 - Detailed debug messages from high level apis\r\n-2 - Response status messages and error response data\r\n-3 - Request and response data for all messages (verbose)\r\n-4 - Protocol details and full data dump (such as encryption steps and keys)"
+				}
+			},
+			"required": [
+				"logAccess",
+				"logError",
+				"logColorsToFile",
+				"logToConsoleAlso",
+				"debugLevel"
+			],
+			"additionalProperties": false
+		},
+		"ServerConfig_DirectoryIndex": {
+			"type": "object",
+			"properties": {
+				"mixFolders": {
+					"type": "boolean",
+					"description": "sort folder and files together rather than separated"
+				},
+				"defaultType": {
+					"type": "string",
+					"enum": [
+						"html",
+						"json"
+					],
+					"description": "default format for the directory index"
+				},
+				"icons": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					"description": "Hashmap of type { \"icon_name\": [\"ext\", \"ext\"]} where ext represents the extensions to use this icon for. \r\nIcons are in the TiddlyServer/assets/icons folder."
+				}
+			},
+			"required": [
+				"mixFolders",
+				"defaultType",
+				"icons"
+			],
+			"additionalProperties": false
+		},
+		"ServerConfig_TiddlyServer": {
+			"type": "object",
+			"properties": {
+				"backupDirectory": {
+					"type": "string",
+					"description": "backup directory for saving SINGLE-FILE wikis only"
+				},
+				"etag": {
+					"type": "string",
+					"enum": [
+						"required",
+						"disabled",
+						""
+					],
+					"description": "whether to use the etag field -- if not specified then it will check it if presented"
+				},
+				"etagWindow": {
+					"type": "number",
+					"description": "etag does not need to be exact by this many seconds"
+				}
+			},
+			"required": [
+				"etag",
+				"etagWindow"
+			],
+			"additionalProperties": false
+		},
+		"ServerConfig_AuthAccountsValue": {
+			"type": "object",
+			"properties": {
+				"passwords": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "Record[username] = password"
+				},
+				"clientKeys": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "string"
+					},
+					"description": "Record[username] = public key"
+				},
+				"permissions": {
+					"$ref": "#/definitions/ServerConfig_AccessOptions",
+					"description": "override hostLevelPermissions for this account"
+				}
+			},
+			"required": [
+				"passwords",
+				"clientKeys",
+				"permissions"
+			],
+			"additionalProperties": false
+		},
+		"ServerConfig_ClientsideDatafolders": {
+			"type": "object",
+			"properties": {
+				"enabled": {
+					"type": "boolean",
+					"description": "temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder)"
+				},
+				"maxAge_tw_plugins": {
+					"type": "number",
+					"description": "how long to cache tw_plugins on the server side"
+				},
+				"alwaysRefreshCache": {
+					"type": "boolean",
+					"description": "refresh cache whenever ?refresh=true is called"
+				}
+			},
+			"required": [
+				"enabled",
+				"maxAge_tw_plugins",
+				"alwaysRefreshCache"
 			],
 			"additionalProperties": false
 		}
