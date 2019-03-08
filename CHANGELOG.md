@@ -1,17 +1,25 @@
 ### 2.1.0
 
 #### Breaking changes
-* We've upgraded to TiddlyWiki 5.1.19. 
-* Settings format is changed. Run `node upgrade-settings old-file.json new-file.json` to upgrade to the new format.
-  * To find out exactly how the old format maps to the new format, find the `ConvertSettings` function in `server-types.ts`.
-  * The tree format has changed significantly to allow better control over individual directories. The upgrade script will modify the tree to make it compatible with the new version. Folder as root is still supported.
-	* The host parameter has been replaced with several parameters in the `server` section.
-	* `allowLocalhost` and `allowNetwork` have been replaced with a hashmap under `settings.tiddlyserver.hostLevelPermissions`
-  * `useTW5path` is set to `true` during the upgrade. If you prefer to access data folders without the trailing slash, you need to set this to false. This affects relative links.
-	* The settings file now includes a JSON Schema, which editors such as VS Code can use to provide descriptions and intellisense. TiddlyServer uses `ajv` to validate the settings file based on the schema in the TiddlyServer directory (not the one specified in the settings file). 
+We've upgraded to TiddlyWiki 5.1.19. 
+
+The settings format is completely changed and is now called Server Config.
+* Run `node upgrade-settings old-file.json new-file.json` to upgrade to the new format. Both fies must be specified, and the new file must NOT exist already. To find out exactly how the old format maps to the new format, find the `ConvertSettings` function in `server-types.ts`.
+* The tree format has changed significantly to allow better control over individual directories. The upgrade script will modify the tree to make it compatible with the new version. Folder as root is still supported.
+* The `host` parameter has been replaced with several parameters in the `bindInfo` section.
+* `allowLocalhost` and `allowNetwork` have been replaced with a hashmap under `settings.bindInfo.hostLevelPermissions`
+* `useTW5path` is set to `true` during the upgrade. If you prefer to access data folders without the trailing slash, you need to set this to false. This affects relative links, but nothing else. The TiddlyWeb adapter gets the page URL from a different source.
+* The settings file now includes a JSON Schema, which editors such as VS Code can use to provide descriptions and intellisense. TiddlyServer uses `ajv` to validate the settings file based on the schema specified (using JSON Schema draft 6).
+* The settings file (and any other JSON files specified in it) are parsed using the JSON5 parser, which allows comments and some sloppy syntax (such as a comma after the last item in an object or array). 
+* The root `server.js` file is more involved in the server startup process. It basically loads the rest of TiddlyServer as a module. If you are interested in extending TiddlyServer significantly or integrating it into existing systems, definitely check it out. 
+* Websocket support is built into TiddlyServer, but the TiddlyWiki server integration is still being finalized.
 
 #### Improvements
-* The tree format has been given a major rework. It is based on XML, which makes it much easier to add things like per-folder auth and index options. An XML file may be specified in `settings.tree` instead of an object.
+* The tree format has been given a major rework. It is based on XML, which makes it much easier to add things like per-folder auth and index options. In the future, a path to an XML file will be allowed in `settings.tree` instead of an object.
+
+### 2.0.14
+
+* Upgraded to TiddlyWiki 5.1.17.
 
 ### 2.0.13
 
