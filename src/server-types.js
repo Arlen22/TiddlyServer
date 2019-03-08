@@ -466,6 +466,7 @@ function sendDirectoryIndex([_r, options]) {
         //if this is a category, just return the key
         if (typeof val === "boolean")
             return rx_1.Observable.of({ key });
+        //otherwise return the statPath result
         else
             return statPath(val).then(res => { return { stat: res, key }; });
     }).reduce((n, e) => {
@@ -886,8 +887,11 @@ class StateObject {
      */
     recieveBody(errorCB) {
         return rx_1.Observable.fromEvent(this._req, 'data')
+            //only take one since we only need one. this will dispose the listener
             .takeUntil(rx_1.Observable.fromEvent(this._req, 'end').take(1))
+            //accumulate all the chunks until it completes
             .reduce((n, e) => { n.push(e); return n; }, [])
+            //convert to json and return state for next part
             .map(e => {
             this.body = Buffer.concat(e).toString('utf8');
             //console.log(state.body);

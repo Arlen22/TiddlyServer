@@ -15,3 +15,7 @@ test.js
 /tiddlywiki/plugins/danielo515
 old-settings.json
 newtree.xml
+*.key
+*.cer
+assets/authenticate/salts-backup.json
+/settings/*
