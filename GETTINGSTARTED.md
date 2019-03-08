@@ -12,10 +12,27 @@ The first thing you need to do is download and install NodeJS on your computer. 
 
 Once you have NodeJS installed on your computer, the next step is to download TiddlyServer. This can be done by going to https://github.com/Arlen22/TiddlyServer/releases/latest and download the source code zip or tar.gz (whichever you prefer). Once it's downloaded, you can unzip it to wherever you like. 
 
-Copy the `example-settings-simple.json` file and name it `settings.json`. 
+Create a `settings.json` file with the following content.
 
-There are two keys in the JSON file that need to be set. The one is `backupDirectory`, which either needs to be created next to `settings.json` or the key needs to be set to an existing path. The other is `tree`, which needs to be set according to the folders you want to serve. 
-
+```json
+{
+  //The JSON5 parser allows comments!
+  //All relative paths are relative to this file.
+  "tree": {
+    //this tree is just going to mount one folder
+    "$element": "folder",
+    "path": "../webroot",
+  },
+  "bindInfo": {
+    //bind to localhost only
+    "bindAddress": ["127.0.0.1"] 
+  },
+  "putsaver": {
+    "backupDirectory": "../backups" // or "" to disable backups
+  },
+  "$schema": "./settings.schema.json"
+}
+```
 ## Ready to Run
 
 You have multiple options depending on your operating system.
@@ -28,18 +45,18 @@ You have multiple options depending on your operating system.
 
 ### Mac OS
 
-I don't have a Mac, but you should be able to easily find documentation online for using NodeJS on Mac. The relevent command is, of course, `node server.js`.
+Open Terminal and use the `cd` command to navigate to the TiddlyServer directory, then run `node server.js`. 
 
 ### Linux
 
-Open the terminal if you aren't already there, then `cd` to the TiddlyServer directory and run `node server.js`. 
+Open the terminal if you aren't already there, then `cd` to the TiddlyServer directory and run `node server.js`. You will need to figure out how to get Node installed on your particular distribution of Linux, but it's pretty simple.
 
 ### Android
 
-The easy way to install it on Android is to use Dory (https://play.google.com/store/apps/details?id=io.tempage.dorynode). Open the app, tap the + button on the bottom right, then select file. Select the TiddlyServer server.js file in your filesystem. If your settings.json file is not beside the server.js file, paste the full path into the "argument" field (not the "Node option" field). That's basically all there is to it. Save it, then hit back to return to the list of scripts and tap start. Tap stdout to see the terminal output.
+The easy way to install it on Android is to use Dory (https://play.google.com/store/apps/details?id=io.tempage.dorynode). Open the app, tap the + button on the bottom right, then select "file". Select the TiddlyServer server.js file in your filesystem. If your settings.json file isn't next to the server.js file, paste the full path into the "argument" field (not the "Node option" field). That's basically all there is to it. Save it, then hit back to return to the list of scripts and tap start. Tap stdout to see the terminal output, including any error messages.
 
-The other option is to use Termux, but it's complicated enough that I don't need to explain it here. It's similar to linux.
- - Once you enable shared storage inside Termux you can use your file manager to unzip the TiddlyServer files and then access them from Termux. 
+The other option is to use Termux. If you have a keyboard attached to your Android, you can basically 
+ - Once you enable shared storage inside Termux you can use your regular Android file manager to unzip the TiddlyServer files and then cd to the directory to access them from Termux. 
  - You can install Node on Termux using the built-in package manager. 
 
 ### iOS
@@ -56,7 +73,7 @@ See [SETTINGS](SETTINGS.md) for details on configuring `settings.json`.
 
 ## The History of TiddlyServer
 
-The inspiration for TiddlyServer came from some discussions between sevaral TiddlyWiki developers about a new version of Firefox that was to be released in the middle of 2017. It was a massively rewrite and no longer had some of the features that we needed to be able to save TiddlyWiki files in Firefox. 
+The inspiration for TiddlyServer came from some discussions between several TiddlyWiki developers about a new version of Firefox that was to be released in the middle of 2017. It was a massively rewrite and no longer had some of the features that we needed to be able to save TiddlyWiki files in Firefox. 
 
 I had worked with NodeJS and Apache servers for a few years already and so I got the idea to create a file server that would let you load your wikis from various places on your computer and edit and save them in any browser, not just Firefox. 
 
