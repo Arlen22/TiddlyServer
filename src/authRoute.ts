@@ -1,130 +1,140 @@
-import { StateObject, ServerEventEmitter, tryParseJSON, ER, ServerConfig } from "./server-types";
+import { StateObject, ServerEventEmitter, tryParseJSON, ER, ServerConfig, serveFile } from "./server-types";
 import { EventEmitter } from "events";
 import * as crypto from "crypto";
 import { libsodium, ws as WebSocket } from "../lib/bundled-lib";
 import { TLSSocket } from "tls";
 import * as http from "http";
-
+import * as path from "path";
 const sockets: WebSocket[] = [];
 const state: {}[] = [];
-export let checkCookieAuth: (request: http.IncomingMessage) => string;
-/** if the cookie is valid it returns the username, otherwise an empty string */
-export let validateCookie: (json: ["pw" | "key", string, string, string, string]) => string;
+/** [type, username, timestamp, hash, sig] */
+export type AuthCookie = [string, "pw" | "key", string, string, string]
+export let checkCookieAuth: (request: http.IncomingMessage, logRegisterNotice: boolean) => [string, string] | false;
+/** if the cookie is valid it returns the username, otherwise an empty string. If the public key cannot be found, it will call logRegisterNotice then return an empty string */
+export let validateCookie: (json: AuthCookie, logRegisterNotice?: (string | false)) => [string, string] | false;
+export let parseAuthCookie = (cookie: string): AuthCookie => {
+	let json: [string, "pw" | "key", string, string, string] = cookie.split("|") as any; //tryParseJSON<>(auth);
+	if (json.length > 5) {
+		let name = json.slice(0, json.length - 4);
+		let rest = json.slice(json.length - 4);
+		json = [name.join("|"), ...rest] as any;
+	}
+	return json;
+}
 const setAuth = (settings: ServerConfig) => {
 	// let ca: Record<string, x509.Certificate[]> = {};
 	// let up: [string, string, string][] = [] as any;
-	let publicKeyLookup: Record<string, string> = {};
+	/** Record<hash+username, [authGroup, publicKey]> */
+	let publicKeyLookup: Record<string, [string, string]> = {};
 	let passwordLookup: Record<string, string> = {};
-	const { crypto_generichash, crypto_generichash_BYTES, crypto_sign_SECRETKEYBYTES, crypto_sign_keypair, crypto_sign_open, from_base64, crypto_sign_verify_detached, randombytes_buf } = libsodium;
-	let passwordKey = crypto_sign_keypair("uint8array");
+	const {
+		crypto_generichash,
+		crypto_generichash_BYTES,
+		crypto_generichash_BYTES_MIN,
+		crypto_generichash_BYTES_MAX,
+		crypto_sign_keypair,
+		crypto_sign_verify_detached,
+		from_base64,
+		crypto_box_SEEDBYTES,
+	} = libsodium;
+	console.log(crypto_box_SEEDBYTES, crypto_generichash_BYTES, crypto_generichash_BYTES_MAX, crypto_generichash_BYTES_MIN);
+	// let passwordKey = crypto_sign_keypair("uint8array");
+	// console.log(settings.authAccounts);
 	Object.keys(settings.authAccounts).forEach(k => {
 		let e = settings.authAccounts[k];
-		if(e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
-			const publicKey = e.clientKeys[u];
-			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
-			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = k;
-			else throw "publicKey+username combination is used for more than one authAccount";
-		})
-		if(e.passwords) Object.keys(e.passwords).forEach(u => {
-			const password = e.passwords[u];
-			let passHash = crypto_generichash(crypto_generichash_BYTES, password, undefined, "base64");
-			if (!passwordLookup[u]) passwordLookup[u] = k;
-			else throw "username is used for more than one authAccount password list";
-		})
-	})
+		// console.log(k, e, e.clientKeys);
+		if (e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
+			console.log(k, u, e.clientKeys[u]);
+			const publicKey = from_base64(e.clientKeys[u]);
 
-	checkCookieAuth = (request: http.IncomingMessage) => {
-		if (!request.headers.cookie) return "";
+			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
+			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u]];
+			else throw "publicKey+username combination is used for more than one authAccount";
+		});
+		// if (e.passwords) Object.keys(e.passwords).forEach(u => {
+		// 	const password = e.passwords[u];
+		// 	let passHash = crypto_generichash(crypto_generichash_BYTES, password, undefined, "base64");
+		// 	if (!passwordLookup[u]) passwordLookup[u] = k;
+		// 	else throw "username is used for more than one authAccount password list";
+		// });
+	});
+
+	checkCookieAuth = (request: http.IncomingMessage, logRegisterNotice: boolean) => {
+		if (!request.headers.cookie) return false;
 		var cookies = {}, rc = request.headers.cookie as string;
 		rc.split(';').forEach(function (cookie) {
 			var parts = cookie.split('=');
 			cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
 		});
 		let auth = cookies["TiddlyServerAuth"] as string;
-		if (!auth) return "";
-		let json = tryParseJSON<["pw" | "key", string, string, string, string]>(auth);
-		if (!json) return "";
-		return validateCookie(json);
+		if (!auth) return false;
+		let json = parseAuthCookie(auth);
+		if (!json) return false;
+		return validateCookie(json, false);
 	};
-	validateCookie = (json: ["pw" | "key", string, string, string, string]) => {
-		let [type, username, timestamp, hash, sig] = json;
-		let valid = crypto_sign_verify_detached(from_base64(sig),
+
+	validateCookie = (json: [string, "pw" | "key", string, string, string], logRegisterNotice?: string | false) => {
+		let [username, type, timestamp, hash, sig] = json;
+		if (type === "key" && !publicKeyLookup[hash + username]) {
+			// console.log(publicKeyLookup);
+			if (logRegisterNotice) console.log(logRegisterNotice);
+			return false;
+		}
+		// console.log(username + timestamp + hash);
+		if (type === "pw") return false; //passwords are currently not implemented
+		let valid = crypto_sign_verify_detached(
+			from_base64(sig),
 			username + timestamp + hash,
-			type === "key" ? from_base64(publicKeyLookup[hash + username]) : passwordKey.publicKey
+			from_base64(publicKeyLookup[hash + username][1])
 		);
-		return valid ? username : "";
-	}
+		// console.log((valid ? "" : "in") + "valid signature")
+		return valid ? [publicKeyLookup[hash + username][0], username] : false;
+	};
 
 }
 export function initAuthRoute(eventer: ServerEventEmitter) {
-	eventer.on("websocket-connection", (client, request) => {
-		if (request.url === "/admin/authenticate") {
-			sockets.push(client);
-			client.on("message", handleSocketMessage);
-		}
-	});
+	// eventer.on("websocket-connection", (client, request) => {
+	// 	if (request.url === "/admin/authenticate") {
+	// 		sockets.push(client);
+	// 		client.on("message", handleSocketMessage);
+	// 	}
+	// });
 	eventer.on("settings", (set) => {
 		setAuth(set);
 	})
 }
 
-// type actions = "sendKey" | "recieveKey";
-function handleSocketMessage(this: WebSocket, data: WebSocket.Data) {
-	if (typeof data === "string") {
-		let message = tryParseJSON(data);
-		if (!message) return;
-
-	} else {
-		let binaryType = this.binaryType as "nodebuffer" | "arraybuffer" | "fragments";
-		let buffer = binaryType === "arraybuffer" ? Buffer.from(data as ArrayBuffer) : data as Buffer;
-
-	}
-
-}
 const pko: Record<string, { step: number, cancelTimeout: NodeJS.Timer, sender?: StateObject, reciever?: StateObject }> = {};
-type actions = "sendKey" | "recieveKey" | "login" | "logout"
-interface keyActionStep1 { step: 1, pendingPin: string; publicKey: string; };
-interface keyActionStep2 { step: 2, pendingPin: string; encryptedKey: string; }
+
 function removePendingPinTimeout(pin: string) {
 	return setTimeout(() => { delete pko[pin] }, 10 * 60 * 1000)
 }
-function handleKeyAction(state: StateObject, direction: "sender" | "reciever") {
-	state.recieveBody(true).then(() => {
-		if (state.body.length && !state.json) return;
-		else if (!state.body.length) return state.throwReason(400, "Empty request body");
-
-		let { step, pendingPin: k } = state.json as keyActionStep1 | keyActionStep2;
-		if (pko[k].step !== step)
-			return state.throwReason(400, "Wrong step specified");
-		pko[k][direction] = state;
-
-		if (step === 1) {
-			let step1 = pko[k];
-			if (!step1.sender || !step1.reciever) return;
-			clearTimeout(pko[k].cancelTimeout);
-			step1.sender.respond(200).json({ publicKey: step1.reciever.json.publicKey });
-			step1.reciever.respond(200).json({ publicKey: step1.sender.json.publicKey });
-			pko[k] = { step: 2, cancelTimeout: removePendingPinTimeout(k) }
-		} else if (step === 2) {
-			let step2 = pko[k];
-			if (!step2.sender || !step2.reciever) return;
-			clearTimeout(pko[k].cancelTimeout);
-			step2.sender.respond(200).empty();
-			step2.reciever.respond(200).json({ encryptedKey: step2.sender.json.encryptedKey });
-			delete pko[k];
-		}
-	})
+function handleTransfer(state: StateObject) {
+	let pin = state.path[4];
+	if (!state.path[4] || !pko[pin] || (state.path[5] !== "sender" && state.path[5] !== "reciever"))
+		return state.throwReason(400, "Invalid request parameters");
+	let direction: "sender" | "reciever" = state.path[5] as any;
+	let pkop = pko[pin];
+	pkop[direction] = state;
+	if (!pkop.sender || !pkop.reciever) return;
+	clearTimeout(pkop.cancelTimeout);
+	pkop.step += 1;
+	pkop.sender.res.writeHead(200, undefined, { "x-tiddlyserver-transfer-count": pkop.step });
+	pkop.reciever.req.pipe(pkop.sender.res);
+	pkop.reciever.res.writeHead(200, undefined, { "x-tiddlyserver-transfer-count": pkop.step });
+	pkop.sender.req.pipe(pkop.reciever.res);
+	pkop.cancelTimeout = removePendingPinTimeout(pin);
 }
+let randomPin;
+libsodium.ready.then(() => { randomPin = libsodium.randombytes_buf(8) });
 function getRandomPin() {
-	const MAX = 1000000
-	let random = Math.floor(Math.random() * MAX);
-	if (random === MAX) random = 999999;
-	let key = random.toString();
-	key = "000000".slice(6 - key.length) + key;
-	//if it already exists we try again
-	if (pko[key]) getRandomPin();
-	else pko[key] = { step: 1, cancelTimeout: removePendingPinTimeout(key) };
-	return key;
+	let pin = "";
+	while (!pin || pko[pin])
+		pin = libsodium.to_hex(
+			randomPin = libsodium.crypto_generichash(8, randomPin, undefined, "uint8array")
+		);
+	pko[pin] = { step: 1, cancelTimeout: removePendingPinTimeout(pin) };
+	return pin;
 }
 const DEFAULT_AGE = "2592000";
 export function getSetCookie(name: string, value: string, secure: boolean, age: number) {
@@ -133,45 +143,64 @@ export function getSetCookie(name: string, value: string, secure: boolean, age: 
 		"Secure": secure,
 		"HttpOnly": true,
 		"Max-Age": age.toString(),
-		"SameSite": "Strict"
+		"SameSite": "Strict",
+		"Path": "/"
 	}
 
 	return [
 		name + "=" + value,
-		...Object.keys(flags).map(k => k + typeof flags[k] === "string" ? "=" + flags[k] : "").filter(e => e)
+		...Object.keys(flags).filter(k => !!flags[k]).map(k => k + (typeof flags[k] === "string" ? "=" + flags[k] : ""))
 	].join("; ");
 }
+
 /** Handles the /admin/authenticate route */
 export function handleAuthRoute(state: StateObject) {
-	//state.path[3]: "sendKey" | "recieveKey" | "login" | "logout"
+	if (state.req.method === "GET" || state.req.method === "HEAD") {
+		if (state.path.length === 4 && state.path[3] === "login.html") {
+			serveFile(state, "login.html", path.join(state.settings.__assetsDir, "authenticate"));
+		} else if (state.path.length === 4 && state.path[3] === "transfer.html") {
+			serveFile(state, "transfer.html", path.join(state.settings.__assetsDir, "authenticate"));
+		} else {
+			state.throw(404);
+		}
+		return;
+	}
+	//state.path[3]: "sendkey" | "recievekey" | "login" | "logout" | "pendingpin"
 	if (state.req.method !== "POST")
 		return state.throw(405);
-	if (state.path[3] === "sendKey") {
-		handleKeyAction(state, "sender");
-	} else if (state.path[3] === "recieveKey") {
-		handleKeyAction(state, "reciever");
-	} else if (state.path[3] === "pendingPin") {
-		let key = getRandomPin();
-		state.respond(200).json({ pendingPin: key });
+	if (state.path[3] === "transfer") {
+		handleTransfer(state);
+	} else if (state.path[3] === "pendingpin") {
+		if (Object.keys(pko).length > 1000)
+			return state.throwReason(509, "Too many transfer requests in progress");
+		else
+			state.respond(200).json({ pendingPin: getRandomPin() });
 	} else if (state.path[3] === "login") {
 		state.recieveBody(true).then(() => {
-			if (state.body.length && !state.json) return;
-			else if (!state.body.length) return state.throwReason(400, "Empty request body");
-			let json = tryParseJSON<any>(state.json.setCookie, (err) => {
-				state.throwError(400, new ER("Invalid JSON in setCookie", err.errorPosition));
-			});
-			let username = validateCookie(json);
+			if (state.body.length && !state.json) return; //recieve body sent a response already
+			if (!state.body.length) return state.throwReason(400, "Empty request body");
+			/** [username, type, timestamp, hash, sig] */
+			let json = parseAuthCookie(state.json.setCookie);
+			if (json.length !== 5) return state.throwReason(400, "Bad cookie format");
+			let { registerNotice } = state.settings.bindInfo.hostLevelPermissions[state.hostLevelPermissionsKey];
+			let username = validateCookie(json, registerNotice && [
+				"    login attempted with unknown public key",
+				"    " + state.json.publicKey,
+				"    username: " + json[1],
+				"    timestamp: " + json[2]
+			].join("\n"));
 			if (username) {
 				state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie, false, state.settings.authCookieAge));
 				state.respond(200).empty();
-				// state.redirect("/");
 			} else {
-				state.throwReason(400, "Invalid cookie in setCookie");
+				state.throwReason(400, "INVALID_CREDENTIALS");
 			}
 		})
 	} else if (state.path[3] === "logout") {
 		state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", "", false, 0));
+		state.respond(200).empty();
 	}
+	return;
 	/* Create cookie for authentication. Can only be secured with HTTPS, otherwise anyone can "borrow" it */{
 		const { crypto_generichash_BYTES, crypto_sign_keypair, crypto_sign_detached, crypto_sign_verify_detached, crypto_generichash, from_base64 } = libsodium;
 		let keys = crypto_sign_keypair("uint8array");

@@ -507,13 +507,6 @@
 		"ServerConfig_AuthAccountsValue": {
 			"type": "object",
 			"properties": {
-				"passwords": {
-					"type": "object",
-					"additionalProperties": {
-						"type": "string"
-					},
-					"description": "Record[username] = password"
-				},
 				"clientKeys": {
 					"type": "object",
 					"additionalProperties": {
@@ -527,7 +520,6 @@
 				}
 			},
 			"required": [
-				"passwords",
 				"clientKeys",
 				"permissions"
 			],
