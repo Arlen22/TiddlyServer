@@ -27,3 +27,5 @@ old-settings.json
 /settings/*
 /assets/authenticate/salts-backup.json
 /assets/static/salts-backup.json
+*.key
+*.cer
