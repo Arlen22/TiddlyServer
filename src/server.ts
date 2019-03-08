@@ -137,6 +137,7 @@ export interface RequestEvent {
 	 * handle a request using some other routing module. Do not override the /assets path or certain static assets will not be available.
 	 */
 	handled: boolean;
+	username: string;
 	/** auth account key to be applied to this request */
 	authAccountKey: string;
 	/** hostLevelPermissions key to be applied to this request */
@@ -193,6 +194,7 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 			hostLevelPermissionsKey: "",
 			interface: { host, addr, iface },
 			authAccountKey: "",
+			username: "",
 			request,
 			client
 		};
@@ -235,7 +237,7 @@ export async function initServer({ preflighter, settingshttps }: {
 	// eventer.emit('settings', settings);
 	const hosts: string[] = [];
 	const bindWildcard = settings.bindInfo.bindWildcard;
-	const tester = parseHostList([...settings.bindInfo.bindAddress, "-127.0.0.0/8"])
+	const tester = parseHostList([...settings.bindInfo.bindAddress, "-127.0.0.0/8"]);
 	const localhostTester = parseHostList(["127.0.0.0/8"]);
 
 	await libsodium.ready;
@@ -337,10 +339,12 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	} else {
 		ev.hostLevelPermissionsKey = "*";
 	}
-
-	ev.authAccountKey = checkCookieAuth(ev.request);
-
-
+	let { registerNotice } = settings.bindInfo.hostLevelPermissions[ev.hostLevelPermissionsKey];
+	let auth = checkCookieAuth(ev.request, registerNotice);
+	if(auth){
+		ev.authAccountKey = auth[0];
+		ev.username = auth[1];	
+	}
 	//send the data to the preflighter
 	return preflighter ? preflighter(ev) : Promise.resolve(ev);
 }
@@ -355,6 +359,7 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 				handled: false,
 				hostLevelPermissionsKey: "",
 				authAccountKey: "",
+				username: "",
 				interface: { host, addr, iface },
 				request, response
 			};
@@ -371,6 +376,7 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 				eventer,
 				ev.hostLevelPermissionsKey,
 				ev.authAccountKey,
+				ev.username,
 				settings
 			);
 			//handle basic auth

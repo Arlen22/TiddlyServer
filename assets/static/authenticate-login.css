@@ -1,0 +1,47 @@
+@import "./material-components-web.min.css";
+
+#react-root {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+	left: 0;
+	display:flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+}
+
+#login-form {
+  max-width: 400px;
+  max-height: 100%;
+  width: 100%;
+  height: auto;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+	justify-content: center;
+	margin: 0 auto;
+	border: solid red 2px;
+	border-radius: 4px;
+	padding: 12px;
+}
+
+.mdc-text-field {
+	margin: 12px;
+}
+
+#error-line, #success-line {
+  padding: 0 12px;
+  
+  font-family: Roboto,sans-serif;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: antialiased;
+}
+#error-line {
+  color: red;
+}
+#success-line {
+  color: green;
+}

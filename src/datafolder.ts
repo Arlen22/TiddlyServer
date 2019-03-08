@@ -203,22 +203,25 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 		}
 
 		//we use $tw.modules.execute so that the module has its respective $tw variable.
-		var server;
+		var Server: typeof TiddlyWikiServer;
 		try {
-			server = $tw.modules.execute('$:/core/modules/server/server.js').Server;
+			Server = $tw.modules.execute('$:/core/modules/server/server.js').Server;
 		} catch (e) {
 			doError(mount, folder, e);
 			return;
 		}
-		var server = new server({
+		var server = new Server({
 			wiki: $tw.wiki,
 			variables: {
-				// "username": settings.username, //TODO
 				"path-prefix": mount,
 				"root-tiddler": "$:/core/save/all-external-js"
 			}
 		});
-
+		// server.TS_StateObject_Queue = [];
+		// server.TS_Request_Queue = [];
+		let auth = new TiddlyServerAuthentication(server);
+		auth.init();
+		server.authenticators.unshift(auth);
 		//invoke the server start hook so plugins can extend the server or attach to the event handler
 		$tw.hooks.invokeHook('th-server-command-post-start', server, loadedFolders[mount].events, "tiddlyserver");
 		//add the event emitter to the $tw variable
@@ -227,9 +230,19 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 		const requests = loadedFolders[mount].handler as StateObject[];
 		loadedFolders[mount].handler = (state: StateObject) => {
 			//pretend to the handler like the path really has a trailing slash
-			let req = new Object(state.req) as http.IncomingMessage;
+			let req = new Object(state.req) as http.IncomingMessage & { tsstate: StateObject };
 			req.url += ((state.url.pathname === mount && !state.url.pathname.endsWith("/")) ? "/" : "");
-			server.requestHandler(state.req, state.res)
+			req.tsstate = state;
+			// let index = server.TS_Request_Queue.findIndex(undefined as any);
+			// //we reuse array indices to presumably save CPU cycles and memory
+			// if(index !== -1){
+			// 	server.TS_Request_Queue[index] = req;
+			// 	server.TS_StateObject_Queue[index] = state;
+			// } else {
+			// 	server.TS_Request_Queue.push(req);
+			// 	server.TS_StateObject_Queue.push(state);
+			// }
+			server.requestHandler(state.req, state.res);
 		};
 		//send queued websocket clients to the event emitter
 		loadedFolders[mount].events.emit('ws-client-preload');
@@ -254,9 +267,51 @@ function doError(mount, folder, err) {
 	})
 
 }
+declare class TiddlyWikiServer {
+	// TS_StateObject_Queue: StateObject[];
+	// TS_Request_Queue: http.IncomingMessage[];
+	addAuthenticator: any;
+	authenticators: TiddlyServerAuthentication[];
+	requestHandler: (request: http.IncomingMessage, response: http.ServerResponse) => void;
+	constructor(...args: any[]);
+}
+class TiddlyServerAuthentication {
+	/**
+	 *  
+	 * @param server The server instance that instantiated this authenticator
+	 */
+	constructor(private server: TiddlyWikiServer) {
 
-
-// let counter = 0;
+	}
+	/**
+	 * Returns true if the authenticator is active, false if it is inactive, 
+	 * or a string if there is an error
+	 */
+	init() {
+		return true;
+	}
+	/**
+	 * Returns true if the request is authenticated and 
+	 * assigns the "authenticatedUsername" state variable.
+	 * 
+	 * Returns false if the request couldn't be authenticated, 
+	 * having sent an appropriate response to the browser
+	 */
+	authenticateRequest(request: http.IncomingMessage & { tsstate: StateObject }, response: http.ServerResponse, state) {
+		// let index = this.server.TS_Request_Queue.indexOf(request);
+		let tsstate = request.tsstate;
+		if(!tsstate.authAccountsKey && state.allowAnon){
+			return true;
+		} else if (tsstate.authAccountsKey) {
+			state.authenticatedUsername = tsstate.username;
+			return true;
+		} else {
+			//The wiki itself may specify that anonymous users cannot access it
+			tsstate.throwReason(403, "Unauthenticated users cannot access this wiki");
+			return false;
+		}
+	}
+}
 
 
 

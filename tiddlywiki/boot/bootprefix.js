@@ -16,7 +16,19 @@ var _bootprefix = (function($tw) {
 
 "use strict";
 
+let _wiki = undefined;
 $tw = $tw || Object.create(null);
+// {
+	// get wiki(){
+	// 	// debugger;
+	// 	// console.log((new Error().stack).split('\n')[2]);
+	// 	return _wiki;
+	// },
+	// set wiki(v){
+	// 	// console.log((new Error().stack).split('\n')[2]);
+	// 	_wiki = v;
+	// }
+// }
 $tw.boot = $tw.boot || Object.create(null);
 
 // Detect platforms

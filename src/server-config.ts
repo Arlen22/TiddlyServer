@@ -106,7 +106,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 		bindInfo: {
 			...{
 				bindAddress: [],
-				bindWildcard: true,
+				bindWildcard: false,
 				enableIPv6: false,
 				filterBindAddress: false,
 				port: 8080,
@@ -132,7 +132,8 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 		authAccounts: spread(set.authAccounts),
 		putsaver: {
 			...{
-				etagWindow: 3
+				etagWindow: 3,
+				backupDirectory: "",
 			},
 			...spread(set.putsaver),
 			...{
@@ -189,20 +190,20 @@ export interface ServerConfigSchema {
 	_devmode?: boolean;
 	tree: NewTreeObjectSchemaItem
 	/** bind address and port info */
-	bindInfo?: ServerConfig_BindInfo & {
+	bindInfo?: Partial<ServerConfig_BindInfo & {
 		/** 
  		 * https-only options: a string to a JavaScript file which exports a function of type
 		 * `(iface:string) => https.ServerOptions`. Note that the initServer function will 
 		 * change this to a boolean value indicating whether https is in use once inside TiddlyServer.
  		 */
 		https?: string;
-	}
+	}>
 	/** logging  */
-	logging?: ServerConfig_Logging;
+	logging?: Partial<ServerConfig_Logging>;
 	/** directory index options */
-	directoryIndex?: ServerConfig_DirectoryIndex
+	directoryIndex?: Partial<ServerConfig_DirectoryIndex>
 	/** tiddlyserver specific options */
-	putsaver?: ServerConfig_TiddlyServer
+	putsaver?: Partial<ServerConfig_TiddlyServer>
 	/** 
 	 * The Hashmap of accounts which may authenticate on this server.
 	 * Takes either an object or a string to a `require`-able file (such as .js or .json) 
@@ -210,7 +211,7 @@ export interface ServerConfigSchema {
 	 */
 	authAccounts?: { [K: string]: ServerConfig_AuthAccountsValue }
 	/** client-side data folder loader which loads datafolders directly into the browser */
-	EXPERIMENTAL_clientside_datafolders?: ServerConfig_ClientsideDatafolders,
+	EXPERIMENTAL_clientside_datafolders?: Partial<ServerConfig_ClientsideDatafolders>,
 	/** 
 	 * Age to set for the auth cookie (default is 30 days)
 	 * - 24 hours: `86400`
@@ -272,6 +273,7 @@ export interface ServerConfig {
 	 * - 180 days: `15552000`
 	 */
 	authCookieAge: number
+
 	$schema: string;
 
 	__dirname: string;
@@ -288,8 +290,8 @@ export interface ServerConfig_ClientsideDatafolders {
 	alwaysRefreshCache: boolean;
 }
 export interface ServerConfig_AuthAccountsValue {
-	/** Record[username] = password */
-	passwords: Record<string, string>,
+	// /** Record[username] = password */
+	// passwords: Record<string, string>,
 	/** Record[username] = public key */
 	clientKeys: Record<string, string>,
 	/** override hostLevelPermissions for this account */
@@ -392,7 +394,7 @@ export interface ServerConfig_DirectoryIndex {
 }
 export interface ServerConfig_TiddlyServer {
 	/** backup directory for saving SINGLE-FILE wikis only */
-	backupDirectory?: string
+	backupDirectory: string
 	/** whether to use the etag field -- if not specified then it will check it if presented */
 	etag: "required" | "disabled" | ""
 	/** etag does not need to be exact by this many seconds */
@@ -613,7 +615,8 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 		},
 		putsaver: {
 			etag: set.etag,
-			etagWindow: set.etagWindow
+			etagWindow: set.etagWindow,
+			backupDirectory: ""
 		},
 		authAccounts: {},
 		directoryIndex: {

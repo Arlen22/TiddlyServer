@@ -63,11 +63,11 @@ type apiListRouteState = [[string, string], string | any, StateObject]
 export function checkRouteAllowed(state: StateObject, result: PathResolverResult) {
 	type CC = (NewTreeGroup["$children"][0] | NewTreePath["$children"][0]);
 	let lastAuth: NewTreePathOptions_Auth | undefined;
+	let findAuth = (f): f is NewTreePathOptions_Auth => f.$element === "auth";
 	result.ancestry.concat(result.item).forEach((e) => {
-		lastAuth = Array.isArray(e.$children)
-			&& (e.$children as CC[]).find((f): f is NewTreePathOptions_Auth => f.$element === "auth")
-			|| lastAuth;
+		lastAuth = Array.isArray(e.$children) && (e.$children as CC[]).find(findAuth) || lastAuth;
 	});
+	// console.log(lastAuth, state.authAccountsKey);
 	return !lastAuth || lastAuth.authList.indexOf(state.authAccountsKey) !== -1;
 }
 export function handleTiddlyServerRoute(state: StateObject) {
@@ -80,7 +80,6 @@ export function handleTiddlyServerRoute(state: StateObject) {
 		if (!checkRouteAllowed(state, result)) {
 			return state.throw<never>(403);
 		}
-		// console.log(result.ancestry, result.reqpath.length);
 		if (isNewTreeGroup(result.item)) {
 			serveDirectoryIndex(result, state);
 			return Observable.empty<never>();
@@ -141,7 +140,8 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		const options = {
 			upload: isFolder && (allow.upload),
 			mkdir: isFolder && (allow.mkdir),
-			mixFolders: settings.directoryIndex.mixFolders
+			mixFolders: settings.directoryIndex.mixFolders,
+			isLoggedIn: state.username ? (state.username + " (as " + state.authAccountsKey + ")") : false
 		};
 		getNewTreePathFiles(result, state)
 			.map(e => [e, options] as [typeof e, typeof options])
@@ -234,7 +234,7 @@ function handlePUTrequest(state: StateObject) {
 	const mtime = Date.parse(state.statPath.stat.mtime as any);
 	const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
 	const ifmatchStr: string = first(state.req.headers['if-match']) || '';
-	if (settings.tiddlyserver.etag !== "disabled" && (ifmatchStr || settings.tiddlyserver.etag === "required") && (ifmatchStr !== etag)) {
+	if (settings.putsaver.etag !== "disabled" && (ifmatchStr || settings.putsaver.etag === "required") && (ifmatchStr !== etag)) {
 		const ifmatch = JSON.parse(ifmatchStr).split('-');
 		const _etag = JSON.parse(etag).split('-');
 		console.log('412 ifmatch %s', ifmatchStr);
@@ -245,15 +245,15 @@ function handlePUTrequest(state: StateObject) {
 		let headTime = +ifmatch[2];
 		let diskTime = mtime;
 		// console.log(settings.etagWindow, diskTime, headTime);
-		if (!settings.tiddlyserver.etagWindow || diskTime - (settings.tiddlyserver.etagWindow * 1000) > headTime)
+		if (!settings.putsaver.etagWindow || diskTime - (settings.putsaver.etagWindow * 1000) > headTime)
 			return state.throw(412);
-		console.log('412 prevented by etagWindow of %s seconds', settings.tiddlyserver.etagWindow);
+		console.log('412 prevented by etagWindow of %s seconds', settings.putsaver.etagWindow);
 	}
 	new Observable((subscriber) => {
-		if (settings.tiddlyserver.backupDirectory) {
+		if (settings.putsaver.backupDirectory) {
 			const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
 			const ext = path.extname(backupFile);
-			const backupWrite = fs.createWriteStream(path.join(settings.tiddlyserver.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
+			const backupWrite = fs.createWriteStream(path.join(settings.putsaver.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
 			const fileRead = fs.createReadStream(fullpath);
 			const gzip = zlib.createGzip();
 			const pipeError = (err) => {

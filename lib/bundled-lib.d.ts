@@ -66,8 +66,10 @@ import * as xmljs from "xml-js";
 import * as ws from "ws";
 import * as ajv from "ajv";
 import * as libsodium from "libsodium-wrappers";
-// import * as asn1js from "asn1.js";
-export { morgan, send, etag, fresh, formidable, xmljs, ws, ajv, libsodium };
+
+declare const JSON5: typeof JSON;
+
+export { morgan, send, etag, fresh, formidable, xmljs, ws, ajv, libsodium, JSON5 };
 
 
 

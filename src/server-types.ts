@@ -7,7 +7,7 @@ import { format } from "util";
 import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
-import { send, ajv, ws as WebSocket } from '../lib/bundled-lib';
+import { send, ajv, ws as WebSocket, JSON5 } from '../lib/bundled-lib';
 import { Stats, appendFileSync } from 'fs';
 import { gzip } from 'zlib';
 import { Writable, Stream } from 'stream';
@@ -146,7 +146,9 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 
 	var schemaChecker = new ajv({ allErrors: true, async: false });
 	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
-	var validate = schemaChecker.compile(require("../settings.schema.json"));
+	var validate = schemaChecker.compile(require(
+		path.resolve(path.dirname(settingsFile), settingsObjSource.$schema)
+	));
 	var valid = validate(settingsObjSource, "settings");
 	var validationErrors = validate.errors;
 	if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
@@ -253,29 +255,20 @@ export function tryParseJSON<T = any>(str: string, onerror: ((e: JsonError) => v
 export function tryParseJSON<T = any>(str: string, onerror?: undefined): T | undefined;
 export function tryParseJSON<T = any>(str: string, onerror?: ((e: JsonError) => T)): T | undefined {
 	function findJSONError(message: string, json: string) {
+		console.log(message);
 		const res: string[] = [];
-		const match = /position (\d+)/gi.exec(message);
+		const match = /at (\d+):(\d+)/gi.exec(message);
 		if (!match) return "";
-		const position = +match[1];
+		const position = [+match[1], +match[2]];
 		const lines = json.split('\n');
-		let current = 1;
-		let i = 0;
-		for (; i < lines.length; i++) {
-			current += lines[i].length + 1; //add one for the new line
-			res.push(lines[i]);
-			if (current > position) break;
-		}
-		const linePos = lines[i].length - (current - position) - 1; //take the new line off again
-		//not sure why I need the +4 but it seems to hold out.
-		res.push(new Array(linePos + 4).join('-') + '^  ' + message);
-		for (i++; i < lines.length; i++) {
-			res.push(lines[i]);
-		}
+		res.push(...lines.slice(0, position[0]));
+		res.push(new Array(position[1]).join('-') + '^  ' + message);
+		res.push(...lines.slice(position[0]));
 		return res.join('\n');
 	}
 	str = str.replace(/\t/gi, '    ').replace(/\r\n/gi, '\n');
 	try {
-		return JSON.parse(str);
+		return JSON5.parse(str);
 	} catch (e) {
 		let err = new JsonError(findJSONError(e.message, str), e)
 		if (onerror) return onerror(err);
@@ -618,7 +611,13 @@ export function getNewTreePathFiles(result: PathResolverResult, state: StateObje
 //I have this in a JS file so I can edit it without recompiling
 const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
 export type DirectoryIndexData = { keys: string[], paths: (string | boolean)[], dirpath: string, type: "group" | "folder" };
-export type DirectoryIndexOptions = { upload: boolean, mkdir: boolean, format: "json" | "html", mixFolders: boolean }
+export type DirectoryIndexOptions = {
+	upload: boolean,
+	mkdir: boolean,
+	format: "json" | "html",
+	mixFolders: boolean,
+	isLoggedIn: string | false
+}
 export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
 	let { keys, paths, dirpath, type } = _r;
 	let pairs = keys.map((k, i) => [k, paths[i]]);
@@ -642,7 +641,8 @@ export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, Directory
 		if (options.format === "json") {
 			return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
 		} else {
-			return generateDirectoryListing({ path: dirpath, entries, type }, options);
+			let def = { path: dirpath, entries, type }
+			return generateDirectoryListing(def, options);
 		}
 	});
 }
@@ -1098,6 +1098,7 @@ export class StateObject {
 		private eventer: ServerEventEmitter,
 		public hostLevelPermissionsKey: string,
 		public authAccountsKey: string,
+		public username: string,
 		public settings: ServerConfig
 	) {
 		this.startTime = process.hrtime();

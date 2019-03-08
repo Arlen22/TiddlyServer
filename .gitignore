@@ -25,3 +25,5 @@ src/_test.ts
 src/_test.js
 old-settings.json
 /settings/*
+/assets/authenticate/salts-backup.json
+/assets/static/salts-backup.json

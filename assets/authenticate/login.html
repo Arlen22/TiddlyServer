@@ -1,0 +1,73 @@
+<html>
+
+<head>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="/assets/static/authenticate-login.css" />
+	<title>Login</title>
+	<script>
+		/** 
+		 * if you want to change these values server wide, you are welcome to, but remember 
+		 * that they will be overwritten by an update, so you may want to copy them into 
+		 * a file next to this one named `salts-backup.json`, which has been added to .gitignore 
+		 * for this purpose. You may also place it in /assets/static/ if you want to, which will 
+		 * allow it to be served directly. Remember that these salts are completely PUBLIC and STATIC.
+		 * Changing them will require all credentials to be re-added to the ServerConfig.
+		 */
+		window.salts = {
+			username: "tiddlyserverclientsaltusername",
+			password: "tiddlyserverclientsaltpassword",
+		};
+		window.sodium = {
+			ready: false,
+			onload: function (s) {
+				console.log(this, s);
+				window.sodium = s;
+			}
+		};
+	</script>
+	<script src="/assets/static/sodium-browser.js"></script>
+	<script src="/assets/static/material-components-web.min.js"></script>
+	<script src="/assets/static/authenticate-login.js"></script>
+
+</head>
+
+<body>
+	<div id="react-root">
+		<div id="login-form">
+			<div id="error-line" style="display:none;"><li></li></div>
+			<div id="success-line" style="display:none;"><li></li></div>
+			<label class="mdc-text-field mdc-text-field--outlined">
+				<input id="username" type="text" class="mdc-text-field__input">
+				<div class="mdc-notched-outline mdc-notched-outline--notched">
+					<div class="mdc-notched-outline__leading"></div>
+					<div class="mdc-notched-outline__notch">
+						<span class="mdc-floating-label mdc-floating-label--float-above">Username</span>
+					</div>
+					<div class="mdc-notched-outline__trailing"></div>
+				</div>
+			</label>
+			<label class="mdc-text-field mdc-text-field--outlined">
+				<input id="password" type="password" class="mdc-text-field__input">
+				<div class="mdc-notched-outline mdc-notched-outline--notched">
+					<div class="mdc-notched-outline__leading"></div>
+					<div class="mdc-notched-outline__notch">
+						<span class="mdc-floating-label mdc-floating-label--float-above">Password</span>
+					</div>
+					<div class="mdc-notched-outline__trailing"></div>
+				</div>
+			</label>
+			<div style="display:flex; flex-direction: row; justify-content: space-evenly;">
+				<button id="logout-button" onclick="tiddlyserverLogout()" class="mdc-button mdc-button--outlined"
+					style="align-self:center;">
+					<span class="mdc-button__label">Logout</span>
+				</button>
+				<button id="login-button" onclick="tiddlyserverLogin()" class="mdc-button mdc-button--raised"
+					style="align-self:center;">
+					<span class="mdc-button__label">Login</span>
+				</button>
+			</div>
+		</div>
+	</div>
+</body>
+
+</html>
