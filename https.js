@@ -3,6 +3,8 @@ const fs = require("fs");
 const https = require('https');
 const tls = require("tls");
 
+// use this command to create a new self-signed certificate
+// openssl req -x509 -sha256 -nodes -newkey rsa:2048 -days 365 -keyout localhost.key -out localhost.crt
 
 module.exports = function (iface) {
 	/** @type { import("tls").TlsOptions } Server options object */
