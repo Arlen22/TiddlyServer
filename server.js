@@ -5,7 +5,7 @@ const path = require('path');
 const { inspect } = require('util');
 
 var args = process.argv.slice(2);
-
+// console.log(process.version);
 const settingsFile = path.normalize(
 	(args[0] && args[0].indexOf('--') !== 0)
 		? path.resolve(args.shift())

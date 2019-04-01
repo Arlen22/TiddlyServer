@@ -29,4 +29,3 @@ old-settings.json
 /assets/static/salts-backup.json
 *.key
 *.cer
-/chakracore.dll
