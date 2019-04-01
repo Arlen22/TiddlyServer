@@ -68,29 +68,29 @@ For this example, create a `webroot` and a `backups` folder beside the TiddlySer
 
 Create a `settings.json` file with the following content.
 
-```json
+```json5
 {
-  //The JSON5 parser allows comments!
-  //All relative paths are relative to this file.
-  "tree": {
-    //this tree is just going to mount one folder: webroot
-    "$element": "folder",
-    "path": "../webroot",
-  },
-  "bindInfo": {
+	//The JSON5 parser allows comments!
+	//All relative paths are relative to this file.
+	"tree": {
+		//this tree is just going to mount one folder: webroot
+		"$element": "folder",
+		"path": "../webroot",
+	},
+	"bindInfo": {
 		// V V V V Uncomment one of the following V V V V 
-    //bind to localhost only (you can specify any ip address in this array)
+		//bind to localhost only (you can specify any ip address in this array)
 		// "bindAddress": ["127.0.0.1"],
 		//bind to all interfaces available
 		// "bindWildcard": true
 		//workaround for android devices (bind to all available ip addresses on startup)
 		// "bindWildcard": false, "bindAddress": ["0.0.0.0/0"], "filterBindAddress": true
-  },
-  "putsaver": {
+	},
+	"putsaver": {
 		//single file wikis will backup to this directory on every save
-    "backupDirectory": "../backups" // or "" to disable backups
-  },
-  "$schema": "./settings.schema.json"
+		"backupDirectory": "../backups" // or "" to disable backups
+	},
+	"$schema": "./settings.schema.json"
 }
 ```
 
