@@ -1,32 +1,23 @@
 {
-    // all comments need to be removed from this file
-    // all relative paths are resolved relative to the location
-    // of this file, whether specified on the command line or 
-    // using the default location
-    "tree": {
-        "dropbox": "C:\\Users\\Someone\\Dropbox\\TiddlyWiki",
-        "tiddlywiki": "C:\\TiddlyWiki5-5.1.14",
-        "relative": "../relative_to_settings_file",
-        "linux": "/home/ubuntu/",
-        "branch": {
-            "twig1": "C:/Some Folder",
-            "twig2": "C:/Some Other Folder"
-        }
-    },
-    //this is the default value if types is not specified
-    //this only applies to the directory listing
-    //specifies file extensions for each icon in the files folder
-    "types":{
-        "htmlfile": ["htm", "html"]
-    },
-    "username": "",
-    "password": "",
-    //127.0.0.1 (the default) serves on localhost, 0.0.0.0 serves on all network connections.
-    "host": "127.0.0.1",
-    "port": 8080,
-    //remove or set to an empty string to disable backups when saving single-file wikis
-    "backupDirectory": "", 
-    "etagWindow": 0,
-    "etag": "",
-    "useTW5path" : false
+  //The JSON5 parser allows comments!
+  //All relative paths are relative to this file.
+  "tree": {
+    //this tree is just going to mount one folder: webroot
+    "$element": "folder",
+    "path": "../webroot",
+  },
+  "bindInfo": {
+		// V V V V Uncomment one of the following V V V V 
+    //bind to localhost only (you can specify any ip address in this array)
+		// "bindAddress": ["127.0.0.1"],
+		//bind to all interfaces available
+		// "bindWildcard": true
+		//workaround for android devices (bind to all available ip addresses on startup)
+		// "bindWildcard": false, "bindAddress": ["0.0.0.0/0"], "filterBindAddress": true
+  },
+  "putsaver": {
+		//single file wikis will backup to this directory on every save
+    "backupDirectory": "../backups" // or "" to disable backups
+  },
+  "$schema": "./settings.schema.json"
 }

@@ -7,6 +7,7 @@ import { Observable, Subject } from "../lib/rx";
 import * as path from 'path';
 import * as http from 'http';
 import * as fs from 'fs';
+import * as vm from 'vm';
 
 //import { TiddlyWiki } from 'tiddlywiki';
 import { EventEmitter } from "events";
@@ -168,11 +169,16 @@ function loadDataFolderType(mount: string, folder: string, reload: string) {
 }
 function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string) {
 	console.time('twboot-' + folder);
+	//The bundle in the Tiddlyserver folder
 	const target = "../tiddlywiki";
+	//The source code the 5.1.19 bundle was compiled from
+	// const target = "..\\..\\TiddlyWiki5-compiled\\Source\\TiddlyWiki5-5.1.19";
+	//Jermolene/TiddlyWiki5@master
+	// const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
 	let _wiki = undefined;
 	const $tw = require(target + "/boot/boot.js").TiddlyWiki(
 		require(target + "/boot/bootprefix.js").bootprefix({
-			packageInfo: JSON.parse(fs.readFileSync(path.join(__dirname, target + '/package.json'), 'utf8')),
+			packageInfo: JSON.parse(fs.readFileSync(path.resolve(__dirname, target + '/package.json'), 'utf8')),
 			// get wiki(){
 			// 	console.log((new Error().stack as string).split('\n')[2]);
 			// 	return _wiki;
@@ -188,6 +194,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 		"text": "$protocol$//$host$" + mount + "/",
 		"title": "$:/config/tiddlyweb/host"
 	});
+
 	try {
 		$tw.boot.boot(() => {
 			complete(null, $tw);
@@ -214,7 +221,8 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 			wiki: $tw.wiki,
 			variables: {
 				"path-prefix": mount,
-				"root-tiddler": "$:/core/save/all-external-js"
+				"root-tiddler": "$:/core/save/all"
+				// "root-tiddler": "$:/core/save/all-external-js"
 			}
 		});
 		// server.TS_StateObject_Queue = [];
@@ -233,15 +241,6 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 			let req = new Object(state.req) as http.IncomingMessage & { tsstate: StateObject };
 			req.url += ((state.url.pathname === mount && !state.url.pathname.endsWith("/")) ? "/" : "");
 			req.tsstate = state;
-			// let index = server.TS_Request_Queue.findIndex(undefined as any);
-			// //we reuse array indices to presumably save CPU cycles and memory
-			// if(index !== -1){
-			// 	server.TS_Request_Queue[index] = req;
-			// 	server.TS_StateObject_Queue[index] = state;
-			// } else {
-			// 	server.TS_Request_Queue.push(req);
-			// 	server.TS_StateObject_Queue.push(state);
-			// }
 			server.requestHandler(state.req, state.res);
 		};
 		//send queued websocket clients to the event emitter
@@ -300,7 +299,7 @@ class TiddlyServerAuthentication {
 	authenticateRequest(request: http.IncomingMessage & { tsstate: StateObject }, response: http.ServerResponse, state) {
 		// let index = this.server.TS_Request_Queue.indexOf(request);
 		let tsstate = request.tsstate;
-		if(!tsstate.authAccountsKey && state.allowAnon){
+		if (!tsstate.authAccountsKey && state.allowAnon) {
 			return true;
 		} else if (tsstate.authAccountsKey) {
 			state.authenticatedUsername = tsstate.username;

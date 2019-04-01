@@ -130,4 +130,4 @@ app.controller("SettingsPageCtrl", function ($scope, $http) {
 // <span style="display:inline-block; width:200px">{{item.name}}</span>
 // <input type="text" ng-model="outputs[item.output]"/>
 // `
-// 	} 
+// 	}

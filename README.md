@@ -14,18 +14,17 @@ Data folders store individual tiddlers instead of entire wikis. They take less d
 
 ### Benefits
 
-* Seemlessly convert between data folders and single-file wikis.
-* Allows relative linking to external files. The same link works in both data folders and single files. 
+* Open single-file wikis and data folder wikis with a single click.
 * Allows you to access your wikis from any computer on the network. 
 * Files save and load instantly on the same computer, and quickly across the network.
-* Mount any location on your computer (in theory, anything NodeJS can stat).
+* Mount any location on your computer (in theory anything NodeJS can stat).
 
 ### Features
  - Uses a folder structure specified in settings.json allowing you serve any folders on the filesystem in whatever tree structure you like.
  - Serves all files found in the folder structure.
  - Saves individual files using the put saver.
  - Allows you to upload a file to any directory (but not categories), or create new directories and data folders. 
-   - Want to make a new data folder? First create it as a directory, then upload your `tiddlywiki.info` file to it.
+   - Want to make a new data folder? First create a directory, then upload your `tiddlywiki.info` file to it.
  - Loads data folders using TiddlyWiki then forwards all requests to the listen command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder`)
  - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
 
@@ -37,7 +36,7 @@ Data folders store individual tiddlers instead of entire wikis. They take less d
 >
 > You will need to use the bookmarklet included in the directory pages to fix the saving. The bookmarklet needs to be clicked each time the affected wiki is opened, after which saving should work normally until the page is reloaded. If there are unsaved changes, another change needs to be made to trigger a save.
 >
-> The updated tiddler is also included as another link and may be dragged into the wiki to import the tiddler normally. After import the wiki will still need to be saved, either by downloading or by using the bookmarklet.
+> The updated tiddler is also included as another link and may be dragged into the wiki to import the tiddler normally. After import, the wiki will still need to be saved, either by downloading or by using the bookmarklet.
 >
 > This is a bug in TiddlyWiki, and is fixed in version 5.1.15. 
 
@@ -47,7 +46,7 @@ This guide is intended for those who are less techy or who just like more verbos
 
 ## How to upgrade
 
-Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0, you need to run `node upgrade-settings.json` after you copy it in.
+Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0.x to 2.1.x, you need to run `node upgrade-settings.json` after you copy it in and follow the instructions.
 
 ## Where to Start
 
@@ -65,25 +64,38 @@ Now you need to create `settings.json`.
 - If you are upgrading from 2.0, you need to run `node upgrade-settings.js` and follow the instructions. 
 - Otherwise, create a `settings.json` file with the following content.
 
+For this example, create a `webroot` and a `backups` folder beside the TiddlyServer folder. 
+
+Create a `settings.json` file with the following content.
+
 ```json
 {
   //The JSON5 parser allows comments!
   //All relative paths are relative to this file.
   "tree": {
-    //this tree is just going to mount one folder
+    //this tree is just going to mount one folder: webroot
     "$element": "folder",
     "path": "../webroot",
   },
   "bindInfo": {
-    //bind to localhost only
-    "bindAddress": ["127.0.0.1"] 
+		// V V V V Uncomment one of the following V V V V 
+    //bind to localhost only (you can specify any ip address in this array)
+		// "bindAddress": ["127.0.0.1"],
+		//bind to all interfaces available
+		// "bindWildcard": true
+		//workaround for android devices (bind to all available ip addresses on startup)
+		// "bindWildcard": false, "bindAddress": ["0.0.0.0/0"], "filterBindAddress": true
   },
   "putsaver": {
+		//single file wikis will backup to this directory on every save
     "backupDirectory": "../backups" // or "" to disable backups
   },
   "$schema": "./settings.schema.json"
 }
 ```
+
+Uncomment one of the lines in `bindInfo` according to your use case. The bindAddress array may be set to any IP addresses desired.
+
 ## Ready to Run
 
 You have multiple options depending on your operating system.
@@ -92,7 +104,7 @@ You have multiple options depending on your operating system.
 
  - Open the start menu (Windows 7 or later) or press Win + R, then enter `cmd` and press enter. Use the `cd` command to navigate to the TiddlyServer directory, then run `node server.js`. 
  - You can also right-click on the TiddlyServer folder while holding down Shift, and click "Open in Command Prompt". Then run `node server.js`.
- - You can also make a copy of the shortcut for NodeJS and then add `server.js` to the target field of the shortcut. Node will look for the `server.js` file in the "start in" directory, so set it to the TiddlyServer directory. 
+ - You can also make a copy of the shortcut for NodeJS and then add `server.js` to the target field of the shortcut. Node will look for the `server.js` file in the "start in" directory, so set it to the TiddlyServer directory. You can also specify the absolute path of `server.js`. The "start in" directory (aka 'cwd') has no affect on TiddlyServer itself.
 
 ### Mac OS
 
@@ -112,7 +124,7 @@ The other option is to use Termux. If you have a keyboard attached to your Andro
 
 ### iOS
 
-Sorry, we're still kind of up the creek on this one, but if you can find a way to install Node on iOS, then that's what you need. 
+Sorry, we're still kind of up the creek on this one, but if you can find a way to run Node on iOS, then that's what you need. 
 
 ### Anything else
 
@@ -124,7 +136,10 @@ If these do not answer your question, feel free to open an issue or ask on the T
 
 ### TiddlyServer throws a Syntax Error on start up
 
-Make sure you are running at least Node version 6. This is the minimum supported.
+The minimum Node version required is 
+
+TiddlyServer 2.0: Node v6 (this is the minimum required)
+TiddlyServer 2.1: Node v8 (this is the minimum supported*)
 
 ## Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.

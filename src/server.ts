@@ -211,6 +211,7 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 	});
 
 }
+
 /**
  * All this function does is create the servers and start listening. The settings object is emitted 
  * on the eventer and addListeners is called to add the listeners to each server before 
@@ -311,7 +312,7 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 						&& (!settings.bindInfo.filterBindAddress || tester(e.address).usable)
 					).map(e => e.address)
 				: hosts
-			).join('\n')
+			.map(e => (settings.bindInfo.https ? "https" : "http") + "://" + e + ":" + settings.bindInfo.port)).join('\n')
 		);
 	});
 
