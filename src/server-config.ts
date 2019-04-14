@@ -1,5 +1,5 @@
 /** @type { import("path") } */
-const path: typeof import("path") = require("path/")
+const path: typeof import("path") = require("path")
 
 function format(str: string, ...args: any[]) {
 	while (args.length && str.indexOf("%s") !== -1)

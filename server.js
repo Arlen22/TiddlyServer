@@ -12,17 +12,16 @@ const settingsFile = path.normalize(
 		: path.join(__dirname, './settings.json')
 );
 const settingsPath = path.dirname(settingsFile);
-
+debugger;
 const server = require('./src/server');
 server.libsReady.then(() => {
 	const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
 	// console.log(settings);
 	server.eventer.emit("settings", settings);
 	let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;
-
 	server.initServer({
 		// env: "node",
-		settingshttps: httpsSettingsFile && require(httpsSettingsFile),
+		settingshttps: httpsSettingsFile && require(httpsSettingsFile).serverOptions,
 		preflighter: fs.existsSync(__dirname + "/preflighter.js")
 			//@ts-ignore
 			? require("./preflighter.js")

@@ -167,26 +167,19 @@ function loadDataFolderType(mount: string, folder: string, reload: string) {
 		}
 	})
 }
+
 function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string) {
 	console.time('twboot-' + folder);
 	//The bundle in the Tiddlyserver folder
-	const target = "../tiddlywiki";
+	// const target = "../tiddlywiki";
 	//The source code the 5.1.19 bundle was compiled from
 	// const target = "..\\..\\TiddlyWiki5-compiled\\Source\\TiddlyWiki5-5.1.19";
 	//Jermolene/TiddlyWiki5@master
-	// const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
+	const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
 	let _wiki = undefined;
 	const $tw = require(target + "/boot/boot.js").TiddlyWiki(
 		require(target + "/boot/bootprefix.js").bootprefix({
 			packageInfo: JSON.parse(fs.readFileSync(path.resolve(__dirname, target + '/package.json'), 'utf8')),
-			// get wiki(){
-			// 	console.log((new Error().stack as string).split('\n')[2]);
-			// 	return _wiki;
-			// },
-			// set wiki(v){
-			// 	console.log((new Error().stack as string).split('\n')[2]);
-			// 	_wiki = v;
-			// }
 		})
 	);
 	$tw.boot.argv = [folder];
