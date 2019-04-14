@@ -141,7 +141,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 			upload: isFolder && (allow.upload),
 			mkdir: isFolder && (allow.mkdir),
 			mixFolders: settings.directoryIndex.mixFolders,
-			isLoggedIn: state.username ? (state.username + " (as " + state.authAccountsKey + ")") : false
+			isLoggedIn: state.username ? (state.username + " (group " + state.authAccountsKey + ")") : false
 		};
 		getNewTreePathFiles(result, state)
 			.map(e => [e, options] as [typeof e, typeof options])
