@@ -1,5 +1,9 @@
-const { ConvertSettings, tryParseJSON, NewDefaultSettings } = require('./src/server-types');
+const { tryParseJSON } = require("./src/server-types");
+const { ConvertSettings, OldDefaultSettings } = require('./src/server-config');
 const fs = require('fs');
+const path = require("path");
+
+if(!ConvertSettings || !tryParseJSON || !OldDefaultSettings) throw "invalid imports";
 
 console.log(`
 ============================================
@@ -16,7 +20,6 @@ still want to load datafolders without a trailing
 slash, set the noTrailingSlash property for the 
 parent folder specified in the tree. 
 
-The conversion failed because:
 `)
 
 let errors = [
@@ -32,11 +35,10 @@ if (errors.some(e => e)) {
 	return;
 }
 
-let settingsStr = fs.readFileSync(process.argv[2], "utf8")
+let settingsStr = fs.readFileSync(process.argv[2], "utf8");
 let oldSettings = tryParseJSON(settingsStr, (err) => console.log(err));
+OldDefaultSettings(oldSettings);
 let newSettings = ConvertSettings(oldSettings);
-newSettings = JSON.parse(JSON.stringify(newSettings));
-newSettings = NewDefaultSettings(newSettings);
 
 function convertTree(tree) {
 	if (typeof tree === "string") {
@@ -53,7 +55,7 @@ function convertTree(tree) {
 }
 
 newSettings.tree = convertTree(newSettings.tree);
+let newpath = path.resolve(process.argv[3]);
+fs.writeFileSync(newpath, JSON.stringify(newSettings, null, 2));
 
-fs.writeFileSync(process.argv[3], JSON.stringify(newSettings, null, 2));
-
-console.log("It didn't fail, it actually worked");
+console.log("Successfully converted settings. The new file is \n" + newpath);
