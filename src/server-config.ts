@@ -102,6 +102,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 		__filename: "",
 		__assetsDir: "",
 		_devmode: !!set._devmode,
+		_datafoldertarget: set._datafoldertarget || "",
 		tree: normalizeSettingsTree(settingsDir, set.tree as any),
 		bindInfo: {
 			...{
@@ -188,6 +189,12 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 export interface ServerConfigSchema {
 	/** enables certain expensive per-request checks */
 	_devmode?: boolean;
+	/** 
+	 * The tiddlywiki folder to use for data folder instances. Defaults to the 
+	 * tiddlywiki folder in the TiddlyServer installation regardless of the 
+	 * settings.json location.
+	 */
+	_datafoldertarget?: string;
 	tree: NewTreeObjectSchemaItem
 	/** bind address and port info */
 	bindInfo?: Partial<ServerConfig_BindInfo & {
@@ -242,6 +249,8 @@ export interface ServerConfigSchema {
 export interface ServerConfig {
 	/** enables certain expensive per-request checks */
 	_devmode: boolean;
+	/** the tiddlywiki folder to use for data folder instances */
+	_datafoldertarget: string;
 	tree: NewTreeGroup | NewTreePath
 	/** bind address and port */
 	bindInfo: ServerConfig_BindInfo & {
@@ -592,6 +601,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 		__dirname: set.__dirname,
 		__filename: set.__filename,
 		_devmode: set._devmode,
+		_datafoldertarget: "",
 		tree: set.tree,
 		bindInfo: {
 			bindAddress: (set.host === "0.0.0.0" || set.host === "::") ? [] : [set.host],
