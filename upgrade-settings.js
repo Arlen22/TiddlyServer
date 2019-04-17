@@ -55,7 +55,10 @@ function convertTree(tree) {
 }
 
 newSettings.tree = convertTree(newSettings.tree);
+delete newSettings._datafoldertarget;
+delete newSettings._devmode;
 let newpath = path.resolve(process.argv[3]);
 fs.writeFileSync(newpath, JSON.stringify(newSettings, null, 2));
 
 console.log("Successfully converted settings. The new file is \n" + newpath);
+

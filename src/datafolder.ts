@@ -175,7 +175,10 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 	//The source code the 5.1.19 bundle was compiled from
 	// const target = "..\\..\\TiddlyWiki5-compiled\\Source\\TiddlyWiki5-5.1.19";
 	//Jermolene/TiddlyWiki5@master
-	const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
+	// const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
+	const target = settings._datafoldertarget
+		? path.resolve(settings.__dirname, settings._datafoldertarget)
+		: "../tiddlywiki";
 	let _wiki = undefined;
 	const $tw = require(target + "/boot/boot.js").TiddlyWiki(
 		require(target + "/boot/bootprefix.js").bootprefix({
