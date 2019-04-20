@@ -90,7 +90,7 @@ Create a `settings.json` file with the following content.
 		//single file wikis will backup to this directory on every save
 		"backupDirectory": "../backups" // or "" to disable backups
 	},
-	"$schema": "./settings.schema.json"
+	"$schema": "./settings-2-1.schema.json"
 }
 ```
 
