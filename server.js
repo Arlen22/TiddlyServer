@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 //@ts-check
 require("./lib/source-map-support-lib");
 const fs = require('fs');
