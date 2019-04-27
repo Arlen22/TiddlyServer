@@ -301,9 +301,9 @@ export interface ServerConfig_ClientsideDatafolders {
 export interface ServerConfig_AuthAccountsValue {
 	// /** Record[username] = password */
 	// passwords: Record<string, string>,
-	/** Record[username] = public key */
+	/** Hashmap of [username] = public key */
 	clientKeys: Record<string, string>,
-	/** override hostLevelPermissions for this account */
+	/** override hostLevelPermissions for users with this account */
 	permissions: ServerConfig_AccessOptions
 }
 export interface ServerConfig_AccessOptions {
@@ -446,15 +446,7 @@ export type NewTreeObjectSchemaItem = NewTreeHashmapGroupSchema | NewTreeHashmap
  */
 export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePathSchema | string;
 export type NewTreeItem = NewTreeGroup | NewTreePath | NewTreeOptions;
-export interface NewTreeGroup {
-	$element: "group";
-	key: string;
-	$children: (NewTreeItem | NewTreeOptions)[];
-}
-export interface NewTreeHashmapPath {
-	$element: "folder";
-	/** Path relative to this file or any absolute path NodeJS can stat */
-	path: string;
+export interface NewTreeMountArgs{ 
 	/** 
 	 * Load data folders under this path with no trailing slash.
 	 * This imitates single-file wikis and allows tiddlers with relative links
@@ -462,6 +454,18 @@ export interface NewTreeHashmapPath {
 	 * relative link becomes the data folder itself as though it is actually a file.
 	 */
 	noTrailingSlash?: boolean;
+
+}
+export interface NewTreeGroup extends NewTreeMountArgs {
+	$element: "group";
+	key: string;
+	$children: (NewTreeItem | NewTreeOptions)[];
+}
+export interface NewTreeHashmapPath extends NewTreeMountArgs {
+	$element: "folder";
+	/** Path relative to this file or any absolute path NodeJS can stat */
+	path: string;
+
 	$children: NewTreeOptions[];
 
 }
@@ -474,7 +478,8 @@ export interface NewTreePath extends NewTreeHashmapPath {
 /** @default { "$element": "" } */
 export type NewTreeOptions =
 	| NewTreePathOptions_Index
-	| NewTreePathOptions_Auth;
+	| NewTreePathOptions_Auth
+	| NewTreePathOptions_Backup;
 
 export interface NewTreePathOptions_Index {
 	/**
@@ -490,7 +495,7 @@ export interface NewTreePathOptions_Index {
 	/** 
 	 * Look for index files named exactly this or with one of the defaultExts added. 
 	 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","html"] would 
-	 * look for "index.htm", "index.html", in that order. 
+	 * look for ["index.htm","index.html","index"] in that order. 
 	 */
 	indexFile: string[],
 	/** 
@@ -513,8 +518,33 @@ export interface NewTreePathOptions_Auth {
 	 * regardless of whether there are auth elements in the tree.
 	 */
 	$element: "auth";
-	/** list of keys from authAccounts (that have credentials) that can access this resource */
+	/** list of keys from authAccounts object that can access this resource */
 	authList: string[];
+}
+export interface NewTreePathOptions_Backup {
+	/** Options related to backups for single-file wikis.  */
+	$element: "backups",
+	/** 
+	 * Backup folder to store backups in. Multiple folder paths 
+	 * can backup to the same folder if desired. 
+	 */
+	backupFolder: string,
+	/** 
+	 * GZip backup file to save disk space. Good for larger wikis. Turn this off
+	 * for experimental wikis that you often need to restore from a backup because
+	 * of a bad line of code (I speak from experience).
+	 */
+	gzip: boolean,
+	/** 
+	 * Save a backup only if the disk copy is older than this many seconds. 
+	 * If the file on disk is only a few minutes old it can be assumed that 
+	 * very little has changed since the last save. So if this is set to 10 minutes,
+	 * and your wiki gets saved every 9 minutes, only the first save will trigger a backup.
+	 * This is a useful option for large wikis that see a lot of daily work but not 
+	 * useful for experimental wikis which might crash at any time and need to be 
+	 * reloaded from the last backup. 
+	 */
+	etagAge: number,
 }
 
 export interface ServerConfigBase {
