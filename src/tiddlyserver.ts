@@ -156,7 +156,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		if (state.url.query.formtype === "upload") {
 
 			if (isNewTreeGroup(result.item))
-				return state.throwReason(400, "upload is not possible for tree items");
+				return state.throwReason(400, "upload is not possible for tree groups");
 			if (!allow.upload)
 				return state.throwReason(403, "upload is not allowed over the network")
 
