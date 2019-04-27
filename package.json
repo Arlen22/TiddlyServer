@@ -14,7 +14,7 @@
   "devDependencies": {
     "@fidm/x509": "^1.2.0",
     "@types/libsodium-wrappers": "^0.7.5",
-    "@types/node": ">=6.0.73 <7.0.0",
+    "@types/node": "^8",
     "ajv": "^6.6.2",
     "asn1.js": "^5.0.1",
     "etag": "^1.8.1",
