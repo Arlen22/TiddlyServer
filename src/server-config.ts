@@ -528,6 +528,12 @@ export interface NewTreePathOptions_Auth {
 	$element: "auth";
 	/** list of keys from authAccounts object that can access this resource */
 	authList: string[];
+	/** 
+	 * Which error code to return for unauthorized (or anonymous) requests
+	 * - 403 Access Denied: Client is not granted permission to access this resouce.
+	 * - 404 Not Found: Client is told that the resource does not exist.
+	 */
+	authError: "403" | "404";
 }
 export interface NewTreePathOptions_Backup {
 	/** Options related to backups for single-file wikis.  */
