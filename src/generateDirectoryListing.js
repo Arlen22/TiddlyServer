@@ -30,18 +30,6 @@ exports.generateDirectoryListing = function (directory, options) {
         <a href="${encodeURI(entry.path)}">${entry.name}</a>
     </span>
 </li>`
-// return `<tr class="row ${(index + 1) % 2 ? 'odd' : 'even'} ${entry.type}">
-//     <td>
-//         <span class="icon">
-//             <img style="width:16px;" src="/assets/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
-//         </span>
-//         <span class="name">
-//             <a href="${encodeURI(entry.path)}">${entry.name}</a>
-//         </span>
-//     </td>
-//     <td class="type"><span>${entry.type}</span></td>
-//     <td class="size"><span>${entry.size}</span></td>
-// </tr>`
         }).join("")
     }
     const pathArr = directory.path.split('/').filter(a => a);
