@@ -7,13 +7,14 @@ function format(str: string, ...args: any[]) {
 	args.unshift(str);
 	return args.join(',');
 }
-
+const homedir = require("os").homedir();
 export function normalizeTree(settingsDir: string, item: NewTreeObjectSchemaItem | NewTreeOptions | NewTreeItem, key: string | undefined, keypath): NewTreeItem {
 	// let t = item as NewTreeObjectSchemaItem;
 	if (typeof item === "string" || item.$element === "folder") {
 		if (typeof item === "string") item = { $element: "folder", path: item } as NewTreePath;
 		if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
-		item.path = path.resolve(settingsDir, item.path);
+		if(item.path.startsWith("~")) item.path = path.join(homedir, item.path.slice(1));
+		else item.path = path.resolve(settingsDir, item.path);
 		key = key || path.basename(item.path);
 		//the hashmap key overrides the key attribute if available
 		return { ...item, key } as NewTreePath;
@@ -404,7 +405,11 @@ export interface ServerConfig_DirectoryIndex {
 export interface ServerConfig_TiddlyServer {
 	/** backup directory for saving SINGLE-FILE wikis only */
 	backupDirectory: string
-	/** whether to use the etag field -- if not specified then it will check it if presented */
+	/** 
+	 * Whether to use the etag field -- if not specified then it will check it if presented.
+	 * This does not affect the backup etagAge option, as the saving mechanism will still 
+	 * send etags back to the browser, regardless of this option.
+	 */
 	etag: "required" | "disabled" | ""
 	/** etag does not need to be exact by this many seconds */
 	etagWindow: number
@@ -463,14 +468,20 @@ export interface NewTreeHashmapPath extends NewTreeMountArgs {
 	$element: "folder";
 	/** Path relative to this file or any absolute path NodeJS can stat */
 	path: string;
-	/**  **
+	/**
 	 * Load data folders under this path with no trailing slash.
 	 * This imitates single-file wikis and allows tiddlers with relative links
 	 * to be imported directly into a data folder wiki. The source point of the 
 	 * relative link becomes the data folder itself as though it is actually a file.
+	 * However, this breaks relative links to resources served by the datafolder instance
+	 * itself, such as the files directory introduced in 5.1.19 and requires the relative
+	 * link to include the data folder name in the relative link. For this reason, 
+	 * it is better to convert single-file wikis to the datafolder format by putting each
+	 * wiki inside its own folder as index.html, putting a "files" folder beside the 
+	 * index.html file, and adding an index option to this element.
 	 */
 	noTrailingSlash?: boolean;
-	$children: NewTreeOptions[];
+	$children?: NewTreeOptions[];
 
 }
 export interface NewTreePathSchema extends NewTreeHashmapPath {
@@ -487,13 +498,16 @@ export type NewTreeOptions =
 
 export interface NewTreePathOptions_Index {
 	/**
-	 * Options related to the directory index (request paths ending in a 
-	 * backslash which do not resolve to a TiddlyWiki data folder).
+	 * Options related to the directory index (request paths that resolve to a folder
+	 * which is not a data folder). Option elements affect the group
+	 * they belong to and all children under that. Each property in an option element 
+	 * replaces the key from parent option elements.
 	 */
 	$element: "index",
 	/** 
 	 * The format of the index generated if no index file is found, or "403" to 
-	 * return a 403 Access Denied, or "404" to return a 404 Not Found.
+	 * return a 403 Access Denied, or "404" to return a 404 Not Found. 403 is the 
+	 * error code used by Apache and Nginx. 
 	 */
 	defaultType: "html" | "json" | "403" | "404",
 	/** 
@@ -501,23 +515,24 @@ export interface NewTreePathOptions_Index {
 	 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","html"] would 
 	 * look for ["index.htm","index.html","index"] in that order. 
 	 * 
-	 * Folder elements only
+	 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
+	 * To use a .hidden file, put the full filename here, and set indexExts to `[""]`. 
 	 */
 	indexFile: string[],
 	/** 
 	 * Extensions to add when looking for an index file. A blank string will set the order 
 	 * to search for the exact indexFile name. The extensions are searched in the order specified. 
 	 * 
-	 * Folder elements only
+	 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
+	 * To search for an exact indexFile, specify a blank string inside an array `[""]`.
 	 */
 	indexExts: string[]
 }
 export interface NewTreePathOptions_Auth {
 	/** 
-	 * Only allow requests using these authAccounts. This affects all descendants under 
-	 * this item unless another auth element is found further down. Each auth element stands alone and 
-	 * completely overrides the auth elements above them, so a more restrictive auth element
-	 * can be overridden by a less restrictive auth element below it. 
+	 * Only allow requests using these authAccounts. Option elements affect the group
+	 * they belong to and all children under that. Each property in an option element 
+	 * replaces the key from parent option elements.
 	 * 
 	 * Anonymous requests are ALWAYS denied if an auth element applies to the requested path. 
 	 * 
@@ -527,7 +542,7 @@ export interface NewTreePathOptions_Auth {
 	 */
 	$element: "auth";
 	/** list of keys from authAccounts object that can access this resource */
-	authList: string[];
+	authList: string[] | null;
 	/** 
 	 * Which error code to return for unauthorized (or anonymous) requests
 	 * - 403 Access Denied: Client is not granted permission to access this resouce.
@@ -536,7 +551,9 @@ export interface NewTreePathOptions_Auth {
 	authError: "403" | "404";
 }
 export interface NewTreePathOptions_Backup {
-	/** Options related to backups for single-file wikis.  */
+	/** Options related to backups for single-file wikis. Option elements affect the group
+	 * they belong to and all children under that. Each property in an option element 
+	 * replaces the key from parent option elements. */
 	$element: "backups",
 	/** 
 	 * Backup folder to store backups in. Multiple folder paths 

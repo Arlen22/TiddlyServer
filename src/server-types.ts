@@ -1063,7 +1063,8 @@ export class StateObject {
 
 	statPath: StatPathResult;
 
-	ancestry: NewTreeGroup | NewTreePath;
+	/** The tree ancestors in descending order, including the final folder element. */
+	ancestry: (NewTreeGroup | NewTreePath)[];
 
 	url: StateObjectUrl;
 
