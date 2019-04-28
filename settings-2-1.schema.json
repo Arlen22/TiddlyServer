@@ -144,7 +144,7 @@
 								"disabled",
 								""
 							],
-							"description": "whether to use the etag field -- if not specified then it will check it if presented"
+							"description": "Whether to use the etag field -- if not specified then it will check it if presented.\r\nThis does not affect the backup etagAge option, as the saving mechanism will still \r\nsend etags back to the browser, regardless of this option."
 						},
 						"etagWindow": {
 							"type": "number",
@@ -303,7 +303,7 @@
 				},
 				"noTrailingSlash": {
 					"type": "boolean",
-					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file."
+					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file.\r\nHowever, this breaks relative links to resources served by the datafolder instance\r\nitself, such as the files directory introduced in 5.1.19 and requires the relative\r\nlink to include the data folder name in the relative link. For this reason, \r\nit is better to convert single-file wikis to the datafolder format by putting each\r\nwiki inside its own folder as index.html, putting a \"files\" folder beside the \r\nindex.html file, and adding an index option to this element."
 				},
 				"$children": {
 					"type": "array",
@@ -317,7 +317,6 @@
 			},
 			"additionalProperties": false,
 			"required": [
-				"$children",
 				"$element",
 				"path"
 			]
@@ -329,6 +328,9 @@
 				},
 				{
 					"$ref": "#/definitions/NewTreePathOptions_Auth"
+				},
+				{
+					"$ref": "#/definitions/NewTreePathOptions_Backup"
 				}
 			],
 			"default": {
@@ -343,7 +345,7 @@
 					"enum": [
 						"index"
 					],
-					"description": "Options related to the directory index (request paths ending in a \r\nbackslash which do not resolve to a TiddlyWiki data folder)."
+					"description": "Options related to the directory index (request paths that resolve to a folder\r\nwhich is not a data folder). Option elements affect the group\r\nthey belong to and all children under that. Each property in an option element \r\nreplaces the key from parent option elements."
 				},
 				"defaultType": {
 					"type": "string",
@@ -353,21 +355,21 @@
 						"403",
 						"404"
 					],
-					"description": "The format of the index generated if no index file is found, or \"403\" to \r\nreturn a 403 Access Denied, or \"404\" to return a 404 Not Found."
+					"description": "The format of the index generated if no index file is found, or \"403\" to \r\nreturn a 403 Access Denied, or \"404\" to return a 404 Not Found. 403 is the \r\nerror code used by Apache and Nginx."
 				},
 				"indexFile": {
 					"type": "array",
 					"items": {
 						"type": "string"
 					},
-					"description": "Look for index files named exactly this or with one of the defaultExts added. \r\nFor example, a defaultFile of [\"index\"] and a defaultExts of [\"htm\",\"html\"] would \r\nlook for \"index.htm\", \"index.html\", in that order."
+					"description": "Look for index files named exactly this or with one of the defaultExts added. \r\nFor example, a defaultFile of [\"index\"] and a defaultExts of [\"htm\",\"html\"] would \r\nlook for [\"index.htm\",\"index.html\",\"index\"] in that order. \r\n\r\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\r\nTo use a .hidden file, put the full filename here, and set indexExts to `[\"\"]`."
 				},
 				"indexExts": {
 					"type": "array",
 					"items": {
 						"type": "string"
 					},
-					"description": "Extensions to add when looking for an index file. A blank string will set the order \r\nto search for the exact indexFile name. The extensions are searched in the order specified."
+					"description": "Extensions to add when looking for an index file. A blank string will set the order \r\nto search for the exact indexFile name. The extensions are searched in the order specified. \r\n\r\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\r\nTo search for an exact indexFile, specify a blank string inside an array `[\"\"]`."
 				}
 			},
 			"required": [
@@ -386,19 +388,66 @@
 					"enum": [
 						"auth"
 					],
-					"description": "Only allow requests using these authAccounts. This affects all descendants under \r\nthis item unless another auth element is found further down. Each auth element stands alone and \r\ncompletely overrides the auth elements above them, so a more restrictive auth element\r\ncan be overridden by a less restrictive auth element below it. \r\n\r\nAnonymous requests are ALWAYS denied if an auth element applies to the requested path. \r\n\r\nNote that this does not change server authentication procedures. \r\nData folders are always given the authenticated username\r\nregardless of whether there are auth elements in the tree."
+					"description": "Only allow requests using these authAccounts. Option elements affect the group\r\nthey belong to and all children under that. Each property in an option element \r\nreplaces the key from parent option elements.\r\n\r\nAnonymous requests are ALWAYS denied if an auth element applies to the requested path. \r\n\r\nNote that this does not change server authentication procedures. \r\nData folders are always given the authenticated username\r\nregardless of whether there are auth elements in the tree."
 				},
 				"authList": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "list of keys from authAccounts (that have credentials) that can access this resource"
+					"anyOf": [
+						{
+							"type": "array",
+							"items": {
+								"type": "string"
+							}
+						},
+						{
+							"type": "null"
+						}
+					],
+					"description": "list of keys from authAccounts object that can access this resource"
+				},
+				"authError": {
+					"type": "string",
+					"enum": [
+						"403",
+						"404"
+					],
+					"description": "Which error code to return for unauthorized (or anonymous) requests\r\n- 403 Access Denied: Client is not granted permission to access this resouce.\r\n- 404 Not Found: Client is told that the resource does not exist."
 				}
 			},
 			"required": [
 				"$element",
-				"authList"
+				"authList",
+				"authError"
+			],
+			"additionalProperties": false
+		},
+		"NewTreePathOptions_Backup": {
+			"type": "object",
+			"properties": {
+				"$element": {
+					"type": "string",
+					"enum": [
+						"backups"
+					],
+					"description": "Options related to backups for single-file wikis. Option elements affect the group\r\nthey belong to and all children under that. Each property in an option element \r\nreplaces the key from parent option elements."
+				},
+				"backupFolder": {
+					"type": "string",
+					"description": "Backup folder to store backups in. Multiple folder paths \r\ncan backup to the same folder if desired."
+				},
+				"gzip": {
+					"type": "boolean",
+					"description": "GZip backup file to save disk space. Good for larger wikis. Turn this off\r\nfor experimental wikis that you often need to restore from a backup because\r\nof a bad line of code (I speak from experience)."
+				},
+				"etagAge": {
+					"type": "number",
+					"description": "Save a backup only if the disk copy is older than this many seconds. \r\nIf the file on disk is only a few minutes old it can be assumed that \r\nvery little has changed since the last save. So if this is set to 10 minutes,\r\nand your wiki gets saved every 9 minutes, only the first save will trigger a backup.\r\nThis is a useful option for large wikis that see a lot of daily work but not \r\nuseful for experimental wikis which might crash at any time and need to be \r\nreloaded from the last backup."
+				}
+			},
+			"required": [
+				"$element",
+				"backupFolder",
+				"gzip",
+				"etagAge"
 			],
 			"additionalProperties": false
 		},
@@ -441,7 +490,7 @@
 				},
 				"noTrailingSlash": {
 					"type": "boolean",
-					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file."
+					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file.\r\nHowever, this breaks relative links to resources served by the datafolder instance\r\nitself, such as the files directory introduced in 5.1.19 and requires the relative\r\nlink to include the data folder name in the relative link. For this reason, \r\nit is better to convert single-file wikis to the datafolder format by putting each\r\nwiki inside its own folder as index.html, putting a \"files\" folder beside the \r\nindex.html file, and adding an index option to this element."
 				},
 				"$children": {
 					"type": "array",
@@ -452,8 +501,7 @@
 			},
 			"required": [
 				"$element",
-				"path",
-				"$children"
+				"path"
 			],
 			"additionalProperties": false
 		},
@@ -497,11 +545,11 @@
 					"additionalProperties": {
 						"type": "string"
 					},
-					"description": "Record[username] = public key"
+					"description": "Hashmap of [username] = public key"
 				},
 				"permissions": {
 					"$ref": "#/definitions/ServerConfig_AccessOptions",
-					"description": "override hostLevelPermissions for this account"
+					"description": "override hostLevelPermissions for users with this account"
 				}
 			},
 			"required": [
