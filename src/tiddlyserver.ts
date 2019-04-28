@@ -29,6 +29,7 @@ import { AnonymousSubscription } from "rxjs/Subscription";
 import { send, formidable } from '../lib/bundled-lib';
 import { Stats } from "fs";
 import { last } from "rxjs/operator/last";
+import { NewTreeOptions, NewTreePathOptions_Backup, NewTreePathOptions_Index } from "./server-config";
 
 const debug = DebugLogger("SER-API");
 __dirname = path.dirname(module.filename || process.execPath);
@@ -61,7 +62,7 @@ export function init(eventer: ServerEventEmitter) {
 
 type apiListRouteState = [[string, string], string | any, StateObject]
 export function checkRouteAllowed(state: StateObject, result: PathResolverResult) {
-	type CC = (NewTreeGroup["$children"][0] | NewTreePath["$children"][0]);
+	type CC = (NewTreeGroup["$children"][0] | NewTreeOptions);
 	let lastAuth: NewTreePathOptions_Auth | undefined;
 	let findAuth = (f): f is NewTreePathOptions_Auth => f.$element === "auth";
 	result.ancestry.concat(result.item).forEach((e) => {
@@ -70,14 +71,40 @@ export function checkRouteAllowed(state: StateObject, result: PathResolverResult
 	// console.log(lastAuth, state.authAccountsKey);
 	return !lastAuth || lastAuth.authList.indexOf(state.authAccountsKey) !== -1;
 }
+export function getTreeOptions(state: StateObject, tree: ServerConfig["tree"]) {
+	let options: {
+		auth: NewTreePathOptions_Auth,
+		backups: NewTreePathOptions_Backup,
+		index: NewTreePathOptions_Index
+	} = {
+		auth: { $element: "auth", authError: "403", authList: null },
+		backups: { $element: "backups", backupFolder: "", etagAge: 0, gzip: true },
+		index: { $element: "index", defaultType: "html", indexFile: [], indexExts: [] }
+	}
+	state.ancestry.forEach((e) => {
+		console.log(e.key);
+		e.$children && e.$children.forEach((f) => {
+			if (f.$element === "auth" || f.$element === "backups" || f.$element === "index") {
+				Object.keys(f).forEach(k => {
+					if(f[k] === undefined) return;
+					options[f.$element][k] = f[k];
+				})
+			}
+		})
+	});
+
+}
 export function handleTiddlyServerRoute(state: StateObject) {
 
 	// const resolvePath = (settings.tree);
 	Observable.of(state).mergeMap((state: StateObject) => {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
+		state.ancestry = result.ancestry;
+		console.log(result.ancestry);
 		if (!result) return state.throw<never>(404);
 		//handle route authentication
 		if (!checkRouteAllowed(state, result)) {
+
 			return state.throw<never>(403);
 		}
 		if (isNewTreeGroup(result.item)) {
