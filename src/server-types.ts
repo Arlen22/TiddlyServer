@@ -35,7 +35,8 @@ import {
 	ServerConfig_AccessOptions,
 	ServerConfig_BindInfo,
 	normalizeSettings,
-	ConvertSettings
+	ConvertSettings,
+	NewTreeOptionsObject
 } from "./server-config";
 export {
 	NewTreeGroup,
@@ -447,8 +448,8 @@ export interface ServeStaticResult {
 
 
 
-export function serveFile(state: StateObject, file: string, root: string) {
-	obs_stat(state)(path.join(root, file)).mergeMap(([err, stat]): any => {
+export function serveFile(state: StateObject, file: string, root: string | null) {
+	obs_stat(state)(root ? path.join(root, file) : file).mergeMap(([err, stat]): any => {
 		if (err) return state.throw<StateObject>(404);
 		state.send({
 			root,
@@ -1065,6 +1066,8 @@ export class StateObject {
 
 	/** The tree ancestors in descending order, including the final folder element. */
 	ancestry: (NewTreeGroup | NewTreePath)[];
+	/** The tree ancestors options as they apply to this request */
+	treeOptions: NewTreeOptionsObject;
 
 	url: StateObjectUrl;
 
@@ -1234,7 +1237,7 @@ export class StateObject {
 		}).empty();
 	}
 	send(options: {
-		root: string;
+		root: string | null;
 		filepath: string;
 		error?: (err: any) => void;
 		directory?: (filepath: string) => void;
