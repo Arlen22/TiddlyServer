@@ -371,7 +371,7 @@ function handlePUTrequest(state: StateObject) {
 			state.respond(200, "", {
 				'x-api-access-type': 'file',
 				'etag': etagNew
-			})
+			}).empty();
 		})
 	}).subscribe();
 }
