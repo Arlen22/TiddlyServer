@@ -100,7 +100,7 @@ export function handleTiddlyServerRoute(state: StateObject) {
 	Observable.of(state).mergeMap((state: StateObject) => {
 		var result = resolvePath(state, settings.tree) as PathResolverResult;
 		state.ancestry = result.ancestry;
-		console.log(result.ancestry);
+		// console.log(result.ancestry);
 		if (!result) return state.throw<never>(404);
 		//handle route authentication
 		if (!checkRouteAllowed(state, result)) {
@@ -325,7 +325,7 @@ function handlePUTrequest(state: StateObject) {
 			state.respond(200, "", {
 				'x-api-access-type': 'file',
 				'etag': etagNew
-			})
+			}).empty();
 		})
 	}).subscribe();
 }
