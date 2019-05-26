@@ -1195,10 +1195,13 @@ export class StateObject {
 	respond(code: number, message?: string, headers?: StandardResponseHeaders) {
 		if (headers) this.setHeaders(headers);
 		if (!message) message = http.STATUS_CODES[code];
-		if (this.settings._devmode) setTimeout(() => {
-			if (!this.responseSent)
-				this.debugLog(3, "Response not sent \n %s", new Error().stack);
-		}, 0);
+		if (this.settings._devmode) {
+			let stack = new Error().stack;
+			setTimeout(() => {
+				if (!this.responseSent)
+					this.debugLog(3, "Response not sent \n %s", stack);
+			}, 0);
+		}
 		var subthis = {
 			json: (data: any) => {
 				this.setHeader("Content-Type", "application/json");
