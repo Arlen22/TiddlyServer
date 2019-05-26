@@ -7,8 +7,8 @@
         "noImplicitAny": false,
         "strictNullChecks": true,
         "sourceMap": false,
-				"inlineSourceMap": true,
-				"experimentalDecorators": true
+        "inlineSourceMap": true,
+        "experimentalDecorators": true
     },
     "files": [
         "./src/server.ts",
@@ -19,7 +19,7 @@
         "node_modules",
         "new-server",
         "archive",
-				"static",
-				"./assets/static"
+        "static",
+        "./assets/static"
     ]
 }

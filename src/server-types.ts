@@ -795,7 +795,7 @@ type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 // export function obs<S>(state?: S) {
 //     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
 // }
-export type obs_stat_result<T> = [NodeJS.ErrnoException, fs.Stats, T, string]
+export type obs_stat_result<T> = [NodeJS.ErrnoException | null, fs.Stats, T, string]
 export const obs_stat = <T = undefined>(tag: T = undefined as any) =>
 	(filepath: string) => new Observable<obs_stat_result<T>>(subs => {
 		fs.stat(filepath, (err, data) => {
@@ -804,7 +804,7 @@ export const obs_stat = <T = undefined>(tag: T = undefined as any) =>
 		})
 	})
 
-export type obs_readdir_result<T> = [NodeJS.ErrnoException, string[], T, string]
+export type obs_readdir_result<T> = [NodeJS.ErrnoException | null, string[], T, string]
 export const obs_readdir = <T>(tag: T = undefined as any) =>
 	(filepath: string) => new Observable<obs_readdir_result<T>>(subs => {
 		fs.readdir(filepath, (err, data) => {
@@ -833,7 +833,7 @@ declare function obs_readFile_inner<T>(filepath: string, encoding: string): Obse
 
 // export type obs_writeFile_result<T> = typeof obs_readFile_inner
 export const obs_writeFile = <T>(tag: T = undefined as any) =>
-	(filepath: string, data: any) => new Observable<[NodeJS.ErrnoException | undefined, T, string]>(subs =>
+	(filepath: string, data: any) => new Observable<[NodeJS.ErrnoException | null, T, string]>(subs =>
 		fs.writeFile(filepath, data, (err) => {
 			subs.next([err, tag, filepath]);
 			subs.complete();
@@ -908,7 +908,7 @@ export class URLSearchParams {
 export interface StateObjectUrl {
 	path: string,
 	pathname: string,
-	query: Hashmap<string>,
+	query: Hashmap<string[] | string | undefined>,
 	search: string,
 	href: string
 }
