@@ -102,6 +102,12 @@ export function init(eventer: ServerEventEmitter) {
 	});
 }
 
+type PromiseType<T> = T extends Promise<infer R> ? R : any;
+type PromiseReturnType<T extends (...args: any) => any> = ReturnType<T> extends Promise<infer R> ? R : any;
+
+interface Async<T> extends Promise<T> {
+	readonly type: T
+}
 
 // export type ServerConfig = NewConfig;
 // export type ServerConfigSchema = NewConfigSchema;
@@ -247,7 +253,7 @@ export interface Directory {
 // export function tryParseJSON(str: string, errObj?: ((e: JsonError) => T | void)): T;
 /**
  * Calls the onerror handler if there is a JSON error. Returns whatever the error handler 
- * returns. If there is no error handler, nothing is returned. 
+ * returns. If there is no error handler, undefined is returned. 
  * The string "undefined" is not a valid JSON document.
  */
 export function tryParseJSON<T = any>(str: string, onerror: ((e: JsonError) => never)): T;
@@ -371,7 +377,7 @@ export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.Errn
 }
 export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
 	//if(prefix.startsWith("V:")) return function(){};
-	return function (msgLevel: number, ...args: any[]) {
+	return function (msgLevel: number, format: any, ...args: any[]) {
 		if (!ignoreLevel && settings.logging.debugLevel > msgLevel) return;
 		if (isError(args[0])) {
 			let err = args[0];
@@ -385,7 +391,7 @@ export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof Debug
 		debugOutput.write(' '
 			+ (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
 			+ ' ' + colors.FgCyan + date + colors.Reset
-			+ ' ' + format.apply(null, args).split('\n').map((e, i) => {
+			+ ' ' + format.apply(null, [format, ...args]).split('\n').map((e, i) => {
 				if (i > 0) {
 					return new Array(23 + prefix.length).join(' ') + e;
 				} else {
@@ -621,51 +627,87 @@ export type DirectoryIndexOptions = {
 }
 export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
 	let { keys, paths, dirpath, type } = _r;
-	let pairs = keys.map((k, i) => [k, paths[i]]);
-	return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
-		//if this is a group, just return the key
-		if (typeof val === "boolean") return Observable.of({ key })
-		//otherwise return the statPath result
-		else return statPath(val).then(res => { return { stat: res, key }; });
-	}).reduce((n, e: { key: string, stat?: StatPathResult }) => {
-		let linkpath = [dirpath, e.key].filter(e => e).join('/');
-		n.push({
-			name: e.key,
-			path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
-			type: (!e.stat ? "group" : (e.stat.itemtype === "file"
-				? typeLookup[e.key.split('.').pop() as string] || 'other'
-				: e.stat.itemtype as string)),
-			size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
+	let pairs = keys.map((k, i) => [k, paths[i]] as [string, string | boolean]);
+	return Promise.all<{ key: string, stat?: StatPathResult }>(pairs.map(e => {
+		let [key, val] = e;
+		if (typeof val === "boolean") return Promise.resolve({ key, stat: undefined });
+		else return statPath(val).then(res => ({ stat: res, key }));
+	})).then(paths => {
+		let entries = paths.map((e): DirectoryEntry => {
+			let linkpath = [dirpath, e.key].filter(e => e).join('/');
+			return {
+				name: e.key,
+				path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
+				type: (!e.stat ? "group" : (e.stat.itemtype === "file"
+					? typeLookup[e.key.split('.').pop() as string] || 'other'
+					: e.stat.itemtype as string)),
+				size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
+			};
 		});
-		return n;
-	}, [] as DirectoryEntry[]).map(entries => {
 		if (options.format === "json") {
 			return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
 		} else {
-			let def = { path: dirpath, entries, type }
+			let def = { path: dirpath, entries, type };
 			return generateDirectoryListing(def, options);
 		}
 	});
+	// return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
+	// 	//if this is a group, just return the key
+	// 	if (typeof val === "boolean") return Observable.of({ key })
+	// 	//otherwise return the statPath result
+	// 	else return statPath(val).then(res => { return { stat: res, key }; });
+	// }).reduce((n, e: { key: string, stat?: StatPathResult }) => {
+	// 	let linkpath = [dirpath, e.key].filter(e => e).join('/');
+	// 	n.push({
+	// 		name: e.key,
+	// 		path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
+	// 		type: (!e.stat ? "group" : (e.stat.itemtype === "file"
+	// 			? typeLookup[e.key.split('.').pop() as string] || 'other'
+	// 			: e.stat.itemtype as string)),
+	// 		size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
+	// 	});
+	// 	return n;
+	// }, [] as DirectoryEntry[]).map(entries => {
+	// 	if (options.format === "json") {
+	// 		return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
+	// 	} else {
+	// 		let def = { path: dirpath, entries, type }
+	// 		return generateDirectoryListing(def, options);
+	// 	}
+	// });
 }
 
 /**
  * If the path 
  */
-export function statWalkPath(test: PathResolverResult) {
-	// let endStat = false;
+export async function statWalkPath(test: PathResolverResult) {
 	if (!isNewTreePath(test.item)) {
 		console.log(test.item);
 		throw "property item must be a TreePath";
 	}
-	let endWalk = false;
-	return Observable.from([test.item.path].concat(test.filepathPortion)).scan((n, e) => {
-		return { statpath: path.join(n.statpath, e), index: n.index + 1, endStat: false };
-	}, { statpath: "", index: -1, endStat: false }).concatMap(s => {
-		if (endWalk) return Observable.empty<never>();
-		else return Observable.fromPromise(
-			statPath(s).then(res => { endWalk = endWalk || res.endStat; return res; })
-		);
-	}).takeLast(1);
+	let n = { statpath: "", index: -1, endStat: false };
+	let stats = [test.item.path, ...test.filepathPortion].map((e) => {
+		return (n = { statpath: path.join(n.statpath, e), index: n.index + 1, endStat: false })
+	});
+	while (true) {
+		let s = stats.shift();
+		/* should never be undefined because we always do at least 
+		 * 1 loop and then exit if stats.length is 0 */
+		if (!s) throw new Error("PROGRAMMER ERROR");
+		let res = await statPath(s);
+		if (res.endStat || stats.length === 0) return res;
+	}
+
+	// return res;
+
+	// return Observable.from([test.item.path].concat(test.filepathPortion)).scan((n, e) => {
+	// 	return { statpath: path.join(n.statpath, e), index: n.index + 1, endStat: false };
+	// }, { statpath: "", index: -1, endStat: false }).concatMap(s => {
+	// 	if (endWalk) return Observable.empty<never>();
+	// 	else return Observable.fromPromise(
+	// 		statPath(s).then(res => { endWalk = endWalk || res.endStat; return res; })
+	// 	);
+	// }).takeLast(1);
 }
 /**
  * returns the info about the specified path. endstat is true if the statpath is not
@@ -679,6 +721,22 @@ export function statPath(s: { statpath: string, index: number, endStat: boolean 
 	const { statpath, index } = s;
 	let { endStat } = s;
 	if (typeof endStat !== "boolean") endStat = false;
+	return (async function () {
+		let [err, stat] = await obs_stat(fs.stat)(statpath).toPromise();
+		if (!err && stat.isDirectory()) {
+			let [err2, infostat] = await obs_stat(stat)(path.join(statpath, "tiddlywiki.info")).toPromise();
+			let exists = !err2 && infostat.isFile();
+			if (exists) endStat = true;
+			return ({ stat, statpath, infostat: exists ? infostat : undefined, index, endStat, itemtype: '' })
+		} else {
+			if (err || stat.isFile()) endStat = true;
+			return ({ stat, statpath, index, endStat, itemtype: '' });
+		}
+	})().then(res => {
+		res.itemtype = getItemType(res.stat, res.infostat)
+		return res;
+	})
+	/*
 	return new Promise<StatPathResult>(resolve => {
 		// What I wish I could write (so I did)
 		obs_stat(fs.stat)(statpath).chainMap(([err, stat]) => {
@@ -697,6 +755,7 @@ export function statPath(s: { statpath: string, index: number, endStat: boolean 
 		res.itemtype = getItemType(res.stat, res.infostat)
 		return res;
 	})
+	*/
 }
 
 function getItemType(stat: Stats, infostat: Stats | undefined) {
@@ -1059,29 +1118,32 @@ export class StateObject {
 	startTime: [number, number];
 	timestamp: string;
 
-	body: string;
+	body: string = "";
 	json: any | undefined;
 
+	/** The StatPathResult if this request resolves to a path */
+	//@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
 	statPath: StatPathResult;
-
 	/** The tree ancestors in descending order, including the final folder element. */
+	//@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
 	ancestry: (NewTreeGroup | NewTreePath)[];
 	/** The tree ancestors options as they apply to this request */
+	//@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
 	treeOptions: NewTreeOptionsObject;
 
 	url: StateObjectUrl;
 
 	path: string[];
 
-	maxid: number;
+	// maxid: number;
 
-	where: string;
+	// where: string;
 	query: any;
-	errorThrown: Error;
+	// errorThrown: Error;
 
 	restrict: any;
 
-	expressNext: ((err?: any) => void) | false;
+	// expressNext: ((err?: any) => void) | false;
 
 	pathOptions: {
 		noTrailingSlash: boolean;
@@ -1150,10 +1212,10 @@ export class StateObject {
 	 * -3 - Request and response data for all messages (verbose)
 	 * -4 - Protocol details and full data dump (such as encryption steps and keys)
 	 */
-	log(level: number, ...args: any[]) {
+	log(level: number, format: any, ...args: any[]) {
 		if (level < this.loglevel) return this;
 		if (level > 1) this.hasCriticalLogs = true;
-		this.doneMessage.push(format.apply(null, args));
+		this.doneMessage.push(format(format, ...args));
 		return this;
 	}
 	// error() {
@@ -1272,30 +1334,54 @@ export class StateObject {
 	 * @returns {Observable<StateObject>}
 	 * @memberof StateObject
 	 */
-	recieveBody(errorCB?: true | ((e: JsonError) => void)) {
+	recieveBody(parseJSON: boolean, errorCB?: true | ((e: JsonError) => void)) {
 
-		return Observable.fromEvent<Buffer>(this._req, 'data')
-			//only take one since we only need one. this will dispose the listener
-			.takeUntil(Observable.fromEvent(this._req, 'end').take(1))
-			//accumulate all the chunks until it completes
-			.reduce<Buffer>((n, e) => { n.push(e); return n; }, [])
-			//convert to json
-			.forEach((e) => {
-				this.body = Buffer.concat(e).toString('utf8');
-				//console.log(state.body);
-				if (this.body.length === 0)
-					return this;
+		return new Promise<Buffer>(resolve => {
+			let chunks: Buffer[] = [];
+			this._req.on("data", (chunk) => {
+				if (typeof chunk === "string") {
+					chunks.push(Buffer.from(chunk));
+				} else {
+					chunks.push(chunk);
+				}
+			});
+			this._req.on("end", () => {
+				this.body = Buffer.concat(chunks).toString('utf8');
+
+				if (this.body.length === 0 || !parseJSON)
+					return resolve()
 
 				let catchHandler = errorCB === true ? (e: JsonError) => {
 					this.respond(400, "", {
 						"Content-Type": "text/plain"
 					}).string(e.errorPosition);
+					//return undefined;
 				} : errorCB;
 
 				this.json = catchHandler ? tryParseJSON<any>(this.body, catchHandler) : tryParseJSON(this.body);
-			})
-			//returns a promise with the state
-			.then(() => this);
+				resolve();
+			});
+		})
+		// return Observable.fromEvent<Buffer>(this._req, 'data')
+		// 	//only take one since we only need one. this will dispose the listener
+		// 	.takeUntil(Observable.fromEvent(this._req, 'end').take(1))
+		// 	//accumulate all the chunks until it completes
+		// 	.reduce<Buffer>((n, e) => { n.push(e); return n; }, [])
+		// 	//convert to json
+		// 	.forEach((e) => {
+		// 		this.body = Buffer.concat(e).toString('utf8');
+		// 		//console.log(state.body);
+		// 		if (this.body.length === 0)
+		// 			return this;
+		// 		let catchHandler = errorCB === true ? (e: JsonError) => {
+		// 			this.respond(400, "", {
+		// 				"Content-Type": "text/plain"
+		// 			}).string(e.errorPosition);
+		// 		} : errorCB;
+		// 		this.json = catchHandler ? tryParseJSON<any>(this.body, catchHandler) : tryParseJSON(this.body);
+		// 	})
+		// 	//returns a promise with the state
+		// 	.then(() => this);
 	}
 
 }
@@ -1306,9 +1392,9 @@ export class ER extends Error {
 	}
 }
 /** to be used with concatMap, mergeMap, etc. */
-export function recieveBody(state: StateObject, sendError?: true | ((e: JsonError) => void)) {
+export function recieveBody(state: StateObject, parseJSON: boolean, sendError?: true | ((e: JsonError) => void)) {
 	//get the data from the request
-	return state.recieveBody(sendError);
+	return state.recieveBody(parseJSON, sendError);
 
 }
 export interface ThrowFunc<T> {
@@ -1389,12 +1475,12 @@ export function getError(code: 'OLD_REVISION'): any;
 export function getError(code: 'KEYS_REQUIRED', keyList: string): any;
 export function getError(code: 'ROW_NOT_FOUND', table: string, id: string): any;
 export function getError(code: 'PROGRAMMER_EXCEPTION', message: string): any;
-export function getError(code: string, ...args: string[]): any;
-export function getError(...args: string[]) {
-	let code = args.shift() as keyof typeof ERRORS;
+// export function getError(code: string, ...args: string[]): any;
+export function getError(code: string, ...args: string[]): any {
+	// let code = args.shift() as keyof typeof ERRORS;
 	if (ERRORS[code]) args.unshift(ERRORS[code])
 	//else args.unshift(code);
-	return { code: code, message: format.apply(null, args) };
+	return { code: code, message: format(code, ...args) };
 }
 
 

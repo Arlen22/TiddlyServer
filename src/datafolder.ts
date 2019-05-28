@@ -46,7 +46,7 @@ export function init(e: ServerEventEmitter) {
 		var result = resolvePath(pathname.split('/'), settings.tree) as PathResolverResult
 		if (!result) return client.close(404);
 
-		statWalkPath(result).subscribe(statPath => {
+		statWalkPath(result).then(statPath => {
 			//if this is a datafolder, we hand the client and request off directly to it
 			//otherwise we stick it in its own section
 			if (statPath.itemtype === "datafolder") {
