@@ -92,62 +92,65 @@ export function getTreeOptions(state: StateObject) {
 	});
 	return options;
 }
-export function handleTiddlyServerRoute(state: StateObject) {
-
+export function handleTiddlyServerRoute(state: StateObject): void {
+	// var result: PathResolverResult | undefined;
 	// const resolvePath = (settings.tree);
-	Observable.of(state).mergeMap((state: StateObject) => {
-		var result = resolvePath(state, settings.tree) as PathResolverResult;
-		if (!result) return state.throw<never>(404);
-		state.ancestry = [...result.ancestry, result.item];
-		state.treeOptions = getTreeOptions(state);
-		//handle route authentication
-		let { authList, authError } = state.treeOptions.auth;
-		if (authList && authList.indexOf(state.authAccountsKey) === -1) {
-			return state.throw<never>(authError);
-		} else if (isNewTreeGroup(result.item)) {
-			serveDirectoryIndex(result, state);
-			return Observable.empty<never>();
-		} else {
-			return statWalkPath(result).map(stat => {
-				state.statPath = stat;
-				return result;
-			});
-		}
-	}).map(result => {
-		if (state.statPath.itemtype === "folder") {
-			serveDirectoryIndex(result, state);
-		} else if (state.statPath.itemtype === "datafolder") {
-			handleDataFolderRequest(result, state);
-		} else if (state.statPath.itemtype === "file") {
-			if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
-				state.send({
-					root: (result.item as NewTreePath).path as string,
-					filepath: result.filepathPortion.join('/'),
-					error: err => {
-						state.log(2, '%s %s', err.status, err.message);
-						if (state.allow.writeErrors) state.throw(500);
-					},
-					headers: (filepath) => {
-						const statItem = state.statPath.stat;
-						const mtime = Date.parse(state.statPath.stat.mtime as any);
-						const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
-						return { 'Etag': etag };
-					}
-				})
-			} else if (['PUT'].indexOf(state.req.method as string) > -1) {
-				handlePUTrequest(state);
-			} else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
-				state.respond(200, "", {
-					'x-api-access-type': 'file',
-					'dav': 'tw5/put'
-				}).string("GET,HEAD,PUT,OPTIONS");
-			} else state.throw(405);
-		} else if (state.statPath.itemtype === "error") {
-			state.throw(404);
-		} else {
-			state.throw(500);
-		}
-	}).subscribe();
+	// Promise.resolve().then(() => {
+	let result = resolvePath(state, settings.tree) as PathResolverResult;
+	if (!result) {
+		state.throw<never>(404);
+		return;
+	}
+	state.ancestry = [...result.ancestry, result.item];
+	state.treeOptions = getTreeOptions(state);
+	//handle route authentication
+	let { authList, authError } = state.treeOptions.auth;
+	if (authList && authList.indexOf(state.authAccountsKey) === -1) {
+		state.throw<never>(authError);
+		// return Promise.reject();
+	} else if (isNewTreeGroup(result.item)) {
+		serveDirectoryIndex(result, state);
+		// return Promise.reject();
+	} else {
+		statWalkPath(result).then((stat) => {
+			state.statPath = stat;
+			if (state.statPath.itemtype === "folder") {
+				serveDirectoryIndex(result, state);
+			} else if (state.statPath.itemtype === "datafolder") {
+				handleDataFolderRequest(result, state);
+			} else if (state.statPath.itemtype === "file") {
+				if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
+					state.send({
+						root: (result.item as NewTreePath).path as string,
+						filepath: result.filepathPortion.join('/'),
+						error: err => {
+							state.log(2, '%s %s', err.status, err.message);
+							if (state.allow.writeErrors) state.throw(500);
+						},
+						headers: (filepath) => {
+							const statItem = state.statPath.stat;
+							const mtime = Date.parse(state.statPath.stat.mtime as any);
+							const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
+							return { 'Etag': etag };
+						}
+					})
+				} else if (['PUT'].indexOf(state.req.method as string) > -1) {
+					handlePUTrequest(state);
+				} else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
+					state.respond(200, "", {
+						'x-api-access-type': 'file',
+						'dav': 'tw5/put'
+					}).string("GET,HEAD,PUT,OPTIONS");
+				} else state.throw(405);
+			} else if (state.statPath.itemtype === "error") {
+				state.throw(404);
+			} else {
+				state.throw(500);
+			}
+		}).catch((err) => {
+			if (err) { console.log(err); console.log(new Error().stack); }
+		});
+	}
 }
 function handleFileError(err: NodeJS.ErrnoException) {
 	debug(2, "%s %s\n%s", err.code, err.message, err.path);
@@ -322,7 +325,7 @@ function handlePUTrequest(state: StateObject) {
 			return state.throw(412);
 		console.log('412 prevented by etagWindow of %s seconds', settings.putsaver.etagWindow);
 	}
-	new Observable((subscriber) => {
+	new Promise((resolve, reject) => {
 		if (settings.putsaver.backupDirectory) {
 			const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
 			const ext = path.extname(backupFile);
@@ -338,42 +341,43 @@ function handlePUTrequest(state: StateObject) {
 				fileRead.close();
 				gzip.end();
 				backupWrite.end();
-				subscriber.complete();
+				reject();
 			};
 			fileRead.on('error', pipeError);
 			gzip.on('error', pipeError);
 			backupWrite.on('error', pipeError);
 			fileRead.pipe(gzip).pipe(backupWrite).on('close', () => {
-				subscriber.next();
-				subscriber.complete();
+				resolve();
 			})
 		} else {
-			subscriber.next();
-			subscriber.complete();
+			resolve();
 		}
-	}).switchMap(() => {
-		// let stream: Stream = state.req;
-
-		const write = state.req.pipe(fs.createWriteStream(fullpath));
-		const finish = Observable.fromEvent(write, 'finish').take(1);
-		return Observable.merge(finish, Observable.fromEvent(write, 'error').takeUntil(finish)).switchMap((err: Error) => {
-			if (err) {
-				return state
+	}).then(() => {
+		return new Promise((resolve, reject) => {
+			const write = state.req.pipe(fs.createWriteStream(fullpath));
+			write.on("finish", () => {
+				resolve();
+			});
+			write.on("error", (err: Error) => {
+				state
 					.log(2, "Error writing the updated file to disk")
 					.log(2, err.stack || [err.name, err.message].join(': '))
 					.throw(500);
-			} else {
-				return obs_stat(false)(fullpath) as any;
-			}
-		}).map(([err, statNew]) => {
-			const mtimeNew = Date.parse(statNew.mtime as any);
-			const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
-			state.respond(200, "", {
-				'x-api-access-type': 'file',
-				'etag': etagNew
-			}).empty();
-		})
-	}).subscribe();
+				reject();
+			});
+		}).then(() => {
+			return obs_stat(false)(fullpath).toPromise(Promise);
+		});
+	}).then(([err, statNew]) => {
+		const mtimeNew = Date.parse(statNew.mtime as any);
+		const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
+		state.respond(200, "", {
+			'x-api-access-type': 'file',
+			'etag': etagNew
+		}).empty();
+	}).catch(() => {
+		//this just means the request got handled early
+	})
 }
 
 

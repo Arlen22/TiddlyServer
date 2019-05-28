@@ -14,7 +14,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 */
 
 
-export function IPv4_Address( addressDotQuad, netmaskBits ) {
+export function IPv4_Address(this: any, addressDotQuad, netmaskBits ) {
 	var split = addressDotQuad.split( '.', 4 );
 	var byte1 = Math.max( 0, Math.min( 255, parseInt( split[0] ))); /* sanity check: valid values: = 0-255 */
 	var byte2 = Math.max( 0, Math.min( 255, parseInt( split[1] )));

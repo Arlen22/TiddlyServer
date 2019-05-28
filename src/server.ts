@@ -118,7 +118,7 @@ eventer.on('settingsChanged', (keys) => {
 })
 
 // === Setup static routes
-const routes = {
+const routes: Record<string, (state: StateObject) => void> = {
 	'admin': state => handleAdminRoute(state),
 	'assets': state => handleAssetsRoute(state),
 	'favicon.ico': state => serveFile(state, 'favicon.ico', settings.__assetsDir),
@@ -154,6 +154,10 @@ export interface RequestEvent {
 interface RequestEventHTTP extends RequestEvent { response: http.ServerResponse; }
 interface RequestEventWS extends RequestEvent { client: WebSocket; }
 
+declare function preflighterFunc(ev: RequestEventWS): Promise<RequestEventWS>;
+declare function preflighterFunc(ev: RequestEventHTTP): Promise<RequestEventHTTP>;
+
+
 /**
  * Adds all the listeners required for tiddlyserver to operate. 
  *
@@ -164,7 +168,7 @@ interface RequestEventWS extends RequestEvent { client: WebSocket; }
  * @param {*} preflighter A preflighter function which may modify data about the request before
  * it is handed off to the router for processing.
  */
-export function addRequestHandlers(server: https.Server | http.Server, iface: string, preflighter) {
+export function addRequestHandlers(server: https.Server | http.Server, iface: string, preflighter: typeof preflighterFunc) {
 	// const addListeners = () => {
 	let closing = false;
 
@@ -198,7 +202,7 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 			request,
 			client
 		};
-		requestHandlerHostLevelChecks(ev, preflighter).then(ev2 => {
+		requestHandlerHostLevelChecks<typeof ev>(ev, preflighter).then(ev2 => {
 			if (!ev2.handled) {
 				// we give the preflighter the option to handle the websocket on its own
 				if (settings.bindInfo.hostLevelPermissions[ev2.hostLevelPermissionsKey].websockets === false) client.close();
@@ -271,8 +275,9 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 `);
 	}
 	let servers: (http.Server | https.Server)[] = [];
+	console.log("Creating servers as %s", typeof settingshttps === "function" ? "https" : "http")
 	Observable.from(hosts).concatMap(host => {
-		let server;
+		let server: any;
 		if (typeof settingshttps === "function") {
 			try {
 				server = https.createServer(settingshttps(host));

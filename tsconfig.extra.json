@@ -4,13 +4,16 @@
         "baseUrl": ".",
         "module": "commonjs",
         "target": "es6",
-        "strict": true,
         "noImplicitAny": false,
+        "strictNullChecks": true,
+        "strict": true,
         "sourceMap": false,
-        "inlineSourceMap": true
+        "inlineSourceMap": true,
+        "experimentalDecorators": true
     },
     "files": [
-        "./src/server.ts"
+        "./lib/boot-node-async.ts",
+        "./src/_test.ts"
     ],
     "exclude": [
         "node_modules",

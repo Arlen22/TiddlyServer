@@ -176,7 +176,7 @@ export function handleAuthRoute(state: StateObject) {
 		else
 			state.respond(200).json({ pendingPin: getRandomPin() });
 	} else if (state.path[3] === "login") {
-		state.recieveBody(true).then(() => {
+		state.recieveBody(true, true).then(() => {
 			if (state.body.length && !state.json) return; //recieve body sent a response already
 			if (!state.body.length) return state.throwReason(400, "Empty request body");
 			/** [username, type, timestamp, hash, sig] */
