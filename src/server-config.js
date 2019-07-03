@@ -259,7 +259,7 @@ function ConvertSettings(set) {
             maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
         },
         authCookieAge: 2592000,
-        $schema: "./settings.schema.json"
+        $schema: "./settings-2-1.schema.json"
     };
 }
 exports.ConvertSettings = ConvertSettings;
