@@ -46,7 +46,7 @@ This guide is intended for those who are less techy or who just like more verbos
 
 ## How to upgrade
 
-Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0.x to 2.1.x, you need to run `node upgrade-settings.json` after you copy it in and follow the instructions.
+Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0.x to 2.1.x, you need to run `node upgrade-settings.js` after you copy it in and follow the instructions.
 
 ## Where to Start
 
