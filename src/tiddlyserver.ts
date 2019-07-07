@@ -4,7 +4,7 @@ import {
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
 	sendDirectoryIndex, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData,
-	ServerEventEmitter, ER, getNewTreePathFiles, isNewTreeGroup, NewTreePath, NewTreeItem, NewTreeGroup, NewTreePathOptions_Auth, StandardResponseHeaders, serveFile
+	ServerEventEmitter, ER, getTreePathFiles, NewTreePathOptions_Auth, StandardResponseHeaders, serveFile, Config
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -80,7 +80,7 @@ export function getTreeOptions(state: StateObject) {
 		index: { $element: "index", defaultType: "html", indexFile: [], indexExts: [] }
 	}
 	state.ancestry.forEach((e) => {
-		console.log(e);
+		// console.log(e);
 		e.$children && e.$children.forEach((f) => {
 			if (f.$element === "auth" || f.$element === "backups" || f.$element === "index") {
 				Object.keys(f).forEach(k => {
@@ -96,7 +96,8 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 	// var result: PathResolverResult | undefined;
 	// const resolvePath = (settings.tree);
 	// Promise.resolve().then(() => {
-	let result = resolvePath(state, settings.tree) as PathResolverResult;
+	
+	let result = resolvePath(state, state.hostRoot) as PathResolverResult;
 	if (!result) {
 		state.throw<never>(404);
 		return;
@@ -108,7 +109,7 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 	if (authList && authList.indexOf(state.authAccountsKey) === -1) {
 		state.throw<never>(authError);
 		// return Promise.reject();
-	} else if (isNewTreeGroup(result.item)) {
+	} else if (Config.isGroup(result.item)) {
 		serveDirectoryIndex(result, state);
 		// return Promise.reject();
 	} else {
@@ -121,7 +122,7 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 			} else if (state.statPath.itemtype === "file") {
 				if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
 					state.send({
-						root: (result.item as NewTreePath).path as string,
+						root: (result.item as Config.PathElement).path,
 						filepath: result.filepathPortion.join('/'),
 						error: err => {
 							state.log(2, '%s %s', err.status, err.message);
@@ -213,7 +214,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				html: "text/html",
 				json: "application/json"
 			}
-			getNewTreePathFiles(result, state)
+			getTreePathFiles(result, state)
 				.map(e => [e, options] as [typeof e, DirectoryIndexOptions])
 				.concatMap(sendDirectoryIndex)
 				.subscribe(res => {
@@ -231,7 +232,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		// console.log(state.url);
 		if (state.url.query.formtype === "upload") {
 
-			if (isNewTreeGroup(result.item))
+			if (Config.isGroup(result.item))
 				return state.throwReason(400, "upload is not possible for tree groups");
 			if (!allow.upload)
 				return state.throwReason(403, "upload is not allowed over the network")
@@ -255,7 +256,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				});
 			});
 		} else if (state.url.query.formtype === "mkdir") {
-			if (isNewTreeGroup(result.item))
+			if (Config.isGroup(result.item))
 				return state.throwReason(400, "mkdir is not possible for tree items");
 			if (!allow.mkdir)
 				return state.throwReason(403, "mkdir is not allowed over the network")

@@ -16,19 +16,19 @@ import * as https from "https";
 import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 import * as ipcalc from "./ipcalc";
 import {
-	NewTreeGroup,
-	NewTreeGroupSchema,
-	NewTreeHashmapGroupSchema,
-	NewTreeHashmapPath,
-	NewTreeItem,
-	NewTreeItemSchema,
-	NewTreeObjectSchema,
-	NewTreeObjectSchemaItem,
+	// NewTreeGroup,
+	// NewTreeGroupSchema,
+	// NewTreeHashmapGroupSchema,
+	// NewTreePathHashmap,
+	// NewTreeItem,
+	// NewTreeItemSchema,
+	// NewTreeObjectSchema,
+	// NewTreeObjectSchemaItem,
 	NewTreeOptions,
-	NewTreePath,
+	// NewTreePath,
 	NewTreePathOptions_Auth,
 	NewTreePathOptions_Index,
-	NewTreePathSchema,
+	// NewTreePathSchema,
 	ServerConfig,
 	ServerConfigBase,
 	ServerConfigSchema,
@@ -36,22 +36,14 @@ import {
 	ServerConfig_BindInfo,
 	normalizeSettings,
 	ConvertSettings,
-	NewTreeOptionsObject
+	NewTreeOptionsObject,
+	Config
 } from "./server-config";
 export {
-	NewTreeGroup,
-	NewTreeGroupSchema,
-	NewTreeHashmapGroupSchema,
-	NewTreeHashmapPath,
-	NewTreeItem,
-	NewTreeItemSchema,
-	NewTreeObjectSchema,
-	NewTreeObjectSchemaItem,
+	Config,
 	NewTreeOptions,
-	NewTreePath,
 	NewTreePathOptions_Auth,
 	NewTreePathOptions_Index,
-	NewTreePathSchema,
 	ServerConfig,
 	ServerConfigBase,
 	ServerConfigSchema,
@@ -112,21 +104,7 @@ interface Async<T> extends Promise<T> {
 // export type ServerConfig = NewConfig;
 // export type ServerConfigSchema = NewConfigSchema;
 
-export function isNewTreeItem(a: any): a is NewTreeItem {
-	return (typeof a === "object" && typeof a["$element"] === "string");
-}
-export function isNewTreeGroup(a: any): a is NewTreeGroup {
-	return isNewTreeItem(a) && a.$element === "group";
-}
-export function isNewTreeHashmapGroupSchema(a: any): a is NewTreeHashmapGroupSchema {
-	return isNewTreeGroup(a) && !Array.isArray(a.$children) && !a.key;
-}
-export function isNewTreePath(a: any): a is NewTreePath {
-	return isNewTreeItem(a) && a.$element === "folder";
-}
-export function isNewTreeMountItem(a: any): a is NewTreeGroup | NewTreePath {
-	return isNewTreeItem(a) && (a.$element === "group" || a.$element === "folder");
-}
+
 
 
 
@@ -169,13 +147,7 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 
 	if (typeof settingsObj.tree === "object") {
 		let keys: string[] = [];
-		if (settingsObj.tree.$element === "group") {
-			keys = settingsObj.tree.$children
-				.map(e => (e.$element === "group" || e.$element === "folder") && e.key)
-				.filter<string>((e): e is string => !!e)
-		} else if (settingsObj.tree.$element === "folder") {
-			keys = fs.readdirSync(settingsObj.tree.path, { encoding: "utf8" })
-		}
+		settingsObj.tree
 		let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
 		if (conflict.length) console.log(
 			"The following tree items are reserved for use by TiddlyServer: %s",
@@ -188,9 +160,35 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 }
 
 
+export interface RequestEvent {
+	/** 
+	 * Allows the preflighter to mark the request as handled, indicating it should not be processed further, 
+	 * in which case, the preflighter takes full responsibility for the request, including calling end or close. 
+	 * This is useful in case the preflighter wants to reject the request or initiate authentication, or wants to 
+	 * handle a request using some other routing module. Do not override the /assets path or certain static assets will not be available.
+	 */
+	handled: boolean;
+	username: string;
+	/** auth account key to be applied to this request */
+	authAccountKey: string;
+	/** hostLevelPermissions key to be applied to this request */
+	hostLevelPermissionsKey: string;
+	/** 
+	 * @argument iface HTTP server "host" option for this request, 
+	 * @argument host the host header, 
+	 * @argument addr socket.localAddress 
+	 */
+	interface: { iface: string, host: string | undefined, addr: string };
+	treeHostIndex: number;
+	settings: ServerConfig;
+	request: http.IncomingMessage;
+}
+export interface RequestEventHTTP extends RequestEvent { response: http.ServerResponse; }
+export interface RequestEventWS extends RequestEvent { client: WebSocket; }
+
 
 interface ServerEventsListener<THIS> {
-	(event: "websocket-connection", listener: (client: WebSocket, request: http.IncomingMessage) => void): THIS;
+	(event: "websocket-connection", listener: (data: RequestEventWS) => void): THIS;
 	(event: "settingsChanged", listener: (keys: (keyof ServerConfig)[]) => void): THIS;
 	(event: "settings", listener: (settings: ServerConfig) => void): THIS;
 	(event: "stateError", listener: (state: StateObject) => void): THIS;
@@ -200,7 +198,7 @@ interface ServerEventsListener<THIS> {
 }
 type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
 export interface ServerEventEmitter extends EventEmitter {
-	emit(event: "websocket-connection", client: WebSocket, request: http.IncomingMessage): boolean;
+	emit(event: "websocket-connection", data: RequestEventWS): boolean;
 	emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
 	emit(event: "settings", settings: ServerConfig): boolean;
 	emit(event: "stateError", state: StateObject): boolean;
@@ -369,7 +367,7 @@ export namespace colors {
 declare function DebugLog(level: number, str: string | NodeJS.ErrnoException, ...args: any[]);
 // declare function DebugLog(str: string, ...args: any[]);
 export function isError(obj): obj is Error {
-	return obj.constructor === Error;
+	return !!obj && obj.constructor === Error;
 	// return [obj.message, obj.name].every(e => typeof e !== "undefined");
 }
 export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException {
@@ -377,7 +375,7 @@ export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.Errn
 }
 export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
 	//if(prefix.startsWith("V:")) return function(){};
-	return function (msgLevel: number, format: any, ...args: any[]) {
+	return function (msgLevel: number, tempString: any, ...args: any[]) {
 		if (!ignoreLevel && settings.logging.debugLevel > msgLevel) return;
 		if (isError(args[0])) {
 			let err = args[0];
@@ -391,7 +389,7 @@ export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof Debug
 		debugOutput.write(' '
 			+ (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
 			+ ' ' + colors.FgCyan + date + colors.Reset
-			+ ' ' + format.apply(null, [format, ...args]).split('\n').map((e, i) => {
+			+ ' ' + format.apply(null, [tempString, ...args]).split('\n').map((e, i) => {
 				if (i > 0) {
 					return new Array(23 + prefix.length).join(' ') + e;
 				} else {
@@ -556,19 +554,17 @@ export function sendResponse(state: StateObject, body: Buffer | string, options:
  * @param {PathResolverResult} result 
  * @returns 
  */
-export function getNewTreePathFiles(result: PathResolverResult, state: StateObject): Observable<DirectoryIndexData> {
+export function getTreePathFiles(result: PathResolverResult, state: StateObject): Observable<DirectoryIndexData> {
 	let dirpath = [
 		result.treepathPortion.join('/'),
 		result.filepathPortion.join('/')
 	].filter(e => e).join('/')
-	const type = isNewTreeGroup(result.item) ? "group" : "folder";
-	if (isNewTreeGroup(result.item)) {
-		let $c = result.item.$children.filter(isNewTreeMountItem);
+	const type = Config.isGroup(result.item) ? "group" : "folder";
+	if (Config.isGroup(result.item)) {
+		let $c = result.item.$children;
 		const keys = $c.map(e => e.key);
 		// const keys = Object.keys(result.item);
-		const paths = $c.map(e =>
-			isNewTreePath(e) ? e.path : true
-		);
+		const paths = $c.map(e => Config.isPath(e) ? e.path : true);
 		return Observable.of({ keys, paths, dirpath, type: type as "group" | "folder" });
 	} else {
 		return obs_readdir()(result.fullfilepath).map(([err, keys]) => {
@@ -681,7 +677,7 @@ export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, Directory
  * If the path 
  */
 export async function statWalkPath(test: PathResolverResult) {
-	if (!isNewTreePath(test.item)) {
+	if (!Config.isPath(test.item)) {
 		console.log(test.item);
 		throw "property item must be a TreePath";
 	}
@@ -769,20 +765,20 @@ function getItemType(stat: Stats, infostat: Stats | undefined) {
 	return itemtype;
 
 }
-export function treeWalker(tree: NewTreeGroup | NewTreePath, reqpath) {
+export function treeWalker(tree: Config.GroupElement | Config.PathElement, reqpath) {
 	function getAncesterEntry(a) {
-		return Object.assign({}, a, { $children: (a.$children || []).filter(e => !isNewTreeMountItem(e)) })
+		return Object.assign({}, a, { $children: undefined })
 	}
 	var item = tree;
-	var ancestry: NewTreeItem[] = [];
-	var folderPathFound = isNewTreePath(item);
+	var ancestry: Config.MountElement[] = [];
+	var folderPathFound = Config.isPath(item);
 	for (var end = 0; end < reqpath.length; end++) {
-		if (isNewTreePath(item)) {
+		if (Config.isPath(item)) {
 			folderPathFound = true;
 			break;
 		}
-		let t = item.$children.find((e): e is NewTreeGroup | NewTreePath =>
-			isNewTreeMountItem(e) && e.key === reqpath[end]
+		let t = item.$children.find((e): e is Config.GroupElement | Config.PathElement =>
+			(Config.isGroup(e) || Config.isPath(e)) && e.key === reqpath[end]
 		);
 		if (t) {
 			ancestry.push(item);
@@ -806,7 +802,7 @@ export function treeWalker(tree: NewTreeGroup | NewTreePath, reqpath) {
 // 	}
 // 	return { item, end, folderPathFound };
 // }
-export function resolvePath(state: StateObject | string[], tree: NewTreeGroup | NewTreePath): PathResolverResult | undefined {
+export function resolvePath(state: StateObject | string[], tree: Config.MountElement): PathResolverResult | undefined {
 	var reqpath;
 	if (Array.isArray(state)) {
 		reqpath = state;
@@ -837,7 +833,7 @@ export function resolvePath(state: StateObject | string[], tree: NewTreeGroup | 
 
 	const fullfilepath = (result.folderPathFound)
 		? path.join(result.item.path, ...filepathPortion)
-		: (isNewTreePath(result.item) ? result.item.path : '');
+		: (Config.isPath(result.item) ? result.item.path : '');
 
 	return {
 		item: result.item,
@@ -1113,6 +1109,10 @@ export class StateObject {
 		// }
 	}
 
+	get hostRoot() {
+		return this.settings.tree[this.treeHostIndex].$mount;
+	}
+
 	// req: http.IncomingMessage;
 	// res: http.ServerResponse;
 	startTime: [number, number];
@@ -1164,6 +1164,8 @@ export class StateObject {
 		private eventer: ServerEventEmitter,
 		public hostLevelPermissionsKey: string,
 		public authAccountsKey: string,
+		/** The HostElement array index in settings.tree */
+		public treeHostIndex: number,
 		public username: string,
 		public settings: ServerConfig
 	) {
@@ -1420,9 +1422,9 @@ export interface AccessPathTag {
 };
 export interface PathResolverResult {
 	//the tree item returned from the path resolver
-	item: NewTreePath | NewTreeGroup;
+	item: Config.MountElement;
 	//the ancestors of the tree item for reference
-	ancestry: (NewTreePath | NewTreeGroup)[];
+	ancestry: (Config.MountElement)[];
 	// client request url path
 	reqpath: string[];
 	// tree part of request url
@@ -1441,8 +1443,8 @@ export type TreePathResultObject<T, U, V> = {
 }
 export type TreePathResult =
 	// TreePathResultObject<NewTreeItem, number, false>
-	| TreePathResultObject<NewTreeGroup, number, false>
-	| TreePathResultObject<NewTreePath, number, true>;
+	| TreePathResultObject<Config.GroupElement, number, false>
+	| TreePathResultObject<Config.PathElement, number, true>;
 export function createHashmapString<T>(keys: string[], values: T[]): { [id: string]: T } {
 	if (keys.length !== values.length)
 		throw 'keys and values must be the same length';

@@ -10,7 +10,8 @@
         "inlineSourceMap": true
     },
     "files": [
-        "./src/server.ts"
+        "./src/server.ts",
+        "./test/test.ts"
     ],
     "exclude": [
         "node_modules",

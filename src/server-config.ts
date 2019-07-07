@@ -12,51 +12,93 @@ function pathResolveWithUser(settingsDir: string, str: string) {
 	if (str.startsWith("~")) return path.join(homedir, str.slice(1));
 	else return path.resolve(settingsDir, str);
 }
-export function normalizeTree(settingsDir: string, item: NewTreeObjectSchemaItem | NewTreeOptions | NewTreeItem, key: string | undefined, keypath): NewTreeItem {
-	// let t = item as NewTreeObjectSchemaItem;
+function is<T>(test: (a: typeof b) => boolean, b: any): b is T {
+	return test(b);
+}
+
+type normalizeTree_itemtype = Schema.ArrayGroupElement | Schema.GroupElement
+	| Schema.ArrayPathElement | Schema.PathElement | string
+export function normalizeTree(settingsDir: string,
+	item: Schema.ArrayGroupElement | Schema.GroupElement,
+	key: string | undefined, keypath
+): Config.GroupElement;
+export function normalizeTree(settingsDir: string,
+	item: Schema.ArrayPathElement | Schema.ArrayGroupElement | string,
+	key: undefined, keypath
+): Config.PathElement | Config.GroupElement;
+export function normalizeTree(settingsDir: string,
+	item: Schema.PathElement | Schema.GroupElement | string,
+	key: string, keypath
+): Config.PathElement | Config.GroupElement;
+export function normalizeTree(settingsDir: string,
+	item: Schema.ArrayPathElement | Schema.PathElement | string,
+	key: string | undefined, keypath
+): Config.PathElement;
+export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, keypath): any {
+	type k<T> = T extends "options" ? never : T;
 	if (typeof item === "string" || item.$element === "folder") {
-		if (typeof item === "string") item = { $element: "folder", path: item } as NewTreePath;
+		if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
 		if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
 		item.path = pathResolveWithUser(settingsDir, item.path);
-		// if (item.path.startsWith("~")) item.path = path.join(homedir, item.path.slice(1));
-		// else item.path = path.resolve(settingsDir, item.path);
 		key = key || path.basename(item.path);
-		//the hashmap key overrides the key attribute if available
-		return { ...item, key } as NewTreePath;
+		return { ...item, key } as Config.PathElement;
 	} else if (item.$element === "group") {
-		if (((a: any): a is NewTreeHashmapGroupSchema => !a.key)(item)) {
-			if (!key) throw new Error("No key specified for group element under " + keypath.join(', '));
+		if (!key) key = (item as Schema.ArrayGroupElement).key;
+		if (!key) throw "key not provided for group element at " + keypath.join(',');
+		let tc = item.$children;
+		let $options: Config.OptionElements[] = [];
+		let $children: (Config.PathElement | Config.GroupElement)[] = [];
+		if (Array.isArray(item.$children)) {
+			$children = item.$children.filter((e: any): e is Schema.ArrayGroupElement | Schema.ArrayPathElement => {
+				if (Config.isOption(e)) {
+					$options.push(e);
+					return false;
+				} else {
+					return true;
+				}
+			}).map(e => normalizeTree(settingsDir, e, undefined, keypath));
 		} else {
-			key = item.key;
+			// let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
+			$children = Object.keys(tc).map(k => k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
+				.filter((e): e is NonNullable<typeof e> => !!e);
+			if (!Array.isArray(item.$children.$options)) throw "$options is not an array at " + keypath.join('.');
+			$options = item.$children.$options;
 		}
-		//at this point we only need the TreeHashmapGroup type since we already extracted the key
-		let t = item as NewTreeHashmapGroupSchema;
-		let tc = t.$children;
-		if (typeof tc !== "object") throw new Error("Invalid $children under " + keypath.join(', '));
-		return ({
-			$element: "group", key,
-			indexPath: t.indexPath ? pathResolveWithUser(settingsDir, t.indexPath) : undefined,
-			$children: Array.isArray(tc)
-				? tc.map(e => normalizeTree(settingsDir, e, undefined, keypath))
-				: Object.keys(tc).filter(k => k !== "$children")
-					.map(k => normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
-					.concat(tc.$children || [])
-		})
+		key = is<Schema.ArrayGroupElement>(a => !!a.key, item) ? item.key : key;
+		return ({ $element: "group", key, $children, $options }) as Config.GroupElement;
 	} else {
 		return item;
 	}
 }
+export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement) {
+	if (host.$element !== "host") throw "Tree array must not mix host elements with other elements";
+	return { ...host, $mount: normalizeTree(settingsDir, host.$mount as any, undefined, []) };
+}
 export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
+	let defaultHost = (tree2: any): Config.HostElement => ({
+		$element: "host",
+		patterns: {
+			"ipv4": ["0.0.0.0/0"],
+			"domain": ["*"]
+		},
+		includeSubdomains: true,
+		$mount: normalizeTree(settingsDir, tree2, undefined, [])
+	});
 	if (typeof tree === "string" && tree.endsWith(".xml")) {
 		//read the xml file and parse it as the tree structure
 
 	} else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
 		//require the json or js file and use it directly
 		let filepath = pathResolveWithUser(settingsDir, tree);
-		return normalizeTree(path.dirname(filepath), require(filepath), "tree", []) as any;
+		tree = require(filepath).tree;
+	}
+	//otherwise just assume we're using the value itself
+	if (Array.isArray(tree) && typeof tree[0] === "object" && (tree[0] as any).$element === "host") {
+		let hosts = tree as Config.HostElement[];
+		hosts.map(host => normalizeTreeHost(settingsDir, host));
+		return hosts;
 	} else {
-		//otherwise just assume we're using the value itself
-		return normalizeTree(settingsDir, tree, "tree", []) as any;
+		return [defaultHost(tree)];
 	}
 }
 export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
@@ -192,7 +234,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 	}
 	return newset;
 }
-
+type ServerConfigSchemaTree = Schema.HostElement[] | Schema.PathElement | Schema.GroupElement | Schema.GroupElement["$children"];
 export interface ServerConfigSchema {
 	/** enables certain expensive per-request checks */
 	_devmode?: boolean;
@@ -202,7 +244,16 @@ export interface ServerConfigSchema {
 	 * settings.json location.
 	 */
 	_datafoldertarget?: string;
-	tree: NewTreeObjectSchemaItem
+	/**
+	 * The tree property accepts one of 3 formats. If it is a string ending in `.xml`, `.js`, or `.json`, 
+	 * it is assumed to be a path and the tree will be loaded from the specified path. JS and JSON files
+	 * must export a `tree` property and XML files must specify a `tree` element as root.
+	 * 
+	 * - An array of only host elements (each takes one path or group element) 
+	 * - A path element (or a string specifying the path) to mount a path as root (a single file is possible but pointless)
+	 * - A group element or the children of a group element (which is either an array, or an object with no $element property)
+	 */
+	tree: ServerConfigSchemaTree | string;
 	/** bind address and port info */
 	bindInfo?: Partial<ServerConfig_BindInfo & {
 		/** 
@@ -238,6 +289,8 @@ export interface ServerConfigSchema {
 	 * - 180 days: `15552000`
 	 */
 	authCookieAge?: number
+	/** Max concurrent transfer requests */
+	maxTransferRequests: number
 	/** 
 	 * The JSON schema location for this document. This schema is generated 
 	 * directly from the TypeScript interfaces
@@ -258,7 +311,7 @@ export interface ServerConfig {
 	_devmode: boolean;
 	/** the tiddlywiki folder to use for data folder instances */
 	_datafoldertarget: string;
-	tree: NewTreeGroup | NewTreePath
+	tree: Config.HostElement[];
 	/** bind address and port */
 	bindInfo: ServerConfig_BindInfo & {
 		https: boolean;
@@ -308,7 +361,7 @@ export interface ServerConfig_ClientsideDatafolders {
 export interface ServerConfig_AuthAccountsValue {
 	// /** Record[username] = password */
 	// passwords: Record<string, string>,
-	/** Hashmap of [username] = public key */
+	/** Hashmap of [username]: public key */
 	clientKeys: Record<string, string>,
 	/** override hostLevelPermissions for users with this account */
 	permissions: ServerConfig_AccessOptions
@@ -419,86 +472,159 @@ export interface ServerConfig_TiddlyServer {
 	etag: "required" | "disabled" | ""
 	/** etag does not need to be exact by this many seconds */
 	etagWindow: number
+}
 
-
-}
-export interface NewTreeHashmapGroupSchema {
-	$element: "group";
-	/**  
-	 * Path to an index file to be served instead of an autogenerated index
-	 */
-	indexPath?: string;
-	/** @default  [{"$element": ""}]  */
-	/** @default  {}  */
-	$children: NewTreeItemSchema[] | NewTreeObjectSchema;
-}
-export interface NewTreeGroupSchema extends NewTreeHashmapGroupSchema {
-	key: string;
-}
-/** @default { "$element": {}} */
-/**
- * 
- * @description A hashmap of `group` elements, `folder` elements, and folder paths
- */
-export interface NewTreeObjectSchema {
-	/**
-	 * The children of a hashmap `group` element which are not
-	 * `group` or `folder` elements
-	 */
-	//@ts-ignore
-	$children?: NewTreeOptions[]
-	/** 
-	 * @description A hashmap tree element: either a string or a group/folder element without the `key` attribute
-	 * @default { "$element": {}}
-	 * @pattern ^([^$]+)+$ 
-	 */
-	[K: string]: NewTreeObjectSchemaItem
-}
-export type NewTreeObjectSchemaItem = NewTreeHashmapGroupSchema | NewTreeHashmapPath | string
-/**
- * @default {"$element": ""} 
- */
-export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePathSchema | string;
-export type NewTreeItem = NewTreeGroup | NewTreePath | NewTreeOptions;
+// export interface NewTreeGroupSchema extends NewTreeGroupSchemaHashmap {
+// 	key: string;
+// }
+// /** @default { "$element": {}} */
+// /**
+//  * 
+//  * @description A hashmap of `group` elements, `folder` elements, and folder paths
+//  */
+// export interface NewTreeObjectSchema {
+// 	/**
+// 	 * The children of a hashmap `group` element which are not
+// 	 * `group` or `folder` elements
+// 	 */
+// 	//@ts-ignore
+// 	$children?: NewTreeOptions[]
+// 	/** 
+// 	 * @description A hashmap tree element: either a string or a group/folder element without the `key` attribute
+// 	 * @default { "$element": {}}
+// 	 * @pattern ^([^$]+)+$ 
+// 	 */
+// 	[K: string]: NewTreeObjectSchemaItem
+// }
+// export type NewTreeObjectSchemaItem = NewTreeGroupSchemaHashmap | NewTreePathHashmap | string
+// /**
+//  * @default {"$element": ""} 
+//  */
+// export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePathSchema | string;
+// export type NewTreeItem = NewTreeGroup | NewTreePath | NewTreeOptions;
 export interface NewTreeMountArgs {
 
 
 }
-export interface NewTreeGroup extends NewTreeMountArgs {
-	$element: "group";
-	key: string;
-	/**
-	 * Path to an index file to be served instead of an autogenerated index
-	 */
-	indexPath?: string;
-	$children: (NewTreeItem | NewTreeOptions)[];
+export namespace Config {
+	export type OptionElements = NewTreeOptions;
+	export function isOption(a: any): a is OptionElements {
+		return !!a.$element && ["auth", "backups", "index"].indexOf(a.$element) !== -1;
+	}
+	export function isElement(a: any): a is GroupElement | PathElement | HostElement | OptionElements {
+		return (typeof a === "object" && typeof a["$element"] === "string");
+	}
+	export function isGroup(a: any): a is GroupElement {
+		return isElement(a) && a.$element === "group";
+	}
+	export function isPath(a: any): a is PathElement {
+		return isElement(a) && a.$element === "folder";
+	}
+	export type MountElement = GroupElement | PathElement;
+	// export type HostElement = Schema.HostElement;
+	export interface HostElement {
+		$element: "host",
+		patterns: {
+			"ipv4": string[],
+			"domain": string[]
+		},
+		includeSubdomains: boolean,
+		$mount: GroupElement | PathElement;
+	}
+	export interface GroupElement {
+		$element: "group";
+		key: string;
+		indexPath?: string;
+		$children: MountElement[];
+		$options: OptionElements[];
+	}
+	export interface PathElement {
+		$element: "folder";
+		key: string;
+		path: string;
+		noTrailingSlash: boolean;
+		$children: never;
+		$options: OptionElements[];
+	}
 }
-export interface NewTreeHashmapPath extends NewTreeMountArgs {
-	$element: "folder";
-	/** Path relative to this file or any absolute path NodeJS can stat */
-	path: string;
-	/**
-	 * Load data folders under this path with no trailing slash.
-	 * This imitates single-file wikis and allows tiddlers with relative links
-	 * to be imported directly into a data folder wiki. The source point of the 
-	 * relative link becomes the data folder itself as though it is actually a file.
-	 * However, this breaks relative links to resources served by the datafolder instance
-	 * itself, such as the files directory introduced in 5.1.19 and requires the relative
-	 * link to include the data folder name in the relative link. For this reason, 
-	 * it is better to convert single-file wikis to the datafolder format by putting each
-	 * wiki inside its own folder as index.html, putting a "files" folder beside the 
-	 * index.html file, and adding an index option to this element.
-	 */
-	noTrailingSlash?: boolean;
-	$children?: NewTreeOptions[];
+export namespace Schema {
+	export type GroupChildElements = (Record<string, GroupElement | PathElement | string | Config.OptionElements[]>) | (ArrayGroupElement | ArrayPathElement | Config.OptionElements | string)[];
 
+	export type TreeElement = HostElement[] | GroupChildElements | string;
+	/** Host elements may only be specified in arrays */
+	export interface HostElement {
+		$element: "host",
+		/** 
+		 * The pattern to match Host header to. 
+		 * 
+		 * For domains, an asterisk will not match a period, but may be placed anywhere in the string. 
+		 * (so `example.*` would match `example.com` and `example.net`, etc.) 
+		 * 
+		 * IPv4 address may include the CIDR notation (0.0.0.0/0 matches all IPv4 addresses), 
+		 * and trailing 0's imply subnet mask accordingly. (so `127.0.0.0` would be `127.0.0.0/8`)
+		 * 
+		 * IPv6 is not supported but may be added using the preflighter (an advanced feature)
+		 * */
+		patterns: {
+			"ipv4": string[],
+			"domain": string[]
+		}
+		/** Whether the pattern should match subdomains of the host name (e.g. example.com would include server2.apis.example.com) */
+		includeSubdomains: boolean,
+		/** The HostElement child may be one group or folder element. A string may be used in place of a folder element. */
+		$mount: GroupElement | PathElement | string;
+	}
+	export interface GroupElement {
+
+		$element: "group";
+		indexPath?: string,
+		/**
+		 * The GroupElement children may be either a hashmap of Group and Path elements, with an $options property 
+		 * for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element.
+		 * 
+		 * A hashmap is a shorthand for the array with a key property specified on each element, 
+		 * and a string is shorthand for a folder element.
+		 
+		 * @default  [{"$element": ""}] 
+		 * @default  {}  
+		 * */
+		$children: GroupChildElements;
+	}
+	export interface ArrayGroupElement extends GroupElement {
+		key: string;
+	}
+	export interface PathElement {
+		$element: "folder";
+		/** Path relative to this file or any absolute path NodeJS can stat */
+		path: string;
+		/**
+		 * Load data folders under this path with no trailing slash.
+		 * This imitates single-file wikis and allows tiddlers with relative links
+		 * to be imported directly into a data folder wiki. The source point of the 
+		 * relative link becomes the data folder itself as though it is actually a file.
+		 * However, this breaks relative links to resources served by the datafolder instance
+		 * itself, such as the files directory introduced in 5.1.19 and requires the relative
+		 * link to include the data folder name in the relative link. For this reason, 
+		 * it is better to convert single-file wikis to the datafolder format by putting each
+		 * wiki inside its own folder as index.html, putting a "files" folder beside the 
+		 * index.html file, and adding an index option to this element.
+		 */
+		noTrailingSlash?: boolean;
+		$children?: NewTreeOptions[];
+	}
+	export interface ArrayPathElement extends PathElement {
+		key: string;
+	}
 }
-export interface NewTreePathSchema extends NewTreeHashmapPath {
-	key?: string;
+namespace Test {
+	type Test<A, T extends { [K in keyof A]: any }> = T;
+	//make sure that all keys in the schema are included in the config
+	type Host = Test<Schema.HostElement, Config.HostElement>;
+	type Group = Test<{ $options: any } & Schema.ArrayGroupElement, Config.GroupElement>;
+	type Path = Test<{ $options: any } & Schema.ArrayPathElement, Config.PathElement>;
 }
-export interface NewTreePath extends NewTreeHashmapPath {
-	key: string;
-}
+
+
 /** @default { "$element": "" } */
 export type NewTreeOptions = NewTreeOptionsObject[keyof NewTreeOptionsObject];
 
@@ -524,8 +650,8 @@ export interface NewTreePathOptions_Index {
 	defaultType: "html" | "json" | 403 | 404,
 	/** 
 	 * Look for index files named exactly this or with one of the defaultExts added. 
-	 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","html"] would 
-	 * look for ["index.htm","index.html","index"] in that order. 
+	 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","",html"] would 
+	 * look for ["index.htm","index","index.html"] in that order. 
 	 * 
 	 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
 	 * To use a .hidden file, put the full filename here, and set indexExts to `[""]`. 
@@ -536,7 +662,7 @@ export interface NewTreePathOptions_Index {
 	 * to search for the exact indexFile name. The extensions are searched in the order specified. 
 	 * 
 	 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
-	 * To search for an exact indexFile, specify a blank string inside an array `[""]`.
+	 * The default is `[""]`, which will search for an exact indexFile. 
 	 */
 	indexExts: string[]
 }
@@ -599,7 +725,7 @@ export interface OldServerConfigBase {
 
 	_disableLocalHost: boolean;
 	_devmode: boolean;
-	// tree: NewTreeItem,
+	// tree: any,
 	types: {
 		htmlfile: string[];
 		[K: string]: string[]
@@ -627,10 +753,10 @@ export interface OldServerConfigBase {
 	$schema: string;
 }
 export interface OldServerConfigSchema extends OldServerConfigBase {
-	tree: NewTreeObjectSchemaItem
+	tree: any
 }
 export interface OldServerConfig extends OldServerConfigBase {
-	tree: NewTreeGroup | NewTreePath
+	tree: any,
 	__dirname: string;
 	__filename: string;
 	__assetsDir: string;

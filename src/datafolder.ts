@@ -1,6 +1,6 @@
 import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger,
-	PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath, obs_stat,
+	PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath, obs_stat, RequestEventWS,
 } from "./server-types";
 import { Observable, Subject } from "../lib/rx";
 
@@ -19,7 +19,7 @@ import { gzip } from 'zlib';
 import { TiddlyWiki, TiddlyServer, PluginInfo, WikiInfo } from './boot-startup';
 import { fresh, etag, ws as WebSocket } from '../lib/bundled-lib';
 
-var settings: ServerConfig = {} as any;
+// var settings: ServerConfig = {} as any;
 
 const debug = DebugLogger('DAT');
 
@@ -31,7 +31,7 @@ let eventer: ServerEventEmitter;
 export function init(e: ServerEventEmitter) {
 	eventer = e;
 	eventer.on('settings', function (set: ServerConfig) {
-		settings = set;
+		// settings = set;
 	})
 	eventer.on('settingsChanged', (keys) => {
 		// if (keys.indexOf("username") > -1) {
@@ -40,18 +40,23 @@ export function init(e: ServerEventEmitter) {
 		//     );
 		// }
 	})
-	eventer.on('websocket-connection', function (client: WebSocket, request: http.IncomingMessage) {
+	eventer.on('websocket-connection', function (data: RequestEventWS) {
+		const { request, client, settings, treeHostIndex } = data;
+		const root = settings.tree[treeHostIndex].$mount;
 		let pathname = parse(request.url as string).pathname as string;// new URL(request.url as string);
 
-		var result = resolvePath(pathname.split('/'), settings.tree) as PathResolverResult
+		var result = resolvePath(pathname.split('/'), root) as PathResolverResult
 		if (!result) return client.close(404);
 
 		statWalkPath(result).then(statPath => {
 			//if this is a datafolder, we hand the client and request off directly to it
 			//otherwise we stick it in its own section
 			if (statPath.itemtype === "datafolder") {
+				const target = settings._datafoldertarget
+					? path.resolve(settings.__dirname, settings._datafoldertarget)
+					: "../tiddlywiki";
 				//trigger the datafolder to load in case it isn't
-				const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '');
+				const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '', target);
 				const subpath = pathname.slice(mount.length);
 				//event to give the client to the data folder
 				const loadClient = () => {
@@ -105,9 +110,12 @@ function quickArrayCheck(obj: any): obj is Array<any> {
 }
 
 export function handleDataFolderRequest(result: PathResolverResult, state: StateObject) {
-
+	const target = state.settings._datafoldertarget
+		? path.resolve(state.settings.__dirname, state.settings._datafoldertarget)
+		: "../tiddlywiki";
+		
 	const { mount, folder } = loadDataFolderTrigger(result,
-		state.statPath, state.url.pathname, state.url.query.reload as any || "");
+		state.statPath, state.url.pathname, state.url.query.reload as any || "", target);
 
 
 	const isFullpath = result.filepathPortion.length === state.statPath.index;
@@ -131,7 +139,7 @@ export function handleDataFolderRequest(result: PathResolverResult, state: State
 		load.handler(state);
 	}
 }
-function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true" | "force" | "") {
+function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true" | "force" | "", target: string) {
 	let filepathPrefix = result.filepathPortion.slice(0, statPath.index).join('/');
 	//get the tree path, and add the file path (none if the tree path is a datafolder)
 	let fullPrefix = ["", result.treepathPortion.join('/')];
@@ -149,7 +157,7 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true
 	//initialize the tiddlywiki instance
 	if (!loadedFolders[mount] || reload === "true") {
 		loadedFolders[mount] = { mount, folder, events: new EventEmitter(), handler: [] };
-		loadDataFolderType(mount, folder, reload);
+		loadDataFolderType(mount, folder, reload, target);
 		// loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
 		// loadTiddlyWiki(prefixURI, folder);
 	}
@@ -157,18 +165,18 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true
 	return { mount, folder };
 }
 
-function loadDataFolderType(mount: string, folder: string, reload: string) {
+function loadDataFolderType(mount: string, folder: string, reload: string, target: string) {
 	obs_readFile()(path.join(folder, "tiddlywiki.info"), 'utf8').subscribe(([err, data]) => {
 		const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
 		if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-			loadDataFolderTiddlyWiki(mount, folder, reload);
+			loadDataFolderTiddlyWiki(mount, folder, reload, target);
 		} else if (wikiInfo.type === "tiddlyserver") {
 			// loadTiddlyServerAdapter(mount, folder, reload)
 		}
 	})
 }
 
-function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string) {
+function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string, target: string) {
 	console.time('twboot-' + folder);
 	//The bundle in the Tiddlyserver folder
 	// const target = "../tiddlywiki";
@@ -176,9 +184,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string)
 	// const target = "..\\..\\TiddlyWiki5-compiled\\Source\\TiddlyWiki5-5.1.19";
 	//Jermolene/TiddlyWiki5@master
 	// const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
-	const target = settings._datafoldertarget
-		? path.resolve(settings.__dirname, settings._datafoldertarget)
-		: "../tiddlywiki";
+
 	let _wiki = undefined;
 	const $tw = require(target + "/boot/boot.js").TiddlyWiki(
 		require(target + "/boot/bootprefix.js").bootprefix({
@@ -465,7 +471,7 @@ function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null
 	const body = meta + '\n\n' + text;
 
 	var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1000; //1 year
-	var maxageSetting = settings.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins;
+	var maxageSetting = state.settings.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins;
 	var maxAge = Math.min(Math.max(0, maxageSetting), MAX_MAXAGE)
 
 	var cacheControl = 'public, max-age=' + Math.floor(maxageSetting / 1000)
