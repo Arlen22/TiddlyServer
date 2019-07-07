@@ -22,7 +22,10 @@ import {
 	parseHostList,
 	testAddress,
 	loadSettings,
-	NodePromise
+	NodePromise,
+	RequestEventWS,
+	RequestEventHTTP,
+	RequestEvent
 } from "./server-types";
 
 import * as http from 'http'
@@ -78,7 +81,7 @@ initAuthRoute(eventer);
 
 // === Setup Logging
 const morgan = require('../lib/morgan.js');
-function setLog() {
+function setLog(): Function {
 	const logger: Function = morgan.handler({
 		logFile: settings.logging.logAccess || undefined,
 		logToConsole: !settings.logging.logAccess || settings.logging.logToConsoleAlso,
@@ -110,7 +113,7 @@ crypto.subtle.
 
 eventer.on('settings', (set) => {
 	settings = set;
-	log = setLog();
+	log = setLog() as any;
 });
 eventer.on('settingsChanged', (keys) => {
 	// let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];
@@ -128,31 +131,6 @@ const libsReady = Promise.all([libsodium.ready]);
 
 //we make it a separate line because typescript loses the const if I export
 export { routes, libsReady };
-
-export interface RequestEvent {
-	/** 
-	 * Allows the preflighter to mark the request as handled, indicating it should not be processed further, 
-	 * in which case, the preflighter takes full responsibility for the request, including calling end or close. 
-	 * This is useful in case the preflighter wants to reject the request or initiate authentication, or wants to 
-	 * handle a request using some other routing module. Do not override the /assets path or certain static assets will not be available.
-	 */
-	handled: boolean;
-	username: string;
-	/** auth account key to be applied to this request */
-	authAccountKey: string;
-	/** hostLevelPermissions key to be applied to this request */
-	hostLevelPermissionsKey: string;
-	/** 
-	 * @argument iface HTTP server "host" option for this request, 
-	 * @argument host the host header, 
-	 * @argument addr socket.localAddress 
-	 */
-	interface: { iface: string, host: string | undefined, addr: string };
-
-	request: http.IncomingMessage;
-}
-interface RequestEventHTTP extends RequestEvent { response: http.ServerResponse; }
-interface RequestEventWS extends RequestEvent { client: WebSocket; }
 
 declare function preflighterFunc(ev: RequestEventWS): Promise<RequestEventWS>;
 declare function preflighterFunc(ev: RequestEventHTTP): Promise<RequestEventHTTP>;
@@ -198,7 +176,9 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 			hostLevelPermissionsKey: "",
 			interface: { host, addr, iface },
 			authAccountKey: "",
+			treeHostIndex: -1,
 			username: "",
+			settings,
 			request,
 			client
 		};
@@ -206,7 +186,7 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 			if (!ev2.handled) {
 				// we give the preflighter the option to handle the websocket on its own
 				if (settings.bindInfo.hostLevelPermissions[ev2.hostLevelPermissionsKey].websockets === false) client.close();
-				else eventer.emit('websocket-connection', client, request);
+				else eventer.emit('websocket-connection', ev);
 			}
 		});
 	});
@@ -317,7 +297,7 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 						&& (!settings.bindInfo.filterBindAddress || tester(e.address).usable)
 					).map(e => e.address)
 				: hosts
-			.map(e => (settings.bindInfo.https ? "https" : "http") + "://" + e + ":" + settings.bindInfo.port)).join('\n')
+					.map(e => (settings.bindInfo.https ? "https" : "http") + "://" + e + ":" + settings.bindInfo.port)).join('\n')
 		);
 	});
 
@@ -334,22 +314,28 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 ) {
 	//connections to the wrong IP address are already filtered out by the connection event listener on the server.
 	//determine hostLevelPermissions to be applied
-	let localAddress = ev.request.socket.localAddress;
-	let keys = Object.keys(settings.bindInfo.hostLevelPermissions);
-	let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
-	let matches = parseHostList(keys)(localAddress);
-	if (isLocalhost) {
-		ev.hostLevelPermissionsKey = "localhost";
-	} else if (matches.lastMatch > -1) {
-		ev.hostLevelPermissionsKey = keys[matches.lastMatch];
-	} else {
-		ev.hostLevelPermissionsKey = "*";
+	{
+		let localAddress = ev.request.socket.localAddress;
+		let keys = Object.keys(settings.bindInfo.hostLevelPermissions);
+		let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
+		let matches = parseHostList(keys)(localAddress);
+		if (isLocalhost) {
+			ev.hostLevelPermissionsKey = "localhost";
+		} else if (matches.lastMatch > -1) {
+			ev.hostLevelPermissionsKey = keys[matches.lastMatch];
+		} else {
+			ev.hostLevelPermissionsKey = "*";
+		}
+	}
+	{
+		let hostHeader = ev.request.headers.host;
+		ev.treeHostIndex = 0;
 	}
 	let { registerNotice } = settings.bindInfo.hostLevelPermissions[ev.hostLevelPermissionsKey];
 	let auth = checkCookieAuth(ev.request, registerNotice);
-	if(auth){
+	if (auth) {
 		ev.authAccountKey = auth[0];
-		ev.username = auth[1];	
+		ev.username = auth[1];
 	}
 	//send the data to the preflighter
 	return preflighter ? preflighter(ev) : Promise.resolve(ev);
@@ -366,8 +352,9 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 				hostLevelPermissionsKey: "",
 				authAccountKey: "",
 				username: "",
+				treeHostIndex: -1,
 				interface: { host, addr, iface },
-				request, response
+				request, response, settings
 			};
 			//send it to the preflighter
 			return requestHandlerHostLevelChecks(ev, preflighter);
@@ -382,8 +369,9 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 				eventer,
 				ev.hostLevelPermissionsKey,
 				ev.authAccountKey,
+				ev.treeHostIndex,
 				ev.username,
-				settings
+				ev.settings
 			);
 			//handle basic auth
 			// if (!handleBasicAuth(state)) return;

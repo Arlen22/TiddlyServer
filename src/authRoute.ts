@@ -119,9 +119,17 @@ function handleTransfer(state: StateObject) {
 	if (!pkop.sender || !pkop.reciever) return;
 	clearTimeout(pkop.cancelTimeout);
 	pkop.step += 1;
-	pkop.sender.res.writeHead(200, undefined, { "x-tiddlyserver-transfer-count": pkop.step });
+	pkop.sender.res.writeHead(200, undefined, { 
+		"x-tiddlyserver-transfer-count": pkop.step,
+		"content-type": pkop.reciever.req.headers["content-type"],
+		"content-length": pkop.reciever.req.headers["content-length"]
+	});
 	pkop.reciever.req.pipe(pkop.sender.res);
-	pkop.reciever.res.writeHead(200, undefined, { "x-tiddlyserver-transfer-count": pkop.step });
+	pkop.reciever.res.writeHead(200, undefined, { 
+		"x-tiddlyserver-transfer-count": pkop.step,
+		"content-type": pkop.sender.req.headers["content-type"],
+		"content-length": pkop.sender.req.headers["content-length"]
+	});
 	pkop.sender.req.pipe(pkop.reciever.res);
 	pkop.cancelTimeout = removePendingPinTimeout(pin);
 }
@@ -136,6 +144,12 @@ function getRandomPin() {
 	pko[pin] = { step: 1, cancelTimeout: removePendingPinTimeout(pin) };
 	return pin;
 }
+let sharedKeyList: Record<string, string> = {};
+function setSharedKey(key: string) {
+	// let pin = getRandomPin();
+	if (!sharedKeyList[key]) sharedKeyList[key] = getRandomPin();
+	return sharedKeyList[key];
+}
 const DEFAULT_AGE = "2592000";
 export function getSetCookie(name: string, value: string, secure: boolean, age: number) {
 	// let flags = ["Secure", "HttpOnly", "Max-Age=2592000", "SameSite=Strict"];
@@ -145,14 +159,20 @@ export function getSetCookie(name: string, value: string, secure: boolean, age: 
 		"Max-Age": age.toString(),
 		"SameSite": "Strict",
 		"Path": "/"
-	}
+	};
 
 	return [
 		name + "=" + value,
 		...Object.keys(flags).filter(k => !!flags[k]).map(k => k + (typeof flags[k] === "string" ? "=" + flags[k] : ""))
 	].join("; ");
 }
-
+interface TiddlyServerResponses {
+	"POST /admin/authenticate/initPin": { initPin: string },
+	"POST /admin/authenticate/initShared/{shared}": { initPin: string },
+	"POST /admin/authenticate/login": undefined,
+	"POST /admin/authenticate/logout": undefined,
+	"POST /admin/authenticate/transfer": any
+}
 /** Handles the /admin/authenticate route */
 export function handleAuthRoute(state: StateObject) {
 	if (state.req.method === "GET" || state.req.method === "HEAD") {
@@ -170,11 +190,16 @@ export function handleAuthRoute(state: StateObject) {
 		return state.throw(405);
 	if (state.path[3] === "transfer") {
 		handleTransfer(state);
-	} else if (state.path[3] === "pendingpin") {
+	} else if (state.path[3] === "initpin") {
 		if (Object.keys(pko).length > 1000)
 			return state.throwReason(509, "Too many transfer requests in progress");
 		else
-			state.respond(200).json({ pendingPin: getRandomPin() });
+			state.respond(200).json({ initPin: getRandomPin() });
+	} else if (state.path[3] === "initshared") {
+		if (Object.keys(pko).length > 1000)
+			return state.throwReason(509, "Too many transfer requests in progress");
+		else
+			state.respond(200).json({ initPin: setSharedKey(state.path[4]) });
 	} else if (state.path[3] === "login") {
 		state.recieveBody(true, true).then(() => {
 			if (state.body.length && !state.json) return; //recieve body sent a response already
