@@ -1,5 +1,5 @@
 import {
-	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DebugLogger,
+	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag,
 	PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath, obs_stat, RequestEventWS,
 } from "./server-types";
 import { Observable, Subject } from "../lib/rx";
@@ -21,7 +21,7 @@ import { fresh, etag, ws as WebSocket } from '../lib/bundled-lib';
 
 // var settings: ServerConfig = {} as any;
 
-const debug = DebugLogger('DAT');
+// const debug = DebugLogger('DAT');
 
 const loadedFolders: { [k: string]: FolderData } = {};
 const otherSocketPaths: { [k: string]: WebSocket[] } = {};
@@ -41,7 +41,9 @@ export function init(e: ServerEventEmitter) {
 		// }
 	})
 	eventer.on('websocket-connection', function (data: RequestEventWS) {
-		const { request, client, settings, treeHostIndex } = data;
+		
+		const { request, client, settings, treeHostIndex, debugOutput } = data;
+		const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
 		const root = settings.tree[treeHostIndex].$mount;
 		let pathname = parse(request.url as string).pathname as string;// new URL(request.url as string);
 
@@ -208,7 +210,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 	function complete(err, $tw) {
 		console.timeEnd('twboot-' + folder);
 		if (err) {
-			return doError(mount, folder, err);
+			return console.log(mount, folder, err);
 		}
 
 		//we use $tw.modules.execute so that the module has its respective $tw variable.
@@ -216,7 +218,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 		try {
 			Server = $tw.modules.execute('$:/core/modules/server/server.js').Server;
 		} catch (e) {
-			doError(mount, folder, e);
+			console.log(mount, folder, e);
 			return;
 		}
 		var server = new Server({
@@ -252,7 +254,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 	}
 };
 
-function doError(mount, folder, err) {
+function doError(debug, mount, folder, err) {
 	debug(3, 'error starting %s at %s: %s', mount, folder, err.stack);
 	const requests = loadedFolders[mount].handler as any[];
 	loadedFolders[mount] = {
@@ -475,22 +477,22 @@ function sendPluginResponse(state: StateObject, pluginCache: PluginCache | "null
 	var maxAge = Math.min(Math.max(0, maxageSetting), MAX_MAXAGE)
 
 	var cacheControl = 'public, max-age=' + Math.floor(maxageSetting / 1000)
-	debug(-3, 'cache-control %s', cacheControl)
+	StateObject.DebugLogger("").call(state, -3, 'cache-control %s', cacheControl)
 	state.setHeader('Cache-Control', cacheControl)
 
 	var modified = new Date(pluginCache.cacheTime).toUTCString()
-	debug(-3, 'modified %s', modified)
+	StateObject.DebugLogger("").call(state, -3, 'modified %s', modified)
 	state.setHeader('Last-Modified', modified)
 
 	var etagStr = etag(body);
-	debug(-3, 'etag %s', etagStr)
+	StateObject.DebugLogger("").call(state, -3, 'etag %s', etagStr)
 	state.setHeader('ETag', etagStr)
 
 	if (fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
-		debug(-1, "client plugin still fresh")
+		StateObject.DebugLogger("").call(state, -1, "client plugin still fresh")
 		state.respond(304).empty();
 	} else {
-		debug(-1, "sending plugin")
+		StateObject.DebugLogger("").call(state, -1, "sending plugin")
 		sendResponse(state, body, { doGzip: canAcceptGzip(state.req) });
 	}
 }
