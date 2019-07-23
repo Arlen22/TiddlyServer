@@ -77,11 +77,11 @@ export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement)
 export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
 	let defaultHost = (tree2: any): Config.HostElement => ({
 		$element: "host",
-		patterns: {
-			"ipv4": ["0.0.0.0/0"],
-			"domain": ["*"]
-		},
-		includeSubdomains: true,
+		// patterns: {
+		// 	"ipv4": ["0.0.0.0/0"],
+		// 	"domain": ["*"]
+		// },
+		// includeSubdomains: true,
 		$mount: normalizeTree(settingsDir, tree2, undefined, [])
 	});
 	if (typeof tree === "string" && tree.endsWith(".xml")) {
@@ -92,14 +92,13 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
 		let filepath = pathResolveWithUser(settingsDir, tree);
 		tree = require(filepath).tree;
 	}
-	//otherwise just assume we're using the value itself
-	if (Array.isArray(tree) && typeof tree[0] === "object" && (tree[0] as any).$element === "host") {
-		let hosts = tree as Config.HostElement[];
-		hosts.map(host => normalizeTreeHost(settingsDir, host));
-		return hosts;
-	} else {
-		return [defaultHost(tree)];
-	}
+	//otherwise just assume we're using the value itself.
+	//we are not implementing host-based routing yet. If TiddlyServer is 
+	//loaded as a module, the tree may be added to after the settings file
+	//has been normalized and the preflighter may specify any index in the 
+	//host array.
+	return [defaultHost(tree)];
+	
 }
 export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
 	if (!auth) return {};
@@ -122,8 +121,8 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 	type T1 = T["bindInfo"];
 	type T3 = T["logging"];
 	type T2 = T["putsaver"];
-	type T21 = T["bindInfo"]["hostLevelPermissions"];
-	let hostLevelPermissions = {
+	type T21 = T["bindInfo"]["localAddressPermissions"];
+	let localAddressPermissions = {
 		...{
 			"localhost": {
 				writeErrors: true,
@@ -144,7 +143,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 				registerNotice: false
 			}
 		},
-		...spread(set.bindInfo && set.bindInfo.hostLevelPermissions)
+		...spread(set.bindInfo && set.bindInfo.localAddressPermissions)
 	};
 	let newset: ServerConfig = {
 		__dirname: "",
@@ -161,7 +160,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 				filterBindAddress: false,
 				port: 8080,
 
-				hostLevelPermissions,
+				localAddressPermissions: localAddressPermissions,
 				_bindLocalhost: false,
 				https: false
 			},
@@ -194,6 +193,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 			...{
 				defaultType: "html",
 				icons: { "htmlfile": ["htm", "html"] },
+				types: {},
 				mixFolders: true
 			},
 			...spread(set.directoryIndex)
@@ -210,8 +210,16 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 		$schema: "./settings.schema.json"
 	}
 	// set second level object defaults
-
-
+		newset.directoryIndex.types = {};
+		Object.keys(newset.directoryIndex.icons).forEach(type => {
+			newset.directoryIndex.icons[type].forEach(ext => {
+				if (!newset.directoryIndex.types[ext]) {
+					newset.directoryIndex.types[ext] = type;
+				} else {
+					throw format('Multiple types for extension %s: %s', ext, newset.directoryIndex.types[ext], type);
+				}
+			})
+		});
 
 
 	if (newset.putsaver.backupDirectory)
@@ -234,7 +242,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 	}
 	return newset;
 }
-type ServerConfigSchemaTree = Schema.HostElement[] | Schema.PathElement | Schema.GroupElement | Schema.GroupElement["$children"];
+type ServerConfigSchemaTree = Schema.PathElement | Schema.GroupElement | Schema.GroupElement["$children"];
 export interface ServerConfigSchema {
 	/** enables certain expensive per-request checks */
 	_devmode?: boolean;
@@ -266,7 +274,7 @@ export interface ServerConfigSchema {
 	/** logging  */
 	logging?: Partial<ServerConfig_Logging>;
 	/** directory index options */
-	directoryIndex?: Partial<ServerConfig_DirectoryIndex>
+	directoryIndex?: { [P in keyof ServerConfig_DirectoryIndex]?: P extends "types" ? never : ServerConfig_DirectoryIndex[P] | undefined; } 
 	/** tiddlyserver specific options */
 	putsaver?: Partial<ServerConfig_TiddlyServer>
 	/** 
@@ -420,8 +428,12 @@ export interface ServerConfig_BindInfo {
 	/** port to listen on, default is 8080 for http and 8443 for https */
 	port: number;
 
-	/** permissions based on host address: "localhost", "*" (all others), "192.168.0.0/16" */
-	hostLevelPermissions: { [host: string]: ServerConfig_AccessOptions }
+	/** 
+	 * Permissions based on local address: "localhost", "*" (all others), "192.168.0.0/16", etc. 
+	 * This checks the IP address each client connects to (socket.localAddress), 
+	 * not the bind address of the server instance that accepted the request.
+	 */
+	localAddressPermissions: { [host: string]: ServerConfig_AccessOptions }
 	/** always bind a separate server instance to 127.0.0.1 regardless of any other settings */
 	_bindLocalhost: boolean;
 
@@ -460,6 +472,7 @@ export interface ServerConfig_DirectoryIndex {
 	 * Icons are in the TiddlyServer/assets/icons folder.
 	 */
 	icons: { [iconName: string]: string[] }
+	types: { [ext: string]: string }
 }
 export interface ServerConfig_TiddlyServer {
 	/** backup directory for saving SINGLE-FILE wikis only */
@@ -524,11 +537,12 @@ export namespace Config {
 	// export type HostElement = Schema.HostElement;
 	export interface HostElement {
 		$element: "host",
-		patterns: {
-			"ipv4": string[],
-			"domain": string[]
-		},
-		includeSubdomains: boolean,
+		//Commenting these out for now. They may be added later.
+		// patterns: {
+		// 	"ipv4": string[],
+		// 	"domain": string[]
+		// },
+		// includeSubdomains: boolean,
 		$mount: GroupElement | PathElement;
 	}
 	export interface GroupElement {
@@ -554,23 +568,23 @@ export namespace Schema {
 	/** Host elements may only be specified in arrays */
 	export interface HostElement {
 		$element: "host",
-		/** 
-		 * The pattern to match Host header to. 
-		 * 
-		 * For domains, an asterisk will not match a period, but may be placed anywhere in the string. 
-		 * (so `example.*` would match `example.com` and `example.net`, etc.) 
-		 * 
-		 * IPv4 address may include the CIDR notation (0.0.0.0/0 matches all IPv4 addresses), 
-		 * and trailing 0's imply subnet mask accordingly. (so `127.0.0.0` would be `127.0.0.0/8`)
-		 * 
-		 * IPv6 is not supported but may be added using the preflighter (an advanced feature)
-		 * */
-		patterns: {
-			"ipv4": string[],
-			"domain": string[]
-		}
-		/** Whether the pattern should match subdomains of the host name (e.g. example.com would include server2.apis.example.com) */
-		includeSubdomains: boolean,
+		// /** 
+		//  * The pattern to match Host header to. 
+		//  * 
+		//  * For domains, an asterisk will not match a period, but may be placed anywhere in the string. 
+		//  * (so `example.*` would match `example.com` and `example.net`, etc.) 
+		//  * 
+		//  * IPv4 address may include the CIDR notation (0.0.0.0/0 matches all IPv4 addresses), 
+		//  * and trailing 0's imply subnet mask accordingly. (so `127.0.0.0` would be `127.0.0.0/8`)
+		//  * 
+		//  * IPv6 is not supported but may be added using the preflighter (an advanced feature)
+		//  * */
+		// patterns: {
+		// 	"ipv4": string[],
+		// 	"domain": string[]
+		// }
+		// /** Whether the pattern should match subdomains of the host name (e.g. example.com would include server2.apis.example.com) */
+		// includeSubdomains: boolean,
 		/** The HostElement child may be one group or folder element. A string may be used in place of a folder element. */
 		$mount: GroupElement | PathElement | string;
 	}
@@ -669,8 +683,8 @@ export interface NewTreePathOptions_Index {
 export interface NewTreePathOptions_Auth {
 	/** 
 	 * Only allow requests using these authAccounts. Option elements affect the group
-	 * they belong to and all children under that. Each property in an option element 
-	 * replaces the key from parent option elements.
+	 * they belong to and all children under that. Each property in an auth element 
+	 * replaces the key from parent auth elements.
 	 * 
 	 * Anonymous requests are ALWAYS denied if an auth element applies to the requested path. 
 	 * 
@@ -690,8 +704,8 @@ export interface NewTreePathOptions_Auth {
 }
 export interface NewTreePathOptions_Backup {
 	/** Options related to backups for single-file wikis. Option elements affect the group
-	 * they belong to and all children under that. Each property in an option element 
-	 * replaces the key from parent option elements. */
+	 * they belong to and all children under that. Each property in a backups element 
+	 * replaces the key from parent backups elements. */
 	$element: "backups",
 	/** 
 	 * Backup folder to store backups in. Multiple folder paths 
@@ -794,7 +808,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 	type T1 = T["bindInfo"];
 	type T3 = T["logging"];
 	type T2 = T["putsaver"];
-	type T21 = T["bindInfo"]["hostLevelPermissions"];
+	type T21 = T["bindInfo"]["localAddressPermissions"];
 	return {
 		__assetsDir: set.__assetsDir,
 		__dirname: set.__dirname,
@@ -808,7 +822,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 			enableIPv6: set.host === "::",
 			port: set.port,
 			bindWildcard: set.host === "0.0.0.0" || set.host === "::",
-			hostLevelPermissions: {
+			localAddressPermissions: {
 				"localhost": set.allowLocalhost,
 				"*": set.allowNetwork
 			},
@@ -831,7 +845,8 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 		directoryIndex: {
 			defaultType: "html",
 			icons: set.types,
-			mixFolders: set.mixFolders
+			mixFolders: set.mixFolders,
+			types: {}
 		},
 		EXPERIMENTAL_clientside_datafolders: {
 			enabled: false,

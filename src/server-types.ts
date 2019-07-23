@@ -52,44 +52,44 @@ export {
 	ConvertSettings
 }
 let DEBUGLEVEL = -1;
-let settings: ServerConfig;
-const colorsRegex = /\x1b\[[0-9]+m/gi
-let debugOutput: Writable = new Writable({
-	write: function (chunk, encoding, callback) {
-		// if we're given a buffer, convert it to a string
-		if (Buffer.isBuffer(chunk)) chunk = chunk.toString('utf8');
-		// remove ending linebreaks for consistency
-		chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
+// let settings: ServerConfig;
+// const colorsRegex = /\x1b\[[0-9]+m/gi
+// let debugOutput: Writable = new Writable({
+// 	write: function (chunk, encoding, callback) {
+// 		// if we're given a buffer, convert it to a string
+// 		if (Buffer.isBuffer(chunk)) chunk = chunk.toString('utf8');
+// 		// remove ending linebreaks for consistency
+// 		chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
 
-		if (settings.logging.logError) {
-			appendFileSync(
-				settings.logging.logError,
-				(settings.logging.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
-				{ encoding: "utf8" }
-			);
-		}
-		if (!settings.logging.logError || settings.logging.logToConsoleAlso) {
-			console.log(chunk);
-		}
-		callback && callback();
-		return true;
-	}
-});;
-export let typeLookup: { [k: string]: string };
+// 		if (settings.logging.logError) {
+// 			appendFileSync(
+// 				settings.logging.logError,
+// 				(settings.logging.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
+// 				{ encoding: "utf8" }
+// 			);
+// 		}
+// 		if (!settings.logging.logError || settings.logging.logToConsoleAlso) {
+// 			console.log(chunk);
+// 		}
+// 		callback && callback();
+// 		return true;
+// 	}
+// });;
+// export let typeLookup: { [k: string]: string };
 export function init(eventer: ServerEventEmitter) {
 	eventer.on('settings', function (set: ServerConfig) {
 		// DEBUGLEVEL = set.debugLevel;
-		settings = set;
-		typeLookup = {};
-		Object.keys(set.directoryIndex.icons).forEach(type => {
-			set.directoryIndex.icons[type].forEach(ext => {
-				if (!typeLookup[ext]) {
-					typeLookup[ext] = type;
-				} else {
-					throw format('Multiple types for extension %s: %s', ext, typeLookup[ext], type);
-				}
-			})
-		});
+		// settings = set;
+		// typeLookup = {};
+		// Object.keys(set.directoryIndex.icons).forEach(type => {
+		// 	set.directoryIndex.icons[type].forEach(ext => {
+		// 		if (!typeLookup[ext]) {
+		// 			typeLookup[ext] = type;
+		// 		} else {
+		// 			throw format('Multiple types for extension %s: %s', ext, typeLookup[ext], type);
+		// 		}
+		// 	})
+		// });
 		// const myWritable = new stream.
 	});
 }
@@ -172,16 +172,20 @@ export interface RequestEvent {
 	/** auth account key to be applied to this request */
 	authAccountKey: string;
 	/** hostLevelPermissions key to be applied to this request */
-	hostLevelPermissionsKey: string;
+	localAddressPermissionsKey: string;
 	/** 
-	 * @argument iface HTTP server "host" option for this request, 
+	 * @argument iface HTTP server "host" option for this request (i.e. server.listen bind address), 
 	 * @argument host the host header, 
 	 * @argument addr socket.localAddress 
 	 */
 	interface: { iface: string, host: string | undefined, addr: string };
+	/** tree hosts array index to be applied to this request */
 	treeHostIndex: number;
+	/** the ServerConfig that will be used for this request */
 	settings: ServerConfig;
 	request: http.IncomingMessage;
+	/** A custom debug output may be set, otherwise the default is used */
+	debugOutput: Writable;
 }
 export interface RequestEventHTTP extends RequestEvent { response: http.ServerResponse; }
 export interface RequestEventWS extends RequestEvent { client: WebSocket; }
@@ -364,7 +368,7 @@ export namespace colors {
  * -3 - Request and response data for all messages (verbose)
  * -4 - Protocol details and full data dump (such as encryption steps and keys)
  */
-declare function DebugLog(level: number, str: string | NodeJS.ErrnoException, ...args: any[]);
+declare function DebugLog(this: { debugOutput: Writable, settings: ServerConfig }, level: number, str: string | NodeJS.ErrnoException, ...args: any[]);
 // declare function DebugLog(str: string, ...args: any[]);
 export function isError(obj): obj is Error {
 	return !!obj && obj.constructor === Error;
@@ -373,31 +377,31 @@ export function isError(obj): obj is Error {
 export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException {
 	return isError(obj);
 }
-export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
-	//if(prefix.startsWith("V:")) return function(){};
-	return function (msgLevel: number, tempString: any, ...args: any[]) {
-		if (!ignoreLevel && settings.logging.debugLevel > msgLevel) return;
-		if (isError(args[0])) {
-			let err = args[0];
-			args = [];
-			if (err.stack) args.push(err.stack);
-			else args.push("Error %s: %s", err.name, err.message);
-		}
-		let t = new Date();
-		let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
-			padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-		debugOutput.write(' '
-			+ (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
-			+ ' ' + colors.FgCyan + date + colors.Reset
-			+ ' ' + format.apply(null, [tempString, ...args]).split('\n').map((e, i) => {
-				if (i > 0) {
-					return new Array(23 + prefix.length).join(' ') + e;
-				} else {
-					return e;
-				}
-			}).join('\n'), "utf8");
-	} as typeof DebugLog;
-}
+// export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
+// 	//if(prefix.startsWith("V:")) return function(){};
+// 	return function (msgLevel: number, tempString: any, ...args: any[]) {
+// 		if (!ignoreLevel && settings.logging.debugLevel > msgLevel) return;
+// 		if (isError(args[0])) {
+// 			let err = args[0];
+// 			args = [];
+// 			if (err.stack) args.push(err.stack);
+// 			else args.push("Error %s: %s", err.name, err.message);
+// 		}
+// 		let t = new Date();
+// 		let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
+// 			padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+// 		debugOutput.write(' '
+// 			+ (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
+// 			+ ' ' + colors.FgCyan + date + colors.Reset
+// 			+ ' ' + format.apply(null, [tempString, ...args]).split('\n').map((e, i) => {
+// 				if (i > 0) {
+// 					return new Array(23 + prefix.length).join(' ') + e;
+// 				} else {
+// 					return e;
+// 				}
+// 			}).join('\n'), "utf8");
+// 	} as typeof DebugLog;
+// }
 
 
 
@@ -619,7 +623,8 @@ export type DirectoryIndexOptions = {
 	mkdir: boolean,
 	format: "json" | "html",
 	mixFolders: boolean,
-	isLoggedIn: string | false
+	isLoggedIn: string | false,
+	extTypes: { [ext: string]: string }
 }
 export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
 	let { keys, paths, dirpath, type } = _r;
@@ -635,7 +640,7 @@ export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, Directory
 				name: e.key,
 				path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
 				type: (!e.stat ? "group" : (e.stat.itemtype === "file"
-					? typeLookup[e.key.split('.').pop() as string] || 'other'
+					? options.extTypes[e.key.split('.').pop() as string] || 'other'
 					: e.stat.itemtype as string)),
 				size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
 			};
@@ -1094,7 +1099,7 @@ export class StateObject {
 		if (this.authAccountsKey) {
 			return this.settings.authAccounts[this.authAccountsKey].permissions;
 		} else {
-			return this.settings.bindInfo.hostLevelPermissions[this.hostLevelPermissionsKey];
+			return this.settings.bindInfo.localAddressPermissions[this.hostLevelPermissionsKey];
 		}
 		// let localAddress = this._req.socket.localAddress;
 		// let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
@@ -1157,17 +1162,20 @@ export class StateObject {
 	responseHeaders: StandardResponseHeaders = {} as any;
 	responseSent: boolean = false;
 
+
+
 	constructor(
 		private _req: http.IncomingMessage,
 		private _res: http.ServerResponse,
-		private debugLog: typeof DebugLog,
+
 		private eventer: ServerEventEmitter,
 		public hostLevelPermissionsKey: string,
 		public authAccountsKey: string,
 		/** The HostElement array index in settings.tree */
 		public treeHostIndex: number,
 		public username: string,
-		public settings: ServerConfig
+		public settings: ServerConfig,
+		public debugOutput: Writable
 	) {
 		this.startTime = process.hrtime();
 		this.req = _req;
@@ -1265,8 +1273,7 @@ export class StateObject {
 		if (this.settings._devmode) {
 			let stack = new Error().stack;
 			setTimeout(() => {
-				if (!this.responseSent)
-					this.debugLog(3, "Response not sent \n %s", stack);
+				if (!this.responseSent) this.debugOutput.write("Response not sent syncly\n " + stack);
 			}, 0);
 		}
 		var subthis = {
@@ -1384,8 +1391,34 @@ export class StateObject {
 		// 	})
 		// 	//returns a promise with the state
 		// 	.then(() => this);
-	}
 
+	}
+	static DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
+		//if(prefix.startsWith("V:")) return function(){};
+		return function (this: { debugOutput: Writable, settings: ServerConfig }, msgLevel: number, tempString: any, ...args: any[]) {
+			if (!ignoreLevel && this.settings.logging.debugLevel > msgLevel) return;
+			if (isError(args[0])) {
+				let err = args[0];
+				args = [];
+				if (err.stack) args.push(err.stack);
+				else args.push("Error %s: %s", err.name, err.message);
+			}
+			let t = new Date();
+			let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
+				padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
+			this.debugOutput.write(' '
+				+ (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
+				+ ' ' + colors.FgCyan + date + colors.Reset
+				+ ' ' + format.apply(null, [tempString, ...args]).split('\n').map((e, i) => {
+					if (i > 0) {
+						return new Array(23 + prefix.length).join(' ') + e;
+					} else {
+						return e;
+					}
+				}).join('\n'), "utf8");
+		}
+	}
+	// private debugLog: typeof DebugLog = StateObject.DebugLogger("STATE  ");
 }
 
 export class ER extends Error {

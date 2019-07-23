@@ -2,8 +2,8 @@ import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } fr
 import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
-	StatPathResult, DebugLogger, TreeObject, PathResolverResult, TreePathResult, resolvePath,
-	sendDirectoryIndex, statWalkPath, typeLookup, DirectoryIndexOptions, DirectoryIndexData,
+	StatPathResult, TreeObject, PathResolverResult, TreePathResult, resolvePath,
+	sendDirectoryIndex, statWalkPath, DirectoryIndexOptions, DirectoryIndexData,
 	ServerEventEmitter, ER, getTreePathFiles, NewTreePathOptions_Auth, StandardResponseHeaders, serveFile, Config
 } from "./server-types";
 
@@ -31,7 +31,7 @@ import { Stats } from "fs";
 import { last } from "rxjs/operator/last";
 import { NewTreeOptions, NewTreePathOptions_Backup, NewTreePathOptions_Index, NewTreeOptionsObject } from "./server-config";
 
-const debug = DebugLogger("SER-API");
+// const debugTag = "SER-API";
 __dirname = path.dirname(module.filename || process.execPath);
 
 function tuple<T1, T2, T3, T4, T5, T6>(a?: T1, b?: T2, c?: T3, d?: T4, e?: T5, f?: T6) {
@@ -51,11 +51,11 @@ export function parsePath(path: string, jsonFile: string) {
 	return path;
 }
 
-var settings: ServerConfig = {} as any;
+// var settings: ServerConfig = {} as any;
 
 export function init(eventer: ServerEventEmitter) {
 	eventer.on('settings', function (set: ServerConfig) {
-		settings = set;
+		// settings = set;
 	});
 	initTiddlyWiki(eventer);
 }
@@ -96,7 +96,7 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 	// var result: PathResolverResult | undefined;
 	// const resolvePath = (settings.tree);
 	// Promise.resolve().then(() => {
-	
+
 	let result = resolvePath(state, state.hostRoot) as PathResolverResult;
 	if (!result) {
 		state.throw<never>(404);
@@ -153,10 +153,13 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 		});
 	}
 }
-function handleFileError(err: NodeJS.ErrnoException) {
-	debug(2, "%s %s\n%s", err.code, err.message, err.path);
-}
 
+function handleFileError(debugTag: string, state: StateObject, err: NodeJS.ErrnoException) {
+	StateObject.DebugLogger(debugTag).call(state, 2, "%s %s\n%s", err.code, err.message, err.path);
+}
+function debugState(debugTag: string, state: StateObject){
+	return StateObject.DebugLogger(debugTag).bind(state);
+}
 function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 	// const { state } = result;
 	const allow = state.allow;
@@ -206,14 +209,14 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 			const options = {
 				upload: isFolder && (allow.upload),
 				mkdir: isFolder && (allow.mkdir),
-				mixFolders: settings.directoryIndex.mixFolders,
+				mixFolders: state.settings.directoryIndex.mixFolders,
 				isLoggedIn: state.username ? (state.username + " (group " + state.authAccountsKey + ")") : false,
-				format
+				format, extTypes: state.settings.directoryIndex.types
 			};
 			let contentType = {
 				html: "text/html",
 				json: "application/json"
-			}
+			};
 			getTreePathFiles(result, state)
 				.map(e => [e, options] as [typeof e, DirectoryIndexOptions])
 				.concatMap(sendDirectoryIndex)
@@ -222,11 +225,6 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 						.buffer(Buffer.from(res, "utf8"));
 				});
 		})
-		if (isFolder && state.treeOptions.index.indexExts.length && state.treeOptions.index.indexFile.length) {
-
-			fs.readdir(result.fullfilepath, (err, files) => {
-			});
-		}
 	} else if (state.req.method === "POST") {
 		var form = new formidable.IncomingForm();
 		// console.log(state.url);
@@ -239,7 +237,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 
 			form.parse(state.req, function (err: Error, fields, files) {
 				if (err) {
-					debug(2, "upload %s", err.toString());
+					debugState("SER-DIR", state)(2, "upload %s", err.toString());
 					state.throwError(500, new ER("Error recieving request", err.toString()));
 					return;
 				}
@@ -251,7 +249,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				newname = path.basename(newname);
 				var newpath = path.join(result.fullfilepath, newname);
 				fs.rename(oldpath, newpath, function (err) {
-					if (err) handleFileError(err)
+					if (err) handleFileError("SER-DIR", state, err)
 					state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
 				});
 			});
@@ -262,13 +260,13 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				return state.throwReason(403, "mkdir is not allowed over the network")
 			form.parse(state.req, function (err: Error, fields, files) {
 				if (err) {
-					debug(2, "mkdir %s", err.toString());
+					debugState("SER-DIR", state)(2, "mkdir %s", err.toString());
 					state.throwError(500, new ER("Error recieving request", err.toString()))
 					return;
 				}
 				fs.mkdir(path.join(result.fullfilepath, fields.dirname), (err) => {
 					if (err) {
-						handleFileError(err);
+						handleFileError("SER-DIR", state, err);
 						state.redirect(state.url.pathname + "?error=mkdir");
 					} else if (fields.dirtype === "datafolder") {
 						let read = fs.createReadStream(path.join(__dirname, "../tiddlywiki/datafolder-template.json"));
@@ -276,7 +274,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 						read.pipe(write);
 						let error;
 						const errorHandler = (err) => {
-							handleFileError(err);
+							handleFileError("SER-DIR", state, err);
 							error = err;
 							state.redirect(state.url.pathname + "?error=mkdf");
 							read.close();
@@ -311,7 +309,7 @@ function handlePUTrequest(state: StateObject) {
 	const mtime = Date.parse(state.statPath.stat.mtime as any);
 	const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
 	const ifmatchStr: string = first(state.req.headers['if-match']) || '';
-	if (settings.putsaver.etag !== "disabled" && (ifmatchStr || settings.putsaver.etag === "required") && (ifmatchStr !== etag)) {
+	if (state.settings.putsaver.etag !== "disabled" && (ifmatchStr || state.settings.putsaver.etag === "required") && (ifmatchStr !== etag)) {
 		const ifmatch = JSON.parse(ifmatchStr).split('-');
 		const _etag = JSON.parse(etag).split('-');
 		console.log('412 ifmatch %s', ifmatchStr);
@@ -322,19 +320,19 @@ function handlePUTrequest(state: StateObject) {
 		let headTime = +ifmatch[2];
 		let diskTime = mtime;
 		// console.log(settings.etagWindow, diskTime, headTime);
-		if (!settings.putsaver.etagWindow || diskTime - (settings.putsaver.etagWindow * 1000) > headTime)
+		if (!state.settings.putsaver.etagWindow || diskTime - (state.settings.putsaver.etagWindow * 1000) > headTime)
 			return state.throw(412);
-		console.log('412 prevented by etagWindow of %s seconds', settings.putsaver.etagWindow);
+		console.log('412 prevented by etagWindow of %s seconds', state.settings.putsaver.etagWindow);
 	}
 	new Promise((resolve, reject) => {
-		if (settings.putsaver.backupDirectory) {
+		if (state.settings.putsaver.backupDirectory) {
 			const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
 			const ext = path.extname(backupFile);
-			const backupWrite = fs.createWriteStream(path.join(settings.putsaver.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
+			const backupWrite = fs.createWriteStream(path.join(state.settings.putsaver.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
 			const fileRead = fs.createReadStream(fullpath);
 			const gzip = zlib.createGzip();
 			const pipeError = (err) => {
-				debug(3, 'Error saving backup file for %s: %s\r\n%s', state.url.pathname, err.message,
+				debugState("SER-SFS", state)(3, 'Error saving backup file for %s: %s\r\n%s', state.url.pathname, err.message,
 					"Please make sure the backup directory actually exists or else make the " +
 					"backupDirectory key falsy in your settings file (e.g. set it to a " +
 					"zero length string or false, or remove it completely)");
