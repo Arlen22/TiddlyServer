@@ -9,7 +9,7 @@ import {
 } from '../lib/rx';
 
 import {
-	StateObject, DebugLogger, sanitizeJSON, keys, ServerConfig,
+	StateObject, sanitizeJSON, keys, ServerConfig,
 	obs_stat, colors, obsTruthy, Hashmap, obs_readdir, serveFolderObs, serveFileObs, serveFolderIndex,
 	init as initServerTypes,
 	tryParseJSON,
@@ -55,20 +55,21 @@ console.debug = function () { }; //noop console debug;
 
 //setup global objects
 export const eventer = new EventEmitter() as ServerEventEmitter;
-const debug = DebugLogger('APP');
+// const debug = DebugLogger('APP');
 
 namespace ENV {
 	export let disableLocalHost: boolean = false;
 };
 
 var settings: ServerConfig;
-
+var debug: OmitThisParameter<ReturnType<typeof StateObject["DebugLogger"]>>;
 export { loadSettings };
 
 //import and init api-access
 import { handleTiddlyServerRoute, init as initTiddlyServer, handleTiddlyWikiRoute } from './tiddlyserver';
 // typescript retains the object reference here ()`authroute_1.checkCookieAuth`)
 import { handleAuthRoute, initAuthRoute, checkCookieAuth } from "./authRoute";
+import { Writable } from 'stream';
 
 
 initServerTypes(eventer);
@@ -111,8 +112,12 @@ cookie with the request. The private key could be pasted in during login and sto
 crypto.subtle. 
  */
 
+
+
 eventer.on('settings', (set) => {
 	settings = set;
+	let debugOutput = MakeDebugOutput(settings);
+	debug = StateObject.DebugLogger("SERVER ").bind({ debugOutput, settings});
 	log = setLog() as any;
 });
 eventer.on('settingsChanged', (keys) => {
@@ -173,11 +178,13 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 		//check host level permissions and the preflighter
 		let ev: RequestEventWS = {
 			handled: false,
-			hostLevelPermissionsKey: "",
+			localAddressPermissionsKey: "",
 			interface: { host, addr, iface },
 			authAccountKey: "",
 			treeHostIndex: -1,
 			username: "",
+			//@ts-ignore
+			debugOutput: undefined,
 			settings,
 			request,
 			client
@@ -185,7 +192,7 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 		requestHandlerHostLevelChecks<typeof ev>(ev, preflighter).then(ev2 => {
 			if (!ev2.handled) {
 				// we give the preflighter the option to handle the websocket on its own
-				if (settings.bindInfo.hostLevelPermissions[ev2.hostLevelPermissionsKey].websockets === false) client.close();
+				if (settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey].websockets === false) client.close();
 				else eventer.emit('websocket-connection', ev);
 			}
 		});
@@ -304,9 +311,10 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 	return eventer;
 }
 /** 
- * handles all checks that apply to the entire server, including 
- *  - auth accounts key
- *  - host level permissions key (based on socket.localAddress)
+ * handles all checks that apply to the entire server (not just inside the tree), including 
+ * > auth accounts key
+ * > local address permissions key (based on socket.localAddress)
+ * > host array index
  */
 function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	ev: T,
@@ -316,29 +324,65 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	//determine hostLevelPermissions to be applied
 	{
 		let localAddress = ev.request.socket.localAddress;
-		let keys = Object.keys(settings.bindInfo.hostLevelPermissions);
+		let keys = Object.keys(settings.bindInfo.localAddressPermissions);
 		let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
 		let matches = parseHostList(keys)(localAddress);
 		if (isLocalhost) {
-			ev.hostLevelPermissionsKey = "localhost";
+			ev.localAddressPermissionsKey = "localhost";
 		} else if (matches.lastMatch > -1) {
-			ev.hostLevelPermissionsKey = keys[matches.lastMatch];
+			ev.localAddressPermissionsKey = keys[matches.lastMatch];
 		} else {
-			ev.hostLevelPermissionsKey = "*";
+			ev.localAddressPermissionsKey = "*";
 		}
 	}
-	{
-		let hostHeader = ev.request.headers.host;
-		ev.treeHostIndex = 0;
-	}
-	let { registerNotice } = settings.bindInfo.hostLevelPermissions[ev.hostLevelPermissionsKey];
+	// host header is currently not implemented, but could be implemented by the preflighter
+	ev.treeHostIndex = 0;
+
+	let { registerNotice } = settings.bindInfo.localAddressPermissions[ev.localAddressPermissionsKey];
 	let auth = checkCookieAuth(ev.request, registerNotice);
 	if (auth) {
 		ev.authAccountKey = auth[0];
 		ev.username = auth[1];
 	}
 	//send the data to the preflighter
-	return preflighter ? preflighter(ev) : Promise.resolve(ev);
+	return (preflighter ? preflighter(ev) : Promise.resolve(ev)).then(ev2 => {
+		//sanity checks after the preflighter
+		//"always check all variables and sometimes check some constants too" -- Arlen Beiler
+		if (ev2.treeHostIndex > ev2.settings.tree.length - 1)
+			throw format("treeHostIndex of %s is not within array length of %s", ev2.treeHostIndex, ev2.settings.tree.length)
+		if(!ev2.settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey]) 
+			throw format("localAddressPermissions key of %s does not exist", ev2.localAddressPermissionsKey);
+		if(ev2.authAccountKey && !ev2.settings.authAccounts[ev2.authAccountKey])
+			throw format("authAccounts key of %s does not exist", ev2.authAccountKey);
+		// let settings: never;
+		if(!ev2.debugOutput) ev2.debugOutput = MakeDebugOutput(ev2.settings);
+		return ev2;
+	});
+}
+function MakeDebugOutput(settings){
+	const colorsRegex = /\x1b\[[0-9]+m/gi
+
+	return new Writable({
+		write: function (chunk, encoding, callback) {
+			// if we're given a buffer, convert it to a string
+			if (Buffer.isBuffer(chunk)) chunk = chunk.toString('utf8');
+			// remove ending linebreaks for consistency
+			chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
+	
+			if (settings.logging.logError) {
+				fs.appendFileSync(
+					settings.logging.logError,
+					(settings.logging.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
+					{ encoding: "utf8" }
+				);
+			}
+			if (!settings.logging.logError || settings.logging.logToConsoleAlso) {
+				console.log(chunk);
+			}
+			callback && callback();
+			return true;
+		}
+	});;
 }
 function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => Promise<RequestEventHTTP>) {
 	return (request: http.IncomingMessage, response: http.ServerResponse) => {
@@ -349,11 +393,13 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 		log(request, response).then(() => {
 			const ev: RequestEventHTTP = {
 				handled: false,
-				hostLevelPermissionsKey: "",
+				localAddressPermissionsKey: "",
 				authAccountKey: "",
 				username: "",
-				treeHostIndex: -1,
+				treeHostIndex: 0,
 				interface: { host, addr, iface },
+				//@ts-ignore
+				debugOutput: undefined,
 				request, response, settings
 			};
 			//send it to the preflighter
@@ -365,13 +411,14 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 			const state = new StateObject(
 				ev.request,
 				ev.response,
-				debug,
+				// debug,
 				eventer,
-				ev.hostLevelPermissionsKey,
+				ev.localAddressPermissionsKey,
 				ev.authAccountKey,
 				ev.treeHostIndex,
 				ev.username,
-				ev.settings
+				ev.settings,
+				ev.debugOutput
 			);
 			//handle basic auth
 			// if (!handleBasicAuth(state)) return;
@@ -390,15 +437,15 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 	}
 }
 
-const errLog = DebugLogger('STATE_ERR');
+// const errLog = DebugLogger('STA-ERR');
 eventer.on("stateError", (state) => {
 	if (state.doneMessage.length > 0)
-		dbgLog(2, state.doneMessage.join('\n'));
+	StateObject.DebugLogger("STA-ERR").call(state, 2, state.doneMessage.join('\n'));
+		
 })
-const dbgLog = DebugLogger('STATE_DBG');
 eventer.on("stateDebug", (state) => {
 	if (state.doneMessage.length > 0)
-		dbgLog(-2, state.doneMessage.join('\n'));
+		StateObject.DebugLogger("STA-DBG").call(state, -2, state.doneMessage.join('\n'));
 })
 
 
@@ -442,24 +489,22 @@ function handleBasicAuth(state: StateObject, settings: { username: string, passw
 	const first = (header?: string | string[]) =>
 		Array.isArray(header) ? header[0] : header;
 	if (!state.req.headers['authorization']) {
-		debug(-2, 'authorization required');
+		StateObject.DebugLogger("AUTH   ").call(state, -2, 'authorization required');
 		state.respond(401, "", { 'WWW-Authenticate': 'Basic realm="TiddlyServer"', 'Content-Type': 'text/plain' }).empty();
 		return false;
 	}
-	debug(-3, 'authorization requested');
+	StateObject.DebugLogger("AUTH   ").call(state, -3, 'authorization requested');
 	var header = first(state.req.headers['authorization']) || '',  // get the header
-		token = header.split(/\s+/).pop() || '',                   // and the encoded auth token
-		auth = new Buffer(token, 'base64').toString(),             // convert from base64
-		parts = auth.split(/:/),                                   // split on colon
+		token = header.split(/\s+/).pop() || '',                     // and the encoded auth token
+		auth = new Buffer(token, 'base64').toString(),               // convert from base64
+		parts = auth.split(/:/),                                     // split on colon
 		username = parts[0],
 		password = parts[1];
 	if (username !== settings.username || password !== settings.password) {
-		debug(-2, 'authorization invalid - UN:%s - PW:%s', username, password);
+		StateObject.DebugLogger("AUTH   ").call(state, -2, 'authorization invalid - UN:%s - PW:%s', username, password);
 		state.throwReason(401, 'Invalid username or password');
 		return false;
 	}
-	debug(-3, 'authorization successful')
-	// securityChecks =====================
-
+	StateObject.DebugLogger("AUTH   ").call(state, -3, 'authorization successful')
 	return true;
 }

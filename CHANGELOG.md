@@ -3,6 +3,12 @@
 #### Breaking changes
 We've upgraded to TiddlyWiki 5.1.19 and `settings.json` has completely changed. Details are included below.
 
+#### Changes to settings.json during Beta
+- `hostLevelPermissions` was renamed `localAddressPermissions`.
+
+#### Changes postponed for a future release
+- Routing requests according to the host header.
+
 #### Improvements
 
 The settings format is completely changed and is now called Server Config.
