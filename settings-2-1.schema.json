@@ -1,563 +1,382 @@
 {
-	"$schema": "http://json-schema.org/draft-06/schema#",
-	"definitions": {
-		"ServerConfigSchema": {
-			"type": "object",
-			"properties": {
-				"_devmode": {
-					"type": "boolean",
-					"description": "enables certain expensive per-request checks"
-				},
-				"_datafoldertarget": {
-					"type": "string",
-					"description": "The tiddlywiki folder to use for data folder instances. Defaults to the \r\ntiddlywiki folder in the TiddlyServer installation regardless of the \r\nsettings.json location."
-				},
-				"tree": {
-					"$ref": "#/definitions/NewTreeObjectSchemaItem"
-				},
-				"bindInfo": {
-					"type": "object",
-					"properties": {
-						"bindAddress": {
-							"type": "array",
-							"items": {
-								"type": "string"
-							},
-							"description": "An array of IP addresses to accept requests on. Can be any IP address\r\nassigned to the machine. Default is \"127.0.0.1\".\r\n\r\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\r\non the specified IP addresses and accepts all connections from the operating system. If an IP address\r\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\r\n\r\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\r\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) \r\nto block requests incoming to that IP address or range."
-						},
-						"filterBindAddress": {
-							"type": "boolean",
-							"description": "IPv4 addresses may include a subnet mask,\r\n(e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) \r\nto block requests incoming to that IP address or range."
-						},
-						"bindWildcard": {
-							"type": "boolean",
-							"enum": [
-								true,
-								false
-							],
-							"description": "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.\r\nThe default is `true`. In many cases this is preferred, however \r\nAndroid does not support this for some reason. On Android, set this to\r\n`false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses."
-						},
-						"enableIPv6": {
-							"type": "boolean",
-							"description": "Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests\r\nincoming to IPv6 addresses if not explicitly denied."
-						},
-						"port": {
-							"type": "number",
-							"description": "port to listen on, default is 8080 for http and 8443 for https"
-						},
-						"hostLevelPermissions": {
-							"type": "object",
-							"additionalProperties": {
-								"$ref": "#/definitions/ServerConfig_AccessOptions"
-							},
-							"description": "permissions based on host address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\""
-						},
-						"_bindLocalhost": {
-							"type": "boolean",
-							"description": "always bind a separate server instance to 127.0.0.1 regardless of any other settings"
-						},
-						"https": {
-							"type": "string",
-							"description": "https-only options: a string to a JavaScript file which exports a function of type\r\n`(iface:string) => https.ServerOptions`. Note that the initServer function will \r\nchange this to a boolean value indicating whether https is in use once inside TiddlyServer."
-						}
-					},
-					"additionalProperties": false,
-					"description": "bind address and port info"
-				},
-				"logging": {
-					"type": "object",
-					"properties": {
-						"logAccess": {
-							"anyOf": [
-								{
-									"type": "string"
-								},
-								{
-									"type": "boolean",
-									"enum": [
-										false
-									]
-								}
-							],
-							"description": "access log file"
-						},
-						"logError": {
-							"type": "string",
-							"description": "error log file"
-						},
-						"logColorsToFile": {
-							"type": "boolean",
-							"description": "write the console color markers to file, useful if you read the logs by printing them to a terminal"
-						},
-						"logToConsoleAlso": {
-							"type": "boolean",
-							"description": "print access and error events to the console regardless of whether they are logged to a file"
-						},
-						"debugLevel": {
-							"type": "number",
-							"description": "4 - Errors that require the process to exit for restart\r\n3 - Major errors that are handled and do not require a server restart\r\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\r\n1 - Info - Most startup messages\r\n0 - Normal debug messages and all software and request-side error messages\r\n-1 - Detailed debug messages from high level apis\r\n-2 - Response status messages and error response data\r\n-3 - Request and response data for all messages (verbose)\r\n-4 - Protocol details and full data dump (such as encryption steps and keys)"
-						}
-					},
-					"additionalProperties": false,
-					"description": "logging"
-				},
-				"directoryIndex": {
-					"type": "object",
-					"properties": {
-						"mixFolders": {
-							"type": "boolean",
-							"description": "sort folder and files together rather than separated"
-						},
-						"defaultType": {
-							"type": "string",
-							"enum": [
-								"html",
-								"json"
-							],
-							"description": "default format for the directory index"
-						},
-						"icons": {
-							"type": "object",
-							"additionalProperties": {
-								"type": "array",
-								"items": {
-									"type": "string"
-								}
-							},
-							"description": "Hashmap of type { \"icon_name\": [\"ext\", \"ext\"]} where ext represents the extensions to use this icon for. \r\nIcons are in the TiddlyServer/assets/icons folder."
-						}
-					},
-					"additionalProperties": false,
-					"description": "directory index options"
-				},
-				"putsaver": {
-					"type": "object",
-					"properties": {
-						"backupDirectory": {
-							"type": "string",
-							"description": "backup directory for saving SINGLE-FILE wikis only"
-						},
-						"etag": {
-							"type": "string",
-							"enum": [
-								"required",
-								"disabled",
-								""
-							],
-							"description": "Whether to use the etag field -- if not specified then it will check it if presented.\r\nThis does not affect the backup etagAge option, as the saving mechanism will still \r\nsend etags back to the browser, regardless of this option."
-						},
-						"etagWindow": {
-							"type": "number",
-							"description": "etag does not need to be exact by this many seconds"
-						}
-					},
-					"additionalProperties": false,
-					"description": "tiddlyserver specific options"
-				},
-				"authAccounts": {
-					"type": "object",
-					"additionalProperties": {
-						"$ref": "#/definitions/ServerConfig_AuthAccountsValue"
-					},
-					"description": "The Hashmap of accounts which may authenticate on this server.\r\nTakes either an object or a string to a `require`-able file (such as .js or .json) \r\nwhich exports the object"
-				},
-				"EXPERIMENTAL_clientside_datafolders": {
-					"type": "object",
-					"properties": {
-						"enabled": {
-							"type": "boolean",
-							"description": "temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder)"
-						},
-						"maxAge_tw_plugins": {
-							"type": "number",
-							"description": "how long to cache tw_plugins on the server side"
-						},
-						"alwaysRefreshCache": {
-							"type": "boolean",
-							"description": "refresh cache whenever ?refresh=true is called"
-						}
-					},
-					"additionalProperties": false,
-					"description": "client-side data folder loader which loads datafolders directly into the browser"
-				},
-				"authCookieAge": {
-					"type": "number",
-					"description": "Age to set for the auth cookie (default is 30 days)\r\n- 24 hours: `86400`\r\n- 7 days: `604800`\r\n- 30 days: `2592000`\r\n- 60 days: `5184000`\r\n- 90 days: `7776000`\r\n- 120 days: `10368000`\r\n- 150 days: `12950000`\r\n- 180 days: `15552000`"
-				},
-				"$schema": {
-					"type": "string",
-					"description": "The JSON schema location for this document. This schema is generated \r\ndirectly from the TypeScript interfaces\r\nused in TiddlyServer. A text-editor with autocomplete, such as VS code, \r\nwill make editing this file much simpler. \r\nMost fields include a description like this one. \r\n\r\nAll relative paths in this file are resolved relative to this file, so \r\n`./settings-tree.xml` refers to an XML file in the same folder as this file. \r\nAll relative paths in included files (such as the XML file) are resolved \r\nrelative to the included file."
-				}
-			},
-			"required": [
-				"tree",
-				"$schema"
-			],
-			"additionalProperties": false
-		},
-		"NewTreeObjectSchemaItem": {
-			"anyOf": [
-				{
-					"$ref": "#/definitions/NewTreeHashmapGroupSchema"
-				},
-				{
-					"$ref": "#/definitions/NewTreeHashmapPath"
-				},
-				{
-					"type": "string"
-				}
-			]
-		},
-		"NewTreeHashmapGroupSchema": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"group"
-					]
-				},
-				"$children": {
-					"anyOf": [
-						{
-							"type": "array",
-							"items": {
-								"$ref": "#/definitions/NewTreeItemSchema"
-							}
-						},
-						{
-							"$ref": "#/definitions/NewTreeObjectSchema"
-						}
-					],
-					"default": {}
-				}
-			},
-			"required": [
-				"$element",
-				"$children"
-			],
-			"additionalProperties": false
-		},
-		"NewTreeItemSchema": {
-			"anyOf": [
-				{
-					"$ref": "#/definitions/NewTreeGroupSchema"
-				},
-				{
-					"$ref": "#/definitions/NewTreePathSchema"
-				},
-				{
-					"type": "string"
-				}
-			],
-			"default": {
-				"$element": ""
-			}
-		},
-		"NewTreeGroupSchema": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"group"
-					]
-				},
-				"$children": {
-					"anyOf": [
-						{
-							"type": "array",
-							"items": {
-								"$ref": "#/definitions/NewTreeItemSchema"
-							}
-						},
-						{
-							"$ref": "#/definitions/NewTreeObjectSchema"
-						}
-					],
-					"default": {}
-				},
-				"key": {
-					"type": "string"
-				}
-			},
-			"required": [
-				"$children",
-				"$element",
-				"key"
-			],
-			"additionalProperties": false
-		},
-		"NewTreePathSchema": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"folder"
-					]
-				},
-				"path": {
-					"type": "string",
-					"description": "Path relative to this file or any absolute path NodeJS can stat"
-				},
-				"noTrailingSlash": {
-					"type": "boolean",
-					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file.\r\nHowever, this breaks relative links to resources served by the datafolder instance\r\nitself, such as the files directory introduced in 5.1.19 and requires the relative\r\nlink to include the data folder name in the relative link. For this reason, \r\nit is better to convert single-file wikis to the datafolder format by putting each\r\nwiki inside its own folder as index.html, putting a \"files\" folder beside the \r\nindex.html file, and adding an index option to this element."
-				},
-				"$children": {
-					"type": "array",
-					"items": {
-						"$ref": "#/definitions/NewTreeOptions"
-					}
-				},
-				"key": {
-					"type": "string"
-				}
-			},
-			"additionalProperties": false,
-			"required": [
-				"$element",
-				"path"
-			]
-		},
-		"NewTreeOptions": {
-			"anyOf": [
-				{
-					"$ref": "#/definitions/NewTreePathOptions_Index"
-				},
-				{
-					"$ref": "#/definitions/NewTreePathOptions_Auth"
-				},
-				{
-					"$ref": "#/definitions/NewTreePathOptions_Backup"
-				}
-			],
-			"default": {
-				"$element": ""
-			}
-		},
-		"NewTreePathOptions_Index": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"index"
-					],
-					"description": "Options related to the directory index (request paths that resolve to a folder\r\nwhich is not a data folder). Option elements affect the group\r\nthey belong to and all children under that. Each property in an option element \r\nreplaces the key from parent option elements."
-				},
-				"defaultType": {
-					"type": "string",
-					"enum": [
-						"html",
-						"json",
-						"403",
-						"404"
-					],
-					"description": "The format of the index generated if no index file is found, or \"403\" to \r\nreturn a 403 Access Denied, or \"404\" to return a 404 Not Found. 403 is the \r\nerror code used by Apache and Nginx."
-				},
-				"indexFile": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "Look for index files named exactly this or with one of the defaultExts added. \r\nFor example, a defaultFile of [\"index\"] and a defaultExts of [\"htm\",\"html\"] would \r\nlook for [\"index.htm\",\"index.html\",\"index\"] in that order. \r\n\r\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\r\nTo use a .hidden file, put the full filename here, and set indexExts to `[\"\"]`."
-				},
-				"indexExts": {
-					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "Extensions to add when looking for an index file. A blank string will set the order \r\nto search for the exact indexFile name. The extensions are searched in the order specified. \r\n\r\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\r\nTo search for an exact indexFile, specify a blank string inside an array `[\"\"]`."
-				}
-			},
-			"required": [
-				"$element",
-				"defaultType",
-				"indexFile",
-				"indexExts"
-			],
-			"additionalProperties": false
-		},
-		"NewTreePathOptions_Auth": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"auth"
-					],
-					"description": "Only allow requests using these authAccounts. Option elements affect the group\r\nthey belong to and all children under that. Each property in an option element \r\nreplaces the key from parent option elements.\r\n\r\nAnonymous requests are ALWAYS denied if an auth element applies to the requested path. \r\n\r\nNote that this does not change server authentication procedures. \r\nData folders are always given the authenticated username\r\nregardless of whether there are auth elements in the tree."
-				},
-				"authList": {
-					"anyOf": [
-						{
-							"type": "array",
-							"items": {
-								"type": "string"
-							}
-						},
-						{
-							"type": "null"
-						}
-					],
-					"description": "list of keys from authAccounts object that can access this resource"
-				},
-				"authError": {
-					"type": "string",
-					"enum": [
-						"403",
-						"404"
-					],
-					"description": "Which error code to return for unauthorized (or anonymous) requests\r\n- 403 Access Denied: Client is not granted permission to access this resouce.\r\n- 404 Not Found: Client is told that the resource does not exist."
-				}
-			},
-			"required": [
-				"$element",
-				"authList",
-				"authError"
-			],
-			"additionalProperties": false
-		},
-		"NewTreePathOptions_Backup": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"backups"
-					],
-					"description": "Options related to backups for single-file wikis. Option elements affect the group\r\nthey belong to and all children under that. Each property in an option element \r\nreplaces the key from parent option elements."
-				},
-				"backupFolder": {
-					"type": "string",
-					"description": "Backup folder to store backups in. Multiple folder paths \r\ncan backup to the same folder if desired."
-				},
-				"gzip": {
-					"type": "boolean",
-					"description": "GZip backup file to save disk space. Good for larger wikis. Turn this off\r\nfor experimental wikis that you often need to restore from a backup because\r\nof a bad line of code (I speak from experience)."
-				},
-				"etagAge": {
-					"type": "number",
-					"description": "Save a backup only if the disk copy is older than this many seconds. \r\nIf the file on disk is only a few minutes old it can be assumed that \r\nvery little has changed since the last save. So if this is set to 10 minutes,\r\nand your wiki gets saved every 9 minutes, only the first save will trigger a backup.\r\nThis is a useful option for large wikis that see a lot of daily work but not \r\nuseful for experimental wikis which might crash at any time and need to be \r\nreloaded from the last backup."
-				}
-			},
-			"required": [
-				"$element",
-				"backupFolder",
-				"gzip",
-				"etagAge"
-			],
-			"additionalProperties": false
-		},
-		"NewTreeObjectSchema": {
-			"type": "object",
-			"properties": {
-				"$children": {
-					"type": "array",
-					"items": {
-						"$ref": "#/definitions/NewTreeOptions"
-					},
-					"description": "The children of a hashmap `group` element which are not\r\n`group` or `folder` elements"
-				}
-			},
-			"additionalProperties": {
-				"$ref": "#/definitions/NewTreeObjectSchemaItem",
-				"description": "A hashmap tree element: either a string or a group/folder element without the `key` attribute",
-				"default": {
-					"$element": {}
-				},
-				"pattern": "^([^$]+)+$"
-			},
-			"default": {
-				"$element": {}
-			},
-			"description": "A hashmap of `group` elements, `folder` elements, and folder paths"
-		},
-		"NewTreeHashmapPath": {
-			"type": "object",
-			"properties": {
-				"$element": {
-					"type": "string",
-					"enum": [
-						"folder"
-					]
-				},
-				"path": {
-					"type": "string",
-					"description": "Path relative to this file or any absolute path NodeJS can stat"
-				},
-				"noTrailingSlash": {
-					"type": "boolean",
-					"description": "Load data folders under this path with no trailing slash.\r\nThis imitates single-file wikis and allows tiddlers with relative links\r\nto be imported directly into a data folder wiki. The source point of the \r\nrelative link becomes the data folder itself as though it is actually a file.\r\nHowever, this breaks relative links to resources served by the datafolder instance\r\nitself, such as the files directory introduced in 5.1.19 and requires the relative\r\nlink to include the data folder name in the relative link. For this reason, \r\nit is better to convert single-file wikis to the datafolder format by putting each\r\nwiki inside its own folder as index.html, putting a \"files\" folder beside the \r\nindex.html file, and adding an index option to this element."
-				},
-				"$children": {
-					"type": "array",
-					"items": {
-						"$ref": "#/definitions/NewTreeOptions"
-					}
-				}
-			},
-			"required": [
-				"$element",
-				"path"
-			],
-			"additionalProperties": false
-		},
-		"ServerConfig_AccessOptions": {
-			"type": "object",
-			"properties": {
-				"writeErrors": {
-					"type": "boolean"
-				},
-				"upload": {
-					"type": "boolean",
-					"description": "allow uploads on the directory index page"
-				},
-				"mkdir": {
-					"type": "boolean",
-					"description": "allow create directory on directory index page"
-				},
-				"websockets": {
-					"type": "boolean",
-					"description": "allow websocket connections (default true)"
-				},
-				"registerNotice": {
-					"type": "boolean",
-					"description": "login attempts for a public/private key pair which has not been \r\nregistered will be logged at debug level 2 with the full public key\r\nwhich can be copied into an authAccounts entry."
-				}
-			},
-			"required": [
-				"writeErrors",
-				"upload",
-				"mkdir",
-				"websockets",
-				"registerNotice"
-			],
-			"additionalProperties": false
-		},
-		"ServerConfig_AuthAccountsValue": {
-			"type": "object",
-			"properties": {
-				"clientKeys": {
-					"type": "object",
-					"additionalProperties": {
-						"type": "string"
-					},
-					"description": "Hashmap of [username] = public key"
-				},
-				"permissions": {
-					"$ref": "#/definitions/ServerConfig_AccessOptions",
-					"description": "override hostLevelPermissions for users with this account"
-				}
-			},
-			"required": [
-				"clientKeys",
-				"permissions"
-			],
-			"additionalProperties": false
-		}
-	},
-	"$ref": "#/definitions/ServerConfigSchema"
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "definitions": {
+    "GroupRecordItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^key$": {
+          "type": "string"
+        }
+      },
+      "properties": {
+        "$element": {
+          "enum": [
+            "group"
+          ]
+        },
+        "indexPath": {
+          "type": "string"
+        },
+        "$children": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/GroupArrayItem"
+                  },
+                  {
+                    "$ref": "#/definitions/FolderArrayItem"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/GroupRecordItem"
+                  },
+                  {
+                    "$ref": "#/definitions/FolderRecordItem"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "$children",
+        "$element"
+      ],
+      "description": "The GroupElement children may be either a hashmap of Group and Path elements, with an $options property for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element. A hashmap is a shorthand for the array with a key property specified on each element, and a string is shorthand for a folder element."
+    },
+    "GroupArrayItem": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/GenericArrayItem"
+        },
+        {
+          "$ref": "#/definitions/GroupRecordItem"
+        }
+      ]
+    },
+    "FolderRecordItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^key$": {
+          "type": "string"
+        }
+      },
+      "properties": {
+        "$element": {
+          "enum": [
+            "folder"
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "$children": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "$element",
+        "path"
+      ],
+      "description": "The GroupElement children may be either a hashmap of Group and Path elements, with an $options property for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element. A hashmap is a shorthand for the array with a key property specified on each element, and a string is shorthand for a folder element."
+    },
+    "FolderArrayItem": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/GenericArrayItem"
+        },
+        {
+          "$ref": "#/definitions/FolderRecordItem"
+        }
+      ]
+    },
+    "GenericArrayItem": {
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The mount name that will show in the URL"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "ServerConfigSchema": {
+      "type": "object",
+      "properties": {
+        "_devmode": {
+          "type": "boolean",
+          "description": "enables certain expensive per-request checks"
+        },
+        "_datafoldertarget": {
+          "type": "string",
+          "description": "The tiddlywiki folder to use for data folder instances. Defaults to the \ntiddlywiki folder in the TiddlyServer installation regardless of the \nsettings.json location."
+        },
+        "tree": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/GroupRecordItem"
+            },
+            {
+              "description": "The tree property accepts one of 3 formats. If it is a string ending in `.xml`, `.js`, or `.json`, \nthe tree will be loaded from the specified path. JS and JSON files must export a `tree` property \nand XML files must specify a `tree` element as root.\n\n- A path element (or a string specifying the path) to mount a path as root (a single file is possible but pointless)\n- A group element or the children of a group element (which is either an array, or an object with no $element property)"
+            }
+          ]
+        },
+        "bindInfo": {
+          "type": "object",
+          "properties": {
+            "bindAddress": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "An array of IP addresses to accept requests on. Can be any IP address\nassigned to the machine. Default is \"127.0.0.1\".\n\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\non the specified IP addresses and accepts all connections from the operating system. If an IP address\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\n\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range."
+            },
+            "filterBindAddress": {
+              "type": "boolean",
+              "description": "IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range."
+            },
+            "bindWildcard": {
+              "type": "boolean",
+              "enum": [
+                true,
+                false
+              ],
+              "description": "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.\nThe default is `true`. In many cases this is preferred, however \nAndroid does not support this for some reason. On Android, set this to\n`false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses."
+            },
+            "enableIPv6": {
+              "type": "boolean",
+              "description": "Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests\nincoming to IPv6 addresses if not explicitly denied."
+            },
+            "port": {
+              "type": "number",
+              "description": "port to listen on, default is 8080 for http and 8443 for https"
+            },
+            "localAddressPermissions": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/ServerConfig_AccessOptions"
+              },
+              "description": "Permissions based on local address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\", etc. \nThis checks the IP address each client connects to (socket.localAddress), \nnot the bind address of the server instance that accepted the request."
+            },
+            "_bindLocalhost": {
+              "type": "boolean",
+              "description": "always bind a separate server instance to 127.0.0.1 regardless of any other settings"
+            },
+            "https": {
+              "type": "string",
+              "description": "https-only options: a string to a JavaScript file which exports a function of type\n`(iface:string) => https.ServerOptions`. Note that the initServer function will \nchange this to a boolean value indicating whether https is in use once inside TiddlyServer."
+            }
+          },
+          "additionalProperties": false,
+          "description": "bind address and port info"
+        },
+        "logging": {
+          "type": "object",
+          "properties": {
+            "logAccess": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "boolean",
+                  "enum": [
+                    false
+                  ]
+                }
+              ],
+              "description": "access log file"
+            },
+            "logError": {
+              "type": "string",
+              "description": "error log file"
+            },
+            "logColorsToFile": {
+              "type": "boolean",
+              "description": "write the console color markers to file, useful if you read the logs by printing them to a terminal"
+            },
+            "logToConsoleAlso": {
+              "type": "boolean",
+              "description": "print access and error events to the console regardless of whether they are logged to a file"
+            },
+            "debugLevel": {
+              "type": "number",
+              "description": "4 - Errors that require the process to exit for restart\n3 - Major errors that are handled and do not require a server restart\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\n1 - Info - Most startup messages\n0 - Normal debug messages and all software and request-side error messages\n-1 - Detailed debug messages from high level apis\n-2 - Response status messages and error response data\n-3 - Request and response data for all messages (verbose)\n-4 - Protocol details and full data dump (such as encryption steps and keys)"
+            }
+          },
+          "additionalProperties": false,
+          "description": "logging"
+        },
+        "directoryIndex": {
+          "type": "object",
+          "properties": {
+            "mixFolders": {
+              "type": "boolean",
+              "description": "sort folder and files together rather than separated"
+            },
+            "defaultType": {
+              "type": "string",
+              "enum": [
+                "html",
+                "json"
+              ],
+              "description": "default format for the directory index"
+            },
+            "icons": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": "Hashmap of type { \"icon_name\": [\"ext\", \"ext\"]} where ext represents the extensions to use this icon for. \nIcons are in the TiddlyServer/assets/icons folder."
+            },
+            "types": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false,
+          "description": "directory index options"
+        },
+        "putsaver": {
+          "type": "object",
+          "properties": {
+            "backupDirectory": {
+              "type": "string",
+              "description": "backup directory for saving SINGLE-FILE wikis only"
+            },
+            "etag": {
+              "type": "string",
+              "enum": [
+                "required",
+                "disabled",
+                ""
+              ],
+              "description": "Whether to use the etag field -- if not specified then it will check it if presented.\nThis does not affect the backup etagAge option, as the saving mechanism will still \nsend etags back to the browser, regardless of this option."
+            },
+            "etagWindow": {
+              "type": "number",
+              "description": "etag does not need to be exact by this many seconds"
+            }
+          },
+          "additionalProperties": false,
+          "description": "tiddlyserver specific options"
+        },
+        "authAccounts": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ServerConfig_AuthAccountsValue"
+          },
+          "description": "The Hashmap of accounts which may authenticate on this server.\nTakes either an object or a string to a `require`-able file (such as .js or .json) \nwhich exports the object"
+        },
+        "EXPERIMENTAL_clientside_datafolders": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder)"
+            },
+            "maxAge_tw_plugins": {
+              "type": "number",
+              "description": "how long to cache tw_plugins on the server side"
+            },
+            "alwaysRefreshCache": {
+              "type": "boolean",
+              "description": "refresh cache whenever ?refresh=true is called"
+            }
+          },
+          "additionalProperties": false,
+          "description": "client-side data folder loader which loads datafolders directly into the browser"
+        },
+        "authCookieAge": {
+          "type": "number",
+          "description": "Age to set for the auth cookie (default is 30 days)\n- 24 hours: `86400`\n- 7 days: `604800`\n- 30 days: `2592000`\n- 60 days: `5184000`\n- 90 days: `7776000`\n- 120 days: `10368000`\n- 150 days: `12950000`\n- 180 days: `15552000`"
+        },
+        "maxTransferRequests": {
+          "type": "number",
+          "description": "Max concurrent transfer requests"
+        },
+        "$schema": {
+          "type": "string",
+          "description": "The JSON schema location for this document. This schema is generated \ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with autocomplete, such as VS code, \nwill make editing this file much simpler. \nMost fields include a description like this one. \n\nAll relative paths in this file are resolved relative to this file, so \n`./settings-tree.xml` refers to an XML file in the same folder as this file. \nAll relative paths in included files (such as the XML file) are resolved \nrelative to the included file."
+        }
+      },
+      "required": [
+        "tree",
+        "$schema"
+      ],
+      "additionalProperties": false
+    },
+    "ServerConfig_AccessOptions": {
+      "type": "object",
+      "properties": {
+        "writeErrors": {
+          "type": "boolean"
+        },
+        "upload": {
+          "type": "boolean",
+          "description": "allow uploads on the directory index page"
+        },
+        "mkdir": {
+          "type": "boolean",
+          "description": "allow create directory on directory index page"
+        },
+        "websockets": {
+          "type": "boolean",
+          "description": "allow websocket connections (default true)"
+        },
+        "registerNotice": {
+          "type": "boolean",
+          "description": "login attempts for a public/private key pair which has not been \nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ServerConfig_AuthAccountsValue": {
+      "type": "object",
+      "properties": {
+        "clientKeys": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Hashmap of [username]: public key"
+        },
+        "permissions": {
+          "$ref": "#/definitions/ServerConfig_AccessOptions",
+          "description": "override hostLevelPermissions for users with this account"
+        }
+      },
+      "required": [
+        "clientKeys",
+        "permissions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "$ref": "#/definitions/ServerConfigSchema"
 }

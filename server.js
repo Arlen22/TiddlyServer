@@ -14,6 +14,7 @@ const settingsFile = path.normalize(
 const settingsPath = path.dirname(settingsFile);
 debugger;
 const server = require('./src/server');
+
 server.libsReady.then(() => {
 	const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
 	// console.log(settings);
@@ -27,6 +28,11 @@ server.libsReady.then(() => {
 			? require("./preflighter.js")
 			: undefined
 	});
+}).catch(e => {
+	console.log("uncaught error during server startup");
+	console.log(e);
+	console.log("exiting");
+	process.exitCode = 1;
 })
 
 process.on('uncaughtException', err => {

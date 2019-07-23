@@ -207,7 +207,7 @@ export function handleAuthRoute(state: StateObject) {
 			/** [username, type, timestamp, hash, sig] */
 			let json = parseAuthCookie(state.json.setCookie);
 			if (json.length !== 5) return state.throwReason(400, "Bad cookie format");
-			let { registerNotice } = state.settings.bindInfo.hostLevelPermissions[state.hostLevelPermissionsKey];
+			let { registerNotice } = state.settings.bindInfo.localAddressPermissions[state.hostLevelPermissionsKey];
 			let username = validateCookie(json, registerNotice && [
 				"    login attempted with unknown public key",
 				"    " + state.json.publicKey,

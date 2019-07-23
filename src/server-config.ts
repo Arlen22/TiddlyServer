@@ -44,7 +44,7 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 		return { ...item, key } as Config.PathElement;
 	} else if (item.$element === "group") {
 		if (!key) key = (item as Schema.ArrayGroupElement).key;
-		if (!key) throw "key not provided for group element at " + keypath.join(',');
+		if (!key) throw "key not provided for group element at /" + keypath.join('/');
 		let tc = item.$children;
 		let $options: Config.OptionElements[] = [];
 		let $children: (Config.PathElement | Config.GroupElement)[] = [];
@@ -61,7 +61,8 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 			// let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
 			$children = Object.keys(tc).map(k => k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
 				.filter((e): e is NonNullable<typeof e> => !!e);
-			if (!Array.isArray(item.$children.$options)) throw "$options is not an array at " + keypath.join('.');
+			if (typeof item.$children.$options !== "undefined" && !Array.isArray(item.$children.$options)) 
+				throw "$options is not an array at " + keypath.join('.');
 			$options = item.$children.$options;
 		}
 		key = is<Schema.ArrayGroupElement>(a => !!a.key, item) ? item.key : key;
@@ -72,7 +73,7 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 }
 export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement) {
 	if (host.$element !== "host") throw "Tree array must not mix host elements with other elements";
-	return { ...host, $mount: normalizeTree(settingsDir, host.$mount as any, undefined, []) };
+	return { ...host, $mount: normalizeTree(settingsDir, host.$mount as any, "tree", []) };
 }
 export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
 	let defaultHost = (tree2: any): Config.HostElement => ({
@@ -82,7 +83,7 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
 		// 	"domain": ["*"]
 		// },
 		// includeSubdomains: true,
-		$mount: normalizeTree(settingsDir, tree2, undefined, [])
+		$mount: normalizeTree(settingsDir, tree2, "tree", [])
 	});
 	if (typeof tree === "string" && tree.endsWith(".xml")) {
 		//read the xml file and parse it as the tree structure
@@ -98,7 +99,7 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
 	//has been normalized and the preflighter may specify any index in the 
 	//host array.
 	return [defaultHost(tree)];
-	
+
 }
 export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
 	if (!auth) return {};
@@ -210,16 +211,16 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 		$schema: "./settings.schema.json"
 	}
 	// set second level object defaults
-		newset.directoryIndex.types = {};
-		Object.keys(newset.directoryIndex.icons).forEach(type => {
-			newset.directoryIndex.icons[type].forEach(ext => {
-				if (!newset.directoryIndex.types[ext]) {
-					newset.directoryIndex.types[ext] = type;
-				} else {
-					throw format('Multiple types for extension %s: %s', ext, newset.directoryIndex.types[ext], type);
-				}
-			})
-		});
+	newset.directoryIndex.types = {};
+	Object.keys(newset.directoryIndex.icons).forEach(type => {
+		newset.directoryIndex.icons[type].forEach(ext => {
+			if (!newset.directoryIndex.types[ext]) {
+				newset.directoryIndex.types[ext] = type;
+			} else {
+				throw format('Multiple types for extension %s: %s', ext, newset.directoryIndex.types[ext], type);
+			}
+		})
+	});
 
 
 	if (newset.putsaver.backupDirectory)
@@ -254,14 +255,13 @@ export interface ServerConfigSchema {
 	_datafoldertarget?: string;
 	/**
 	 * The tree property accepts one of 3 formats. If it is a string ending in `.xml`, `.js`, or `.json`, 
-	 * it is assumed to be a path and the tree will be loaded from the specified path. JS and JSON files
-	 * must export a `tree` property and XML files must specify a `tree` element as root.
+	 * the tree will be loaded from the specified path. JS and JSON files must export a `tree` property 
+	 * and XML files must specify a `tree` element as root.
 	 * 
-	 * - An array of only host elements (each takes one path or group element) 
 	 * - A path element (or a string specifying the path) to mount a path as root (a single file is possible but pointless)
 	 * - A group element or the children of a group element (which is either an array, or an object with no $element property)
 	 */
-	tree: ServerConfigSchemaTree | string;
+	tree: any;
 	/** bind address and port info */
 	bindInfo?: Partial<ServerConfig_BindInfo & {
 		/** 
@@ -274,7 +274,7 @@ export interface ServerConfigSchema {
 	/** logging  */
 	logging?: Partial<ServerConfig_Logging>;
 	/** directory index options */
-	directoryIndex?: { [P in keyof ServerConfig_DirectoryIndex]?: P extends "types" ? never : ServerConfig_DirectoryIndex[P] | undefined; } 
+	directoryIndex?: Partial<ServerConfig_DirectoryIndex>
 	/** tiddlyserver specific options */
 	putsaver?: Partial<ServerConfig_TiddlyServer>
 	/** 
@@ -298,7 +298,7 @@ export interface ServerConfigSchema {
 	 */
 	authCookieAge?: number
 	/** Max concurrent transfer requests */
-	maxTransferRequests: number
+	maxTransferRequests?: number
 	/** 
 	 * The JSON schema location for this document. This schema is generated 
 	 * directly from the TypeScript interfaces
@@ -562,6 +562,23 @@ export namespace Config {
 	}
 }
 export namespace Schema {
+	interface SchemaObjectDefinition {
+		"type": "object";
+		"additionalProperties": boolean;
+		"properties": {};
+		"required": string[];
+		"title": string;
+		"description": string;
+	}
+	function define(name: string, val: any) {
+
+	}
+	function defstring(enumArr?: string[]) {
+		return {
+			"type": "string",
+			"enum": ["group"]
+		}
+	}
 	export type GroupChildElements = (Record<string, GroupElement | PathElement | string | Config.OptionElements[]>) | (ArrayGroupElement | ArrayPathElement | Config.OptionElements | string)[];
 
 	export type TreeElement = HostElement[] | GroupChildElements | string;
@@ -588,20 +605,11 @@ export namespace Schema {
 		/** The HostElement child may be one group or folder element. A string may be used in place of a folder element. */
 		$mount: GroupElement | PathElement | string;
 	}
-	export interface GroupElement {
 
+
+	export interface GroupElement {
 		$element: "group";
 		indexPath?: string,
-		/**
-		 * The GroupElement children may be either a hashmap of Group and Path elements, with an $options property 
-		 * for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element.
-		 * 
-		 * A hashmap is a shorthand for the array with a key property specified on each element, 
-		 * and a string is shorthand for a folder element.
-		 
-		 * @default  [{"$element": ""}] 
-		 * @default  {}  
-		 * */
 		$children: GroupChildElements;
 	}
 	export interface ArrayGroupElement extends GroupElement {
