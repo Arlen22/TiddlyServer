@@ -170,7 +170,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 				filterBindAddress: false,
 				port: 8080,
 
-				localAddressPermissions: localAddressPermissions,
+				localAddressPermissions,
 				_bindLocalhost: false,
 				https: false
 			},

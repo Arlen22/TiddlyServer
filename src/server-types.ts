@@ -181,8 +181,8 @@ export interface RequestEvent {
 	interface: { iface: string, host: string | undefined, addr: string };
 	/** tree hosts array index to be applied to this request */
 	treeHostIndex: number;
-	/** the ServerConfig that will be used for this request */
-	settings: ServerConfig;
+	/** the ServerConfig currently in use on the server */
+	readonly settings: ServerConfig;
 	request: http.IncomingMessage;
 	/** A custom debug output may be set, otherwise the default is used */
 	debugOutput: Writable;
