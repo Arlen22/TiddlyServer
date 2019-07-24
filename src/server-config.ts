@@ -16,7 +16,7 @@ function is<T>(test: (a: typeof b) => boolean, b: any): b is T {
 	return test(b);
 }
 
-type normalizeTree_itemtype = Schema.ArrayGroupElement | Schema.GroupElement
+type normalizeTree_itemtype = Schema.ArrayGroupElement | Schema.GroupElement | { $element: undefined }
 	| Schema.ArrayPathElement | Schema.PathElement | string
 export function normalizeTree(settingsDir: string,
 	item: Schema.ArrayGroupElement | Schema.GroupElement,
@@ -35,7 +35,16 @@ export function normalizeTree(settingsDir: string,
 	key: string | undefined, keypath
 ): Config.PathElement;
 export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, keypath): any {
-	type k<T> = T extends "options" ? never : T;
+	// type k<T> = T extends "options" ? never : T;
+	if (typeof item === "object" && !item.$element) {
+		//@ts-ignore
+		if (Object.keys(item).findIndex(e => e.startsWith("$")) !== -1)
+			console.log("Is this a mistake? Found keys starting with the dollar sign under /" + keypath.join('/'));
+		item = {
+			$element: "group",
+			$children: item as any
+		} as Schema.GroupElement;
+	}
 	if (typeof item === "string" || item.$element === "folder") {
 		if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
 		if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
@@ -61,7 +70,7 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 			// let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
 			$children = Object.keys(tc).map(k => k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
 				.filter((e): e is NonNullable<typeof e> => !!e);
-			if (typeof item.$children.$options !== "undefined" && !Array.isArray(item.$children.$options)) 
+			if (typeof item.$children.$options !== "undefined" && !Array.isArray(item.$children.$options))
 				throw "$options is not an array at " + keypath.join('.');
 			$options = item.$children.$options;
 		}
@@ -73,7 +82,7 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 }
 export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement) {
 	if (host.$element !== "host") throw "Tree array must not mix host elements with other elements";
-	return { ...host, $mount: normalizeTree(settingsDir, host.$mount as any, "tree", []) };
+	return { ...host, $mount: normalizeTree(settingsDir, host.$mount as any, "$mount", []) };
 }
 export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
 	let defaultHost = (tree2: any): Config.HostElement => ({
@@ -83,7 +92,7 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
 		// 	"domain": ["*"]
 		// },
 		// includeSubdomains: true,
-		$mount: normalizeTree(settingsDir, tree2, "tree", [])
+		$mount: normalizeTree(settingsDir, tree2, "$mount", [])
 	});
 	if (typeof tree === "string" && tree.endsWith(".xml")) {
 		//read the xml file and parse it as the tree structure
@@ -243,7 +252,7 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 	}
 	return newset;
 }
-type ServerConfigSchemaTree = Schema.PathElement | Schema.GroupElement | Schema.GroupElement["$children"];
+
 export interface ServerConfigSchema {
 	/** enables certain expensive per-request checks */
 	_devmode?: boolean;
