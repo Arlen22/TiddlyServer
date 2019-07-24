@@ -1,6 +1,55 @@
 {
   "$schema": "http://json-schema.org/draft-06/schema#",
   "definitions": {
+    "GroupHashmap": {
+      "type": "object",
+      "description": "A shorthand form of group specified without any options",
+      "patternProperties": {
+        "^[^$]+$": {
+          "$ref": "#/definitions/GroupChildren"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GroupChildren": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/GroupArrayItem"
+              },
+              {
+                "$ref": "#/definitions/FolderArrayItem"
+              },
+              {
+                "$ref": "#/definitions/FolderPathShorthand"
+              }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/GroupRecordItem"
+              },
+              {
+                "$ref": "#/definitions/FolderRecordItem"
+              },
+              {
+                "$ref": "#/definitions/FolderPathShorthand"
+              },
+              {
+                "$ref": "#/definitions/GroupHashmap"
+              }
+            ]
+          }
+        }
+      ]
+    },
     "GroupRecordItem": {
       "type": "object",
       "additionalProperties": false,
@@ -18,58 +67,13 @@
         "indexPath": {
           "type": "string"
         },
-        "$children": {
-          "oneOf": [
-            {
-              "type": "array",
-              "items": {
-                "anyOf": [
-                  {
-                    "$ref": "#/definitions/GroupArrayItem"
-                  },
-                  {
-                    "$ref": "#/definitions/FolderArrayItem"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
-              }
-            },
-            {
-              "type": "object",
-              "additionalProperties": {
-                "anyOf": [
-                  {
-                    "$ref": "#/definitions/GroupRecordItem"
-                  },
-                  {
-                    "$ref": "#/definitions/FolderRecordItem"
-                  },
-                  {
-                    "type": "string"
-                  }
-                ]
-              }
-            }
-          ]
-        }
+        "$children": { "$ref": "#/definitions/GroupChildren" }
       },
       "required": [
         "$children",
         "$element"
       ],
       "description": "The GroupElement children may be either a hashmap of Group and Path elements, with an $options property for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element. A hashmap is a shorthand for the array with a key property specified on each element, and a string is shorthand for a folder element."
-    },
-    "GroupArrayItem": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/GenericArrayItem"
-        },
-        {
-          "$ref": "#/definitions/GroupRecordItem"
-        }
-      ]
     },
     "FolderRecordItem": {
       "type": "object",
@@ -98,6 +102,16 @@
       ],
       "description": "The GroupElement children may be either a hashmap of Group and Path elements, with an $options property for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element. A hashmap is a shorthand for the array with a key property specified on each element, and a string is shorthand for a folder element."
     },
+    "GroupArrayItem": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/GenericArrayItem"
+        },
+        {
+          "$ref": "#/definitions/GroupRecordItem"
+        }
+      ]
+    },
     "FolderArrayItem": {
       "allOf": [
         {
@@ -118,6 +132,10 @@
       "required": [
         "key"
       ]
+    },
+    "FolderPathShorthand": {
+      "type": "string",
+      "description": "The path of a folder to mount without any extra options. The folder name will be used for the url name."
     },
     "ServerConfigSchema": {
       "type": "object",
