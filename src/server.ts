@@ -185,9 +185,12 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 			username: "",
 			//@ts-ignore
 			debugOutput: undefined,
-			settings,
+			// settings,
 			request,
-			client
+			client,
+			get settings(){
+				return settings;
+			}
 		};
 		requestHandlerHostLevelChecks<typeof ev>(ev, preflighter).then(ev2 => {
 			if (!ev2.handled) {
@@ -337,7 +340,7 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	}
 	// host header is currently not implemented, but could be implemented by the preflighter
 	ev.treeHostIndex = 0;
-
+	console.log(settings.bindInfo);
 	let { registerNotice } = settings.bindInfo.localAddressPermissions[ev.localAddressPermissionsKey];
 	let auth = checkCookieAuth(ev.request, registerNotice);
 	if (auth) {
@@ -348,11 +351,11 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	return (preflighter ? preflighter(ev) : Promise.resolve(ev)).then(ev2 => {
 		//sanity checks after the preflighter
 		//"always check all variables and sometimes check some constants too" -- Arlen Beiler
-		if (ev2.treeHostIndex > ev2.settings.tree.length - 1)
-			throw format("treeHostIndex of %s is not within array length of %s", ev2.treeHostIndex, ev2.settings.tree.length)
-		if(!ev2.settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey]) 
+		if (ev2.treeHostIndex > settings.tree.length - 1)
+			throw format("treeHostIndex of %s is not within array length of %s", ev2.treeHostIndex, settings.tree.length)
+		if(!settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey]) 
 			throw format("localAddressPermissions key of %s does not exist", ev2.localAddressPermissionsKey);
-		if(ev2.authAccountKey && !ev2.settings.authAccounts[ev2.authAccountKey])
+		if(ev2.authAccountKey && !settings.authAccounts[ev2.authAccountKey])
 			throw format("authAccounts key of %s does not exist", ev2.authAccountKey);
 		// let settings: never;
 		if(!ev2.debugOutput) ev2.debugOutput = MakeDebugOutput(ev2.settings);
