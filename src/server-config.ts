@@ -6,7 +6,7 @@ import { oc } from "./optional-chaining";
 // 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
 // };
 // function oc<T extends {}>(data: T): AlwaysDefined<T> & (() => T) {
-	
+
 // 	return new Proxy((() => data) as any,
 // 		{
 // 			get: (target, key) => {
@@ -156,34 +156,36 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 	let set = oc(_set);
 	// proxset.bindInfo
 	if (!set.tree) throw "tree is required in ServerConfig";
-	type T = ServerConfig;
-	type T1 = T["bindInfo"];
-	type T3 = T["logging"];
-	type T2 = T["putsaver"];
-	type T21 = T["bindInfo"]["localAddressPermissions"];
-	let localAddressPermissions = {
-		...{
-			"localhost": {
+	let lap = {
+		"localhost": {
+			...{
 				writeErrors: true,
 				mkdir: true,
 				upload: true,
-				settings: true,
-				WARNING_all_settings_WARNING: false,
 				websockets: true,
 				registerNotice: true
 			},
-			"*": {
+			...set.bindInfo.localAddressPermissions["localhost"]({} as any)
+		},
+		"*": {
+			...{
 				writeErrors: true,
 				mkdir: false,
 				upload: false,
-				settings: false,
-				WARNING_all_settings_WARNING: false,
 				websockets: true,
 				registerNotice: false
-			}
-		},
-		...spread(set.bindInfo && set.bindInfo.localAddressPermissions)
+			},
+			...set.bindInfo.localAddressPermissions["*"]({} as any)
+		}
 	};
+
+	Object.keys(set.bindInfo.localAddressPermissions({})).forEach(k => {
+		if (k === "localhost" || k === "*") return;
+		lap[k] = set.bindInfo.localAddressPermissions[k](lap["*"]);
+		Object.keys(lap["*"]).forEach(k2 => {
+			if (lap[k][k2] === undefined) lap[k][k2] = lap["*"][k2];
+		});
+	});
 	let newset: ServerConfig = {
 		__dirname: "",
 		__filename: "",
@@ -198,26 +200,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 			enableIPv6: set.bindInfo.enableIPv6(false),
 			filterBindAddress: set.bindInfo.filterBindAddress(false),
 			port: set.bindInfo.port(8080),
-			localAddressPermissions: {
-				"localhost": set.bindInfo.localAddressPermissions["localhost"]({
-					writeErrors: true,
-					mkdir: true,
-					upload: true,
-					// settings: true,
-					// WARNING_all_settings_WARNING: false,
-					websockets: true,
-					registerNotice: true
-				}),
-				"*": set.bindInfo.localAddressPermissions["*"]({
-					writeErrors: true,
-					mkdir: false,
-					upload: false,
-					// settings: false,
-					// WARNING_all_settings_WARNING: false,
-					websockets: true,
-					registerNotice: false
-				})
-			},
+			localAddressPermissions: lap,
 			_bindLocalhost: set.bindInfo._bindLocalhost(false),
 			https: !!set.bindInfo.https("")
 			// },
@@ -251,8 +234,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 		directoryIndex: {
 			// ...{
 			defaultType: set.directoryIndex.defaultType("html"),
-			icons: { 
-				...set.directoryIndex.icons({}), 
+			icons: {
+				...set.directoryIndex.icons({}),
 				"htmlfile": set.directoryIndex.icons["htmlfile"](["htm", "html"]),
 			},
 			types: {},
@@ -271,8 +254,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 		authCookieAge: set.authCookieAge(2592000),
 		$schema: "./settings.schema.json"
 	}
-	// set second level object defaults
-	newset.directoryIndex.types = {};
+
 	Object.keys(newset.directoryIndex.icons).forEach(type => {
 		newset.directoryIndex.icons[type].forEach(ext => {
 			if (!newset.directoryIndex.types[ext]) {
