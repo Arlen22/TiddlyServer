@@ -1222,10 +1222,10 @@ export class StateObject {
 	 * -3 - Request and response data for all messages (verbose)
 	 * -4 - Protocol details and full data dump (such as encryption steps and keys)
 	 */
-	log(level: number, format: any, ...args: any[]) {
+	log(level: number, template: any, ...args: any[]) {
 		if (level < this.loglevel) return this;
 		if (level > 1) this.hasCriticalLogs = true;
-		this.doneMessage.push(format(format, ...args));
+		this.doneMessage.push(format(template, ...args));
 		return this;
 	}
 	// error() {
