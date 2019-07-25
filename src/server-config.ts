@@ -198,7 +198,6 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 			enableIPv6: set.bindInfo.enableIPv6(false),
 			filterBindAddress: set.bindInfo.filterBindAddress(false),
 			port: set.bindInfo.port(8080),
-
 			localAddressPermissions: {
 				"localhost": set.bindInfo.localAddressPermissions["localhost"]({
 					writeErrors: true,
@@ -220,7 +219,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 				})
 			},
 			_bindLocalhost: set.bindInfo._bindLocalhost(false),
-			https: false
+			https: !!set.bindInfo.https("")
 			// },
 			// ...spread(set.bindInfo),
 			// ...{
@@ -229,19 +228,20 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 		},
 		logging: {
 			// ...{
-			debugLevel: 0,
-			logAccess: "",
-			logError: "",
-			logColorsToFile: false,
-			logToConsoleAlso: true,
+			debugLevel: set.logging.debugLevel(0),
+			logAccess: set.logging.logAccess(""),
+			logError: set.logging.logError(""),
+			logColorsToFile: set.logging.logColorsToFile(false),
+			logToConsoleAlso: set.logging.logToConsoleAlso(true),
 			// }
 		},
-		authAccounts: spread(set.authAccounts),
+		authAccounts: set.authAccounts({}),
 		putsaver: {
 			// ...{
-			etagWindow: 3,
-			backupDirectory: "",
-			etag: ""
+			etagWindow: set.putsaver.etagWindow(3),
+			backupDirectory: set.putsaver.backupDirectory(""),
+			etag: set.putsaver.etag("")
+
 			// },
 			// ...spread(set.putsaver),
 			// ...{
@@ -250,22 +250,25 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 		},
 		directoryIndex: {
 			// ...{
-			defaultType: "html",
-			icons: { "htmlfile": ["htm", "html"] },
+			defaultType: set.directoryIndex.defaultType("html"),
+			icons: { 
+				...set.directoryIndex.icons({}), 
+				"htmlfile": set.directoryIndex.icons["htmlfile"](["htm", "html"]),
+			},
 			types: {},
-			mixFolders: true
+			mixFolders: set.directoryIndex.mixFolders(true)
 			// },
 			// ...spread(set.directoryIndex)
 		},
 		EXPERIMENTAL_clientside_datafolders: {
 			// ...{
-			enabled: false,
-			alwaysRefreshCache: true,
-			maxAge_tw_plugins: 0
+			enabled: set.EXPERIMENTAL_clientside_datafolders.enabled(false),
+			alwaysRefreshCache: set.EXPERIMENTAL_clientside_datafolders.alwaysRefreshCache(true),
+			maxAge_tw_plugins: set.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins(0)
 			// },
 			// ...spread(set.EXPERIMENTAL_clientside_datafolders)
 		},
-		authCookieAge: set.authCookieAge || 2592000,
+		authCookieAge: set.authCookieAge(2592000),
 		$schema: "./settings.schema.json"
 	}
 	// set second level object defaults
