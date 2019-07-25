@@ -1,6 +1,33 @@
 /** @type { import("path") } */
 const path: typeof import("path") = require("path")
 
+import { oc } from "./optional-chaining";
+// type AlwaysDefined<T> = {
+// 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
+// };
+// function oc<T extends {}>(data: T): AlwaysDefined<T> & (() => T) {
+	
+// 	return new Proxy((() => data) as any,
+// 		{
+// 			get: (target, key) => {
+// 				return typeof target[key] === "undefined" ? oc(oc.empty)
+// 					: typeof target[key] === "object" ? oc(target[key])
+// 						: target[key];
+// 			},
+// 		},
+// 	);
+// 	// return new Proxy(data as any,
+// 	// 	{
+// 	// 		get: (target, key) => {
+// 	// 			return typeof target[key] === "undefined" ? oc(oc.empty)
+// 	// 				: typeof target[key] === "object" ? oc(target[key])
+// 	// 					: target[key];
+// 	// 		},
+// 	// 	},
+// 	// );
+// }
+// oc.empty = Object.create(null);
+
 function format(str: string, ...args: any[]) {
 	while (args.length && str.indexOf("%s") !== -1)
 		str = str.replace("%s", args.shift());
@@ -124,8 +151,10 @@ function isObject(a): a is OptionalAny {
 function spread(a: any): ({}) {
 	return typeof a === "object" ? a : {};
 }
-export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
+export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 	const settingsDir = path.dirname(settingsFile);
+	let set = oc(_set);
+	// proxset.bindInfo
 	if (!set.tree) throw "tree is required in ServerConfig";
 	type T = ServerConfig;
 	type T1 = T["bindInfo"];
@@ -159,62 +188,82 @@ export function normalizeSettings(set: ServerConfigSchema, settingsFile) {
 		__dirname: "",
 		__filename: "",
 		__assetsDir: "",
-		_devmode: !!set._devmode,
-		_datafoldertarget: set._datafoldertarget || "",
-		tree: normalizeSettingsTree(settingsDir, set.tree as any),
+		_devmode: !!set._devmode(),
+		_datafoldertarget: set._datafoldertarget() || "",
+		tree: normalizeSettingsTree(settingsDir, set.tree() as any),
 		bindInfo: {
-			...{
-				bindAddress: [],
-				bindWildcard: false,
-				enableIPv6: false,
-				filterBindAddress: false,
-				port: 8080,
+			// ...{
+			bindAddress: set.bindInfo.bindAddress([]),
+			bindWildcard: set.bindInfo.bindWildcard(false),
+			enableIPv6: set.bindInfo.enableIPv6(false),
+			filterBindAddress: set.bindInfo.filterBindAddress(false),
+			port: set.bindInfo.port(8080),
 
-				localAddressPermissions,
-				_bindLocalhost: false,
-				https: false
+			localAddressPermissions: {
+				"localhost": set.bindInfo.localAddressPermissions["localhost"]({
+					writeErrors: true,
+					mkdir: true,
+					upload: true,
+					// settings: true,
+					// WARNING_all_settings_WARNING: false,
+					websockets: true,
+					registerNotice: true
+				}),
+				"*": set.bindInfo.localAddressPermissions["*"]({
+					writeErrors: true,
+					mkdir: false,
+					upload: false,
+					// settings: false,
+					// WARNING_all_settings_WARNING: false,
+					websockets: true,
+					registerNotice: false
+				})
 			},
-			...spread(set.bindInfo),
-			...{
-				https: !!(set.bindInfo && set.bindInfo.https)
-			}
+			_bindLocalhost: set.bindInfo._bindLocalhost(false),
+			https: false
+			// },
+			// ...spread(set.bindInfo),
+			// ...{
+			// 	https: !!(set.bindInfo && set.bindInfo.https)
+			// }
 		},
 		logging: {
-			...{
-				debugLevel: 0,
-				logAccess: "",
-				logError: "",
-				logColorsToFile: false,
-				logToConsoleAlso: true,
-			}
+			// ...{
+			debugLevel: 0,
+			logAccess: "",
+			logError: "",
+			logColorsToFile: false,
+			logToConsoleAlso: true,
+			// }
 		},
 		authAccounts: spread(set.authAccounts),
 		putsaver: {
-			...{
-				etagWindow: 3,
-				backupDirectory: "",
-			},
-			...spread(set.putsaver),
-			...{
-				etag: set.putsaver && set.putsaver.etag || ""
-			}
+			// ...{
+			etagWindow: 3,
+			backupDirectory: "",
+			etag: ""
+			// },
+			// ...spread(set.putsaver),
+			// ...{
+			// 	etag: set.putsaver && set.putsaver.etag || ""
+			// }
 		},
 		directoryIndex: {
-			...{
-				defaultType: "html",
-				icons: { "htmlfile": ["htm", "html"] },
-				types: {},
-				mixFolders: true
-			},
-			...spread(set.directoryIndex)
+			// ...{
+			defaultType: "html",
+			icons: { "htmlfile": ["htm", "html"] },
+			types: {},
+			mixFolders: true
+			// },
+			// ...spread(set.directoryIndex)
 		},
 		EXPERIMENTAL_clientside_datafolders: {
-			...{
-				enabled: false,
-				alwaysRefreshCache: true,
-				maxAge_tw_plugins: 0
-			},
-			...spread(set.EXPERIMENTAL_clientside_datafolders)
+			// ...{
+			enabled: false,
+			alwaysRefreshCache: true,
+			maxAge_tw_plugins: 0
+			// },
+			// ...spread(set.EXPERIMENTAL_clientside_datafolders)
 		},
 		authCookieAge: set.authCookieAge || 2592000,
 		$schema: "./settings.schema.json"
