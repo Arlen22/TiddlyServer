@@ -1,0 +1,6 @@
+{
+	"tree": "../webroot",
+	"bindInfo": {"bindAddress": ["127.0.0.1"]},
+	"putsaver": {"backupDirectory": "../backups"},
+	"$schema": "./settings-2-1.schema.json"
+}
