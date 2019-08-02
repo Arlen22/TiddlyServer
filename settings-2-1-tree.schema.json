@@ -1,5 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-06/schema#",
+  "$id": "settings-2-1-tree.schema.json",
   "definitions": {
     "GroupChildrenHashmap": {
       "type": "object",

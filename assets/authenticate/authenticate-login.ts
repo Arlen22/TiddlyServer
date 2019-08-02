@@ -4,7 +4,7 @@ declare var ReactDOM: any;
 	let { salts } = window as any;
 	const byID = <T extends HTMLElement>(id: string) => {
 		return document.getElementById(id) as T;
-	}
+	};
 	(window as any).tiddlyserverLogout = async () => {
 		let res = await fetch("/admin/authenticate/logout", {
 			method: "POST"
@@ -13,7 +13,7 @@ declare var ReactDOM: any;
 			byID<HTMLDivElement>("success-line").style.display = "";
 			byID<HTMLDivElement>("success-line").innerHTML = "<li>" + new Date().toISOString().slice(11,19) + " - Successfully logged out, you may press Back to return to your previous page, then refresh" + "</li>";
 		})
-	}
+	};
 	(window as any).tiddlyserverLogin = async () => {
 		// debugger;
 		if (!(window as any).sodium) { console.log("Sodium is not ready"); return; }
@@ -79,5 +79,5 @@ declare var ReactDOM: any;
 			byID<HTMLDivElement>("success-line").style.display = "";
 			byID<HTMLDivElement>("success-line").innerHTML = "<li>" + new Date().toISOString().slice(11,19) + " - Successfully logged in, you may press Back to return to your previous page, then refresh" + "</li>";
 		}
-	}
+	};
 }

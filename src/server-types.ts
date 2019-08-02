@@ -131,6 +131,9 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 
 	var schemaChecker = new ajv({ allErrors: true, async: false });
 	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
+	// schemaChecker.addMetaSchema(require("../settings-2-1.schema.json"));
+	schemaChecker.addMetaSchema(require("../settings-2-1-tree.schema.json"));
+	schemaChecker.addMetaSchema(require("../settings-2-1-tree-options.schema.json"));
 	var validate = schemaChecker.compile(require(
 		path.resolve(path.dirname(settingsFile), settingsObjSource.$schema)
 	));
