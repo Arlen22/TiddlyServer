@@ -33,7 +33,7 @@
 
 <body>
 	<div id="react-root">
-		<div id="login-form">
+		<form onsubmit="tiddlyserverLogin()" id="login-form">
 			<div id="error-line" style="display:none;"><li></li></div>
 			<div id="success-line" style="display:none;"><li></li></div>
 			<label class="mdc-text-field mdc-text-field--outlined">
@@ -61,12 +61,12 @@
 					style="align-self:center;">
 					<span class="mdc-button__label">Logout</span>
 				</button>
-				<button id="login-button" onclick="tiddlyserverLogin()" class="mdc-button mdc-button--raised"
+				<input type="submit" id="login-button" onclick="tiddlyserverLogin()" class="mdc-button mdc-button--raised"
 					style="align-self:center;">
-					<span class="mdc-button__label">Login</span>
+					<!-- <span class="mdc-button__label">Login</span> -->
 				</button>
 			</div>
-		</div>
+		</form>
 	</div>
 </body>
 
