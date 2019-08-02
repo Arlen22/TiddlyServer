@@ -1,142 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-06/schema#",
   "definitions": {
-    "GroupHashmap": {
-      "type": "object",
-      "description": "A shorthand form of group specified without any options",
-      "patternProperties": {
-        "^[^$]+$": {
-          "$ref": "#/definitions/GroupChildren"
-        }
-      },
-      "additionalProperties": false
-    },
-    "GroupChildren": {
-      "oneOf": [
-        {
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/GroupArrayItem"
-              },
-              {
-                "$ref": "#/definitions/FolderArrayItem"
-              },
-              {
-                "$ref": "#/definitions/FolderPathShorthand"
-              }
-            ]
-          }
-        },
-        {
-          "type": "object",
-          "additionalProperties": {
-            "anyOf": [
-              {
-                "$ref": "#/definitions/GroupRecordItem"
-              },
-              {
-                "$ref": "#/definitions/FolderRecordItem"
-              },
-              {
-                "$ref": "#/definitions/FolderPathShorthand"
-              },
-              {
-                "$ref": "#/definitions/GroupHashmap"
-              }
-            ]
-          }
-        }
-      ]
-    },
-    "GroupRecordItem": {
-      "type": "object",
-      "additionalProperties": false,
-      "patternProperties": {
-        "^key$": {
-          "type": "string"
-        }
-      },
-      "properties": {
-        "$element": {
-          "enum": [
-            "group"
-          ]
-        },
-        "indexPath": {
-          "type": "string"
-        },
-        "$children": { "$ref": "#/definitions/GroupChildren" }
-      },
-      "required": [
-        "$children",
-        "$element"
-      ],
-      "description": "The GroupElement children may be either a hashmap of Group and Path elements, with an $options property for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element. A hashmap is a shorthand for the array with a key property specified on each element, and a string is shorthand for a folder element."
-    },
-    "FolderRecordItem": {
-      "type": "object",
-      "additionalProperties": false,
-      "patternProperties": {
-        "^key$": {
-          "type": "string"
-        }
-      },
-      "properties": {
-        "$element": {
-          "enum": [
-            "folder"
-          ]
-        },
-        "path": {
-          "type": "string"
-        },
-        "$children": {
-          "type": "array"
-        }
-      },
-      "required": [
-        "$element",
-        "path"
-      ],
-      "description": "The GroupElement children may be either a hashmap of Group and Path elements, with an $options property for the Option elements array, OR an Array of Group, Path, and Option elements. A string is shorthand for a Path element. A hashmap is a shorthand for the array with a key property specified on each element, and a string is shorthand for a folder element."
-    },
-    "GroupArrayItem": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/GenericArrayItem"
-        },
-        {
-          "$ref": "#/definitions/GroupRecordItem"
-        }
-      ]
-    },
-    "FolderArrayItem": {
-      "allOf": [
-        {
-          "$ref": "#/definitions/GenericArrayItem"
-        },
-        {
-          "$ref": "#/definitions/FolderRecordItem"
-        }
-      ]
-    },
-    "GenericArrayItem": {
-      "properties": {
-        "key": {
-          "type": "string",
-          "description": "The mount name that will show in the URL"
-        }
-      },
-      "required": [
-        "key"
-      ]
-    },
-    "FolderPathShorthand": {
-      "type": "string",
-      "description": "The path of a folder to mount without any extra options. The folder name will be used for the url name."
-    },
     "ServerConfigSchema": {
       "type": "object",
       "properties": {
@@ -149,14 +13,7 @@
           "description": "The tiddlywiki folder to use for data folder instances. Defaults to the \ntiddlywiki folder in the TiddlyServer installation regardless of the \nsettings.json location."
         },
         "tree": {
-          "allOf": [
-            {
-              "$ref": "#/definitions/GroupRecordItem"
-            },
-            {
-              "description": "The tree property accepts one of 3 formats. If it is a string ending in `.xml`, `.js`, or `.json`, \nthe tree will be loaded from the specified path. JS and JSON files must export a `tree` property \nand XML files must specify a `tree` element as root.\n\n- A path element (or a string specifying the path) to mount a path as root (a single file is possible but pointless)\n- A group element or the children of a group element (which is either an array, or an object with no $element property)"
-            }
-          ]
+          "$ref": "settings-2-1-tree.schema.json"
         },
         "bindInfo": {
           "type": "object",
@@ -371,7 +228,13 @@
           "description": "login attempts for a public/private key pair which has not been \nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry."
         }
       },
-      "required": [],
+      "required": [
+        "writeErrors",
+        "upload",
+        "mkdir",
+        "websockets",
+        "registerNotice"
+      ],
       "additionalProperties": false
     },
     "ServerConfig_AuthAccountsValue": {
@@ -380,9 +243,25 @@
         "clientKeys": {
           "type": "object",
           "additionalProperties": {
-            "type": "string"
+            "type": "array",
+            "minItems": 2,
+            "items": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "maxItems": 2,
+            "description": "username: [public key, cookie suffix] \n\nChanging the public key or cookie suffix will require the user to log in again."
           },
-          "description": "Hashmap of [username]: public key"
+          "default": {
+            "username": [
+              "publickey",
+              "usersalt"
+            ]
+          }
         },
         "permissions": {
           "$ref": "#/definitions/ServerConfig_AccessOptions",

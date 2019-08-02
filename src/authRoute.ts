@@ -8,13 +8,17 @@ import * as path from "path";
 const sockets: WebSocket[] = [];
 const state: {}[] = [];
 /** [type, username, timestamp, hash, sig] */
-export type AuthCookie = [string, "pw" | "key", string, string, string]
-export let checkCookieAuth: (request: http.IncomingMessage, logRegisterNotice: boolean) => [string, string] | false;
+export type AuthCookie = [string, "pw" | "key", string, string, string, string]
+export type AuthCookieSet = [string, "pw" | "key", string, string, string]
+export let checkCookieAuth: (request: http.IncomingMessage, logRegisterNotice: boolean) => ReturnType<typeof validateCookie>;
 /** if the cookie is valid it returns the username, otherwise an empty string. If the public key cannot be found, it will call logRegisterNotice then return an empty string */
-export let validateCookie: (json: AuthCookie, logRegisterNotice?: (string | false)) => [string, string] | false;
-export let parseAuthCookie = (cookie: string): AuthCookie => {
-	let json: [string, "pw" | "key", string, string, string] = cookie.split("|") as any; //tryParseJSON<>(auth);
-	if (json.length > 5) {
+export let validateCookie: (json: AuthCookie | AuthCookieSet, logRegisterNotice?: (string | false)) => [string, string, string] | false;
+// export let parseAuthCookie = ;
+export function parseAuthCookie(cookie: string, suffix: true): AuthCookie;
+export function parseAuthCookie(cookie: string, suffix: false): AuthCookieSet;
+export function parseAuthCookie(cookie: string, suffix: boolean): AuthCookie | AuthCookieSet {
+	let json: [string, "pw" | "key", string, string, string, string] = cookie.split("|") as any; //tryParseJSON<>(auth);
+	if (json.length > (suffix ? 6 : 5)) {
 		let name = json.slice(0, json.length - 4);
 		let rest = json.slice(json.length - 4);
 		json = [name.join("|"), ...rest] as any;
@@ -22,10 +26,8 @@ export let parseAuthCookie = (cookie: string): AuthCookie => {
 	return json;
 }
 const setAuth = (settings: ServerConfig) => {
-	// let ca: Record<string, x509.Certificate[]> = {};
-	// let up: [string, string, string][] = [] as any;
-	/** Record<hash+username, [authGroup, publicKey]> */
-	let publicKeyLookup: Record<string, [string, string]> = {};
+	/** Record<hash+username, [authGroup, publicKey, suffix]> */
+	let publicKeyLookup: Record<string, [string, string, string]> = {};
 	let passwordLookup: Record<string, string> = {};
 	const {
 		crypto_generichash,
@@ -45,10 +47,10 @@ const setAuth = (settings: ServerConfig) => {
 		// console.log(k, e, e.clientKeys);
 		if (e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
 			console.log(k, u, e.clientKeys[u]);
-			const publicKey = from_base64(e.clientKeys[u]);
-
+			const publicKey = from_base64(e.clientKeys[u][0]);
+			// let t = e.clientKeys[u];
 			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
-			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u]];
+			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u][0], e.clientKeys[u][1]];
 			else throw "publicKey+username combination is used for more than one authAccount";
 		});
 		// if (e.passwords) Object.keys(e.passwords).forEach(u => {
@@ -68,29 +70,35 @@ const setAuth = (settings: ServerConfig) => {
 		});
 		let auth = cookies["TiddlyServerAuth"] as string;
 		if (!auth) return false;
-		let json = parseAuthCookie(auth);
-		if (!json) return false;
+		let json = parseAuthCookie(auth, true);
+		if (!json || json.length !== 6) return false;
 		return validateCookie(json, false);
 	};
 
-	validateCookie = (json: [string, "pw" | "key", string, string, string], logRegisterNotice?: string | false) => {
-		let [username, type, timestamp, hash, sig] = json;
+	validateCookie = (json: AuthCookie | AuthCookieSet, logRegisterNotice?: string | false) => {
+		let [username, type, timestamp, hash, sig, suffix] = json;
 		if (type === "key" && !publicKeyLookup[hash + username]) {
-			// console.log(publicKeyLookup);
 			if (logRegisterNotice) console.log(logRegisterNotice);
 			return false;
 		}
 		// console.log(username + timestamp + hash);
 		if (type === "pw") return false; //passwords are currently not implemented
+		let pubkey = publicKeyLookup[hash + username];
+		//don't check suffix unless it is provided, other code checks whether it is provided or not
+		//check it after the signiture to prevent brute-force suffix checking
 		let valid = crypto_sign_verify_detached(
 			from_base64(sig),
 			username + timestamp + hash,
-			from_base64(publicKeyLookup[hash + username][1])
-		);
+			from_base64(pubkey[1])
+		) && (!suffix || suffix === pubkey[2]);
 		// console.log((valid ? "" : "in") + "valid signature")
-		return valid ? [publicKeyLookup[hash + username][0], username] : false;
+		return valid ? [pubkey[0], username, pubkey[2]] : false;
 	};
 
+}
+const expect = function <T>(a: any, keys: (string | number | symbol)[]): a is T {
+	return keys.every(k => Object.prototype.hasOwnProperty.call(a, k))
+		&& Object.keys(a).every(k => keys.indexOf(k) !== -1);
 }
 export function initAuthRoute(eventer: ServerEventEmitter) {
 	// eventer.on("websocket-connection", (client, request) => {
@@ -119,13 +127,13 @@ function handleTransfer(state: StateObject) {
 	if (!pkop.sender || !pkop.reciever) return;
 	clearTimeout(pkop.cancelTimeout);
 	pkop.step += 1;
-	pkop.sender.res.writeHead(200, undefined, { 
+	pkop.sender.res.writeHead(200, undefined, {
 		"x-tiddlyserver-transfer-count": pkop.step,
 		"content-type": pkop.reciever.req.headers["content-type"],
 		"content-length": pkop.reciever.req.headers["content-length"]
 	});
 	pkop.reciever.req.pipe(pkop.sender.res);
-	pkop.reciever.res.writeHead(200, undefined, { 
+	pkop.reciever.res.writeHead(200, undefined, {
 		"x-tiddlyserver-transfer-count": pkop.step,
 		"content-type": pkop.sender.req.headers["content-type"],
 		"content-length": pkop.sender.req.headers["content-length"]
@@ -202,20 +210,25 @@ export function handleAuthRoute(state: StateObject) {
 			state.respond(200).json({ initPin: setSharedKey(state.path[4]) });
 	} else if (state.path[3] === "login") {
 		state.recieveBody(true, true).then(() => {
-			if (state.body.length && !state.json) return; //recieve body sent a response already
-			if (!state.body.length) return state.throwReason(400, "Empty request body");
+			if (state.body.length && !state.json)
+				return; //recieve body sent a response already
+			if (!state.body.length) {
+				return state.throwReason(400, "Empty request body");
+			} 
+			if (!expect<{ setCookie: string, publicKey: string }>(state.json, ["setCookie", "publicKey"]))
+				return state.throwReason(400, "Improper request body");
 			/** [username, type, timestamp, hash, sig] */
-			let json = parseAuthCookie(state.json.setCookie);
+			let json = parseAuthCookie(state.json.setCookie, false);
 			if (json.length !== 5) return state.throwReason(400, "Bad cookie format");
 			let { registerNotice } = state.settings.bindInfo.localAddressPermissions[state.hostLevelPermissionsKey];
-			let username = validateCookie(json, registerNotice && [
+			let valid = validateCookie(json, registerNotice && [
 				"    login attempted with unknown public key",
 				"    " + state.json.publicKey,
-				"    username: " + json[1],
+				"    username: " + json[0],
 				"    timestamp: " + json[2]
 			].join("\n"));
-			if (username) {
-				state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie, false, state.settings.authCookieAge));
+			if (valid) {
+				state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie + "|" + valid[2], false, state.settings.authCookieAge));
 				state.respond(200).empty();
 			} else {
 				state.throwReason(400, "INVALID_CREDENTIALS");

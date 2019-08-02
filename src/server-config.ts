@@ -412,8 +412,22 @@ export interface ServerConfig_ClientsideDatafolders {
 export interface ServerConfig_AuthAccountsValue {
 	// /** Record[username] = password */
 	// passwords: Record<string, string>,
-	/** Hashmap of [username]: public key */
-	clientKeys: Record<string, string>,
+	/** 
+	 * @default {"username":["publickey","usersalt"]}
+	 */
+	clientKeys: {
+		/**
+		 * username: [public key, cookie suffix] 
+		 * 
+		 * Changing the public key or cookie suffix will require the user to log in again. 
+		 */
+		[P: string]: [
+			/** public key */
+			string,
+			/** user salt */
+			string
+		]
+	}; // Record<string, [string, string]>,
 	/** override hostLevelPermissions for users with this account */
 	permissions: ServerConfig_AccessOptions
 }
@@ -562,8 +576,86 @@ export interface NewTreeMountArgs {
 
 
 }
+
+type OptionElementsSchema = NewTreePathOptions_Index | NewTreePathOptions_Auth | NewTreePathOptions_Backup;
+export interface OptionsSchema {
+	auth: Config.Options_Auth,
+	backups: Config.Options_Backup,
+	index: Config.Options_Index
+}
+/** The options array schema is in `settings-2-1-tree-options.schema.json` */
+export type OptionsArraySchema = (Config.Options_Auth | Config.Options_Backup | Config.Options_Index)[];
+
 export namespace Config {
-	export type OptionElements = NewTreeOptions;
+	export type OptionElements = OptionsSchema[keyof OptionsSchema];
+
+	export interface Options_Index {
+		/**
+		 * Options related to the directory index (request paths that resolve to a folder
+		 * which is not a data folder). Option elements affect the group
+		 * they belong to and all children under that. Each property in an option element 
+		 * replaces the key from parent option elements.
+		 */
+		$element: "index",
+		/** 
+		 * The format of the index generated if no index file is found, or "403" to 
+		 * return a 403 Access Denied, or 404 to return a 404 Not Found. 403 is the 
+		 * error code used by Apache and Nginx. 
+		 */
+		defaultType: "html" | "json" | 403 | 404,
+		/** 
+		 * Look for index files named exactly this or with one of the defaultExts added. 
+		 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","",html"] would 
+		 * look for ["index.htm","index","index.html"] in that order. 
+		 * 
+		 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
+		 * To use a .hidden file, put the full filename here, and set indexExts to `[""]`. 
+		 */
+		indexFile: string[],
+		/** 
+		 * Extensions to add when looking for an index file. A blank string will set the order 
+		 * to search for the exact indexFile name. The extensions are searched in the order specified. 
+		 * 
+		 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
+		 * The default is `[""]`, which will search for an exact indexFile. 
+		 */
+		indexExts: string[]
+	}
+	export interface Options_Auth {
+		/** 
+		 * Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.
+		 * 
+		 * Anonymous requests are ALWAYS denied if an auth element applies to the requested path. 
+		 * 
+		 * Note that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.
+		 */
+		$element: "auth";
+		/** list of keys from authAccounts object that can access this resource */
+		authList: string[] | null;
+		/** 
+		 * Which error code to return for unauthorized (or anonymous) requests
+		 * - 403 Access Denied: Client is not granted permission to access this resouce.
+		 * - 404 Not Found: Client is told that the resource does not exist.
+		 */
+		authError: 403 | 404;
+	}
+	export interface Options_Backup {
+		/** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
+		$element: "backups",
+		/** 
+		 * Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired. 
+		 */
+		backupFolder: string,
+		/** 
+		 * GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience).
+		 */
+		gzip: boolean,
+		/** 
+		 * Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup. 
+		 */
+		etagAge: number,
+	}
+
 	export function isOption(a: any): a is OptionElements {
 		return !!a.$element && ["auth", "backups", "index"].indexOf(a.$element) !== -1;
 	}
@@ -622,8 +714,8 @@ export namespace Schema {
 			"enum": ["group"]
 		}
 	}
-	export type GroupChildElements = (Record<string, GroupElement | PathElement | string | Config.OptionElements[]>) | (ArrayGroupElement | ArrayPathElement | Config.OptionElements | string)[];
-
+	export type GroupChildElements = (Record<string, GroupElement | PathElement | string>) | (ArrayGroupElement | ArrayPathElement | string)[];
+	export type OptionElements = Config.OptionElements;
 	export type TreeElement = HostElement[] | GroupChildElements | string;
 	/** Host elements may only be specified in arrays */
 	export interface HostElement {
@@ -654,6 +746,7 @@ export namespace Schema {
 		$element: "group";
 		indexPath?: string,
 		$children: GroupChildElements;
+		$options?: OptionElements[]
 	}
 	export interface ArrayGroupElement extends GroupElement {
 		key: string;
@@ -675,7 +768,7 @@ export namespace Schema {
 		 * index.html file, and adding an index option to this element.
 		 */
 		noTrailingSlash?: boolean;
-		$children?: NewTreeOptions[];
+		$options?: OptionElements[];
 	}
 	export interface ArrayPathElement extends PathElement {
 		key: string;
@@ -685,8 +778,8 @@ namespace Test {
 	type Test<A, T extends { [K in keyof A]: any }> = T;
 	//make sure that all keys in the schema are included in the config
 	type Host = Test<Schema.HostElement, Config.HostElement>;
-	type Group = Test<{ $options: any } & Schema.ArrayGroupElement, Config.GroupElement>;
-	type Path = Test<{ $options: any } & Schema.ArrayPathElement, Config.PathElement>;
+	type Group = Test<Schema.ArrayGroupElement, Config.GroupElement>;
+	type Path = Test<Schema.ArrayPathElement, Config.PathElement>;
 }
 
 
