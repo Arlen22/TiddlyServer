@@ -27,24 +27,24 @@ export function normalizeTree_GroupElement_() {
         $options: 2,
         $children: 3,
         key: "test1",
-        indexPath: undefined
+        // indexPath: undefined
       };
       deepStrictEqual(test, expected);
     }),
 
     Promise.resolve(normalizeTree(SETTINGSDIR, {
       $element: "group",
-
+      // indexPath: undefined,
       $children: {
         // "$element": "",
         "test1sub1": { $element: "folder", path: "~/test1" },
         "test1sub2": "~/test2",
         "test1sub3": { $element: "folder", path: "~/test1" },
-        "$options": [
-          { $element: "auth", authError: 404, authList: null },
-          { $element: "index", defaultType: 404 }
-        ]
-      }
+      },
+      "$options": [
+        { $element: "auth", authError: 404, authList: null },
+        { $element: "index", defaultType: 404 }
+      ]
     } as Schema.GroupElement, "test1", [])).then(test => {
       //@ts-ignore
       test.$children = test.$children.length;
@@ -56,7 +56,7 @@ export function normalizeTree_GroupElement_() {
         $options: 2,
         $children: 3,
         key: "test1",
-        indexPath: undefined
+        // indexPath: undefined
       };
       deepStrictEqual(test, expected);
     })

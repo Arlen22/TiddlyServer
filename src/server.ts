@@ -193,9 +193,8 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 			}
 		};
 		requestHandlerHostLevelChecks<typeof ev>(ev, preflighter).then(ev2 => {
-			if (!ev2.handled) {
-				// we give the preflighter the option to handle the websocket on its own
-				if (settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey].websockets === false) client.close();
+			if (!ev2.handled) { // we give the preflighter the option to handle the websocket on its own
+				if (!settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey].websockets) client.close();
 				else eventer.emit('websocket-connection', ev);
 			}
 		});
@@ -324,7 +323,7 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	preflighter?: (ev: T) => Promise<T>
 ) {
 	//connections to the wrong IP address are already filtered out by the connection event listener on the server.
-	//determine hostLevelPermissions to be applied
+	//determine localAddressPermissions to be applied
 	{
 		let localAddress = ev.request.socket.localAddress;
 		let keys = Object.keys(settings.bindInfo.localAddressPermissions);
@@ -340,7 +339,7 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	}
 	// host header is currently not implemented, but could be implemented by the preflighter
 	ev.treeHostIndex = 0;
-	console.log(settings.bindInfo);
+	// console.log(settings.bindInfo);
 	let { registerNotice } = settings.bindInfo.localAddressPermissions[ev.localAddressPermissionsKey];
 	let auth = checkCookieAuth(ev.request, registerNotice);
 	if (auth) {
@@ -423,7 +422,7 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 				ev.settings,
 				ev.debugOutput
 			);
-			//handle basic auth
+			//
 			// if (!handleBasicAuth(state)) return;
 			//check for static routes
 			const route = routes[state.path[1]];
