@@ -10,7 +10,7 @@ console.log(`
 ==  Upgrade TiddlyServer from 2.0 to 2.1. ==
 ============================================
 
-Syntax: node upgrade-settings.js old new
+Syntax: node upgrade-settings.js old.json new.json
 
 The new settings file must not exist.
 
@@ -40,21 +40,21 @@ let oldSettings = tryParseJSON(settingsStr, (err) => console.log(err));
 OldDefaultSettings(oldSettings);
 let newSettings = ConvertSettings(oldSettings);
 
-function convertTree(tree) {
-	if (typeof tree === "string") {
-		return tree
-	} else if (typeof tree === "object") {
-		Object.keys(tree).forEach(k => {
-			tree[k] = convertTree(tree[k]);
-		})
-		return {
-			$element: "group",
-			$children: tree
-		}
-	}
-}
+// function convertTree(tree) {
+// 	if (typeof tree === "string") {
+// 		return tree
+// 	} else if (typeof tree === "object") {
+// 		Object.keys(tree).forEach(k => {
+// 			tree[k] = convertTree(tree[k]);
+// 		})
+// 		return {
+// 			$element: "group",
+// 			$children: tree
+// 		}
+// 	}
+// }
 
-newSettings.tree = convertTree(newSettings.tree);
+// newSettings.tree = convertTree(newSettings.tree);
 delete newSettings._datafoldertarget;
 delete newSettings._devmode;
 let newpath = path.resolve(process.argv[3]);

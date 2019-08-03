@@ -21,7 +21,7 @@ export function normalizeTree_GroupElement_() {
       test.$children = test.$children.length;
       //@ts-ignore
       test.$options = test.$options.length;
-
+      //@ts-ignore
       let expected: Record<keyof Config.GroupElement, any> = {
         $element: "group",
         $options: 2,
@@ -50,7 +50,7 @@ export function normalizeTree_GroupElement_() {
       test.$children = test.$children.length;
       //@ts-ignore
       test.$options = test.$options.length;
-
+      //@ts-ignore
       let expected: Record<keyof Config.GroupElement, any> = {
         $element: "group",
         $options: 2,
