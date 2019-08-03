@@ -947,22 +947,17 @@ export function OldDefaultSettings(set: OldServerConfig) {
 		set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
 }
 
-export function ConvertSettings(set: OldServerConfig): ServerConfig {
-	type T = ServerConfig;
-	type T1 = T["bindInfo"];
-	type T3 = T["logging"];
-	type T2 = T["putsaver"];
-	type T21 = T["bindInfo"]["localAddressPermissions"];
+export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
 	return {
-		__assetsDir: set.__assetsDir,
-		__dirname: set.__dirname,
-		__filename: set.__filename,
+		// __assetsDir: set.__assetsDir,
+		// __dirname: set.__dirname,
+		// __filename: set.__filename,
 		_devmode: set._devmode,
-		_datafoldertarget: "",
+		_datafoldertarget: undefined,
 		tree: set.tree,
 		bindInfo: {
-			bindAddress: (set.host === "0.0.0.0" || set.host === "::") ? [] : [set.host],
-			filterBindAddress: false,
+			bindAddress: (set.host === "0.0.0.0" || set.host === "::") ? undefined : [set.host],
+			filterBindAddress: undefined,
 			enableIPv6: set.host === "::",
 			port: set.port,
 			bindWildcard: set.host === "0.0.0.0" || set.host === "::",
@@ -970,7 +965,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 				"localhost": set.allowLocalhost,
 				"*": set.allowNetwork
 			},
-			https: false,
+			https: undefined,
 			_bindLocalhost: set._disableLocalHost === false,
 		},
 		logging: {
@@ -992,11 +987,11 @@ export function ConvertSettings(set: OldServerConfig): ServerConfig {
 			mixFolders: set.mixFolders,
 			types: {}
 		},
-		EXPERIMENTAL_clientside_datafolders: {
+		EXPERIMENTAL_clientside_datafolders: (typeof set.tsa === "object" || typeof set.maxAge === "object") ? {
 			enabled: false,
 			alwaysRefreshCache: typeof set.tsa === "object" ? set.tsa.alwaysRefreshCache : true,
 			maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
-		},
+		} : undefined,
 		authCookieAge: 2592000,
 		$schema: "./settings.schema.json"
 	}
