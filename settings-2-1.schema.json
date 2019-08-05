@@ -1,5 +1,6 @@
 {
-  "$schema": "http://json-schema.org/draft-06/schema#",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/ServerConfigSchema",
   "definitions": {
     "ServerConfigSchema": {
       "type": "object",
@@ -124,13 +125,20 @@
                   "type": "string"
                 }
               },
-              "description": "Hashmap of type { \"icon_name\": [\"ext\", \"ext\"]} where ext represents the extensions to use this icon for. \nIcons are in the TiddlyServer/assets/icons folder."
+              "description": "Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for. \nIcons are in the TiddlyServer/assets/icons folder."
             },
             "types": {
+              "not": {}
+            },
+            "mimetypes": {
               "type": "object",
               "additionalProperties": {
-                "type": "string"
-              }
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "description": "additional extensions to apply to mime types"
             }
           },
           "additionalProperties": false,
@@ -275,5 +283,5 @@
       "additionalProperties": false
     }
   },
-  "$ref": "#/definitions/ServerConfigSchema"
+  "$id": "settings-2-1.schema.json"
 }

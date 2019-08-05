@@ -1,6 +1,6 @@
 {
-  "$schema": "http://json-schema.org/draft-06/schema#",
-  "$id": "settings-2-1-tree-options.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$ref": "#/definitions/OptionsArraySchema",
   "definitions": {
     "OptionsArraySchema": {
       "type": "array",
@@ -16,7 +16,8 @@
             "$ref": "#/definitions/Config.Options_Index"
           }
         ]
-      }
+      },
+      "description": "The options array schema is in `settings-2-1-tree-options.schema.json`"
     },
     "Config.Options_Auth": {
       "type": "object",
@@ -26,7 +27,7 @@
           "enum": [
             "auth"
           ],
-          "description": "Only allow requests using these authAccounts. Option elements affect the group\nthey belong to and all children under that. Each property in an auth element \nreplaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth element applies to the requested path. \n\nNote that this does not change server authentication procedures. \nData folders are always given the authenticated username\nregardless of whether there are auth elements in the tree."
+          "description": "Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth element applies to the requested path. \n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree."
         },
         "authList": {
           "anyOf": [
@@ -66,19 +67,19 @@
           "enum": [
             "backups"
           ],
-          "description": "Options related to backups for single-file wikis. Option elements affect the group\nthey belong to and all children under that. Each property in a backups element \nreplaces the key from parent backups elements."
+          "description": "Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements."
         },
         "backupFolder": {
           "type": "string",
-          "description": "Backup folder to store backups in. Multiple folder paths \ncan backup to the same folder if desired."
+          "description": "Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired."
         },
         "gzip": {
           "type": "boolean",
-          "description": "GZip backup file to save disk space. Good for larger wikis. Turn this off\nfor experimental wikis that you often need to restore from a backup because\nof a bad line of code (I speak from experience)."
+          "description": "GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience)."
         },
         "etagAge": {
           "type": "number",
-          "description": "Save a backup only if the disk copy is older than this many seconds. \nIf the file on disk is only a few minutes old it can be assumed that \nvery little has changed since the last save. So if this is set to 10 minutes,\nand your wiki gets saved every 9 minutes, only the first save will trigger a backup.\nThis is a useful option for large wikis that see a lot of daily work but not \nuseful for experimental wikis which might crash at any time and need to be \nreloaded from the last backup."
+          "description": "Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup."
         }
       },
       "required": [
@@ -136,5 +137,5 @@
       "additionalProperties": false
     }
   },
-  "$ref": "#/definitions/OptionsArraySchema"
+  "$id": "settings-2-1-tree-options.schema.json"
 }
