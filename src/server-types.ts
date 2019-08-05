@@ -459,7 +459,7 @@ export interface ServeStaticResult {
 
 
 
-export function serveFile(state: StateObject, file: string, root: string | null) {
+export function serveFile(state: StateObject, file: string, root: string | undefined) {
 	obs_stat(state)(root ? path.join(root, file) : file).mergeMap(([err, stat]): any => {
 		if (err) return state.throw<StateObject>(404);
 		state.send({
@@ -1314,7 +1314,7 @@ export class StateObject {
 		}).empty();
 	}
 	send(options: {
-		root: string | null;
+		root: string | undefined;
 		filepath: string;
 		error?: (err: any) => void;
 		directory?: (filepath: string) => void;
@@ -1323,7 +1323,7 @@ export class StateObject {
 		const { filepath, root, error, directory, headers } = options;
 		const sender = send(this._req, filepath, { root });
 		if (error)
-			sender.on('error', options.error);
+			sender.on('error', error);
 		if (directory)
 			sender.on('directory', (res: http.ServerResponse, fp) => directory(fp));
 		if (headers)

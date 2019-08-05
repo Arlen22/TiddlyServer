@@ -236,6 +236,8 @@ export async function initServer({ preflighter, settingshttps }: {
 
 	await libsodium.ready;
 
+	send.mime.define(settings.directoryIndex.mimetypes);
+
 	if (bindWildcard) {
 		//bind to everything and filter elsewhere if needed
 		hosts.push('0.0.0.0');
