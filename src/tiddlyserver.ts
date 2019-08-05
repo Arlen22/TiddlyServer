@@ -194,7 +194,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 			} else if (result.item.$element === "group" && result.item.indexPath) {
 				let { indexPath } = result.item;
 				state.send({
-					root: null,
+					root: undefined,
 					filepath: indexPath,
 					error: (err) => {
 						let error = new ER("error sending index", err.toString());

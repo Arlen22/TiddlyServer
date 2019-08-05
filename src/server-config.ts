@@ -239,7 +239,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 				"htmlfile": set.directoryIndex.icons["htmlfile"](["htm", "html"]),
 			},
 			types: {},
-			mixFolders: set.directoryIndex.mixFolders(true)
+			mixFolders: set.directoryIndex.mixFolders(true),
+			mimetypes: {}
 			// },
 			// ...spread(set.directoryIndex)
 		},
@@ -286,7 +287,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 	}
 	return newset;
 }
-
+// T extends U ? never : T
+type ExcludedPartial<T, NK> = { [P in keyof T]?: (P extends NK ? never : T[P]) | undefined; };  //Partial<ServerConfig_DirectoryIndex>
 export interface ServerConfigSchema {
 	/** enables certain expensive per-request checks */
 	_devmode?: boolean;
@@ -317,7 +319,7 @@ export interface ServerConfigSchema {
 	/** logging  */
 	logging?: Partial<ServerConfig_Logging>;
 	/** directory index options */
-	directoryIndex?: Partial<ServerConfig_DirectoryIndex>
+	directoryIndex?: ExcludedPartial<ServerConfig_DirectoryIndex, "types">;
 	/** tiddlyserver specific options */
 	putsaver?: Partial<ServerConfig_TiddlyServer>
 	/** 
@@ -525,11 +527,13 @@ export interface ServerConfig_DirectoryIndex {
 	/** default format for the directory index */
 	defaultType: "html" | "json";
 	/** 
-	 * Hashmap of type { "icon_name": ["ext", "ext"]} where ext represents the extensions to use this icon for. 
+	 * Hashmap of type { "icon_name": [".ext", "mime/type"]} where ext represents the extensions to use this icon for. 
 	 * Icons are in the TiddlyServer/assets/icons folder.
 	 */
 	icons: { [iconName: string]: string[] }
 	types: { [ext: string]: string }
+	/** additional extensions to apply to mime types */
+	mimetypes: {[type: string]: string[]}
 }
 export interface ServerConfig_TiddlyServer {
 	/** backup directory for saving SINGLE-FILE wikis only */
@@ -985,7 +989,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
 			defaultType: "html",
 			icons: set.types,
 			mixFolders: set.mixFolders,
-			types: {}
+			// types: {}
 		},
 		EXPERIMENTAL_clientside_datafolders: (typeof set.tsa === "object" || typeof set.maxAge === "object") ? {
 			enabled: false,
