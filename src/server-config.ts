@@ -993,6 +993,6 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
 			maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
 		} : undefined,
 		authCookieAge: 2592000,
-		$schema: "./settings.schema.json"
+		$schema: "./settings-2-1.schema.json"
 	}
 }
