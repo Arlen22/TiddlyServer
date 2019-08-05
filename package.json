@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@material/textfield": "^0.44.0",
+    "@types/send": "^0.14.4",
     "@types/ws": "^6.0.1",
     "json5": "^2.1.0",
     "path": "^0.12.7"
@@ -25,7 +26,6 @@
     "morgan": ">=1.9.1",
     "rxjs": "5.4.3",
     "serve-static": "*",
-    "ts-json-schema-generator": "^0.38.0",
     "ws": "*",
     "xml-js": "*"
   },
