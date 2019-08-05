@@ -1,239 +1,240 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "settings-2-1.schema.json",
   "$ref": "#/definitions/ServerConfigSchema",
+  "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
     "ServerConfigSchema": {
-      "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "_devmode": {
-          "type": "boolean",
-          "description": "enables certain expensive per-request checks"
+        "$schema": {
+          "description": "The JSON schema location for this document. This schema is generated \ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with autocomplete, such as VS code, \nwill make editing this file much simpler. \nMost fields include a description like this one. \n\nAll relative paths in this file are resolved relative to this file, so \n`./settings-tree.xml` refers to an XML file in the same folder as this file. \nAll relative paths in included files (such as the XML file) are resolved \nrelative to the included file.",
+          "type": "string"
+        },
+        "EXPERIMENTAL_clientside_datafolders": {
+          "additionalProperties": false,
+          "description": "client-side data folder loader which loads datafolders directly into the browser",
+          "properties": {
+            "alwaysRefreshCache": {
+              "description": "refresh cache whenever ?refresh=true is called",
+              "type": "boolean"
+            },
+            "enabled": {
+              "description": "temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder)",
+              "type": "boolean"
+            },
+            "maxAge_tw_plugins": {
+              "description": "how long to cache tw_plugins on the server side",
+              "type": "number"
+            }
+          },
+          "type": "object"
         },
         "_datafoldertarget": {
-          "type": "string",
-          "description": "The tiddlywiki folder to use for data folder instances. Defaults to the \ntiddlywiki folder in the TiddlyServer installation regardless of the \nsettings.json location."
+          "description": "The tiddlywiki folder to use for data folder instances. Defaults to the \ntiddlywiki folder in the TiddlyServer installation regardless of the \nsettings.json location.",
+          "type": "string"
         },
-        "tree": {
-          "$ref": "settings-2-1-tree.schema.json"
+        "_devmode": {
+          "description": "enables certain expensive per-request checks",
+          "type": "boolean"
+        },
+        "authAccounts": {
+          "additionalProperties": {
+            "$ref": "#/definitions/ServerConfig_AuthAccountsValue"
+          },
+          "description": "The Hashmap of accounts which may authenticate on this server.\nTakes either an object or a string to a `require`-able file (such as .js or .json) \nwhich exports the object",
+          "type": "object"
+        },
+        "authCookieAge": {
+          "description": "Age to set for the auth cookie (default is 30 days)\n- 24 hours: `86400`\n- 7 days: `604800`\n- 30 days: `2592000`\n- 60 days: `5184000`\n- 90 days: `7776000`\n- 120 days: `10368000`\n- 150 days: `12950000`\n- 180 days: `15552000`",
+          "type": "number"
         },
         "bindInfo": {
-          "type": "object",
+          "additionalProperties": false,
+          "description": "bind address and port info",
           "properties": {
+            "_bindLocalhost": {
+              "description": "always bind a separate server instance to 127.0.0.1 regardless of any other settings",
+              "type": "boolean"
+            },
             "bindAddress": {
-              "type": "array",
+              "description": "An array of IP addresses to accept requests on. Can be any IP address\nassigned to the machine. Default is \"127.0.0.1\".\n\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\non the specified IP addresses and accepts all connections from the operating system. If an IP address\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\n\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range.",
               "items": {
                 "type": "string"
               },
-              "description": "An array of IP addresses to accept requests on. Can be any IP address\nassigned to the machine. Default is \"127.0.0.1\".\n\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\non the specified IP addresses and accepts all connections from the operating system. If an IP address\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\n\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range."
-            },
-            "filterBindAddress": {
-              "type": "boolean",
-              "description": "IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range."
+              "type": "array"
             },
             "bindWildcard": {
-              "type": "boolean",
+              "description": "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.\nThe default is `true`. In many cases this is preferred, however \nAndroid does not support this for some reason. On Android, set this to\n`false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses.",
               "enum": [
                 true,
                 false
               ],
-              "description": "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.\nThe default is `true`. In many cases this is preferred, however \nAndroid does not support this for some reason. On Android, set this to\n`false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses."
+              "type": "boolean"
             },
             "enableIPv6": {
-              "type": "boolean",
-              "description": "Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests\nincoming to IPv6 addresses if not explicitly denied."
+              "description": "Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests\nincoming to IPv6 addresses if not explicitly denied.",
+              "type": "boolean"
             },
-            "port": {
-              "type": "number",
-              "description": "port to listen on, default is 8080 for http and 8443 for https"
+            "filterBindAddress": {
+              "description": "IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range.",
+              "type": "boolean"
+            },
+            "https": {
+              "description": "https-only options: a string to a JavaScript file which exports a function of type\n`(iface:string) => https.ServerOptions`. Note that the initServer function will \nchange this to a boolean value indicating whether https is in use once inside TiddlyServer.",
+              "type": "string"
             },
             "localAddressPermissions": {
-              "type": "object",
               "additionalProperties": {
                 "$ref": "#/definitions/ServerConfig_AccessOptions"
               },
-              "description": "Permissions based on local address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\", etc. \nThis checks the IP address each client connects to (socket.localAddress), \nnot the bind address of the server instance that accepted the request."
+              "description": "Permissions based on local address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\", etc. \nThis checks the IP address each client connects to (socket.localAddress), \nnot the bind address of the server instance that accepted the request.",
+              "type": "object"
             },
-            "_bindLocalhost": {
-              "type": "boolean",
-              "description": "always bind a separate server instance to 127.0.0.1 regardless of any other settings"
-            },
-            "https": {
-              "type": "string",
-              "description": "https-only options: a string to a JavaScript file which exports a function of type\n`(iface:string) => https.ServerOptions`. Note that the initServer function will \nchange this to a boolean value indicating whether https is in use once inside TiddlyServer."
+            "port": {
+              "description": "port to listen on, default is 8080 for http and 8443 for https",
+              "type": "number"
             }
           },
+          "type": "object"
+        },
+        "directoryIndex": {
           "additionalProperties": false,
-          "description": "bind address and port info"
+          "description": "directory index options",
+          "properties": {
+            "defaultType": {
+              "description": "default format for the directory index",
+              "enum": [
+                "html",
+                "json"
+              ],
+              "type": "string"
+            },
+            "icons": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": "Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for. \nIcons are in the TiddlyServer/assets/icons folder.",
+              "type": "object"
+            },
+            "mimetypes": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": "additional extensions to apply to mime types",
+              "type": "object"
+            },
+            "mixFolders": {
+              "description": "sort folder and files together rather than separated",
+              "type": "boolean"
+            },
+            "types": {
+              "not": {}
+            }
+          },
+          "type": "object"
         },
         "logging": {
-          "type": "object",
+          "additionalProperties": false,
+          "description": "logging",
           "properties": {
+            "debugLevel": {
+              "description": "4 - Errors that require the process to exit for restart\n3 - Major errors that are handled and do not require a server restart\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\n1 - Info - Most startup messages\n0 - Normal debug messages and all software and request-side error messages\n-1 - Detailed debug messages from high level apis\n-2 - Response status messages and error response data\n-3 - Request and response data for all messages (verbose)\n-4 - Protocol details and full data dump (such as encryption steps and keys)",
+              "type": "number"
+            },
             "logAccess": {
               "anyOf": [
                 {
                   "type": "string"
                 },
                 {
-                  "type": "boolean",
                   "enum": [
                     false
-                  ]
+                  ],
+                  "type": "boolean"
                 }
               ],
               "description": "access log file"
             },
-            "logError": {
-              "type": "string",
-              "description": "error log file"
-            },
             "logColorsToFile": {
-              "type": "boolean",
-              "description": "write the console color markers to file, useful if you read the logs by printing them to a terminal"
+              "description": "write the console color markers to file, useful if you read the logs by printing them to a terminal",
+              "type": "boolean"
+            },
+            "logError": {
+              "description": "error log file",
+              "type": "string"
             },
             "logToConsoleAlso": {
-              "type": "boolean",
-              "description": "print access and error events to the console regardless of whether they are logged to a file"
-            },
-            "debugLevel": {
-              "type": "number",
-              "description": "4 - Errors that require the process to exit for restart\n3 - Major errors that are handled and do not require a server restart\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\n1 - Info - Most startup messages\n0 - Normal debug messages and all software and request-side error messages\n-1 - Detailed debug messages from high level apis\n-2 - Response status messages and error response data\n-3 - Request and response data for all messages (verbose)\n-4 - Protocol details and full data dump (such as encryption steps and keys)"
+              "description": "print access and error events to the console regardless of whether they are logged to a file",
+              "type": "boolean"
             }
           },
-          "additionalProperties": false,
-          "description": "logging"
+          "type": "object"
         },
-        "directoryIndex": {
-          "type": "object",
-          "properties": {
-            "mixFolders": {
-              "type": "boolean",
-              "description": "sort folder and files together rather than separated"
-            },
-            "defaultType": {
-              "type": "string",
-              "enum": [
-                "html",
-                "json"
-              ],
-              "description": "default format for the directory index"
-            },
-            "icons": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "description": "Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for. \nIcons are in the TiddlyServer/assets/icons folder."
-            },
-            "types": {
-              "not": {}
-            },
-            "mimetypes": {
-              "type": "object",
-              "additionalProperties": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "description": "additional extensions to apply to mime types"
-            }
-          },
-          "additionalProperties": false,
-          "description": "directory index options"
+        "maxTransferRequests": {
+          "description": "Max concurrent transfer requests",
+          "type": "number"
         },
         "putsaver": {
-          "type": "object",
+          "additionalProperties": false,
+          "description": "tiddlyserver specific options",
           "properties": {
             "backupDirectory": {
-              "type": "string",
-              "description": "backup directory for saving SINGLE-FILE wikis only"
+              "description": "backup directory for saving SINGLE-FILE wikis only",
+              "type": "string"
             },
             "etag": {
-              "type": "string",
+              "description": "Whether to use the etag field -- if not specified then it will check it if presented.\nThis does not affect the backup etagAge option, as the saving mechanism will still \nsend etags back to the browser, regardless of this option.",
               "enum": [
                 "required",
                 "disabled",
                 ""
               ],
-              "description": "Whether to use the etag field -- if not specified then it will check it if presented.\nThis does not affect the backup etagAge option, as the saving mechanism will still \nsend etags back to the browser, regardless of this option."
+              "type": "string"
             },
             "etagWindow": {
-              "type": "number",
-              "description": "etag does not need to be exact by this many seconds"
+              "description": "etag does not need to be exact by this many seconds",
+              "type": "number"
             }
           },
-          "additionalProperties": false,
-          "description": "tiddlyserver specific options"
+          "type": "object"
         },
-        "authAccounts": {
-          "type": "object",
-          "additionalProperties": {
-            "$ref": "#/definitions/ServerConfig_AuthAccountsValue"
-          },
-          "description": "The Hashmap of accounts which may authenticate on this server.\nTakes either an object or a string to a `require`-able file (such as .js or .json) \nwhich exports the object"
-        },
-        "EXPERIMENTAL_clientside_datafolders": {
-          "type": "object",
-          "properties": {
-            "enabled": {
-              "type": "boolean",
-              "description": "temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder)"
-            },
-            "maxAge_tw_plugins": {
-              "type": "number",
-              "description": "how long to cache tw_plugins on the server side"
-            },
-            "alwaysRefreshCache": {
-              "type": "boolean",
-              "description": "refresh cache whenever ?refresh=true is called"
-            }
-          },
-          "additionalProperties": false,
-          "description": "client-side data folder loader which loads datafolders directly into the browser"
-        },
-        "authCookieAge": {
-          "type": "number",
-          "description": "Age to set for the auth cookie (default is 30 days)\n- 24 hours: `86400`\n- 7 days: `604800`\n- 30 days: `2592000`\n- 60 days: `5184000`\n- 90 days: `7776000`\n- 120 days: `10368000`\n- 150 days: `12950000`\n- 180 days: `15552000`"
-        },
-        "maxTransferRequests": {
-          "type": "number",
-          "description": "Max concurrent transfer requests"
-        },
-        "$schema": {
-          "type": "string",
-          "description": "The JSON schema location for this document. This schema is generated \ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with autocomplete, such as VS code, \nwill make editing this file much simpler. \nMost fields include a description like this one. \n\nAll relative paths in this file are resolved relative to this file, so \n`./settings-tree.xml` refers to an XML file in the same folder as this file. \nAll relative paths in included files (such as the XML file) are resolved \nrelative to the included file."
+        "tree": {
+          "$ref": "settings-2-1-tree.schema.json"
         }
       },
       "required": [
         "tree",
         "$schema"
       ],
-      "additionalProperties": false
+      "type": "object"
     },
     "ServerConfig_AccessOptions": {
-      "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "writeErrors": {
+        "mkdir": {
+          "description": "allow create directory on directory index page",
+          "type": "boolean"
+        },
+        "registerNotice": {
+          "description": "login attempts for a public/private key pair which has not been \nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry.",
           "type": "boolean"
         },
         "upload": {
-          "type": "boolean",
-          "description": "allow uploads on the directory index page"
-        },
-        "mkdir": {
-          "type": "boolean",
-          "description": "allow create directory on directory index page"
+          "description": "allow uploads on the directory index page",
+          "type": "boolean"
         },
         "websockets": {
-          "type": "boolean",
-          "description": "allow websocket connections (default true)"
+          "description": "allow websocket connections (default true)",
+          "type": "boolean"
         },
-        "registerNotice": {
-          "type": "boolean",
-          "description": "login attempts for a public/private key pair which has not been \nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry."
+        "writeErrors": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -243,16 +244,14 @@
         "websockets",
         "registerNotice"
       ],
-      "additionalProperties": false
+      "type": "object"
     },
     "ServerConfig_AuthAccountsValue": {
-      "type": "object",
+      "additionalProperties": false,
       "properties": {
         "clientKeys": {
-          "type": "object",
           "additionalProperties": {
-            "type": "array",
-            "minItems": 2,
+            "description": "username: [public key, cookie suffix] \n\nChanging the public key or cookie suffix will require the user to log in again.",
             "items": [
               {
                 "type": "string"
@@ -262,14 +261,16 @@
               }
             ],
             "maxItems": 2,
-            "description": "username: [public key, cookie suffix] \n\nChanging the public key or cookie suffix will require the user to log in again."
+            "minItems": 2,
+            "type": "array"
           },
           "default": {
             "username": [
               "publickey",
               "usersalt"
             ]
-          }
+          },
+          "type": "object"
         },
         "permissions": {
           "$ref": "#/definitions/ServerConfig_AccessOptions",
@@ -280,8 +281,7 @@
         "clientKeys",
         "permissions"
       ],
-      "additionalProperties": false
+      "type": "object"
     }
-  },
-  "$id": "settings-2-1.schema.json"
+  }
 }
