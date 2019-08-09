@@ -24,28 +24,7 @@ function checkRecord<K extends string | number | symbol, T>(keychecker: (b) => b
     return typeof a === "object" && Object.keys(a).every(k => checker(a[k]));
   };
 }
-interface Tuple1<A> extends Array<any> { length: 1, 0: A }
-interface Tuple2<A, B> extends Array<any> { length: 2, 0: A, 1: B, }
-interface Tuple3<A, B, C> extends Array<any> { length: 3, 0: A, 1: B, 2: C }
-interface Tuple4<A, B, C, D> extends Array<any> { length: 4, 0: A, 1: B, 2: C, 3: D }
-interface Tuple5<A, B, C, D, E> extends Array<any> { length: 5, 0: A, 1: B, 2: C, 3: D, 4: E }
-interface Tuple6<A, B, C, D, E, F> extends Array<any> { length: 6, 0: A, 1: B, 2: C, 3: D, 4: E, 5: F }
-// type Tuple = Tuple1 | Tuple2 | Tuple3 | Tuple4 | Tuple5 | Tuple6;
-// class Tuple<L extends number> extends Array {
-//   length: L;
-//   constructor(...args: any[]){
-//     super(...args);
-//   }
-// }
-// function checkTuple<A, B>(length: 2, args: [(a) => a is A, (a) => a is B]): (tup) => tup is [A, B];
-function checkTuple<T>(length: number, checker: ((a) => boolean)[]) {
-  return (tup): tup is T => {
-    return typeof tup === "object"
-      && Array.isArray(tup)
-      && tup.length === length
-      && checker.every((c, i) => c(tup[i]));
-  }
-}
+
 function checkObject<T extends {} = unknown>(
   checkermap: { [K in keyof T]-?: ((b) => b is T[K]) },
   optionalcheckermap: { [K in keyof T]?: ((b) => b is T[K]) } = {}) {
