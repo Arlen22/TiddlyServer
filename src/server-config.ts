@@ -423,12 +423,12 @@ export interface ServerConfig_AuthAccountsValue {
 		 * 
 		 * Changing the public key or cookie suffix will require the user to log in again. 
 		 */
-		[P: string]: [
+		[P: string]: {
 			/** public key */
-			string,
+			publicKey: string,
 			/** user salt */
-			string
-		]
+			userSalt: string
+		}
 	}; // Record<string, [string, string]>,
 	/** override hostLevelPermissions for users with this account */
 	permissions: ServerConfig_AccessOptions
