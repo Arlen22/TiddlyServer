@@ -58,7 +58,7 @@ function checkObject<T extends {} = unknown>(
     return keys.every((k): boolean => {
       return !!checkermap[k] && checkermap[k](a[k])
         || !!optionalcheckermap[k] && optionalcheckermap[k](a[k])
-    }) && required.every(k => keys.indexOf(k) !== -1); 
+    }) && required.every(k => keys.indexOf(k) !== -1);
 
   };
 }
@@ -82,7 +82,10 @@ checkObject<ServerConfig>({
     $mount: (a): a is any => true
   })),
   authAccounts: checkRecord(checkString, checkObject<ServerConfig_AuthAccountsValue>({
-    clientKeys: checkRecord(checkString, checkTuple<[string, string]>(2, [checkString, checkString])),
+    clientKeys: checkRecord(checkString, checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
+      publicKey: checkString,
+      userSalt: checkString
+    })),
     permissions: checkAccessPerms
   })),
   bindInfo: checkObject<ServerConfig["bindInfo"]>({
