@@ -4,10 +4,11 @@ import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValu
 export function checkInterface() {
 
 }
-function or<A,B>(af: (a) => a is A, bf: (b) => b is B){
+function or<A, B>(af: (a) => a is A, bf: (b) => b is B) {
   return (item): item is A | B => af(item) || bf(item);
 }
 const checkNever = (a): a is never => typeof a === "undefined";
+const checkNull = (a): a is null => a === null;
 const checkString = (a): a is string => typeof a === "string";
 const checkStringEnum = <T extends string>(...values: T[]) => ((a): a is T => typeof a === "string" && values.indexOf(a as T) !== -1)
 const checkBoolean = (a): a is boolean => typeof a === "boolean";
@@ -45,13 +46,20 @@ function checkTuple<T>(length: number, checker: ((a) => boolean)[]) {
       && checker.every((c, i) => c(tup[i]));
   }
 }
-function checkObject<T extends {} = unknown>(checkermap: { [K in keyof T]: ((b) => b is T[K]) }) {
+function checkObject<T extends {} = unknown>(
+  checkermap: { [K in keyof T]-?: ((b) => b is T[K]) },
+  optionalcheckermap: { [K in keyof T]?: ((b) => b is T[K]) } = {}) {
   return (a): a is T => {
     if (typeof a !== "object") return false;
-    const keys = Object.keys(checkermap);
-    return Object.keys(a).every(k => {
-      return !!checkermap[k] && checkermap[k](a[k]);
-    });
+    const keys = Object.keys(a);
+    const required = Object.keys(checkermap);
+    //make sure every key is either in required or optional
+    //and every key in required is actually present
+    return keys.every((k): boolean => {
+      return !!checkermap[k] && checkermap[k](a[k])
+        || !!optionalcheckermap[k] && optionalcheckermap[k](a[k])
+    }) && required.every(k => keys.indexOf(k) !== -1); 
+
   };
 }
 const checkAccessPerms = checkObject<ServerConfig_AccessOptions>({
