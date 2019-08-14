@@ -42,6 +42,9 @@ function pathResolveWithUser(settingsDir: string, str: string) {
 function is<T>(test: (a: typeof b) => boolean, b: any): b is T {
 	return test(b);
 }
+function as<T>(obj: T) {
+	return obj;
+}
 
 type normalizeTree_itemtype = Schema.ArrayGroupElement | Schema.GroupElement | { $element: undefined }
 	| Schema.ArrayPathElement | Schema.PathElement | string
@@ -67,17 +70,23 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 		//@ts-ignore
 		if (Object.keys(item).findIndex(e => e.startsWith("$")) !== -1)
 			console.log("Is this a mistake? Found keys starting with the dollar sign under /" + keypath.join('/'));
-		item = {
+		item = as<Schema.GroupElement>({
 			$element: "group",
 			$children: item as any
-		} as Schema.GroupElement;
+		});
 	}
 	if (typeof item === "string" || item.$element === "folder") {
 		if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
 		if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
 		item.path = pathResolveWithUser(settingsDir, item.path);
 		key = key || path.basename(item.path);
-		return { ...item, key } as Config.PathElement;
+		return as<Config.PathElement>({
+			$element: item.$element,
+			$options: item.$options || [], //TODO: Normalize $options
+			path: item.path,
+			key,
+			noTrailingSlash: !!item.noTrailingSlash
+		});
 	} else if (item.$element === "group") {
 		if (!key) key = (item as Schema.ArrayGroupElement).key;
 		if (!key) throw "key not provided for group element at /" + keypath.join('/');
@@ -93,16 +102,22 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 					return true;
 				}
 			}).map(e => normalizeTree(settingsDir, e, undefined, keypath));
+			item.$options && $options.push(...item.$options);
 		} else {
 			// let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
 			$children = Object.keys(tc).map(k => k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
 				.filter((e): e is NonNullable<typeof e> => !!e);
-			if (typeof item.$children.$options !== "undefined" && !Array.isArray(item.$children.$options))
-				throw "$options is not an array at " + keypath.join('.');
-			$options = item.$children.$options;
+			$options = (e => {
+				if(typeof e !== "undefined" && !Array.isArray(e))
+					throw "$options is not an array at " + keypath.join('.');
+				return e || [];
+			})(item.$options);
 		}
 		key = is<Schema.ArrayGroupElement>(a => !!a.key, item) ? item.key : key;
-		return ({ $element: "group", key, $children, $options }) as Config.GroupElement;
+		return as<Config.GroupElement>({
+			$element: "group", key, $children, $options,
+			indexPath: item.indexPath ? pathResolveWithUser(settingsDir, item.indexPath) : false
+		});
 	} else {
 		return item;
 	}
@@ -533,7 +548,7 @@ export interface ServerConfig_DirectoryIndex {
 	icons: { [iconName: string]: string[] }
 	types: { [ext: string]: string }
 	/** additional extensions to apply to mime types */
-	mimetypes: {[type: string]: string[]}
+	mimetypes: { [type: string]: string[] }
 }
 export interface ServerConfig_TiddlyServer {
 	/** backup directory for saving SINGLE-FILE wikis only */
@@ -584,11 +599,11 @@ export interface NewTreeMountArgs {
 type OptionElementsSchema = NewTreePathOptions_Index | NewTreePathOptions_Auth | NewTreePathOptions_Backup;
 export interface OptionsSchema {
 	auth: Config.Options_Auth,
-	backups: Config.Options_Backup,
+	backups: Config.Options_Backups,
 	index: Config.Options_Index
 }
 /** The options array schema is in `settings-2-1-tree-options.schema.json` */
-export type OptionsArraySchema = (Config.Options_Auth | Config.Options_Backup | Config.Options_Index)[];
+export type OptionsArraySchema = (Config.Options_Auth | Config.Options_Backups | Config.Options_Index)[];
 
 export namespace Config {
 	export type OptionElements = OptionsSchema[keyof OptionsSchema];
@@ -643,7 +658,7 @@ export namespace Config {
 		 */
 		authError: 403 | 404;
 	}
-	export interface Options_Backup {
+	export interface Options_Backups {
 		/** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
 		$element: "backups",
 		/** 
@@ -687,7 +702,7 @@ export namespace Config {
 	export interface GroupElement {
 		$element: "group";
 		key: string;
-		indexPath?: string;
+		indexPath: string | false;
 		$children: MountElement[];
 		$options: OptionElements[];
 	}
@@ -696,7 +711,7 @@ export namespace Config {
 		key: string;
 		path: string;
 		noTrailingSlash: boolean;
-		$children: never;
+		// $children: never;
 		$options: OptionElements[];
 	}
 }
