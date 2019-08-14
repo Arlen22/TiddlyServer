@@ -43,7 +43,7 @@
       ],
       "type": "object"
     },
-    "Config.Options_Backup": {
+    "Config.Options_Backups": {
       "additionalProperties": false,
       "properties": {
         "$element": {
@@ -128,7 +128,7 @@
             "$ref": "#/definitions/Config.Options_Auth"
           },
           {
-            "$ref": "#/definitions/Config.Options_Backup"
+            "$ref": "#/definitions/Config.Options_Backups"
           },
           {
             "$ref": "#/definitions/Config.Options_Index"

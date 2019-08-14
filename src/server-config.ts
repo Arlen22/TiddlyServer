@@ -96,8 +96,7 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 		if (Array.isArray(item.$children)) {
 			$children = item.$children.filter((e: any): e is Schema.ArrayGroupElement | Schema.ArrayPathElement => {
 				if (Config.isOption(e)) {
-					$options.push(e);
-					return false;
+					throw "specifying options in $children is unsupported at " + keypath.join('.');
 				} else {
 					return true;
 				}
@@ -105,6 +104,7 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 			item.$options && $options.push(...item.$options);
 		} else {
 			// let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
+			if(item.$children.$options) throw "specifying options in $children is unsupported at " + keypath.join('.');
 			$children = Object.keys(tc).map(k => k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
 				.filter((e): e is NonNullable<typeof e> => !!e);
 			$options = (e => {
@@ -430,12 +430,10 @@ export interface ServerConfig_AuthAccountsValue {
 	// /** Record[username] = password */
 	// passwords: Record<string, string>,
 	/** 
-	 * @default {"username":["publickey","usersalt"]}
+	 * @default {"username":{"publicKey":"","userSalt":""}}
 	 */
 	clientKeys: {
 		/**
-		 * username: [public key, cookie suffix] 
-		 * 
 		 * Changing the public key or cookie suffix will require the user to log in again. 
 		 */
 		[P: string]: {
