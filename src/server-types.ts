@@ -617,7 +617,12 @@ export function getTreePathFiles(result: PathResolverResult, state: StateObject)
 /// directory handler section =============================================
 //I have this in a JS file so I can edit it without recompiling
 const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
-export type DirectoryIndexData = { keys: string[], paths: (string | boolean)[], dirpath: string, type: "group" | "folder" };
+export type DirectoryIndexData = {
+	keys: string[],
+	paths: (string | true)[],
+	dirpath: string,
+	type: "group" | "folder"
+};
 export type DirectoryIndexOptions = {
 	upload: boolean,
 	mkdir: boolean,
@@ -629,8 +634,10 @@ export type DirectoryIndexOptions = {
 export async function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
 	let { keys, paths, dirpath, type } = _r;
 	let pairs = keys.map((k, i) => [k, paths[i]] as [string, string | boolean]);
-	let entries = await Promise.all(keys.map(async key => {
-		let stat = (paths[key] === true) ? undefined : await statPath(paths[key]);
+	let entries = await Promise.all(keys.map(async (key, i) => {
+		// if(paths[key] == null) debugger;
+		let statpath = paths[i];
+		let stat = (statpath === true) ? undefined : await statPath(statpath);
 		// let e = { stat, key };
 		// let linkpath = [dirpath, e.key].filter(e => e).join('/');
 		return {
@@ -725,7 +732,7 @@ export async function statPath(s: { statpath: string, index: number } | string) 
 	let infostat: fs.Stats | undefined = undefined;
 	if (!endStat) {
 		infostat = await statsafe(path.join(statpath, "tiddlywiki.info"));
-		endStat = !infostat || infostat.isFile();
+		endStat = !!infostat && infostat.isFile();
 	}
 
 	return ({
@@ -1064,7 +1071,7 @@ export interface StandardResponseHeaders {
 	"dav"?: string;
 	"etag"?: string;
 }
-export class StateObject<STATPATH=StatPathResult, T=any> {
+export class StateObject<STATPATH = StatPathResult, T = any> {
 	static parseURL(str: string): StateObjectUrl {
 		let item = url.parse(str, true);
 		let { path, pathname, query, search, href } = item;
@@ -1215,7 +1222,10 @@ export class StateObject<STATPATH=StatPathResult, T=any> {
 	 */
 	log(level: number, template: any, ...args: any[]) {
 		if (level < this.loglevel) return this;
-		if (level > 1) this.hasCriticalLogs = true;
+		if (level > 1) {
+			this.hasCriticalLogs = true;
+			debugger;
+		}
 		this.doneMessage.push(format(template, ...args));
 		return this;
 	}

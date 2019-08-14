@@ -9,12 +9,12 @@ const sendOptions = {};
 // } from '../lib/rx';
 
 import {
-	StateObject, 
-	sanitizeJSON, 
-	keys, 
-	ServerConfig, 
-	colors, 
-	Hashmap, 
+	StateObject,
+	sanitizeJSON,
+	keys,
+	ServerConfig,
+	colors,
+	Hashmap,
 	serveFolderIndex,
 	init as initServerTypes,
 	tryParseJSON,
@@ -122,10 +122,10 @@ crypto.subtle.
 eventer.on('settings', (set) => {
 	settings = set;
 	let debugOutput = MakeDebugOutput(settings);
-	debug = StateObject.DebugLogger("SERVER ").bind({ debugOutput, settings});
+	debug = StateObject.DebugLogger("SERVER ").bind({ debugOutput, settings });
 	log = setLog() as any;
 	console.log(JSON.stringify(set, null, 2));
-	if(!checkServerConfig(set)) throw "ServerConfig did not pass validator";
+	if (!checkServerConfig(set)) throw "ServerConfig did not pass validator";
 });
 eventer.on('settingsChanged', (keys) => {
 	// let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];
@@ -195,7 +195,7 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
 			// settings,
 			request,
 			client,
-			get settings(){
+			get settings() {
 				return settings;
 			}
 		};
@@ -361,16 +361,16 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 		//"always check all variables and sometimes check some constants too" -- Arlen Beiler
 		if (ev2.treeHostIndex > settings.tree.length - 1)
 			throw format("treeHostIndex of %s is not within array length of %s", ev2.treeHostIndex, settings.tree.length)
-		if(!settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey]) 
+		if (!settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey])
 			throw format("localAddressPermissions key of %s does not exist", ev2.localAddressPermissionsKey);
-		if(ev2.authAccountKey && !settings.authAccounts[ev2.authAccountKey])
+		if (ev2.authAccountKey && !settings.authAccounts[ev2.authAccountKey])
 			throw format("authAccounts key of %s does not exist", ev2.authAccountKey);
 		// let settings: never;
-		if(!ev2.debugOutput) ev2.debugOutput = MakeDebugOutput(ev2.settings);
+		if (!ev2.debugOutput) ev2.debugOutput = MakeDebugOutput(ev2.settings);
 		return ev2;
 	});
 }
-function MakeDebugOutput(settings){
+function MakeDebugOutput(settings) {
 	const colorsRegex = /\x1b\[[0-9]+m/gi
 
 	return new Writable({
@@ -379,7 +379,7 @@ function MakeDebugOutput(settings){
 			if (Buffer.isBuffer(chunk)) chunk = chunk.toString('utf8');
 			// remove ending linebreaks for consistency
 			chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
-	
+
 			if (settings.logging.logError) {
 				fs.appendFileSync(
 					settings.logging.logError,
@@ -451,8 +451,8 @@ function requestHandler(iface: string, preflighter?: (ev: RequestEventHTTP) => P
 // const errLog = DebugLogger('STA-ERR');
 eventer.on("stateError", (state) => {
 	if (state.doneMessage.length > 0)
-	StateObject.DebugLogger("STA-ERR").call(state, 2, state.doneMessage.join('\n'));
-		
+		StateObject.DebugLogger("STA-ERR").call(state, 2, state.doneMessage.join('\n'));
+	debugger;
 })
 eventer.on("stateDebug", (state) => {
 	if (state.doneMessage.length > 0)
