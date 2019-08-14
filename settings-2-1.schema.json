@@ -134,7 +134,8 @@
               "type": "boolean"
             },
             "types": {
-              "not": {}
+              "not": {
+              }
             }
           },
           "type": "object"
@@ -251,24 +252,29 @@
       "properties": {
         "clientKeys": {
           "additionalProperties": {
-            "description": "username: [public key, cookie suffix] \n\nChanging the public key or cookie suffix will require the user to log in again.",
-            "items": [
-              {
+            "additionalProperties": false,
+            "description": "Changing the public key or cookie suffix will require the user to log in again.",
+            "properties": {
+              "publicKey": {
+                "description": "public key",
                 "type": "string"
               },
-              {
+              "userSalt": {
+                "description": "user salt",
                 "type": "string"
               }
+            },
+            "required": [
+              "publicKey",
+              "userSalt"
             ],
-            "maxItems": 2,
-            "minItems": 2,
-            "type": "array"
+            "type": "object"
           },
           "default": {
-            "username": [
-              "publickey",
-              "usersalt"
-            ]
+            "username": {
+              "publicKey": "",
+              "userSalt": ""
+            }
           },
           "type": "object"
         },
