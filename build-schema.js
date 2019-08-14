@@ -10,14 +10,13 @@ const config = {
 };
 
 try {
-    // const gen = ;
     let root = createGenerator(config).createSchema("ServerConfigSchema");
     root["$id"] = "settings-2-1.schema.json";
     root["definitions"]['ServerConfigSchema']['properties']['tree'] = { '$ref': 'settings-2-1-tree.schema.json' }
     let options = createGenerator(config).createSchema("OptionsArraySchema");
     options["$id"] = "settings-2-1-tree-options.schema.json";
     writeFileSync("settings-2-1.schema.json", stringify(root, { space: 2 }));
-    writeFileSync("settings-2-1-tree-options.schema.json", stringify(options, {space: 2}));
+    writeFileSync("settings-2-1-tree-options.schema.json", stringify(options, { space: 2 }));
 } catch (error) {
     if (error instanceof BaseError) {
         process.stderr.write(formatError(error));

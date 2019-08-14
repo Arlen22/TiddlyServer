@@ -1,7 +1,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { tryParseJSON, JsonError, JsonErrorContainer, obs_readFile, obs_readdir, Hashmap } from './server-types';
-import { Observable } from '../lib/rx';
+import { tryParseJSON, JsonError, JsonErrorContainer, Hashmap } from './server-types';
+import { promisify } from 'util';
+// import { Observable } from '../lib/rx';
 // const MULTILEVEL = false;
 //load the boot tiddlers
 // $tw.utils.each($tw.loadTiddlersFromPath($tw.boot.bootPath), function (tiddlerFile) {
@@ -29,8 +30,9 @@ export interface FileInfo {
 	type: string;
 }
 export function loadWikiInfo(wikipath) {
-	return obs_readFile()(path.join(wikipath, 'tiddlywiki.info'), 'utf8').map(([err, data, _tag, filePath]) => {
-		if (err) throw err;
+	let filePath = path.join(wikipath, 'tiddlywiki.info');
+	return promisify(fs.readFile)(filePath, 'utf8').then((data) => {
+		// if (err) throw err;
 		let isError = false;
 		let wikiInfo: WikiInfo = tryParseJSON(data, (error) => {
 			error.filePath = filePath;
@@ -41,7 +43,7 @@ export function loadWikiInfo(wikipath) {
 }
 export function loadWikiFolder(wikipath, wikiInfo) {
 	if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-		return Observable.of(TiddlyWiki.loadWiki(wikipath));
+		return TiddlyWiki.loadWiki(wikipath);
 	} else if (wikiInfo.type === "tiddlyserver") {
 		return TiddlyServer.loadWiki(wikipath, wikiInfo, false);
 	} else {
@@ -53,26 +55,27 @@ export function loadWikiFolder(wikipath, wikiInfo) {
  * @param filepath Tiddler file to load
  * @param options hasMetaFile (skips reading meta file if false)
  */
-export function loadTiddlersFromFile(filepath: string, options: {
+export async function loadTiddlersFromFile(filepath: string, options: {
 	hasMetaFile?: boolean;
 } = {}) {
 	var ext = path.extname(filepath),
 		extensionInfo = global_tw.utils.getFileExtensionInfo(ext),
 		type = extensionInfo ? extensionInfo.type : null,
 		typeInfo = type ? global_tw.config.contentTypeInfo[type] : null,
-		encoding = typeInfo ? typeInfo.encoding : "utf8",
+		encoding: string = typeInfo ? typeInfo.encoding : "utf8",
 		getMetaFile = (ext !== ".json" && options.hasMetaFile !== false);
 
-	return Observable.zip(
-		obs_readFile()(filepath, encoding),
-		getMetaFile ? obs_readFile()(filepath + ".meta", "utf8") : Observable.of<[undefined, undefined]>([] as any)
-	).map(([[err1, data1], [err2, data2]]) => {
-		let tiddlers = !err1 ? global_tw.wiki.deserializeTiddlers(ext, data1, {}) : [];
-		let metadata = data2 ? global_tw.utils.parseFields(data2) : false;
-		if (metadata && tiddlers.length === 1)
-			tiddlers = [global_tw.utils.extend({}, tiddlers[0], metadata)];
-		return { tiddlers, filepath, encoding, error: err1, type };
-	});
+	let [data1, data2] = await Promise.all([
+		promisify(fs.readFile)(filepath, encoding).catch((x: NodeJS.ErrnoException) => x),
+		getMetaFile ? promisify(fs.readFile)(filepath + ".meta", "utf8") : Promise.resolve(undefined)
+	])
+	//.then(([data1, data2]) => {
+	let tiddlers = (typeof data1 === "string") ? global_tw.wiki.deserializeTiddlers(ext, data1, {}) : [];
+	let metadata = data2 ? global_tw.utils.parseFields(data2) : false;
+	if (metadata && tiddlers.length === 1)
+		tiddlers = [global_tw.utils.extend({}, tiddlers[0], metadata)];
+	return { tiddlers, filepath, encoding, error: typeof data1 === "string" ? undefined : data1, type };
+	// });
 }
 
 // export function getFileName(dirPath: string, title: string, multiLevel: boolean = false) {
@@ -296,20 +299,21 @@ export namespace TiddlyServer {
 		public files: any[] = [];
 		public tiddlers: Hashmap<any> = {};
 	}
-	export function loadWiki(wikiPath: string, wikiInfo: WikiInfo, fallback: boolean) {
+	export async function loadWiki(wikiPath: string, wikiInfo: WikiInfo, fallback: boolean) {
 		if (wikiInfo.type !== "tiddlyserver") {
-			if (fallback) { loadWikiFolder(wikiPath, wikiInfo); return Observable.empty<never>(); }
+			if (fallback) { loadWikiFolder(wikiPath, wikiInfo); return undefined as never; }
 			else throw new Error("Invalid wiki type " + wikiInfo.type);
 		}
 
-		const includes: Observable<{ $ts: Wiki, $tw?: any, wikiInfo: WikiInfo }>[] = wikiInfo.includeWikis.map(e => {
+		const includes: Promise<{ $ts: Wiki, $tw?: any, wikiInfo: WikiInfo }>[] = wikiInfo.includeWikis.map(e => {
 			var item = typeof e === "string" ? { path: e, "read-only": false } : e;
 			var subWikiPath = path.resolve(wikiPath, item.path);
-			return Observable.of(subWikiPath).mergeMap(loadWikiInfo).mergeMap(wikiInfo => {
+			return loadWikiInfo(wikiPath).then(wikiInfo => {
 				return loadWiki(wikiPath, wikiInfo, true);
-			});
+			})
+
 		});
-		return Observable.from(includes).concatMap(e => e).reduce((wiki: Wiki, item) => {
+		let wiki = (await Promise.all(includes)).reduce((wiki: Wiki, item) => {
 			const { $ts, $tw, wikiInfo } = item;
 			if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
 				if (!$tw) return wiki;
@@ -330,67 +334,64 @@ export namespace TiddlyServer {
 				})
 			}
 			return wiki;
-		}, new Wiki()).concatMap(wiki => {
-			return loadWikiTiddlers(wikiPath, wikiInfo).map(wikiFiles => {
-				wikiFiles.forEach(file => {
-					file.tiddlers.forEach(fields => {
-						wiki.tiddlers[fields.title] = fields;
-					})
-					delete file.tiddlers;
-					wiki.files[file.filepath] = file;
+		}, new Wiki());
+		return loadWikiTiddlers(wikiPath, wikiInfo).then(wikiFiles => {
+			wikiFiles.forEach(file => {
+				file.tiddlers.forEach(fields => {
+					wiki.tiddlers[fields.title] = fields;
 				})
-				return { $ts: wiki, wikiInfo };
+				delete file.tiddlers;
+				wiki.files[file.filepath] = file;
 			})
-		})
-	}
-	export function loadWikiTiddlers(wikipath: string, wikiInfo: WikiInfo) {
-		let tiddlerFolder = path.join(wikipath, global_tw.config.wikiTiddlersSubDir);
-		return obs_readdir()(tiddlerFolder).concatMap(([err, files]) => {
-			if (err) return Observable.empty<never>();
-
-			var metas = files.filter(e => path.extname(e) === ".meta");
-			var datas = files.filter(e => path.extname(e) !== ".meta");
-
-			return Observable.from(datas.map(e => {
-				return {
-					filepath: path.join(tiddlerFolder, e),
-					hasMetaFile: metas.indexOf(e + ".meta") > -1
-				}
-			})).mergeMap(item => {
-				return loadTiddlersFromFile(item.filepath, { hasMetaFile: item.hasMetaFile });
-			}).reduce((n, e) => {
-				n.push(e);
-				return n;
-			}, []);
-		})
-	}
-
-	export function getFileType(tiddlerType?: string) {
-		if (!tiddlerType) tiddlerType = "text/vnd.tiddlywiki";
-		var contentTypeInfo = global_tw.config.contentTypeInfo[tiddlerType] || {};
-		var extension = contentTypeInfo.extension || ".tid";
-		var type = (global_tw.config.fileExtensionInfo[extension] || { type: "application/x-tiddler" }).type;
-		return { type, extension };
-	}
-	export function getTiddlerFileInfo(fields: Hashmap<any>, options: {
-		fileInfo?: FileInfo
-	} = {}) {
-		let { type, extension } = getFileType(fields.type);
-
-		var hasMetaFile = (type !== "application/x-tiddler") && (type !== "application/json");
-		if (!hasMetaFile) { extension = ".tid"; }
-		var filename = fields.title;
-
-		filename = filename.replace(/<|>|\:|\"|\||\?|\*|\^|\_|\/|\\/g, (str) => {
-			return "_" + str.charCodeAt(0).toString(16);
+			return { $ts: wiki, wikiInfo };
 		});
-
-		if (filename.substr(-extension.length).toLocaleLowerCase() !== extension.toLocaleLowerCase()) {
-			filename = filename + extension;
-		}
-
-		return { filename, extension, hasMetaFile, type };
 	}
 }
+export function loadWikiTiddlers(wikipath: string, wikiInfo: WikiInfo) {
+	let tiddlerFolder = path.join(wikipath, global_tw.config.wikiTiddlersSubDir);
+	return promisify(fs.readdir)(tiddlerFolder).catch(x => undefined).then((files) => {
+		if (!files) return [];
+
+		var metas = files.filter(e => path.extname(e) === ".meta");
+		var datas = files.filter(e => path.extname(e) !== ".meta");
+
+		return Promise.all(datas.map(e => {
+			return {
+				filepath: path.join(tiddlerFolder, e),
+				hasMetaFile: metas.indexOf(e + ".meta") > -1
+			}
+		}).map(item => {
+			return loadTiddlersFromFile(item.filepath, { hasMetaFile: item.hasMetaFile });
+		}));
+	});
+}
+
+export function getFileType(tiddlerType?: string) {
+	if (!tiddlerType) tiddlerType = "text/vnd.tiddlywiki";
+	var contentTypeInfo = global_tw.config.contentTypeInfo[tiddlerType] || {};
+	var extension = contentTypeInfo.extension || ".tid";
+	var type = (global_tw.config.fileExtensionInfo[extension] || { type: "application/x-tiddler" }).type;
+	return { type, extension };
+}
+export function getTiddlerFileInfo(fields: Hashmap<any>, options: {
+	fileInfo?: FileInfo
+} = {}) {
+	let { type, extension } = getFileType(fields.type);
+
+	var hasMetaFile = (type !== "application/x-tiddler") && (type !== "application/json");
+	if (!hasMetaFile) { extension = ".tid"; }
+	var filename = fields.title;
+
+	filename = filename.replace(/<|>|\:|\"|\||\?|\*|\^|\_|\/|\\/g, (str) => {
+		return "_" + str.charCodeAt(0).toString(16);
+	});
+
+	if (filename.substr(-extension.length).toLocaleLowerCase() !== extension.toLocaleLowerCase()) {
+		filename = filename + extension;
+	}
+
+	return { filename, extension, hasMetaFile, type };
+}
+
 
 export let global_tw = TiddlyWiki.loadCore();

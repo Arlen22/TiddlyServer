@@ -1,8 +1,10 @@
 import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag,
-	PathResolverResult, obs_readFile, tryParseJSON, obs_readdir, JsonError, serveFolderObs, serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, resolvePath, statWalkPath, obs_stat, RequestEventWS,
+	PathResolverResult, tryParseJSON, JsonError, 
+	serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, 
+	resolvePath, statWalkPath, RequestEventWS, serveFolder,
 } from "./server-types";
-import { Observable, Subject } from "../lib/rx";
+// import { Observable, Subject } from "../lib/rx";
 
 import * as path from 'path';
 import * as http from 'http';
@@ -12,7 +14,7 @@ import * as vm from 'vm';
 //import { TiddlyWiki } from 'tiddlywiki';
 import { EventEmitter } from "events";
 import { parse } from "url";
-import { inspect } from "util";
+import { inspect, promisify } from "util";
 
 import { gzip } from 'zlib';
 
@@ -41,7 +43,7 @@ export function init(e: ServerEventEmitter) {
 		// }
 	})
 	eventer.on('websocket-connection', function (data: RequestEventWS) {
-		
+
 		const { request, client, settings, treeHostIndex, debugOutput } = data;
 		const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
 		const root = settings.tree[treeHostIndex].$mount;
@@ -115,7 +117,7 @@ export function handleDataFolderRequest(result: PathResolverResult, state: State
 	const target = state.settings._datafoldertarget
 		? path.resolve(state.settings.__dirname, state.settings._datafoldertarget)
 		: "../tiddlywiki";
-		
+
 	const { mount, folder } = loadDataFolderTrigger(result,
 		state.statPath, state.url.pathname, state.url.query.reload as any || "", target);
 
@@ -168,7 +170,7 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true
 }
 
 function loadDataFolderType(mount: string, folder: string, reload: string, target: string) {
-	obs_readFile()(path.join(folder, "tiddlywiki.info"), 'utf8').subscribe(([err, data]) => {
+	promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), 'utf8').then((data) => {
 		const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
 		if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
 			loadDataFolderTiddlyWiki(mount, folder, reload, target);
@@ -392,13 +394,6 @@ function initPluginLoader() {
 }
 initPluginLoader();
 // mounted at /tiddlywiki
-const serveBootFolder = new Subject<StateObject>();
-serveFolderObs(
-	serveBootFolder.asObservable(),
-	'/assets/tiddlywiki/boot',
-	path.join(__dirname, "../tiddlywiki/boot"),
-	serveFolderIndex({ type: 'json' })
-);
 
 export function handleTiddlyWikiRoute(state: StateObject) {
 	//number of elements on state.path that are part of the mount path.
@@ -411,23 +406,31 @@ export function handleTiddlyWikiRoute(state: StateObject) {
 	} else if (state.path[mountLength] === "core") {
 		sendPluginResponse(state, coreCache);
 	} else if (state.path[mountLength] === "boot") {
-		serveBootFolder.next(state);
+		serveFolder(
+			state,
+			'/assets/tiddlywiki/boot',
+			path.join(__dirname, "../tiddlywiki/boot"),
+			serveFolderIndex({ type: 'json' })
+		);
 	} else if (!state.path[mountLength]) {
 		const folder = path.join(__dirname, "../tiddlywiki");
 		const folderPaths: string[] = [];
-		const processFolder = (dirpath: string): Observable<never> => {
-			return obs_readdir()(dirpath).mergeMap(([err, files, tag, dirpath]) => {
-				return Observable.from(files).mergeMap(file => obs_stat()(path.join(dirpath, file)))
-			}).mergeMap(([err, stat, tag, subpath]) => {
+		const processFolder = async (dirpath: string) => {
+			let files = await promisify(fs.readdir)(dirpath);
+			await Promise.all(files.map(subpath => promisify(fs.stat)(path.join(dirpath, subpath)).then(stat => {
 				folderPaths.push(subpath.slice(folder.length));
-				return stat.isDirectory() ? processFolder(subpath) : Observable.empty<never>();
-			});
+				return stat.isDirectory() ? processFolder(subpath) : Promise.resolve();
+			})));
+			// return obs_readdir()(dirpath).mergeMap(([err, files, tag, dirpath]) => {
+			// 	return Observable.from(files).mergeMap(file => obs_stat()(path.join(dirpath, file)))
+			// }).mergeMap(([err, stat, tag, subpath]) => {
+			// 	folderPaths.push(subpath.slice(folder.length));
+			// 	return stat.isDirectory() ? processFolder(subpath) : Observable.empty<never>();
+			// });
 		}
-		processFolder(folder).subscribe({
-			complete: () => {
-				state.respond(200).json(folderPaths);
-			}
-		})
+		processFolder(folder).then(() => {
+			state.respond(200).json(folderPaths);
+		});
 
 	} else {
 		sendPluginResponse(state,

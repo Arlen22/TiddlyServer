@@ -1,7 +1,7 @@
 // import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
 import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
-	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
+	Directory, sortBySelector, FolderEntryType, obsTruthy,
 	StatPathResult, TreeObject, PathResolverResult, TreePathResult, resolvePath,
 	sendDirectoryIndex, statWalkPath, DirectoryIndexOptions, DirectoryIndexData,
 	ServerEventEmitter, ER, getTreePathFiles, NewTreePathOptions_Auth, StandardResponseHeaders,
@@ -114,13 +114,14 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 		serveDirectoryIndex(result, state);
 		// return Promise.reject();
 	} else {
-		statWalkPath(result).then((stat) => {
-			state.statPath = stat;
-			if (state.statPath.itemtype === "folder") {
+		const stateItemType = <T extends StatPathResult["itemtype"]>(state: StateObject, itemtype: T): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> => state.statPath.itemtype === itemtype;
+		statWalkPath(result).then((statPath) => {
+			state.statPath = statPath;
+			if (stateItemType(state, "folder")) {
 				serveDirectoryIndex(result, state);
-			} else if (state.statPath.itemtype === "datafolder") {
+			} else if (stateItemType(state, "datafolder")) {
 				handleDataFolderRequest(result, state);
-			} else if (state.statPath.itemtype === "file") {
+			} else if (stateItemType(state, "file")) {
 				if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
 					state.send({
 						root: (result.item as Config.PathElement).path,
@@ -129,14 +130,15 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 							state.log(2, '%s %s', err.status, err.message);
 							if (state.allow.writeErrors) state.throw(500);
 						},
-						headers: (filepath) => {
-							const statItem = state.statPath.stat;
-							const mtime = Date.parse(state.statPath.stat.mtime as any);
+						headers: ((statPath) => (filepath) => {
+							const statItem = statPath.stat;
+							const mtime = Date.parse(statPath.stat.mtime as any);
 							const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
 							return { 'Etag': etag };
-						}
+						})(state.statPath)
 					})
 				} else if (['PUT'].indexOf(state.req.method as string) > -1) {
+					// state.statPath.itemtype
 					handlePUTrequest(state);
 				} else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
 					state.respond(200, "", {
@@ -170,29 +172,28 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		state.redirect(state.url.pathname + "/");
 	} else if (state.req.method === "GET") {
 		const isFolder = result.item.$element === "folder";
-		Promise.resolve().then(() => {
+		Promise.resolve().then(async () => {
 			let { indexFile, indexExts, defaultType } = state.treeOptions.index;
 
 			if (isFolder && indexExts.length && indexFile.length) {
-				return promisify(fs.readdir)(result.fullfilepath).then(files => {
-					let indexFiles: string[] = [];
-					indexFile.forEach(e => {
-						indexExts.forEach(f => {
-							if (f === "") indexFiles.push(e);
-							else indexFiles.push(e + "." + f);
-						});
+				let files = await promisify(fs.readdir)(result.fullfilepath);
+				let indexFiles: string[] = [];
+				indexFile.forEach(e => {
+					indexExts.forEach(f => {
+						if (f === "") indexFiles.push(e);
+						else indexFiles.push(e + "." + f);
 					});
-					let index = indexFiles.find((e) => files.indexOf(e) !== -1);
-					if (index) {
-						serveFile(state, index, result.fullfilepath);
-						return false;
-					} else if (defaultType === 403 || defaultType === 404) {
-						state.throw(defaultType);
-						return false;
-					} else {
-						return true;
-					}
-				})
+				});
+				let index = indexFiles.find((e) => files.indexOf(e) !== -1);
+				if (index) {
+					serveFile(state, index, result.fullfilepath);
+					return false;
+				} else if (defaultType === 403 || defaultType === 404) {
+					state.throw(defaultType);
+					return false;
+				} else {
+					return true;
+				}
 			} else if (result.item.$element === "group" && result.item.indexPath) {
 				let { indexPath } = result.item;
 				state.send({
@@ -203,9 +204,10 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 						state.log(2, error.message).throwError(500, error);
 					}
 				});
-				return Promise.resolve(false);
-			} else return Promise.resolve(true);
-		}).then((contin: boolean) => {
+				return false;
+			} else
+				return true;
+		}).then(async (contin: boolean) => {
 			if (!contin) return;
 			const format = state.treeOptions.index.defaultType as "html" | "json";
 			const options = {
@@ -219,11 +221,10 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 				html: "text/html",
 				json: "application/json"
 			};
-			return getTreePathFiles(result, state).then(e => {
-				return sendDirectoryIndex([e, options])
-			}).then((res) => {
-				state.respond(200, "", { 'Content-Type': contentType[format], "Content-Encoding": 'utf-8' }).buffer(Buffer.from(res, "utf8"));
-			});
+			let e = await getTreePathFiles(result, state);
+			let res = await sendDirectoryIndex([e, options]);
+			state.respond(200, "", { 'Content-Type': contentType[format], "Content-Encoding": 'utf-8' }).buffer(Buffer.from(res, "utf8"));
+
 		}).catch(err => {
 			if (err) {
 				state.log(2, "Error caught " + err.toString());
@@ -306,10 +307,11 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 
 /// file handler section =============================================
 
-function handlePUTrequest(state: StateObject) {
+function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
 	// const hash = createHash('sha256').update(fullpath).digest('base64');
 	const first = (header?: string | string[]) =>
 		Array.isArray(header) ? header[0] : header;
+	const t = state.statPath;
 	const fullpath = state.statPath.statpath;
 	const statItem = state.statPath.stat;
 	const mtime = Date.parse(state.statPath.stat.mtime as any);
@@ -371,9 +373,13 @@ function handlePUTrequest(state: StateObject) {
 				reject();
 			});
 		}).then(() => {
-			return obs_stat(false)(fullpath).toPromise(Promise);
+			return promisify(fs.stat)(fullpath).catch(err => {
+				state.log(2, "statNew target does not exist");
+				state.throw(500);
+				return Promise.reject();
+			});
 		});
-	}).then(([err, statNew]) => {
+	}).then((statNew) => {
 		const mtimeNew = Date.parse(statNew.mtime as any);
 		const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
 		state.respond(200, "", {

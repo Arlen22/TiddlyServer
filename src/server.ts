@@ -4,13 +4,18 @@ import { send, ws as WebSocket, ajv, libsodium } from '../lib/bundled-lib';
 const sendOptions = {};
 
 
-import {
-	Observable, Subject, Subscription, BehaviorSubject, Subscriber
-} from '../lib/rx';
+// import {
+// 	Observable, Subject, Subscription, BehaviorSubject, Subscriber
+// } from '../lib/rx';
 
 import {
-	StateObject, sanitizeJSON, keys, ServerConfig,
-	obs_stat, colors, obsTruthy, Hashmap, obs_readdir, serveFolderObs, serveFileObs, serveFolderIndex,
+	StateObject, 
+	sanitizeJSON, 
+	keys, 
+	ServerConfig, 
+	colors, 
+	Hashmap, 
+	serveFolderIndex,
 	init as initServerTypes,
 	tryParseJSON,
 	JsonError,
@@ -269,7 +274,7 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 	}
 	let servers: (http.Server | https.Server)[] = [];
 	console.log("Creating servers as %s", typeof settingshttps === "function" ? "https" : "http")
-	Observable.from(hosts).concatMap(host => {
+	Promise.all(hosts.map(host => {
 		let server: any;
 		if (typeof settingshttps === "function") {
 			try {
@@ -290,13 +295,10 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 			if (!tester(socket.localAddress).usable && !localhostTester(socket.localAddress).usable) socket.end();
 		})
 		servers.push(server);
-		return new Observable(subs => {
-			server.listen(settings.bindInfo.port, host, undefined, () => { subs.complete(); });
-		})
-	}).subscribe(item => { }, x => {
-		console.log("Error thrown while starting server");
-		console.log(x);
-	}, () => {
+		return new Promise(resolve => {
+			server.listen(settings.bindInfo.port, host, undefined, () => { resolve(); });
+		});
+	})).then(() => {
 		eventer.emit("serverOpen", servers, hosts, !!settingshttps);
 		let ifaces = networkInterfaces();
 		console.log('Open your browser and type in one of the following:\n' +
@@ -312,6 +314,9 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 				: hosts
 					.map(e => (settings.bindInfo.https ? "https" : "http") + "://" + e + ":" + settings.bindInfo.port)).join('\n')
 		);
+	}, (x) => {
+		console.log("Error thrown while starting server");
+		console.log(x);
 	});
 
 	return eventer;
