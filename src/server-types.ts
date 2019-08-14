@@ -3,7 +3,7 @@ import * as url from 'url';
 import * as fs from 'fs';
 import * as path from 'path';
 
-import { format } from "util";
+import { format, promisify } from "util";
 import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
@@ -107,7 +107,9 @@ interface Async<T> extends Promise<T> {
 
 
 
-
+export function as<T>(obj: T) {
+	return obj;
+}
 
 const assets = path.resolve(__dirname, '../assets');
 const favicon = path.resolve(__dirname, '../assets/favicon.ico');
@@ -561,7 +563,7 @@ export function sendResponse(state: StateObject, body: Buffer | string, options:
  * @param {PathResolverResult} result 
  * @returns 
  */
-export function getTreePathFiles(result: PathResolverResult, state: StateObject): Observable<DirectoryIndexData> {
+export function getTreePathFiles(result: PathResolverResult, state: StateObject): Promise<DirectoryIndexData> {
 	let dirpath = [
 		result.treepathPortion.join('/'),
 		result.filepathPortion.join('/')
@@ -572,17 +574,17 @@ export function getTreePathFiles(result: PathResolverResult, state: StateObject)
 		const keys = $c.map(e => e.key);
 		// const keys = Object.keys(result.item);
 		const paths = $c.map(e => Config.isPath(e) ? e.path : true);
-		return Observable.of({ keys, paths, dirpath, type: type as "group" | "folder" });
+		return Promise.resolve({ keys, paths, dirpath, type: type as "group" | "folder" });
 	} else {
-		return obs_readdir()(result.fullfilepath).map(([err, keys]) => {
-			if (err) {
-				state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
-				state.throw(500);
-				return;
-			}
+		return promisify(fs.readdir)(result.fullfilepath).then(keys => {
 			const paths = keys.map(k => path.join(result.fullfilepath, k));
 			return { keys, paths, dirpath, type: type as "group" | "folder" };
-		}).filter(obsTruthy);
+		}).catch(err => {
+			if(!err) return Promise.reject(err);
+			state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
+			state.throw(500);
+			return Promise.reject(false);
+		})
 	}
 }
 // /**
@@ -1255,7 +1257,7 @@ export class StateObject {
 		}
 		return Observable.empty<T>();
 	}
-	throw<T = StateObject>(statusCode: number, headers?: StandardResponseHeaders) {
+	throw<T = never>(statusCode: number, headers?: StandardResponseHeaders) {
 		if (!this.responseSent) {
 			if (headers) this.setHeaders(headers);
 			this.respond(statusCode).empty();
