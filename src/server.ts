@@ -40,7 +40,7 @@ import * as x509 from "@fidm/x509";
 import { ServerResponse } from 'http';
 import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 import { TLSSocket } from 'tls';
-
+import { checkServerConfig } from "./interfacechecker";
 // import { parse as jsonParse } from 'jsonlint';
 
 // import send = require('../lib/send-lib');
@@ -119,6 +119,8 @@ eventer.on('settings', (set) => {
 	let debugOutput = MakeDebugOutput(settings);
 	debug = StateObject.DebugLogger("SERVER ").bind({ debugOutput, settings});
 	log = setLog() as any;
+	console.log(JSON.stringify(set, null, 2));
+	if(!checkServerConfig(set)) throw "ServerConfig did not pass validator";
 });
 eventer.on('settingsChanged', (keys) => {
 	// let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];
