@@ -1,10 +1,11 @@
-import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
+// import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
 import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
 	Directory, sortBySelector, obs_stat, obs_readdir, FolderEntryType, obsTruthy,
 	StatPathResult, TreeObject, PathResolverResult, TreePathResult, resolvePath,
 	sendDirectoryIndex, statWalkPath, DirectoryIndexOptions, DirectoryIndexData,
-	ServerEventEmitter, ER, getTreePathFiles, NewTreePathOptions_Auth, StandardResponseHeaders, serveFile, Config
+	ServerEventEmitter, ER, getTreePathFiles, NewTreePathOptions_Auth, StandardResponseHeaders,
+	serveFile, Config
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -20,15 +21,15 @@ import { EventEmitter } from "events";
 import { handleDataFolderRequest, init as initTiddlyWiki, handleTiddlyWikiRoute } from "./datafolder";
 export { handleTiddlyWikiRoute };
 
-import { format, inspect } from "util";
+import { format, inspect, promisify } from "util";
 import { Stream, Writable } from "stream";
-import { Subscribable } from "rxjs/Observable";
-import { NextObserver, ErrorObserver, CompletionObserver } from "rxjs/Observer";
-import { AnonymousSubscription } from "rxjs/Subscription";
+// import { Subscribable } from "rxjs/Observable";
+// import { NextObserver, ErrorObserver, CompletionObserver } from "rxjs/Observer";
+// import { AnonymousSubscription } from "rxjs/Subscription";
 
 import { send, formidable } from '../lib/bundled-lib';
 import { Stats } from "fs";
-import { last } from "rxjs/operator/last";
+// import { last } from "rxjs/operator/last";
 import { NewTreeOptions, NewTreePathOptions_Backup, NewTreePathOptions_Index, NewTreeOptionsObject } from "./server-config";
 
 // const debugTag = "SER-API";
@@ -97,7 +98,7 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 	// const resolvePath = (settings.tree);
 	// Promise.resolve().then(() => {
 
-	let result = resolvePath(state, state.hostRoot) as PathResolverResult;
+	let result: PathResolverResult = resolvePath(state, state.hostRoot) || null as never;
 	if (!result) {
 		state.throw<never>(404);
 		return;
@@ -157,7 +158,7 @@ export function handleTiddlyServerRoute(state: StateObject): void {
 function handleFileError(debugTag: string, state: StateObject, err: NodeJS.ErrnoException) {
 	StateObject.DebugLogger(debugTag).call(state, 2, "%s %s\n%s", err.code, err.message, err.path);
 }
-function debugState(debugTag: string, state: StateObject){
+function debugState(debugTag: string, state: StateObject) {
 	return StateObject.DebugLogger(debugTag).bind(state);
 }
 function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
@@ -169,12 +170,11 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 		state.redirect(state.url.pathname + "/");
 	} else if (state.req.method === "GET") {
 		const isFolder = result.item.$element === "folder";
-		Observable.of(state).concatMap(() => {
+		Promise.resolve().then(() => {
 			let { indexFile, indexExts, defaultType } = state.treeOptions.index;
 
 			if (isFolder && indexExts.length && indexFile.length) {
-				return obs_readdir()(result.fullfilepath).concatMap(([err, files]) => {
-					if (err) return state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message).throw(500);
+				return promisify(fs.readdir)(result.fullfilepath).then(files => {
 					let indexFiles: string[] = [];
 					indexFile.forEach(e => {
 						indexExts.forEach(f => {
@@ -185,12 +185,14 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 					let index = indexFiles.find((e) => files.indexOf(e) !== -1);
 					if (index) {
 						serveFile(state, index, result.fullfilepath);
-						return Observable.empty();
+						return false;
 					} else if (defaultType === 403 || defaultType === 404) {
-						return state.throw(defaultType);
+						state.throw(defaultType);
+						return false;
+					} else {
+						return true;
 					}
-					return Observable.of(state);
-				});
+				})
 			} else if (result.item.$element === "group" && result.item.indexPath) {
 				let { indexPath } = result.item;
 				state.send({
@@ -198,33 +200,37 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 					filepath: indexPath,
 					error: (err) => {
 						let error = new ER("error sending index", err.toString());
-						return state.log(2, error.message).throwError(500, error);
+						state.log(2, error.message).throwError(500, error);
 					}
 				});
-				return Observable.empty();
-			}
-			else return Observable.of(state);
-		}).subscribe(() => {
+				return Promise.resolve(false);
+			} else return Promise.resolve(true);
+		}).then((contin: boolean) => {
+			if (!contin) return;
 			const format = state.treeOptions.index.defaultType as "html" | "json";
 			const options = {
 				upload: isFolder && (allow.upload),
 				mkdir: isFolder && (allow.mkdir),
 				mixFolders: state.settings.directoryIndex.mixFolders,
-				isLoggedIn: state.username ? (state.username + " (group " + state.authAccountsKey + ")") : false,
+				isLoggedIn: state.username ? (state.username + " (group " + state.authAccountsKey + ")") : false as false,
 				format, extTypes: state.settings.directoryIndex.types
 			};
 			let contentType = {
 				html: "text/html",
 				json: "application/json"
 			};
-			getTreePathFiles(result, state)
-				.map(e => [e, options] as [typeof e, DirectoryIndexOptions])
-				.concatMap(sendDirectoryIndex)
-				.subscribe(res => {
-					state.respond(200, "", { 'Content-Type': contentType[format], "Content-Encoding": 'utf-8' })
-						.buffer(Buffer.from(res, "utf8"));
-				});
-		})
+			return getTreePathFiles(result, state).then(e => {
+				return sendDirectoryIndex([e, options])
+			}).then((res) => {
+				state.respond(200, "", { 'Content-Type': contentType[format], "Content-Encoding": 'utf-8' }).buffer(Buffer.from(res, "utf8"));
+			});
+		}).catch(err => {
+			if (err) {
+				state.log(2, "Error caught " + err.toString());
+				state.throw(500);
+				//catch all: return nothing
+			}
+		});;
 	} else if (state.req.method === "POST") {
 		var form = new formidable.IncomingForm();
 		// console.log(state.url);
