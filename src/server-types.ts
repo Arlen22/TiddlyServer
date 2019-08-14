@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { format, promisify } from "util";
-import { Observable, Subscriber } from '../lib/rx';
+// import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 import { send, ajv, ws as WebSocket, JSON5 } from '../lib/bundled-lib';
@@ -210,8 +210,8 @@ export interface ServerEventEmitter extends EventEmitter {
 	emit(event: "websocket-connection", data: RequestEventWS): boolean;
 	emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
 	emit(event: "settings", settings: ServerConfig): boolean;
-	emit(event: "stateError", state: StateObject): boolean;
-	emit(event: "stateDebug", state: StateObject): boolean;
+	emit(event: "stateError", state: StateObject<any, any>): boolean;
+	emit(event: "stateDebug", state: StateObject<any, any>): boolean;
 	emit(event: "serverOpen", serverList: any[], hosts: string[], https: boolean): boolean;
 	emit(event: "serverClose", iface: string): boolean;
 
@@ -462,8 +462,7 @@ export interface ServeStaticResult {
 
 
 export function serveFile(state: StateObject, file: string, root: string | undefined) {
-	obs_stat(state)(root ? path.join(root, file) : file).mergeMap(([err, stat]): any => {
-		if (err) return state.throw<StateObject>(404);
+	promisify(fs.stat)(root ? path.join(root, file) : file).then((stat): any => {
 		state.send({
 			root,
 			filepath: file,
@@ -471,13 +470,13 @@ export function serveFile(state: StateObject, file: string, root: string | undef
 				state.log(2, '%s %s', err.status, err.message).throw(500);
 			}
 		});
-		return Observable.empty<StateObject>();
-	}).subscribe();
+		// return Observable.empty<StateObject>();
+	}, err => { state.throw<StateObject>(404); })
 
 }
-export function serveFileObs(obs: Observable<StateObject>, file: string, root: string) {
-	return obs.do(state => serveFile(state, file, root)).ignoreElements();
-}
+// export function serveFileObs(obs: Observable<StateObject>, file: string, root: string) {
+// 	return obs.do(state => serveFile(state, file, root)).ignoreElements();
+// }
 export function serveFolder(state: StateObject, mount: string, root: string, serveIndex?: Function) {
 	const pathname = state.url.pathname;
 	if (state.url.pathname.slice(0, mount.length) !== mount) {
@@ -497,26 +496,22 @@ export function serveFolder(state: StateObject, mount: string, root: string, ser
 		})
 	}
 }
-export function serveFolderObs(obs: Observable<StateObject>, mount: string, root: string, serveIndex?: Function) {
-	return obs.do(state => serveFolder(state, mount, root, serveIndex)).ignoreElements();
-}
+// export function serveFolderObs(obs: Observable<StateObject>, mount: string, root: string, serveIndex?: Function) {
+// 	return obs.do(state => serveFolder(state, mount, root, serveIndex)).ignoreElements();
+// }
 export function serveFolderIndex(options: { type: string }) {
-	function readFolder(folder: string) {
-		return obs_readdir()(folder).mergeMap(([err, files]) => {
-			return Observable.from(files)
-		}).mergeMap(file => {
-			return obs_stat(file)(path.join(folder, file));
-		}).map(([err, stat, key]) => {
+	async function readFolder(folder: string) {
+		let files = await promisify(fs.readdir)(folder);
+		let res = { "directory": [], "file": [] };
+		await Promise.all(files.map(file => promisify(fs.stat)(path.join(folder, file)).then(stat => {
 			let itemtype = stat.isDirectory() ? 'directory' : (stat.isFile() ? 'file' : 'other');
-			return { key, itemtype };
-		}).reduce((n, e) => {
-			n[e.itemtype].push(e.key);
-			return n;
-		}, { "directory": [], "file": [] });
+			res[itemtype].push(file);
+		}, x => undefined)));
+		return res;
 	}
 	if (options.type === "json") {
 		return function (state: StateObject, folder: string) {
-			readFolder(folder).subscribe(item => {
+			readFolder(folder).then(item => {
 				sendResponse(state, JSON.stringify(item), {
 					contentType: "application/json",
 					doGzip: canAcceptGzip(state.req)
@@ -580,11 +575,11 @@ export function getTreePathFiles(result: PathResolverResult, state: StateObject)
 			const paths = keys.map(k => path.join(result.fullfilepath, k));
 			return { keys, paths, dirpath, type: type as "group" | "folder" };
 		}).catch(err => {
-			if(!err) return Promise.reject(err);
+			if (!err) return Promise.reject(err);
 			state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
 			state.throw(500);
 			return Promise.reject(false);
-		})
+		});
 	}
 }
 // /**
@@ -631,32 +626,29 @@ export type DirectoryIndexOptions = {
 	isLoggedIn: string | false,
 	extTypes: { [ext: string]: string }
 }
-export function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
+export async function sendDirectoryIndex([_r, options]: [DirectoryIndexData, DirectoryIndexOptions]) {
 	let { keys, paths, dirpath, type } = _r;
 	let pairs = keys.map((k, i) => [k, paths[i]] as [string, string | boolean]);
-	return Promise.all<{ key: string, stat?: StatPathResult }>(pairs.map(e => {
-		let [key, val] = e;
-		if (typeof val === "boolean") return Promise.resolve({ key, stat: undefined });
-		else return statPath(val).then(res => ({ stat: res, key }));
-	})).then(paths => {
-		let entries = paths.map((e): DirectoryEntry => {
-			let linkpath = [dirpath, e.key].filter(e => e).join('/');
-			return {
-				name: e.key,
-				path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
-				type: (!e.stat ? "group" : (e.stat.itemtype === "file"
-					? options.extTypes[e.key.split('.').pop() as string] || 'other'
-					: e.stat.itemtype as string)),
-				size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
-			};
-		});
-		if (options.format === "json") {
-			return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
-		} else {
-			let def = { path: dirpath, entries, type };
-			return generateDirectoryListing(def, options);
-		}
-	});
+	let entries = await Promise.all(keys.map(async key => {
+		let stat = (paths[key] === true) ? undefined : await statPath(paths[key]);
+		// let e = { stat, key };
+		// let linkpath = [dirpath, e.key].filter(e => e).join('/');
+		return {
+			name: key,
+			path: key + ((!stat || stat.itemtype === "folder") ? "/" : ""),
+			type: (!stat ? "group" : (stat.itemtype === "file"
+				? options.extTypes[key.split('.').pop() as string] || 'other'
+				: stat.itemtype as string)),
+			size: (stat && stat.stat) ? getHumanSize(stat.stat.size) : ""
+		};
+	}));
+	if (options.format === "json") {
+		return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
+	} else {
+		let def = { path: dirpath, entries, type };
+		return generateDirectoryListing(def, options);
+	}
+
 	// return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
 	// 	//if this is a group, just return the key
 	// 	if (typeof val === "boolean") return Observable.of({ key })
@@ -715,6 +707,9 @@ export async function statWalkPath(test: PathResolverResult) {
 	// 	);
 	// }).takeLast(1);
 }
+export function statsafe(p: string) {
+	return promisify(fs.stat)(p).catch(x => undefined);
+}
 /**
  * returns the info about the specified path. endstat is true if the statpath is not
  * found or if it is a directory and contains a tiddlywiki.info file, or if it is a file.
@@ -722,49 +717,45 @@ export async function statWalkPath(test: PathResolverResult) {
  * @param {({ statpath: string, index: number, endStat: boolean } | string)} s 
  * @returns 
  */
-export function statPath(s: { statpath: string, index: number, endStat: boolean } | string) {
-	if (typeof s === "string") s = { statpath: s, index: 0, endStat: false };
+export async function statPath(s: { statpath: string, index: number } | string) {
+	if (typeof s === "string") s = { statpath: s, index: 0 };
 	const { statpath, index } = s;
-	let { endStat } = s;
-	if (typeof endStat !== "boolean") endStat = false;
-	return (async function () {
-		let [err, stat] = await obs_stat(fs.stat)(statpath).toPromise();
-		if (!err && stat.isDirectory()) {
-			let [err2, infostat] = await obs_stat(stat)(path.join(statpath, "tiddlywiki.info")).toPromise();
-			let exists = !err2 && infostat.isFile();
-			if (exists) endStat = true;
-			return ({ stat, statpath, infostat: exists ? infostat : undefined, index, endStat, itemtype: '' })
-		} else {
-			if (err || stat.isFile()) endStat = true;
-			return ({ stat, statpath, index, endStat, itemtype: '' });
-		}
-	})().then(res => {
-		res.itemtype = getItemType(res.stat, res.infostat)
-		return res;
-	})
-	/*
-	return new Promise<StatPathResult>(resolve => {
-		// What I wish I could write (so I did)
-		obs_stat(fs.stat)(statpath).chainMap(([err, stat]) => {
-			if (err || stat.isFile()) endStat = true;
-			if (!err && stat.isDirectory())
-				return obs_stat(stat)(path.join(statpath, "tiddlywiki.info"));
-			else resolve({ stat, statpath, index, endStat, itemtype: '' })
-		}).concatAll().subscribe(([err2, infostat, stat]) => {
-			if (!err2 && infostat.isFile()) {
-				endStat = true;
-				resolve({ stat, statpath, infostat, index, endStat, itemtype: '' })
-			} else
-				resolve({ stat, statpath, index, endStat, itemtype: '' });
-		});
-	}).then(res => {
-		res.itemtype = getItemType(res.stat, res.infostat)
-		return res;
-	})
-	*/
-}
+	let stat = await statsafe(statpath);
+	let endStat = !stat || !stat.isDirectory();
+	let infostat: fs.Stats | undefined = undefined;
+	if (!endStat) {
+		infostat = await statsafe(path.join(statpath, "tiddlywiki.info"));
+		endStat = !infostat || infostat.isFile();
+	}
 
-function getItemType(stat: Stats, infostat: Stats | undefined) {
+	return ({
+		stat, statpath, index, endStat, itemtype: getItemType(stat, infostat),
+		infostat: (infostat && infostat.isFile()) ? infostat : undefined
+	} as StatPathResult);
+}
+/*
+return new Promise<StatPathResult>(resolve => {
+	// What I wish I could write (so I did)
+	obs_stat(fs.stat)(statpath).chainMap(([err, stat]) => {
+		if (err || stat.isFile()) endStat = true;
+		if (!err && stat.isDirectory())
+			return obs_stat(stat)(path.join(statpath, "tiddlywiki.info"));
+		else resolve({ stat, statpath, index, endStat, itemtype: '' })
+	}).concatAll().subscribe(([err2, infostat, stat]) => {
+		if (!err2 && infostat.isFile()) {
+			endStat = true;
+			resolve({ stat, statpath, infostat, index, endStat, itemtype: '' })
+		} else
+			resolve({ stat, statpath, index, endStat, itemtype: '' });
+	});
+}).then(res => {
+	res.itemtype = getItemType(res.stat, res.infostat)
+	return res;
+})
+*/
+
+
+function getItemType(stat: Stats | undefined, infostat: Stats | undefined) {
 	let itemtype;
 
 	if (!stat) itemtype = "error";
@@ -860,50 +851,50 @@ type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 // export function obs<S>(state?: S) {
 //     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
 // }
-export type obs_stat_result<T> = [NodeJS.ErrnoException | null, fs.Stats, T, string]
-export const obs_stat = <T = undefined>(tag: T = undefined as any) =>
-	(filepath: string) => new Observable<obs_stat_result<T>>(subs => {
-		fs.stat(filepath, (err, data) => {
-			subs.next([err, data, tag, filepath]);
-			subs.complete();
-		})
-	})
+// export type obs_stat_result<T> = [NodeJS.ErrnoException | null, fs.Stats, T, string]
+// export const obs_stat = <T = undefined>(tag: T = undefined as any) =>
+// 	(filepath: string) => new Observable<obs_stat_result<T>>(subs => {
+// 		fs.stat(filepath, (err, data) => {
+// 			subs.next([err, data, tag, filepath]);
+// 			subs.complete();
+// 		})
+// 	})
 
-export type obs_readdir_result<T> = [NodeJS.ErrnoException | null, string[], T, string]
-export const obs_readdir = <T>(tag: T = undefined as any) =>
-	(filepath: string) => new Observable<obs_readdir_result<T>>(subs => {
-		fs.readdir(filepath, (err, data) => {
-			subs.next([err, data, tag, filepath]);
-			subs.complete();
-		})
-	})
+// export type obs_readdir_result<T> = [NodeJS.ErrnoException | null, string[], T, string]
+// export const obs_readdir = <T>(tag: T = undefined as any) =>
+// 	(filepath: string) => new Observable<obs_readdir_result<T>>(subs => {
+// 		fs.readdir(filepath, (err, data) => {
+// 			subs.next([err, data, tag, filepath]);
+// 			subs.complete();
+// 		})
+// 	})
 
-export type obs_readFile_result<T> = typeof obs_readFile_inner
-export const obs_readFile = <T>(tag: T = undefined as any): obs_readFile_result<T> =>
-	(filepath: string, encoding?: string) =>
-		new Observable(subs => {
-			const cb = (err, data) => {
-				subs.next([err, data, tag, filepath]);
-				subs.complete();
-			}
-			if (encoding)
-				fs.readFile(filepath, encoding, cb);
-			else
-				fs.readFile(filepath, cb)
-		}) as any;
+// export type obs_readFile_result<T> = typeof obs_readFile_inner
+// export const obs_readFile = <T>(tag: T = undefined as any): obs_readFile_result<T> =>
+// 	(filepath: string, encoding?: string) =>
+// 		new Observable(subs => {
+// 			const cb = (err, data) => {
+// 				subs.next([err, data, tag, filepath]);
+// 				subs.complete();
+// 			}
+// 			if (encoding)
+// 				fs.readFile(filepath, encoding, cb);
+// 			else
+// 				fs.readFile(filepath, cb)
+// 		}) as any;
 
-declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T, string]>;
-declare function obs_readFile_inner<T>(filepath: string, encoding: string): Observable<[NodeJS.ErrnoException, string, T, string]>;
+// declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T, string]>;
+// declare function obs_readFile_inner<T>(filepath: string, encoding: string): Observable<[NodeJS.ErrnoException, string, T, string]>;
 
 
-// export type obs_writeFile_result<T> = typeof obs_readFile_inner
-export const obs_writeFile = <T>(tag: T = undefined as any) =>
-	(filepath: string, data: any) => new Observable<[NodeJS.ErrnoException | null, T, string]>(subs =>
-		fs.writeFile(filepath, data, (err) => {
-			subs.next([err, tag, filepath]);
-			subs.complete();
-		})
-	);
+// // export type obs_writeFile_result<T> = typeof obs_readFile_inner
+// export const obs_writeFile = <T>(tag: T = undefined as any) =>
+// 	(filepath: string, data: any) => new Observable<[NodeJS.ErrnoException | null, T, string]>(subs =>
+// 		fs.writeFile(filepath, data, (err) => {
+// 			subs.next([err, tag, filepath]);
+// 			subs.complete();
+// 		})
+// 	);
 export function fs_move(oldPath, newPath, callback) {
 
 	fs.rename(oldPath, newPath, function (err) {
@@ -945,24 +936,19 @@ export class StateError extends Error {
 		this.state = state;
 	}
 }
-export type StatPathResult = {
-	stat: fs.Stats,
-	statpath: string,
-	infostat?: fs.Stats,
+export interface IStatPathResult<IT, ST, IFST, END> {
+	stat: ST,
+	infostat: IFST,
 	index: number,
-	/**
-	 * error, folder, datafolder, file
-	 * 
-	 * @type {string}
-	 */
-	itemtype: string,
-	/**
-	 * either the path does not exist or it is a data folder
-	 * 
-	 * @type {boolean}
-	 */
-	endStat: boolean
+	endStat: END,
+	itemtype: IT,
+	statpath: string
 }
+export type StatPathResult =
+	| IStatPathResult<"error", fs.Stats | undefined, undefined, true>
+	| IStatPathResult<"folder", fs.Stats, undefined, false>
+	| IStatPathResult<"datafolder", fs.Stats, fs.Stats, true>
+	| IStatPathResult<"file", fs.Stats, undefined, true>
 // export interface 
 // export type LoggerFunc = (str: string, ...args: any[]) => void;
 export class URLSearchParams {
@@ -1078,7 +1064,7 @@ export interface StandardResponseHeaders {
 	"dav"?: string;
 	"etag"?: string;
 }
-export class StateObject {
+export class StateObject<STATPATH=StatPathResult, T=any> {
 	static parseURL(str: string): StateObjectUrl {
 		let item = url.parse(str, true);
 		let { path, pathname, query, search, href } = item;
@@ -1090,14 +1076,14 @@ export class StateObject {
 		return { path, pathname, query, search, href };
 	}
 	static errorRoute(status: number, reason?: string) {
-		return (obs: Observable<any>): any => {
-			return obs.mergeMap((state: StateObject) => {
-				if (reason)
-					return state.throwReason(status, reason);
-				else
-					return state.throw(status);
-			})
-		}
+		// return (obs: Observable<any>): any => {
+		// 	return obs.mergeMap((state: StateObject) => {
+		// 		if (reason)
+		// 			return state.throwReason(status, reason);
+		// 		else
+		// 			return state.throw(status);
+		// 	})
+		// }
 	}
 
 	get allow(): ServerConfig_AccessOptions {
@@ -1133,7 +1119,7 @@ export class StateObject {
 
 	/** The StatPathResult if this request resolves to a path */
 	//@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-	statPath: StatPathResult;
+	statPath: STATPATH;
 	/** The tree ancestors in descending order, including the final folder element. */
 	//@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
 	ancestry: (NewTreeGroup | NewTreePath)[];
@@ -1255,14 +1241,14 @@ export class StateObject {
 				if (statusCode !== 204) res.string(reason.message);
 			}
 		}
-		return Observable.empty<T>();
+		// return Observable.empty<T>();
 	}
 	throw<T = never>(statusCode: number, headers?: StandardResponseHeaders) {
 		if (!this.responseSent) {
 			if (headers) this.setHeaders(headers);
 			this.respond(statusCode).empty();
 		}
-		return Observable.empty<T>();
+		// return Observable.empty<T>();
 	}
 	setHeader(key: keyof StandardResponseHeaders, val: string) {
 		this.setHeaders({ [key]: val } as any);
@@ -1438,7 +1424,7 @@ export function recieveBody(state: StateObject, parseJSON: boolean, sendError?: 
 
 }
 export interface ThrowFunc<T> {
-	throw(statusCode: number, reason?: string, str?: string, ...args: any[]): Observable<T>;
+	throw(statusCode: number, reason?: string, str?: string, ...args: any[]);
 }
 
 
