@@ -109,12 +109,13 @@ export namespace TiddlyWiki {
 		options = options || {};
 		$tw.locationHash = "#";
 		if ($tw.browser && !$tw.node) {
-			if (location.hash === "#:safe") {
-				$tw.safeMode = true;
-			}
-			else {
-				$tw.locationHash = $tw.utils.getLocationHash();
-			}
+			throw "browser-only not implemented";
+			// if (location.hash === "#:safe") {
+			// 	$tw.safeMode = true;
+			// }
+			// else {
+			// 	$tw.locationHash = $tw.utils.getLocationHash();
+			// }
 		}
 		// Initialise some more $tw properties
 		$tw.utils.deepDefaults($tw, {
