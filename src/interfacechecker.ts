@@ -4,23 +4,43 @@ import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValu
 export function checkInterface() {
 
 }
-class CheckInterface {
+type CheckInterfaceFunction = { expected: string } & (<T>(a: any, stringError: boolean) => any);
+type ICheckInterfaceFunction<A> = { expected: string } & ((a: any) => a is A)
+interface ICheckInterface {
+  currentKeyArray: (string | number | symbol)[];
+  union<A, B>(af: (a) => a is A, bf: (b) => b is B): (a) => a is A | B;
+  union<A, B, C>(af: (a) => a is A, bf: (b) => b is B, cf: (c) => c is C): (a) => a is A | B | C;
+  checkNull: ICheckInterfaceFunction<null>;
+  checkString: ICheckInterfaceFunction<string>;
+  checkStringEnum: <T extends string>(...values: T[]) => ICheckInterfaceFunction<T>;
+  checkBoolean: ICheckInterfaceFunction<boolean>;
+  checkBooleanTrue: ICheckInterfaceFunction<true>;
+  checkBooleanFalse: ICheckInterfaceFunction<false>;
+  checkNumber: ICheckInterfaceFunction<number>;
+  checkNumberEnum: <T extends number>(...values: T[]) => ICheckInterfaceFunction<T>;
+  checkArray: <T>(checker: ICheckInterfaceFunction<T>) => ICheckInterfaceFunction<T[]>;
+  checkRecord<K extends string | number | symbol, T>(
+    keychecker: ICheckInterfaceFunction<K>,
+    checker: ICheckInterfaceFunction<T>
+  )
+  checkObject<T extends {}, REQUIRED extends keyof T = keyof T>(
+    checkermap: { [KEY in REQUIRED]-?: ((b) => b is T[KEY]) },
+    optionalcheckermap?: { [KEY in Exclude<keyof T, keyof typeof checkermap>]?: ((b) => b is T[KEY]) },
+    /** if these keys do not pass, the item is assumed to be unrelated */
+    unionKeys?: (string)[]
+  )
+}
+class CheckInterface implements ICheckInterface {
 
   errorLog: string[][] = [];
 
   constructor() {
-    // this.assignExpected("", this.checkString);
-    this.assignExpected("expected string value", this.checkString);
-    this.assignExpected("expected number value", this.checkNumber);
-    this.assignExpected("expected boolean value", this.checkBoolean);
-    this.assignExpected("expected boolean true", this.checkBooleanTrue);
-    this.assignExpected("expected boolean false", this.checkBooleanFalse);
-    this.assignExpected("expected null value", this.checkNull);
+
   }
 
-  assignExpected<T>(message: string, func: T): T {
-    (func as T & { expected: string }).expected = message;
-    return func;
+  assignProperties<T>(message: string, func: (a: any, stringError?: boolean) => a is T): ICheckInterfaceFunction<T> {
+    (func as typeof func & { expected: string }).expected = message;
+    return func as any;
   }
   currentKeyArray: (string | number | symbol)[] = [];
   responseStringError = (err: string) => JSON.stringify(this.currentKeyArray) + " " + err + "\n";
@@ -28,7 +48,7 @@ class CheckInterface {
   union<A, B>(af: (a) => a is A, bf: (b) => b is B): (a) => a is A | B;
   union<A, B, C>(af: (a) => a is A, bf: (b) => b is B, cf: (c) => c is C): (a) => a is A | B | C;
   union(af, bf, cf?) {
-    return this.assignExpected([af, bf, cf].map(e => e && e.expected).join(', '), (item) => {
+    return this.assignProperties([af, bf, cf].map(e => e && e.expected).join(', '), ((item) => {
       // this.currentKeyArray.push(i);
       let errs: (string | false)[] = [];
       let res: boolean | string;
@@ -44,29 +64,37 @@ class CheckInterface {
         ).join("\n"));
       }
       return typeof res === "string" ? false : res;
-    });
+    }) as ReturnType<ICheckInterface["union"]>);
   }
   checkObjectError(str: string) {
     return str.split("\n").filter(e => !!e.trim()).map((l, j) => (j > 0 ? "   " : " - ") + l).join('\n')
   }
   // checkNever = (a): a is never => typeof a === "undefined";
-  checkNull = (a): a is null => a === null;
-  checkString = (a): a is string => typeof a === "string";
-  checkStringEnum = <T extends string>(...values: T[]) => this.assignExpected(
+  // this.assignExpected("expected string value", (a): a is string => typeof a === "string";);
+  //   this.assignExpected("expected number value", this.checkNumber);
+  // this.assignExpected("expected boolean value", this.checkBoolean);
+  // this.assignExpected("expected boolean true", this.checkBooleanTrue);
+  // this.assignExpected("expected boolean false", this.checkBooleanFalse);
+  // this.assignExpected("expected null value", this.checkNull);
+
+  checkNull = this.assignProperties("expected null value", (a): a is null => a === null);
+  checkString = this.assignProperties("expected string value", (a): a is string => typeof a === "string");
+
+  checkStringEnum = <T extends string>(...values: T[]) => this.assignProperties(
     "expected one string of " + JSON.stringify(values),
     (a): a is T => typeof a === "string" && values.indexOf(a as T) !== -1)
-  checkBoolean = (a): a is boolean => typeof a === "boolean";
-  checkBooleanTrue = (a): a is true => typeof a === "boolean" && a === true;
-  checkBooleanFalse = (a): a is false => typeof a === "boolean" && a === false;
-  checkNumber = (a): a is number => typeof a === "number";
-  checkNumberEnum = <T extends number>(...values: T[]) => this.assignExpected(
+  checkBoolean = this.assignProperties("", (a): a is boolean => typeof a === "boolean");
+  checkBooleanTrue = this.assignProperties("", (a): a is true => typeof a === "boolean" && a === true);
+  checkBooleanFalse = this.assignProperties("", (a): a is false => typeof a === "boolean" && a === false);
+  checkNumber = this.assignProperties("", (a): a is number => typeof a === "number");
+  checkNumberEnum = <T extends number>(...values: T[]) => this.assignProperties(
     "expected one number of " + JSON.stringify(values),
     (a): a is T => typeof a === "number" && values.indexOf(a as T) !== -1)
 
   // checkArrayValue: ()
   checkArray<T>(checker: ((b, stringError: boolean) => b is T)) {
     let sourceLine = new Error("checkArray origin");
-    return this.assignExpected(
+    return this.assignProperties(
       "expected an array that " + (checker as any).expected,
       (a): a is T[] => typeof a === "object" && Array.isArray(a) && (a.filter((b, i) => {
         let res = this.checkArrayValue<number, T>(i, checker, b);
@@ -80,7 +108,7 @@ class CheckInterface {
     checker: ((b, stringError: boolean) => b is T)
   ) {
     let sourceLine = new Error("checkRecord origin");
-    return this.assignExpected("expected a record that " + (checker as any).expected, (a): a is Record<K, T> => {
+    return this.assignProperties("expected a record that " + (checker as any).expected, (a): a is Record<K, T> => {
       const keys = Object.keys(a);
       return typeof a === "object" && (keys.filter(k => {
         let res = keychecker(k) && this.checkArrayValue<K, T>(k, checker, a[k]);
@@ -99,21 +127,21 @@ class CheckInterface {
     return res;
   }
 
-  checkObject<T extends {}>(
-    checkermap: { [KEY in keyof T]-?: ((b) => b is T[KEY]) },
-    optionalcheckermap?: undefined,
-    /** if these keys do not pass, the item is assumed to be unrelated */
-    unionKeys?: (keyof T)[]
-  ): (a) => a is T;
-  checkObject<T extends {}, REQUIRED extends keyof T>(
+  // checkObject<T extends {}>(
+  //   checkermap: { [KEY in keyof T]-?: ((b) => b is T[KEY]) },
+  //   optionalcheckermap?: undefined,
+  //   /** if these keys do not pass, the item is assumed to be unrelated */
+  //   unionKeys?: (keyof T)[]
+  // ): (a) => a is T;
+  // checkObject<T extends {}, REQUIRED extends keyof T>(
+  //   checkermap: { [KEY in REQUIRED]-?: ((b) => b is T[KEY]) },
+  //   optionalcheckermap: { [KEY in Exclude<keyof T, keyof typeof checkermap>]-?: ((b) => b is T[KEY]) },
+  //   /** if these keys do not pass, the item is assumed to be unrelated */
+  //   unionKeys?: (keyof T)[]
+  // ): (a) => a is T;
+  checkObject<T extends {}, REQUIRED extends keyof T = keyof T>(
     checkermap: { [KEY in REQUIRED]-?: ((b) => b is T[KEY]) },
-    optionalcheckermap: { [KEY in Exclude<keyof T, REQUIRED>]-?: ((b) => b is T[KEY]) },
-    /** if these keys do not pass, the item is assumed to be unrelated */
-    unionKeys?: (keyof T)[]
-  ): (a) => a is T;
-  checkObject<T extends {}, REQUIRED extends keyof T>(
-    checkermap: { [KEY in REQUIRED]-?: ((b) => b is T[KEY]) },
-    optionalcheckermap: { [KEY in keyof T]?: ((b) => b is T[KEY]) } = {},
+    optionalcheckermap: { [KEY in Exclude<keyof T, keyof typeof checkermap>]?: ((b) => b is T[KEY]) } = {},
     /** if these keys do not pass, the item is assumed to be unrelated */
     unionKeys?: (string)[]
   ) {
@@ -131,7 +159,7 @@ class CheckInterface {
         throw new Error("unionKey not found in checkermap " + k);
     });
 
-    return this.assignExpected(
+    return this.assignProperties(
       expectedMessage,
       (a, stringError: boolean = false): a is T => {
         if (typeof a !== "object") return false;
@@ -232,7 +260,7 @@ const GroupChild = checker.union(
   }, undefined, ["$element"]),
   checker.checkObject<Config.GroupElement>({
     $element: checkStringEnum("group"),
-    $children: checker.checkArray(checker.assignExpected("expected GroupChild", (b): b is Config.GroupElement["$children"][0] => GroupChild(b))),
+    $children: checker.checkArray(checker.assignProperties("expected GroupChild", (b): b is Config.GroupElement["$children"][0] => GroupChild(b))),
     $options: checker.checkArray(checkOptions),
     key: checkString,
     indexPath: checker.union(checkString, checkBooleanFalse),
