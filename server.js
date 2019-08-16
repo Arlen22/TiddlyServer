@@ -25,7 +25,7 @@ server.libsReady.then(() => {
 		settingshttps: httpsSettingsFile && require(httpsSettingsFile).serverOptions,
 		preflighter: fs.existsSync(__dirname + "/preflighter.js")
 			//@ts-ignore
-			? require("./preflighter.js")
+			? require("./preflighter.js").preflighter
 			: undefined
 	});
 }).catch(e => {
