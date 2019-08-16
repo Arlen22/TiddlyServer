@@ -53,13 +53,13 @@ class CheckInterface implements ICheckInterface {
 
   }
 
-  assignProperties<T>(message: string, func: (a: any, stringError?: boolean) => a is T): ICheckInterfaceFunction<T> {
+  assignProperties<T>(message: string, func: (a: any) => a is T): ICheckInterfaceFunction<T> {
     (func as typeof func & { expected: string }).expected = message;
     return func as any;
   }
   currentKeyArray: (string | number | symbol)[] = [];
   get currentKey() { return this.currentKeyArray[this.currentKeyArray.length - 1]; }
-  responseStringError = (err: string) => "  ".repeat(this.currentKeyArray.length) + this.currentKey.toString()/* JSON.stringify(this.currentKeyArray) */ + " " + err + "\n";
+  responseStringError = (err: string) => JSON.stringify(this.currentKeyArray) + " " + err + "\n";
 
   union<A, B>(
     af: ICheckInterfaceFunction<A>,
@@ -73,8 +73,7 @@ class CheckInterface implements ICheckInterface {
   union(af, bf, cf?) {
     const expectedMessage = [af, bf, cf].map(e => e && e.expected).join(', ');
     return this.assignProperties(expectedMessage, ((item) => {
-      // return true;
-      // this.currentKeyArray.push(i);
+
       let errs: (string | false)[] = [];
       let res: boolean | string;
       if ((res = af(item, true)) === true) return true;
@@ -83,24 +82,13 @@ class CheckInterface implements ICheckInterface {
       errs.push(res);
       if (!!cf && (res = cf(item, true)) === true) return true;
       if (!!cf) errs.push(res);
-      // if (errs.length && errs.some(e => typeof e === "string")) {
-      //   console.log(this.responseStringError("OR \n" + errs.map((e, i) =>
-      //     this.responseStringError(this.checkObjectError((typeof e === "string") ? e : (e + "\n")))
-      //   ).join("")));
-      // }
+
       return new UnionError(expectedMessage, errs) as never;
     }) as ReturnType<ICheckInterface["union"]>);
   }
   checkObjectError(str: string) {
     return str.split("\n").filter(e => !!e.trim()).map((l, j) => (j > 0 ? "   " : " - ") + l).join('\n')
   }
-  // checkNever = (a): a is never => typeof a === "undefined";
-  // this.assignExpected("expected string value", (a): a is string => typeof a === "string";);
-  //   this.assignExpected("expected number value", this.checkNumber);
-  // this.assignExpected("expected boolean value", this.checkBoolean);
-  // this.assignExpected("expected boolean true", this.checkBooleanTrue);
-  // this.assignExpected("expected boolean false", this.checkBooleanFalse);
-  // this.assignExpected("expected null value", this.checkNull);
 
   checkNull = this.assignProperties("expected null value", (a): a is null => a === null);
 
@@ -118,32 +106,39 @@ class CheckInterface implements ICheckInterface {
     "expected one number of " + JSON.stringify(values),
     (a): a is T => typeof a === "number" && values.indexOf(a as T) !== -1)
 
-  // checkArrayValue: ()
+  /**
+   * @returns {object} object: A hashmap of the errors for any values that don't validate.
+   * @returns {false} false: The item typeof is not "object" or Array.isArray returns false.
+   * @returns {true} true: All values are valid
+   */
   checkArray<T>(checker: ICheckInterfaceFunction<T>) {
-    // let sourceLine = new Error("checkArray origin");
     return this.assignProperties(
       "expected an array that " + checker.expected,
       (a): a is T[] => {
         if (typeof a !== "object" || !Array.isArray(a)) return false;
         const errs: Record<number, string> = {};
         return (a.filter((b, i) => this.checkArrayValue<number, T>(i, checker, b, errs)).length === a.length) || errs as never;
-      });
+      }
+    );
   }
 
+  /**
+   * @returns {object} object: A hashmap of the errors for any properties that don't validate.
+   * @returns {false} false: The item typeof is not "object"
+   * @returns {true} true: All properties are valid
+   */
   checkRecord<K extends string | number | symbol, T>(
     keychecker: ICheckInterfaceFunction<K>,
     checker: ICheckInterfaceFunction<T>
   ) {
-    // let sourceLine = new Error("checkRecord origin");
     return this.assignProperties("expected a record that " + checker.expected, (a): a is Record<K, T> => {
       const keys = Object.keys(a);
       const errs: Record<K, string> = {} as any;
-      return typeof a === "object"
-        && (keys.filter(k =>
-          this.checkArrayValueResult<any, any>(keychecker(k), errs, k,
-            keychecker.expected ? "key " + keychecker.expected : "")
-          && this.checkArrayValue<K, T>(k as any, checker, a[k], errs)
-        ).length === keys.length) || errs as never;
+      return typeof a === "object" && (keys.filter(k =>
+        this.checkArrayValueResult<any, any>(keychecker(k), errs, k,
+          keychecker.expected ? "key " + keychecker.expected : "")
+        && this.checkArrayValue<K, T>(k as any, checker, a[k], errs)
+      ).length === keys.length) || errs as never;
     });
   }
   private checkArrayValue<K extends string | number | symbol, T>(k: K, checker: ICheckInterfaceFunction<T>, b: any, errs: Record<K, string>) {
@@ -169,18 +164,13 @@ class CheckInterface implements ICheckInterface {
     return res;
   }
 
-  // checkObject<T extends {}>(
-  //   checkermap: { [KEY in keyof T]-?: ((b) => b is T[KEY]) },
-  //   optionalcheckermap?: undefined,
-  //   /** if these keys do not pass, the item is assumed to be unrelated */
-  //   unionKeys?: (keyof T)[]
-  // ): (a) => a is T;
-  // checkObject<T extends {}, REQUIRED extends keyof T>(
-  //   checkermap: { [KEY in REQUIRED]-?: ((b) => b is T[KEY]) },
-  //   optionalcheckermap: { [KEY in Exclude<keyof T, keyof typeof checkermap>]-?: ((b) => b is T[KEY]) },
-  //   /** if these keys do not pass, the item is assumed to be unrelated */
-  //   unionKeys?: (keyof T)[]
-  // ): (a) => a is T;
+  /** 
+   * @returns {null} null: The specified union keys are not valid.
+   * @returns {object} object: A hashmap of the errors for any properties that don't validate.
+   * @returns {string} string: Required keys are missing
+   * @returns {false} false: The item typeof is not "object"
+   * @returns {true} true: All properties are valid
+   */
   checkObject<T extends {}, REQUIRED extends keyof T = keyof T>(
     checkermap: { [KEY in REQUIRED]-?: ICheckInterfaceFunction<T[KEY]> },
     optionalcheckermap: { [KEY in Exclude<keyof T, keyof typeof checkermap>]?: ICheckInterfaceFunction<T[KEY]> } = {},
@@ -226,7 +216,7 @@ class CheckInterface implements ICheckInterface {
           return this.responseStringError("missing required keys " + missingkeys.join(',')) as never;
         const log: string[] = [];
         this.errorLog.push(log);
-        let errs: Partial<T> | false = {};
+        let errs: Partial<T> = {};
         let res = (keys.filter((k): boolean => {
           this.currentKeyArray.push(k);
           const keylog: string[] = [];
@@ -241,9 +231,6 @@ class CheckInterface implements ICheckInterface {
             } else if (!res && checkermap[k].expected) {
               keylog.push(this.responseStringError(checkermap[k].expected));
               errs[k] = checkermap[k].expected;
-            }
-            if (!res && unionKeys && unionKeys.indexOf(k) !== -1) {
-              wrongunionkey = true;
             }
           } else if (optionalcheckermap[k]) {
             res = optionalcheckermap[k](a[k]);
@@ -267,7 +254,7 @@ class CheckInterface implements ICheckInterface {
         }).length === keys.length);
         if (badkey) log.unshift(this.responseStringError(expectedMessage + " but got " + JSON.stringify(Object.keys(a))));
         // console.log(log.join('\n'));
-        return (!res && !wrongunionkey) ? errs as never : res;
+        return (!res) ? errs as never : res;
       });
   }
 
@@ -378,7 +365,8 @@ const _checkServerConfig = checker.checkObject<ServerConfig>({
 });
 export function checkServerConfig(obj) {
   let res = _checkServerConfig(obj);
-  debugger;
-  console.log(JSON.stringify(res, null, 2));
+  if (res !== true) debugger; //if you hit this breakpoint, it means the settings does 
+  //not conform to ServerConfig and the server is about to exit. The error data is in `res`. 
+  console.log("Check server config result: " + JSON.stringify(res, null, 2));
   return res;
 };

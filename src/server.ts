@@ -124,7 +124,7 @@ eventer.on('settings', (set) => {
 	let debugOutput = MakeDebugOutput(settings);
 	debug = StateObject.DebugLogger("SERVER ").bind({ debugOutput, settings });
 	log = setLog() as any;
-	console.log(JSON.stringify(set, null, 2));
+	// console.log(JSON.stringify(set, null, 2));
 	if (!checkServerConfig(set)) throw "ServerConfig did not pass validator";
 });
 eventer.on('settingsChanged', (keys) => {
