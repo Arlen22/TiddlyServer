@@ -46,6 +46,21 @@ function as<T>(obj: T) {
 	return obj;
 }
 
+function normalizeOptions(keypath: string[], a: OptionsSchema[keyof OptionsSchema]) {
+	if(typeof a.$element !== "string") throw new Error("Missing $element property " + keypath.join('.'));
+	
+	if (a.$element === "auth") {
+		
+	} else if (a.$element === "backups") {
+
+	} else if (a.$element === "index") {
+
+	} else {
+		let { $element } = a; 
+		throw new Error("Invalid element " + $element + " found at " + keypath.join('.'));
+	}
+}
+
 type normalizeTree_itemtype = Schema.ArrayGroupElement | Schema.GroupElement | { $element: undefined }
 	| Schema.ArrayPathElement | Schema.PathElement | string
 export function normalizeTree(settingsDir: string,
@@ -64,7 +79,7 @@ export function normalizeTree(settingsDir: string,
 	item: Schema.ArrayPathElement | Schema.PathElement | string,
 	key: string | undefined, keypath
 ): Config.PathElement;
-export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, keypath): any {
+export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, keypath: string[]): any {
 	// type k<T> = T extends "options" ? never : T;
 	if (typeof item === "object" && !item.$element) {
 		//@ts-ignore
@@ -80,9 +95,11 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 		if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
 		item.path = pathResolveWithUser(settingsDir, item.path);
 		key = key || path.basename(item.path);
+		let $options = item.$options || [];
+		$options.forEach(e => normalizeOptions(keypath, e));
 		return as<Config.PathElement>({
 			$element: item.$element,
-			$options: item.$options || [], //TODO: Normalize $options
+			$options,
 			path: item.path,
 			key,
 			noTrailingSlash: !!item.noTrailingSlash
@@ -100,20 +117,21 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
 				} else {
 					return true;
 				}
-			}).map(e => normalizeTree(settingsDir, e, undefined, keypath));
+			}).map(e => normalizeTree(settingsDir, e, undefined, [...keypath, key]));
 			item.$options && $options.push(...item.$options);
 		} else {
 			// let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
-			if(item.$children.$options) throw "specifying options in $children is unsupported at " + keypath.join('.');
+			if (item.$children.$options) throw "specifying options in $children is unsupported at " + keypath.join('.');
 			$children = Object.keys(tc).map(k => k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
 				.filter((e): e is NonNullable<typeof e> => !!e);
 			$options = (e => {
-				if(typeof e !== "undefined" && !Array.isArray(e))
+				if (typeof e !== "undefined" && !Array.isArray(e))
 					throw "$options is not an array at " + keypath.join('.');
 				return e || [];
 			})(item.$options);
 		}
 		key = is<Schema.ArrayGroupElement>(a => !!a.key, item) ? item.key : key;
+		$options.forEach(e => normalizeOptions(keypath, e));
 		return as<Config.GroupElement>({
 			$element: "group", key, $children, $options,
 			indexPath: item.indexPath ? pathResolveWithUser(settingsDir, item.indexPath) : false
@@ -602,21 +620,22 @@ export interface NewTreeMountArgs {
 type PartialExcept<T extends {}, REQUIRED extends keyof T> = {
 	[KEY in Extract<keyof T, REQUIRED>]-?: T[KEY];
 } & {
-	[KEY in Exclude<keyof T, REQUIRED>]?: T[KEY];
-}
-type OptionElementsSchema = NewTreePathOptions_Index | NewTreePathOptions_Auth | NewTreePathOptions_Backup;
+		[KEY in Exclude<keyof T, REQUIRED>]?: T[KEY];
+	}
+// type OptionElementsSchema = ;
 export interface OptionsSchema {
-	auth: PartialExcept<Config.Options_Auth, "$element">,
-	backups: PartialExcept<Config.Options_Backups, "$element">,
-	index: PartialExcept<Config.Options_Index, "$element">
-}
-export interface OptionsConfig {
 	auth: Config.Options_Auth,
 	backups: Config.Options_Backups,
-	index: Config.Options_Index
+	index: Config.Options_Index,
+}
+/** Used by the StateObject to compile the final Options object for the request */
+export interface OptionsConfig {
+	auth: Required<Config.Options_Auth>,
+	backups: Required<Config.Options_Backups>,
+	index: Required<Config.Options_Index>
 }
 /** The options array schema is in `settings-2-1-tree-options.schema.json` */
-export type OptionsArraySchema = (Config.Options_Auth | Config.Options_Backups | Config.Options_Index)[];
+export type OptionsArraySchema = (OptionsSchema[keyof OptionsSchema])[];
 
 export namespace Config {
 	export type OptionElements = OptionsSchema[keyof OptionsSchema];
@@ -634,7 +653,7 @@ export namespace Config {
 		 * return a 403 Access Denied, or 404 to return a 404 Not Found. 403 is the 
 		 * error code used by Apache and Nginx. 
 		 */
-		defaultType: "html" | "json" | 403 | 404,
+		defaultType?: "html" | "json" | 403 | 404,
 		/** 
 		 * Look for index files named exactly this or with one of the defaultExts added. 
 		 * For example, a defaultFile of ["index"] and a defaultExts of ["htm","",html"] would 
@@ -643,7 +662,7 @@ export namespace Config {
 		 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
 		 * To use a .hidden file, put the full filename here, and set indexExts to `[""]`. 
 		 */
-		indexFile: string[],
+		indexFile?: string[],
 		/** 
 		 * Extensions to add when looking for an index file. A blank string will set the order 
 		 * to search for the exact indexFile name. The extensions are searched in the order specified. 
@@ -651,25 +670,25 @@ export namespace Config {
 		 * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
 		 * The default is `[""]`, which will search for an exact indexFile. 
 		 */
-		indexExts: string[]
+		indexExts?: string[]
 	}
 	export interface Options_Auth {
 		/** 
 		 * Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.
 		 * 
-		 * Anonymous requests are ALWAYS denied if an auth element applies to the requested path. 
+		 * Anonymous requests are ALWAYS denied if an auth list applies to the requested path. 
 		 * 
 		 * Note that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.
 		 */
 		$element: "auth";
-		/** Array of keys from authAccounts object that can access this resource. Null allows all, except anonymous. */
-		authList: string[] | null;
+		/** Array of keys from authAccounts object that can access this resource. Null allows all, including anonymous. */
+		authList?: string[] | null;
 		/** 
 		 * Which error code to return for unauthorized (or anonymous) requests
 		 * - 403 Access Denied: Client is not granted permission to access this resouce.
 		 * - 404 Not Found: Client is told that the resource does not exist.
 		 */
-		authError: 403 | 404;
+		authError?: 403 | 404;
 	}
 	export interface Options_Backups {
 		/** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
@@ -677,15 +696,15 @@ export namespace Config {
 		/** 
 		 * Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired. 
 		 */
-		backupFolder: string,
+		backupFolder?: string,
 		/** 
 		 * GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience).
 		 */
-		gzip: boolean,
+		gzip?: boolean,
 		/** 
 		 * Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup. 
 		 */
-		etagAge: number,
+		etagAge?: number,
 	}
 
 	export function isOption(a: any): a is OptionElements {

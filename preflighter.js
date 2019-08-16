@@ -3,9 +3,7 @@ const { StateObject } = require("./src/server-types");
 const USERNAME = "";
 const PASSWORD = "";
 const ALLOW_UNSECURED_WEBSOCKETS = false;
-/**
- * @param {import("./src/server-types").RequestEventHTTP} ev
- */
+
 exports.preflighter = async function (ev) {
 	if (!USERNAME && !PASSWORD) return ev;
 	if (ev.response) ev.handled = !handleBasicAuth(ev.request, ev.response);

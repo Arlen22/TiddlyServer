@@ -7,7 +7,7 @@
       "additionalProperties": false,
       "properties": {
         "$element": {
-          "description": "Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth element applies to the requested path. \n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.",
+          "description": "Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth list applies to the requested path. \n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.",
           "enum": [
             "auth"
           ],
@@ -33,13 +33,11 @@
               "type": "null"
             }
           ],
-          "description": "Array of keys from authAccounts object that can access this resource. Null allows all, except anonymous."
+          "description": "Array of keys from authAccounts object that can access this resource. Null allows all, including anonymous."
         }
       },
       "required": [
-        "$element",
-        "authList",
-        "authError"
+        "$element"
       ],
       "type": "object"
     },
@@ -67,10 +65,7 @@
         }
       },
       "required": [
-        "$element",
-        "backupFolder",
-        "gzip",
-        "etagAge"
+        "$element"
       ],
       "type": "object"
     },
@@ -113,10 +108,7 @@
         }
       },
       "required": [
-        "$element",
-        "defaultType",
-        "indexFile",
-        "indexExts"
+        "$element"
       ],
       "type": "object"
     },
