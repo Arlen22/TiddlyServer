@@ -4,12 +4,27 @@ import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValu
 export function checkInterface() {
 
 }
-type CheckInterfaceFunction = { expected: string } & (<T>(a: any, stringError: boolean) => any);
+class UnionError {
+  constructor(
+    public expected: string,
+    public union_result: any[]
+  ) {
+
+  }
+}
+// type CheckInterfaceFunction = { expected: string } & (<T>(a: any, stringError: boolean) => any);
 type ICheckInterfaceFunction<A> = { expected: string } & ((a: any) => a is A)
 interface ICheckInterface {
   currentKeyArray: (string | number | symbol)[];
-  union<A, B>(af: (a) => a is A, bf: (b) => b is B): (a) => a is A | B;
-  union<A, B, C>(af: (a) => a is A, bf: (b) => b is B, cf: (c) => c is C): (a) => a is A | B | C;
+  union<A, B>(
+    af: ICheckInterfaceFunction<A>,
+    bf: ICheckInterfaceFunction<B>
+  ): ICheckInterfaceFunction<A | B>;
+  union<A, B, C>(
+    af: ICheckInterfaceFunction<A>,
+    bf: ICheckInterfaceFunction<B>,
+    cf: ICheckInterfaceFunction<C>
+  ): ICheckInterfaceFunction<A | B | C>;
   checkNull: ICheckInterfaceFunction<null>;
   checkString: ICheckInterfaceFunction<string>;
   checkStringEnum: <T extends string>(...values: T[]) => ICheckInterfaceFunction<T>;
@@ -43,12 +58,22 @@ class CheckInterface implements ICheckInterface {
     return func as any;
   }
   currentKeyArray: (string | number | symbol)[] = [];
-  responseStringError = (err: string) => JSON.stringify(this.currentKeyArray) + " " + err + "\n";
+  get currentKey() { return this.currentKeyArray[this.currentKeyArray.length - 1]; }
+  responseStringError = (err: string) => "  ".repeat(this.currentKeyArray.length) + this.currentKey.toString()/* JSON.stringify(this.currentKeyArray) */ + " " + err + "\n";
 
-  union<A, B>(af: (a) => a is A, bf: (b) => b is B): (a) => a is A | B;
-  union<A, B, C>(af: (a) => a is A, bf: (b) => b is B, cf: (c) => c is C): (a) => a is A | B | C;
+  union<A, B>(
+    af: ICheckInterfaceFunction<A>,
+    bf: ICheckInterfaceFunction<B>
+  ): ICheckInterfaceFunction<A | B>;
+  union<A, B, C>(
+    af: ICheckInterfaceFunction<A>,
+    bf: ICheckInterfaceFunction<B>,
+    cf: ICheckInterfaceFunction<C>
+  ): ICheckInterfaceFunction<A | B | C>;
   union(af, bf, cf?) {
-    return this.assignProperties([af, bf, cf].map(e => e && e.expected).join(', '), ((item) => {
+    const expectedMessage = [af, bf, cf].map(e => e && e.expected).join(', ');
+    return this.assignProperties(expectedMessage, ((item) => {
+      // return true;
       // this.currentKeyArray.push(i);
       let errs: (string | false)[] = [];
       let res: boolean | string;
@@ -58,12 +83,12 @@ class CheckInterface implements ICheckInterface {
       errs.push(res);
       if (!!cf && (res = cf(item, true)) === true) return true;
       if (!!cf) errs.push(res);
-      if (errs.length && errs.some(e => typeof e === "string")) {
-        console.log(JSON.stringify(this.currentKeyArray) + " OR \n" + errs.map((e, i) =>
-          this.checkObjectError((typeof e === "string") ? e : (e + "\n"))
-        ).join("\n"));
-      }
-      return typeof res === "string" ? false : res;
+      // if (errs.length && errs.some(e => typeof e === "string")) {
+      //   console.log(this.responseStringError("OR \n" + errs.map((e, i) =>
+      //     this.responseStringError(this.checkObjectError((typeof e === "string") ? e : (e + "\n")))
+      //   ).join("")));
+      // }
+      return new UnionError(expectedMessage, errs) as never;
     }) as ReturnType<ICheckInterface["union"]>);
   }
   checkObjectError(str: string) {
@@ -78,52 +103,69 @@ class CheckInterface implements ICheckInterface {
   // this.assignExpected("expected null value", this.checkNull);
 
   checkNull = this.assignProperties("expected null value", (a): a is null => a === null);
-  checkString = this.assignProperties("expected string value", (a): a is string => typeof a === "string");
 
+  checkString = this.assignProperties("expected string value", (a): a is string => typeof a === "string");
   checkStringEnum = <T extends string>(...values: T[]) => this.assignProperties(
     "expected one string of " + JSON.stringify(values),
     (a): a is T => typeof a === "string" && values.indexOf(a as T) !== -1)
+
   checkBoolean = this.assignProperties("", (a): a is boolean => typeof a === "boolean");
   checkBooleanTrue = this.assignProperties("", (a): a is true => typeof a === "boolean" && a === true);
   checkBooleanFalse = this.assignProperties("", (a): a is false => typeof a === "boolean" && a === false);
+
   checkNumber = this.assignProperties("", (a): a is number => typeof a === "number");
   checkNumberEnum = <T extends number>(...values: T[]) => this.assignProperties(
     "expected one number of " + JSON.stringify(values),
     (a): a is T => typeof a === "number" && values.indexOf(a as T) !== -1)
 
   // checkArrayValue: ()
-  checkArray<T>(checker: ((b, stringError: boolean) => b is T)) {
-    let sourceLine = new Error("checkArray origin");
+  checkArray<T>(checker: ICheckInterfaceFunction<T>) {
+    // let sourceLine = new Error("checkArray origin");
     return this.assignProperties(
-      "expected an array that " + (checker as any).expected,
-      (a): a is T[] => typeof a === "object" && Array.isArray(a) && (a.filter((b, i) => {
-        let res = this.checkArrayValue<number, T>(i, checker, b);
-        return res;
-      }).length === a.length)
-    );
+      "expected an array that " + checker.expected,
+      (a): a is T[] => {
+        if (typeof a !== "object" || !Array.isArray(a)) return false;
+        const errs: Record<number, string> = {};
+        return (a.filter((b, i) => this.checkArrayValue<number, T>(i, checker, b, errs)).length === a.length) || errs as never;
+      });
   }
 
   checkRecord<K extends string | number | symbol, T>(
-    keychecker: ((b) => b is K),
-    checker: ((b, stringError: boolean) => b is T)
+    keychecker: ICheckInterfaceFunction<K>,
+    checker: ICheckInterfaceFunction<T>
   ) {
-    let sourceLine = new Error("checkRecord origin");
-    return this.assignProperties("expected a record that " + (checker as any).expected, (a): a is Record<K, T> => {
+    // let sourceLine = new Error("checkRecord origin");
+    return this.assignProperties("expected a record that " + checker.expected, (a): a is Record<K, T> => {
       const keys = Object.keys(a);
-      return typeof a === "object" && (keys.filter(k => {
-        let res = keychecker(k) && this.checkArrayValue<K, T>(k, checker, a[k]);
-        return res;
-      }).length === keys.length);
+      const errs: Record<K, string> = {} as any;
+      return typeof a === "object"
+        && (keys.filter(k =>
+          this.checkArrayValueResult<any, any>(keychecker(k), errs, k,
+            keychecker.expected ? "key " + keychecker.expected : "")
+          && this.checkArrayValue<K, T>(k as any, checker, a[k], errs)
+        ).length === keys.length) || errs as never;
     });
   }
-  private checkArrayValue<K extends string | number | symbol, T>(k: K, checker: (b: any, stringError: boolean) => b is T, b: any) {
+  private checkArrayValue<K extends string | number | symbol, T>(k: K, checker: ICheckInterfaceFunction<T>, b: any, errs: Record<K, string>) {
     this.currentKeyArray.push(k);
-    let res = checker(b, true);
-    if (typeof res === "string")
-      console.log(JSON.stringify(this.currentKeyArray) + " " + this.checkObjectError(res));
-    else if (!res)
-      console.log(JSON.stringify(this.currentKeyArray) + " " + typeof b);
+    let res = checker(b);
+    res = this.checkArrayValueResult<K, T>(res, errs, k, checker.expected);
     this.currentKeyArray.pop();
+    return res;
+  }
+
+  private checkArrayValueResult<K extends string | number | symbol, T>(res: boolean, errs: Record<K, string>, k: K, expected: string) {
+    if (typeof res === "object" && res !== null || typeof res === "string") {
+      // we have an error hashmap or string
+      if (typeof res === "object")
+        errs[k] = res;
+      else
+        errs[k] = res;
+      res = false;
+    }
+    else if (!res && expected) {
+      errs[k] = expected;
+    }
     return res;
   }
 
@@ -140,8 +182,8 @@ class CheckInterface implements ICheckInterface {
   //   unionKeys?: (keyof T)[]
   // ): (a) => a is T;
   checkObject<T extends {}, REQUIRED extends keyof T = keyof T>(
-    checkermap: { [KEY in REQUIRED]-?: ((b) => b is T[KEY]) },
-    optionalcheckermap: { [KEY in Exclude<keyof T, keyof typeof checkermap>]?: ((b) => b is T[KEY]) } = {},
+    checkermap: { [KEY in REQUIRED]-?: ICheckInterfaceFunction<T[KEY]> },
+    optionalcheckermap: { [KEY in Exclude<keyof T, keyof typeof checkermap>]?: ICheckInterfaceFunction<T[KEY]> } = {},
     /** if these keys do not pass, the item is assumed to be unrelated */
     unionKeys?: (string)[]
   ) {
@@ -178,36 +220,45 @@ class CheckInterface implements ICheckInterface {
           //don't log anything because something else is probably taking care of it
           return null as unknown as false;
         }
-
-        let responseString = "";
-        //make sure every key is either in required or optional
-        //and every key in required is actually present
+        //check for missing required keys and return a string error if any are missing
+        let missingkeys = required.filter(k => keys.indexOf(k) === -1);
+        if (missingkeys.length)
+          return this.responseStringError("missing required keys " + missingkeys.join(',')) as never;
         const log: string[] = [];
         this.errorLog.push(log);
-        let res = (required.filter(k => {
-          let res = keys.indexOf(k) !== -1;
-          log.push(this.responseStringError("required property" + k + " not found"))
-          if (!res) badkey = true;
-          return res;
-        }).length === required.length) && (keys.filter((k): boolean => {
+        let errs: Partial<T> | false = {};
+        let res = (keys.filter((k): boolean => {
           this.currentKeyArray.push(k);
           const keylog: string[] = [];
-          this.errorLog.push(keylog);
+          // this.errorLog.push(keylog);
           let res: boolean;
           if (checkermap[k]) {
             res = checkermap[k](a[k]);
-            if (!res && checkermap[k].expected)
+            if (typeof res === "object" && res !== null || typeof res === "string") {
+              // we have an error hashmap or string
+              errs[k] = res;
+              res = false;
+            } else if (!res && checkermap[k].expected) {
               keylog.push(this.responseStringError(checkermap[k].expected));
+              errs[k] = checkermap[k].expected;
+            }
             if (!res && unionKeys && unionKeys.indexOf(k) !== -1) {
               wrongunionkey = true;
             }
           } else if (optionalcheckermap[k]) {
             res = optionalcheckermap[k](a[k]);
-            if (!res && optionalcheckermap[k].expected)
+            if (typeof res === "object" && res !== null || typeof res === "string") {
+              // we have an error hashmap or string
+              errs[k] = res;
+              res = false;
+            } else if (!res && optionalcheckermap[k].expected) {
               keylog.push(this.responseStringError(optionalcheckermap[k].expected));
+              errs[k] = optionalcheckermap[k].expected;
+            }
           } else {
             res = false;
             keylog.push(this.responseStringError("property is unexpected"));
+            errs[k] = "property is unexpected";
             badkey = true;
           }
           log.push(...keylog);
@@ -215,8 +266,8 @@ class CheckInterface implements ICheckInterface {
           return res;
         }).length === keys.length);
         if (badkey) log.unshift(this.responseStringError(expectedMessage + " but got " + JSON.stringify(Object.keys(a))));
-        if (!stringError && responseString) console.log(log.join('\n'));
-        return (!res && stringError && !wrongunionkey) ? log.join('\n') as never : res;
+        // console.log(log.join('\n'));
+        return (!res && !wrongunionkey) ? errs as never : res;
       });
   }
 
@@ -231,23 +282,29 @@ const checkAccessPerms = checker.checkObject<ServerConfig_AccessOptions>({
   registerNotice: checkBoolean
 });
 const checkOptions = checker.union(
-  checker.checkObject<Config.Options_Auth>({
-    $element: checkStringEnum("auth"),
-    authError: checkNumberEnum(403, 404),
-    authList: checker.union(checker.checkArray(checkString), checkNull)
-  }, undefined, ["$element"]),
-  checker.checkObject<Config.Options_Backups>({
-    $element: checkStringEnum("backups"),
-    backupFolder: checkString,
-    etagAge: checkNumber,
-    gzip: checkBoolean
-  }, undefined, ["$element"]),
-  checker.checkObject<Config.Options_Index>({
-    $element: checkStringEnum("index"),
-    defaultType: checker.union(checkStringEnum("html", "json"), checkNumberEnum(404, 403)),
-    indexExts: checker.checkArray(checkString),
-    indexFile: checker.checkArray(checkString)
-  }, undefined, ["$element"])
+  checker.checkObject<Config.Options_Auth, "$element">(
+    {
+      $element: checkStringEnum("auth"),
+    }, {
+      authError: checkNumberEnum(403, 404),
+      authList: checker.union(checker.checkArray(checkString), checkNull)
+    }, ["$element"]),
+  checker.checkObject<Config.Options_Backups, "$element">(
+    {
+      $element: checkStringEnum("backups"),
+    }, {
+      backupFolder: checkString,
+      etagAge: checkNumber,
+      gzip: checkBoolean
+    }, ["$element"]),
+  checker.checkObject<Config.Options_Index, "$element">(
+    {
+      $element: checkStringEnum("index"),
+    }, {
+      defaultType: checker.union(checkStringEnum("html", "json"), checkNumberEnum(404, 403)),
+      indexExts: checker.checkArray(checkString),
+      indexFile: checker.checkArray(checkString)
+    }, ["$element"])
 );
 const GroupChild = checker.union(
   checker.checkObject<Config.PathElement>({
@@ -265,7 +322,7 @@ const GroupChild = checker.union(
     indexPath: checker.union(checkString, checkBooleanFalse),
   }, undefined, ["$element"])
 );
-export const checkServerConfig = checker.checkObject<ServerConfig>({
+const _checkServerConfig = checker.checkObject<ServerConfig>({
   $schema: checkString,
   __assetsDir: checkString,
   __dirname: checkString,
@@ -277,7 +334,7 @@ export const checkServerConfig = checker.checkObject<ServerConfig>({
     $element: checkStringEnum<"host">("host"),
     $mount: GroupChild
   })),
-  authAccounts: checker.checkRecord(checkString, checker.checkObject<ServerConfig_AuthAccountsValue>({
+  authAccounts: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]>({
     clientKeys: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
       publicKey: checkString,
       cookieSalt: checkString
@@ -319,3 +376,9 @@ export const checkServerConfig = checker.checkObject<ServerConfig>({
     maxAge_tw_plugins: checkNumber
   })
 });
+export function checkServerConfig(obj) {
+  let res = _checkServerConfig(obj);
+  debugger;
+  console.log(JSON.stringify(res, null, 2));
+  return res;
+};
