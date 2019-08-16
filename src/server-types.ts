@@ -7,7 +7,7 @@ import { format, promisify } from "util";
 // import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
-import { send, ajv, ws as WebSocket, JSON5 } from '../lib/bundled-lib';
+import { send, ws as WebSocket, JSON5 } from '../lib/bundled-lib';
 import { Stats, appendFileSync } from 'fs';
 import { gzip } from 'zlib';
 import { Writable, Stream } from 'stream';
@@ -132,17 +132,17 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 
 	if (!settingsObjSource.$schema) throw "The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new"
 
-	var schemaChecker = new ajv({ allErrors: true, async: false });
-	schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
-	// schemaChecker.addMetaSchema(require("../settings-2-1.schema.json"));
-	schemaChecker.addMetaSchema(require("../settings-2-1-tree.schema.json"));
-	schemaChecker.addMetaSchema(require("../settings-2-1-tree-options.schema.json"));
-	var validate = schemaChecker.compile(require(
-		path.resolve(path.dirname(settingsFile), settingsObjSource.$schema)
-	));
-	var valid = validate(settingsObjSource, "settings");
-	var validationErrors = validate.errors;
-	if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
+	// var schemaChecker = new ajv({ allErrors: true, async: false });
+	// schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
+	// // schemaChecker.addMetaSchema(require("../settings-2-1.schema.json"));
+	// schemaChecker.addMetaSchema(require("../settings-2-1-tree.schema.json"));
+	// schemaChecker.addMetaSchema(require("../settings-2-1-tree-options.schema.json"));
+	// var validate = schemaChecker.compile(require(
+	// 	path.resolve(path.dirname(settingsFile), settingsObjSource.$schema)
+	// ));
+	// var valid = validate(settingsObjSource, "settings");
+	// var validationErrors = validate.errors;
+	// if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
 
 	if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
 	// let routeKeys = Object.keys(routes);
