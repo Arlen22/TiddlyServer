@@ -47,10 +47,10 @@ const setAuth = (settings: ServerConfig) => {
 		// console.log(k, e, e.clientKeys);
 		if (e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
 			console.log(k, u, e.clientKeys[u]);
-			const publicKey = from_base64(e.clientKeys[u][0]);
+			const publicKey = from_base64(e.clientKeys[u].publicKey);
 			// let t = e.clientKeys[u];
 			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
-			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u][0], e.clientKeys[u][1]];
+			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u].publicKey, e.clientKeys[u].userSalt];
 			else throw "publicKey+username combination is used for more than one authAccount";
 		});
 		// if (e.passwords) Object.keys(e.passwords).forEach(u => {
@@ -214,7 +214,7 @@ export function handleAuthRoute(state: StateObject) {
 				return; //recieve body sent a response already
 			if (!state.body.length) {
 				return state.throwReason(400, "Empty request body");
-			} 
+			}
 			if (!expect<{ setCookie: string, publicKey: string }>(state.json, ["setCookie", "publicKey"]))
 				return state.throwReason(400, "Improper request body");
 			/** [username, type, timestamp, hash, sig] */
