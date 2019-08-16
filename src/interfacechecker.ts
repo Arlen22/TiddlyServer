@@ -280,7 +280,7 @@ export const checkServerConfig = checker.checkObject<ServerConfig>({
   authAccounts: checker.checkRecord(checkString, checker.checkObject<ServerConfig_AuthAccountsValue>({
     clientKeys: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
       publicKey: checkString,
-      userSalt: checkString
+      cookieSalt: checkString
     })),
     permissions: checkAccessPerms
   })),

@@ -50,7 +50,7 @@ const setAuth = (settings: ServerConfig) => {
 			const publicKey = from_base64(e.clientKeys[u].publicKey);
 			// let t = e.clientKeys[u];
 			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
-			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u].publicKey, e.clientKeys[u].userSalt];
+			if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u].publicKey, e.clientKeys[u].cookieSalt];
 			else throw "publicKey+username combination is used for more than one authAccount";
 		});
 		// if (e.passwords) Object.keys(e.passwords).forEach(u => {
