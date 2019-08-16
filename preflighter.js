@@ -2,14 +2,14 @@ import { StateObject } from "./src/server-types";
 
 const USERNAME = "";
 const PASSWORD = "";
-
+const ALLOW_UNSECURED_WEBSOCKETS = false;
 /**
  * @param {import("./src/server-types").RequestEventHTTP} ev
  */
 exports.preflighter = async function (ev) {
 	if (!USERNAME && !PASSWORD) return ev;
 	if (ev.response) ev.handled = !handleBasicAuth(ev.request, ev.response);
-	else {
+	else if (!ALLOW_UNSECURED_WEBSOCKETS && ev.client) {
 		//reject all websocket connections because they do not have basic auth
 		ev.client.close();
 		ev.handled = true;
