@@ -339,3 +339,27 @@ Yurii Rashkovskii, @yrashk, 2018/10/19
 Abraham Samma, @abesamma, 2018/10/31
 
 German Ramírez, @g0erman, 2018/11/14
+
+@00SS, 2018/12/10
+
+David Nebauer, @dnebauer, 2019/01/01
+
+Moritz Ulrich, @the-kenny, 2019/01/03
+
+Johannes Löthberg, @kyrias, 2019/01/07
+
+Ben Webber, @benwebber, 2019/01/09
+
+Jesse Weinstein, @JesseWeinstein, 2019/01/14
+
+Adam Sherwood, @admls, 2019/01/27
+
+Joshua Fontany, @joshuafontany, 2019/03/07
+
+Irene Castaños, @jdjdjdjdjdjd, 2019/03/11
+
+Dong Zhihong, @donmor, 2019/05/29
+
+Joshua Stubbs, @LordRatte, 2019/05/31
+
+Robin Munn, @rmunn, 2019/06/16
