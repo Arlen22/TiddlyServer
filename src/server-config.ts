@@ -599,9 +599,18 @@ export interface NewTreeMountArgs {
 
 
 }
-
+type PartialExcept<T extends {}, REQUIRED extends keyof T> = {
+	[KEY in Extract<keyof T, REQUIRED>]-?: T[KEY];
+} & {
+	[KEY in Exclude<keyof T, REQUIRED>]?: T[KEY];
+}
 type OptionElementsSchema = NewTreePathOptions_Index | NewTreePathOptions_Auth | NewTreePathOptions_Backup;
 export interface OptionsSchema {
+	auth: PartialExcept<Config.Options_Auth, "$element">,
+	backups: PartialExcept<Config.Options_Backups, "$element">,
+	index: PartialExcept<Config.Options_Index, "$element">
+}
+export interface OptionsConfig {
 	auth: Config.Options_Auth,
 	backups: Config.Options_Backups,
 	index: Config.Options_Index
@@ -807,13 +816,9 @@ namespace Test {
 
 
 /** @default { "$element": "" } */
-export type NewTreeOptions = NewTreeOptionsObject[keyof NewTreeOptionsObject];
+export type NewTreeOptions = Config.OptionElements
 
-export interface NewTreeOptionsObject {
-	auth: NewTreePathOptions_Auth,
-	backups: NewTreePathOptions_Backup,
-	index: NewTreePathOptions_Index
-}
+export type NewTreeOptionsObject = OptionsSchema
 
 export interface NewTreePathOptions_Index {
 	/**

@@ -33,7 +33,7 @@
               "type": "null"
             }
           ],
-          "description": "list of keys from authAccounts object that can access this resource"
+          "description": "Array of keys from authAccounts object that can access this resource. Null allows all, except anonymous."
         }
       },
       "required": [
