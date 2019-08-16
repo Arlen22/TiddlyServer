@@ -19,3 +19,4 @@ newtree.xml
 *.cer
 assets/authenticate/salts-backup.json
 /settings/*
+.DS_Store
