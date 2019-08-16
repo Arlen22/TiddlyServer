@@ -30,7 +30,7 @@ import { Stream, Writable } from "stream";
 import { send, formidable } from '../lib/bundled-lib';
 import { Stats } from "fs";
 // import { last } from "rxjs/operator/last";
-import { NewTreeOptions, NewTreePathOptions_Backup, NewTreePathOptions_Index, NewTreeOptionsObject } from "./server-config";
+import { NewTreeOptions, NewTreePathOptions_Backup, NewTreePathOptions_Index, NewTreeOptionsObject, OptionsSchema, OptionsConfig } from "./server-config";
 
 // const debugTag = "SER-API";
 __dirname = path.dirname(module.filename || process.execPath);
@@ -75,7 +75,7 @@ type apiListRouteState = [[string, string], string | any, StateObject]
 // }
 
 export function getTreeOptions(state: StateObject) {
-	let options: NewTreeOptionsObject = {
+	let options: OptionsConfig = {
 		auth: { $element: "auth", authError: 403, authList: null },
 		backups: { $element: "backups", backupFolder: "", etagAge: 0, gzip: true },
 		index: { $element: "index", defaultType: "html", indexFile: [], indexExts: [] }

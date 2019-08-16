@@ -37,7 +37,8 @@ import {
 	normalizeSettings,
 	ConvertSettings,
 	NewTreeOptionsObject,
-	Config
+	Config,
+	OptionsConfig
 } from "./server-config";
 export {
 	Config,
@@ -1132,7 +1133,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
 	ancestry: (NewTreeGroup | NewTreePath)[];
 	/** The tree ancestors options as they apply to this request */
 	//@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-	treeOptions: NewTreeOptionsObject;
+	treeOptions: OptionsConfig;
 
 	url: StateObjectUrl;
 
