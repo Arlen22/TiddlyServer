@@ -164,9 +164,7 @@ class CheckInterface implements ICheckInterface {
       (a, stringError: boolean = false): a is T => {
         if (typeof a !== "object") return false;
         const keys = Object.keys(a);
-        // const required = Object.keys(checkermap);
         const checkOrder: string[] = [...required];
-        // const optional = Object.keys(optionalcheckermap);
         optional.forEach(k => { if (checkOrder.indexOf(k) === -1) checkOrder.push(k); });
         let badkey = false;
         //check if any union keys don't validate
@@ -188,6 +186,7 @@ class CheckInterface implements ICheckInterface {
         this.errorLog.push(log);
         let res = (required.filter(k => {
           let res = keys.indexOf(k) !== -1;
+          log.push(this.responseStringError("required property" + k + " not found"))
           if (!res) badkey = true;
           return res;
         }).length === required.length) && (keys.filter((k): boolean => {
