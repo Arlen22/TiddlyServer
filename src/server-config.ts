@@ -430,7 +430,7 @@ export interface ServerConfig_AuthAccountsValue {
 	// /** Record[username] = password */
 	// passwords: Record<string, string>,
 	/** 
-	 * @default {"username":{"publicKey":"","userSalt":""}}
+	 * @default {"username":{"publicKey":"","cookieSalt":""}}
 	 */
 	clientKeys: {
 		/**
@@ -439,8 +439,14 @@ export interface ServerConfig_AuthAccountsValue {
 		[P: string]: {
 			/** public key */
 			publicKey: string,
-			/** user salt */
-			userSalt: string
+			/** 
+			 * String which will be added to the cookie by the server.
+			 * Changing it will invalidate all current cookies for this user,
+			 * which requires them to login again on each device. 
+			 * `node -e "console.log(Date.now())"` will print the current timestamp,
+			 * which you can use to make sure you get one that you've never used it before. 
+			 */
+			cookieSalt: string
 		}
 	}; // Record<string, [string, string]>,
 	/** override hostLevelPermissions for users with this account */
@@ -647,7 +653,7 @@ export namespace Config {
 		 * Note that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.
 		 */
 		$element: "auth";
-		/** list of keys from authAccounts object that can access this resource */
+		/** Array of keys from authAccounts object that can access this resource. Null allows all, except anonymous. */
 		authList: string[] | null;
 		/** 
 		 * Which error code to return for unauthorized (or anonymous) requests

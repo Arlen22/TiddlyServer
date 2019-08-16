@@ -255,25 +255,25 @@
             "additionalProperties": false,
             "description": "Changing the public key or cookie suffix will require the user to log in again.",
             "properties": {
-              "publicKey": {
-                "description": "public key",
+              "cookieSalt": {
+                "description": "String which will be added to the cookie by the server.\nChanging it will invalidate all current cookies for this user,\nwhich requires them to login again on each device. \n`node -e \"console.log(Date.now())\"` will print the current timestamp,\nwhich you can use to make sure you get one that you've never used it before.",
                 "type": "string"
               },
-              "userSalt": {
-                "description": "user salt",
+              "publicKey": {
+                "description": "public key",
                 "type": "string"
               }
             },
             "required": [
               "publicKey",
-              "userSalt"
+              "cookieSalt"
             ],
             "type": "object"
           },
           "default": {
             "username": {
-              "publicKey": "",
-              "userSalt": ""
+              "cookieSalt": "",
+              "publicKey": ""
             }
           },
           "type": "object"
