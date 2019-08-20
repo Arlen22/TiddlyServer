@@ -1173,7 +1173,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
 		/** The HostElement array index in settings.tree */
 		public treeHostIndex: number,
 		public username: string,
-		public settings: ServerConfig,
+		public readonly settings: Readonly<ServerConfig>,
 		public debugOutput: Writable
 	) {
 		this.startTime = process.hrtime();

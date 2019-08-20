@@ -47,16 +47,16 @@ function as<T>(obj: T) {
 }
 
 function normalizeOptions(keypath: string[], a: OptionsSchema[keyof OptionsSchema]) {
-	if(typeof a.$element !== "string") throw new Error("Missing $element property " + keypath.join('.'));
-	
+	if (typeof a.$element !== "string") throw new Error("Missing $element property " + keypath.join('.'));
+
 	if (a.$element === "auth") {
-		
-	} else if (a.$element === "backups") {
+
+	} else if (a.$element === "putsaver") {
 
 	} else if (a.$element === "index") {
 
 	} else {
-		let { $element } = a; 
+		let { $element } = a;
 		throw new Error("Invalid element " + $element + " found at " + keypath.join('.'));
 	}
 }
@@ -254,10 +254,10 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 		authAccounts: set.authAccounts({}),
 		putsaver: {
 			// ...{
-			etagWindow: set.putsaver.etagWindow(3),
-			backupDirectory: set.putsaver.backupDirectory(""),
-			etag: set.putsaver.etag("")
-
+			etagAge: set.putsaver.etagAge(3),
+			backupFolder: set.putsaver.backupFolder(""),
+			etag: set.putsaver.etag("optional")
+			
 			// },
 			// ...spread(set.putsaver),
 			// ...{
@@ -300,8 +300,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 	});
 
 
-	if (newset.putsaver.backupDirectory)
-		newset.putsaver.backupDirectory = pathResolveWithUser(settingsDir, newset.putsaver.backupDirectory);
+	if (newset.putsaver && newset.putsaver.backupFolder)
+		newset.putsaver.backupFolder = pathResolveWithUser(settingsDir, newset.putsaver.backupFolder);
 	if (newset.logging.logAccess)
 		newset.logging.logAccess = pathResolveWithUser(settingsDir, newset.logging.logAccess);
 	if (newset.logging.logError)
@@ -310,7 +310,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 	newset.__dirname = settingsDir;
 	newset.__filename = settingsFile;
 
-	if (newset.putsaver.etag === "disabled" && !newset.putsaver.backupDirectory) {
+	if (newset.putsaver && newset.putsaver.etag === "disabled" && !newset.putsaver.backupFolder) {
 		console.log("Etag checking is disabled, but a backup folder is not set. "
 			+ "Changes made in multiple tabs/windows/browsers/computers can overwrite each "
 			+ "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED "
@@ -407,7 +407,7 @@ export interface ServerConfig {
 	/** directory index */
 	directoryIndex: ServerConfig_DirectoryIndex
 	/** PUT saver options */
-	putsaver: ServerConfig_TiddlyServer
+	putsaver: ServerConfig_TiddlyServer | false
 	/** 
 	 * The Hashmap of accounts which may authenticate on this server.
 	 * Takes either an object or a string to a `require`-able file (such as .js or .json) 
@@ -573,16 +573,24 @@ export interface ServerConfig_DirectoryIndex {
 	mimetypes: { [type: string]: string[] }
 }
 export interface ServerConfig_TiddlyServer {
-	/** backup directory for saving SINGLE-FILE wikis only */
-	backupDirectory: string
+	/** 
+	 * Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired. 
+	 */
+	backupFolder?: string,
+	/** 
+	 * GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience).
+	 */
+	gzipBackups?: boolean,
+	/** 
+	 * Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup. 
+	 */
+	etagAge?: number,
 	/** 
 	 * Whether to use the etag field -- if not specified then it will check it if presented.
 	 * This does not affect the backup etagAge option, as the saving mechanism will still 
 	 * send etags back to the browser, regardless of this option.
 	 */
-	etag: "required" | "disabled" | ""
-	/** etag does not need to be exact by this many seconds */
-	etagWindow: number
+	etag?: "required" | "disabled" | "optional"
 }
 
 // export interface NewTreeGroupSchema extends NewTreeGroupSchemaHashmap {
@@ -631,7 +639,7 @@ export interface OptionsSchema {
 /** Used by the StateObject to compile the final Options object for the request */
 export interface OptionsConfig {
 	auth: Required<Config.Options_Auth>,
-	backups: Required<Config.Options_Backups>,
+	putsaver: Required<Config.Options_Backups>,
 	index: Required<Config.Options_Index>
 }
 /** The options array schema is in `settings-2-1-tree-options.schema.json` */
@@ -690,21 +698,10 @@ export namespace Config {
 		 */
 		authError?: 403 | 404;
 	}
-	export interface Options_Backups {
+	export interface Options_Backups extends ServerConfig_TiddlyServer {
 		/** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
-		$element: "backups",
-		/** 
-		 * Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired. 
-		 */
-		backupFolder?: string,
-		/** 
-		 * GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience).
-		 */
-		gzip?: boolean,
-		/** 
-		 * Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup. 
-		 */
-		etagAge?: number,
+		$element: "putsaver",
+
 	}
 
 	export function isOption(a: any): a is OptionElements {
@@ -1023,9 +1020,9 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
 			debugLevel: set.debugLevel,
 		},
 		putsaver: {
-			etag: set.etag,
-			etagWindow: set.etagWindow,
-			backupDirectory: ""
+			etag: set.etag || "optional",
+			etagAge: set.etagWindow,
+			backupFolder: "",
 		},
 		authAccounts: {},
 		directoryIndex: {

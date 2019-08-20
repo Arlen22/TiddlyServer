@@ -5,7 +5,7 @@ import {
 	StatPathResult, TreeObject, PathResolverResult, TreePathResult, resolvePath,
 	sendDirectoryIndex, statWalkPath, DirectoryIndexOptions, DirectoryIndexData,
 	ServerEventEmitter, ER, getTreePathFiles, NewTreePathOptions_Auth, StandardResponseHeaders,
-	serveFile, Config
+	serveFile, Config, as
 } from "./server-types";
 
 import * as fs from 'fs';
@@ -21,7 +21,7 @@ import { EventEmitter } from "events";
 import { handleDataFolderRequest, init as initTiddlyWiki, handleTiddlyWikiRoute } from "./datafolder";
 export { handleTiddlyWikiRoute };
 
-import { format, inspect, promisify } from "util";
+import { format, inspect, promisify, puts } from "util";
 import { Stream, Writable } from "stream";
 // import { Subscribable } from "rxjs/Observable";
 // import { NextObserver, ErrorObserver, CompletionObserver } from "rxjs/Observer";
@@ -75,15 +75,24 @@ type apiListRouteState = [[string, string], string | any, StateObject]
 // }
 
 export function getTreeOptions(state: StateObject) {
+	//nonsense we have to write because putsaver could be false
+	type putsaverT = Required<typeof state.settings.putsaver>;
+	let putsaver = as<Exclude<putsaverT, false>>({
+		gzipBackups: true,
+		backupFolder: "",
+		etag: "optional",
+		etagAge: 3,
+		...(state.settings.putsaver || {})
+	});
 	let options: OptionsConfig = {
 		auth: { $element: "auth", authError: 403, authList: null },
-		backups: { $element: "backups", backupFolder: "", etagAge: 0, gzip: true },
-		index: { $element: "index", defaultType: "html", indexFile: [], indexExts: [] }
+		putsaver: { $element: "putsaver", ...putsaver },
+		index: { $element: "index", defaultType: state.settings.directoryIndex.defaultType, indexFile: [], indexExts: [] }
 	}
 	state.ancestry.forEach((e) => {
 		// console.log(e);
-		e.$children && e.$children.forEach((f) => {
-			if (f.$element === "auth" || f.$element === "backups" || f.$element === "index") {
+		e.$children && e.$children.forEach((f: Config.MountElement | Config.OptionElements) => {
+			if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
 				Object.keys(f).forEach(k => {
 					if (f[k] === undefined) return;
 					options[f.$element][k] = f[k];
@@ -308,6 +317,12 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 /// file handler section =============================================
 
 function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
+	if (state.settings.putsaver === false) {
+		let message = "PUT saver is disabled on this server";
+		state.log(-2, message);
+		state.respond(405, message).string(message);
+		return;
+	}
 	// const hash = createHash('sha256').update(fullpath).digest('base64');
 	const first = (header?: string | string[]) =>
 		Array.isArray(header) ? header[0] : header;
@@ -328,15 +343,15 @@ function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype:
 		let headTime = +ifmatch[2];
 		let diskTime = mtime;
 		// console.log(settings.etagWindow, diskTime, headTime);
-		if (!state.settings.putsaver.etagWindow || diskTime - (state.settings.putsaver.etagWindow * 1000) > headTime)
+		if (!state.settings.putsaver.etagAge || diskTime - (state.settings.putsaver.etagAge * 1000) > headTime)
 			return state.throw(412);
-		console.log('412 prevented by etagWindow of %s seconds', state.settings.putsaver.etagWindow);
+		console.log('412 prevented by etagWindow of %s seconds', state.settings.putsaver.etagAge);
 	}
 	new Promise((resolve, reject) => {
-		if (state.settings.putsaver.backupDirectory) {
+		if (state.treeOptions.putsaver.backupFolder) {
 			const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
 			const ext = path.extname(backupFile);
-			const backupWrite = fs.createWriteStream(path.join(state.settings.putsaver.backupDirectory, backupFile + "-" + mtime + ext + ".gz"));
+			const backupWrite = fs.createWriteStream(path.join(state.treeOptions.putsaver.backupFolder, backupFile + "-" + mtime + ext + ".gz"));
 			const fileRead = fs.createReadStream(fullpath);
 			const gzip = zlib.createGzip();
 			const pipeError = (err) => {

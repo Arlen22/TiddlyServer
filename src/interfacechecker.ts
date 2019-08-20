@@ -1,5 +1,9 @@
 
-import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValue, Config } from "./server-config";
+import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValue, Config, ServerConfig_TiddlyServer } from "./server-config";
+
+function as<T>(obj: T) {
+  return obj;
+}
 
 export function checkInterface() {
 
@@ -28,6 +32,7 @@ interface ICheckInterface {
   checkNull: ICheckInterfaceFunction<null>;
   checkString: ICheckInterfaceFunction<string>;
   checkStringEnum: <T extends string>(...values: T[]) => ICheckInterfaceFunction<T>;
+  checkStringNotEmpty: ICheckInterfaceFunction<string>
   checkBoolean: ICheckInterfaceFunction<boolean>;
   checkBooleanTrue: ICheckInterfaceFunction<true>;
   checkBooleanFalse: ICheckInterfaceFunction<false>;
@@ -45,6 +50,8 @@ interface ICheckInterface {
     unionKeys?: (string)[]
   )
 }
+type RequiredCheckermap<T, REQUIRED extends keyof T> = { [KEY in REQUIRED]-?: ICheckInterfaceFunction<T[KEY]> };
+type OptionalCheckermap<T, REQUIRED> = { [KEY in Exclude<keyof T, REQUIRED>]?: ICheckInterfaceFunction<T[KEY]> };
 class CheckInterface implements ICheckInterface {
 
   errorLog: string[][] = [];
@@ -96,7 +103,7 @@ class CheckInterface implements ICheckInterface {
   checkStringEnum = <T extends string>(...values: T[]) => this.assignProperties(
     "expected one string of " + JSON.stringify(values),
     (a): a is T => typeof a === "string" && values.indexOf(a as T) !== -1)
-
+  checkStringNotEmpty = this.assignProperties("expected string with length more than 0", (a): a is string => typeof a === "string" && a.length > 0);
   checkBoolean = this.assignProperties("", (a): a is boolean => typeof a === "boolean");
   checkBooleanTrue = this.assignProperties("", (a): a is true => typeof a === "boolean" && a === true);
   checkBooleanFalse = this.assignProperties("", (a): a is false => typeof a === "boolean" && a === false);
@@ -172,8 +179,8 @@ class CheckInterface implements ICheckInterface {
    * @returns {true} true: All properties are valid
    */
   checkObject<T extends {}, REQUIRED extends keyof T = keyof T>(
-    checkermap: { [KEY in REQUIRED]-?: ICheckInterfaceFunction<T[KEY]> },
-    optionalcheckermap: { [KEY in Exclude<keyof T, keyof typeof checkermap>]?: ICheckInterfaceFunction<T[KEY]> } = {},
+    checkermap: RequiredCheckermap<T, REQUIRED>,
+    optionalcheckermap: OptionalCheckermap<T, keyof typeof checkermap> = {},
     /** if these keys do not pass, the item is assumed to be unrelated */
     unionKeys?: (string)[]
   ) {
@@ -259,6 +266,7 @@ class CheckInterface implements ICheckInterface {
   }
 
 }
+
 let checker = new CheckInterface();
 let { checkBoolean, checkString, checkStringEnum, checkNumber, checkNumberEnum, checkBooleanFalse, checkNull } = checker;
 const checkAccessPerms = checker.checkObject<ServerConfig_AccessOptions>({
@@ -268,6 +276,12 @@ const checkAccessPerms = checker.checkObject<ServerConfig_AccessOptions>({
   writeErrors: checkBoolean,
   registerNotice: checkBoolean
 });
+const putsaverOptional = as<OptionalCheckermap<ServerConfig_TiddlyServer, never>>({
+  backupFolder: checkString,
+  etag: checkStringEnum("optional", "required", "disabled"),
+  etagAge: checkNumber,
+  gzipBackups: checkBoolean
+});
 const checkOptions = checker.union(
   checker.checkObject<Config.Options_Auth, "$element">(
     {
@@ -276,14 +290,9 @@ const checkOptions = checker.union(
       authError: checkNumberEnum(403, 404),
       authList: checker.union(checker.checkArray(checkString), checkNull)
     }, ["$element"]),
-  checker.checkObject<Config.Options_Backups, "$element">(
-    {
-      $element: checkStringEnum("backups"),
-    }, {
-      backupFolder: checkString,
-      etagAge: checkNumber,
-      gzip: checkBoolean
-    }, ["$element"]),
+  checker.checkObject<Config.Options_Backups, "$element">({
+    $element: checkStringEnum("putsaver"),
+  }, putsaverOptional, ["$element"]),
   checker.checkObject<Config.Options_Index, "$element">(
     {
       $element: checkStringEnum("index"),
@@ -309,6 +318,7 @@ const GroupChild = checker.union(
     indexPath: checker.union(checkString, checkBooleanFalse),
   }, undefined, ["$element"])
 );
+
 const _checkServerConfig = checker.checkObject<ServerConfig>({
   $schema: checkString,
   __assetsDir: checkString,
@@ -324,7 +334,7 @@ const _checkServerConfig = checker.checkObject<ServerConfig>({
   authAccounts: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]>({
     clientKeys: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
       publicKey: checkString,
-      cookieSalt: checkString
+      cookieSalt: checker.checkStringNotEmpty
     })),
     permissions: checkAccessPerms
   })),
@@ -352,11 +362,7 @@ const _checkServerConfig = checker.checkObject<ServerConfig>({
     logError: checkString,
     logToConsoleAlso: checkBoolean
   }),
-  putsaver: checker.checkObject<ServerConfig["putsaver"]>({
-    backupDirectory: checkString,
-    etag: checkStringEnum("", "required", "disabled"),
-    etagWindow: checkNumber
-  }),
+  putsaver: checker.union(checker.checkObject<ServerConfig["putsaver"]>({}, putsaverOptional), checker.checkBooleanFalse),
   EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
     alwaysRefreshCache: checkBoolean,
     enabled: checkBoolean,
