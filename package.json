@@ -5,6 +5,7 @@
   "bin": {
     "tiddlyserver": "./server.js"
   },
+  "main": "./lib/compiled-lib.js",
   "dependencies": {
     "@material/textfield": "^0.44.0",
     "@types/send": "^0.14.4",
