@@ -47,7 +47,7 @@
         "$element": {
           "description": "Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements.",
           "enum": [
-            "backups"
+            "putsaver"
           ],
           "type": "string"
         },
@@ -55,11 +55,20 @@
           "description": "Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired.",
           "type": "string"
         },
+        "etag": {
+          "description": "Whether to use the etag field -- if not specified then it will check it if presented.\nThis does not affect the backup etagAge option, as the saving mechanism will still \nsend etags back to the browser, regardless of this option.",
+          "enum": [
+            "required",
+            "disabled",
+            "optional"
+          ],
+          "type": "string"
+        },
         "etagAge": {
           "description": "Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup.",
           "type": "number"
         },
-        "gzip": {
+        "gzipBackups": {
           "description": "GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience).",
           "type": "boolean"
         }
