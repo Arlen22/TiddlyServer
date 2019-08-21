@@ -358,6 +358,7 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	}
 	//send the data to the preflighter
 	return (preflighter ? preflighter(ev) : Promise.resolve(ev)).then(ev2 => {
+		if(ev2.handled) return ev2; //cancel early if it is handled
 		//sanity checks after the preflighter
 		//"always check all variables and sometimes check some constants too" -- Arlen Beiler
 		//@ts-ignore
