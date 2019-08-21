@@ -176,11 +176,18 @@ export interface RequestEvent {
 	/** hostLevelPermissions key to be applied to this request */
 	localAddressPermissionsKey: string;
 	/** 
-	 * @argument iface HTTP server "host" option for this request (i.e. server.listen bind address), 
-	 * @argument host the host header, 
-	 * @argument addr socket.localAddress 
+	 * @property iface HTTP server "host" option for this request (i.e. server.listen bind address), 
+	 * @property host the host header, 
+	 * @property addr socket.localAddress 
 	 */
-	interface: { iface: string, host: string | undefined, addr: string };
+	interface: {
+		/** HTTP server "host" option for this request (i.e. server.listen bind address) */
+		iface: string,
+		/** the host header */
+		host: string | undefined,
+		/** socket.localAddress */
+		addr: string
+	};
 	/** tree hosts array index to be applied to this request */
 	treeHostIndex: number;
 	/** the ServerConfig currently in use on the server */
