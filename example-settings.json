@@ -1,23 +1,30 @@
 {
-  //The JSON5 parser allows comments!
-  //All relative paths are relative to this file.
-  "tree": {
-    //this tree is just going to mount one folder: webroot
-    "$element": "folder",
-    "path": "../webroot",
-  },
-  "bindInfo": {
-		// V V V V Uncomment one of the following V V V V 
-    //bind to localhost only (you can specify any ip address in this array)
-		// "bindAddress": ["127.0.0.1"],
-		//bind to all interfaces available
-		// "bindWildcard": true
-		//workaround for android devices (bind to all available ip addresses on startup)
-		// "bindWildcard": false, "bindAddress": ["0.0.0.0/0"], "filterBindAddress": true
-  },
-  "putsaver": {
+	//The JSON5 parser allows comments!
+	//All relative paths are relative to this file.
+  "tree": "../webroot", //this tree is just going to mount one folder: webroot
+
+  // That line could also look like this:
+  // { 
+	// 	//this tree is just going to mount one folder: webroot
+	// 	"$element": "folder",
+	// 	"path": "../webroot",
+  // },
+  
+	"bindInfo": {
+    // V V V V Uncomment one of the following V V V V 
+    
+		//bind to localhost only (you can specify any other ip address in this array, and it will bind to all available addresses)
+    // "bindAddress": ["127.0.0.1"],
+    
+		//bind to 0.0.0.0
+    // "bindWildcard": true
+    
+		//workaround for android devices (bind to all available private ip addresses on startup)
+		// "bindWildcard": false, "bindAddress": ["192.168.0.0/16", "10.0.0.0/8", "172.31.0.0/16"], "filterBindAddress": true,
+	},
+	"putsaver": {
 		//single file wikis will backup to this directory on every save
-    "backupDirectory": "../backups" // or "" to disable backups
-  },
-  "$schema": "./settings-2-1.schema.json"
+		"backupFolder": "../backups" // or "" to disable backups
+	},
+	"$schema": "./settings-2-1.schema.json"
 }
