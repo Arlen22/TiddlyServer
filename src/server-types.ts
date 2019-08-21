@@ -167,13 +167,9 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
 
 
 export interface RequestEvent {
-	/** 
-	 * Allows the preflighter to mark the request as handled, indicating it should not be processed further, 
-	 * in which case, the preflighter takes full responsibility for the request, including calling end or close. 
-	 * This is useful in case the preflighter wants to reject the request or initiate authentication, or wants to 
-	 * handle a request using some other routing module. Do not override the /assets path or certain static assets will not be available.
-	 */
+	/** mark the request as handled, canceling any further processing */
 	handled: boolean;
+	/** the username to give to data folders and anywhere else it is needed */
 	username: string;
 	/** auth account key to be applied to this request */
 	authAccountKey: string;
