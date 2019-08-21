@@ -1,30 +1,32 @@
 {
 	//The JSON5 parser allows comments!
 	//All relative paths are relative to this file.
-  "tree": "../webroot", //this tree is just going to mount one folder: webroot
+	//The user directory prefix ~ is allowed.
 
-  // That line could also look like this:
-  // { 
-	// 	//this tree is just going to mount one folder: webroot
+	"tree": "../webroot", //this tree is just going to mount a folder as root: ../webroot
+
+	// That line could also look like this:
+	// { 
+	// 	//this tree is just going to mount a folder as root: ../webroot
 	// 	"$element": "folder",
 	// 	"path": "../webroot",
-  // },
-  
+	// },
+
 	"bindInfo": {
-    // V V V V Uncomment one of the following V V V V 
-    
+		// V V V V Uncomment one of the following V V V V 
+
 		//bind to localhost only (you can specify any other ip address in this array, and it will bind to all available addresses)
-    // "bindAddress": ["127.0.0.1"],
-    
+		// "bindAddress": ["127.0.0.1"],
+
 		//bind to 0.0.0.0
-    // "bindWildcard": true
-    
+		// "bindWildcard": true
+
 		//workaround for android devices (bind to all available private ip addresses on startup)
 		// "bindWildcard": false, "bindAddress": ["192.168.0.0/16", "10.0.0.0/8", "172.31.0.0/16"], "filterBindAddress": true,
 	},
 	"putsaver": {
 		//single file wikis will backup to this directory on every save
-		"backupFolder": "../backups" // or "" to disable backups
+		"backupFolder": "../backups" // comment out or set to "" to disable backups
 	},
 	"$schema": "./settings-2-1.schema.json"
 }

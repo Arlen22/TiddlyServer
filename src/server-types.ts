@@ -175,11 +175,6 @@ export interface RequestEvent {
 	authAccountKey: string;
 	/** hostLevelPermissions key to be applied to this request */
 	localAddressPermissionsKey: string;
-	/** 
-	 * @property iface HTTP server "host" option for this request (i.e. server.listen bind address), 
-	 * @property host the host header, 
-	 * @property addr socket.localAddress 
-	 */
 	interface: {
 		/** HTTP server "host" option for this request (i.e. server.listen bind address) */
 		iface: string,
