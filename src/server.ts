@@ -360,6 +360,9 @@ function requestHandlerHostLevelChecks<T extends RequestEvent>(
 	return (preflighter ? preflighter(ev) : Promise.resolve(ev)).then(ev2 => {
 		//sanity checks after the preflighter
 		//"always check all variables and sometimes check some constants too" -- Arlen Beiler
+		//@ts-ignore
+		if (!ev.response !== !ev2.response || !ev.client !== !ev2.client)
+			throw new Error("DEV: Request Event types got mixed up");
 		if (ev2.treeHostIndex > settings.tree.length - 1)
 			throw format("treeHostIndex of %s is not within array length of %s", ev2.treeHostIndex, settings.tree.length)
 		if (!settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey])

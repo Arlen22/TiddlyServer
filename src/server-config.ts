@@ -1,6 +1,6 @@
 /** @type { import("path") } */
 const path: typeof import("path") = require("path")
-
+declare const __non_webpack_require__: NodeRequire | undefined;
 import { oc } from "./optional-chaining";
 // type AlwaysDefined<T> = {
 // 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
@@ -160,7 +160,8 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
 	} else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
 		//require the json or js file and use it directly
 		let filepath = pathResolveWithUser(settingsDir, tree);
-		tree = require(filepath).tree;
+		let nodeRequire = __non_webpack_require__ ? __non_webpack_require__ : require;
+		tree = nodeRequire(filepath).tree;
 	}
 	//otherwise just assume we're using the value itself.
 	//we are not implementing host-based routing yet. If TiddlyServer is 

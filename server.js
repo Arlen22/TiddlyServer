@@ -12,8 +12,11 @@ const settingsFile = path.normalize(
 		: path.join(__dirname, './settings.json')
 );
 const settingsPath = path.dirname(settingsFile);
-debugger;
-const server = require('./src/server');
+
+/** @type {import("./src/server")} */
+// @ts-ignore
+// const server = require('./lib/compiled-lib');
+const server = require("./src/server");
 
 server.libsReady.then(() => {
 	const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
