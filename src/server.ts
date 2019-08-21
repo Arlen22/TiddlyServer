@@ -46,6 +46,7 @@ import { ServerResponse } from 'http';
 import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 import { TLSSocket } from 'tls';
 import { checkServerConfig } from "./interfacechecker";
+export { checkServerConfig };
 // import { parse as jsonParse } from 'jsonlint';
 
 // import send = require('../lib/send-lib');

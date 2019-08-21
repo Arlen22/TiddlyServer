@@ -18,6 +18,7 @@ const server = require('./src/server');
 server.libsReady.then(() => {
 	const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
 	// console.log(settings);
+	if(!server.checkServerConfig(settings)) debugger;
 	server.eventer.emit("settings", settings);
 	let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;
 	server.initServer({
