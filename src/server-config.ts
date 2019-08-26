@@ -265,6 +265,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 			// 	etag: set.putsaver && set.putsaver.etag || ""
 			// }
 		},
+		datafolder: set.datafolder({}),
 		directoryIndex: {
 			// ...{
 			defaultType: set.directoryIndex.defaultType("html"),
@@ -355,7 +356,8 @@ export interface ServerConfigSchema {
 	/** directory index options */
 	directoryIndex?: ExcludedPartial<ServerConfig_DirectoryIndex, "types">;
 	/** tiddlyserver specific options */
-	putsaver?: Partial<ServerConfig_TiddlyServer>
+	putsaver?: Partial<ServerConfig_TiddlyServer>,
+	datafolder: Record<string, any>,
 	/** 
 	 * The Hashmap of accounts which may authenticate on this server.
 	 * Takes either an object or a string to a `require`-able file (such as .js or .json) 
@@ -408,7 +410,9 @@ export interface ServerConfig {
 	/** directory index */
 	directoryIndex: ServerConfig_DirectoryIndex
 	/** PUT saver options */
-	putsaver: ServerConfig_TiddlyServer | false
+	putsaver: ServerConfig_TiddlyServer | false,
+	/** Variables passed directly to TiddlyWiki server instance */
+	datafolder: Record<string, unknown>,
 	/** 
 	 * The Hashmap of accounts which may authenticate on this server.
 	 * Takes either an object or a string to a `require`-able file (such as .js or .json) 
@@ -1025,6 +1029,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
 			etagAge: set.etagWindow,
 			backupFolder: "",
 		},
+		datafolder: {},
 		authAccounts: {},
 		directoryIndex: {
 			defaultType: "html",

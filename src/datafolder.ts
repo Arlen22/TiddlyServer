@@ -60,7 +60,7 @@ export function init(e: ServerEventEmitter) {
 					? path.resolve(settings.__dirname, settings._datafoldertarget)
 					: "../tiddlywiki";
 				//trigger the datafolder to load in case it isn't
-				const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '', target);
+				const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '', target, settings.datafolder);
 				const subpath = pathname.slice(mount.length);
 				//event to give the client to the data folder
 				const loadClient = () => {
@@ -119,7 +119,7 @@ export function handleDataFolderRequest(result: PathResolverResult, state: State
 		: "../tiddlywiki";
 
 	const { mount, folder } = loadDataFolderTrigger(result,
-		state.statPath, state.url.pathname, state.url.query.reload as any || "", target);
+		state.statPath, state.url.pathname, state.url.query.reload as any || "", target, state.settings.datafolder);
 
 
 	const isFullpath = result.filepathPortion.length === state.statPath.index;
@@ -143,7 +143,7 @@ export function handleDataFolderRequest(result: PathResolverResult, state: State
 		load.handler(state);
 	}
 }
-function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true" | "force" | "", target: string) {
+function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true" | "force" | "", target: string, vars: {}) {
 	let filepathPrefix = result.filepathPortion.slice(0, statPath.index).join('/');
 	//get the tree path, and add the file path (none if the tree path is a datafolder)
 	let fullPrefix = ["", result.treepathPortion.join('/')];
@@ -161,7 +161,7 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true
 	//initialize the tiddlywiki instance
 	if (!loadedFolders[mount] || reload === "true") {
 		loadedFolders[mount] = { mount, folder, events: new EventEmitter(), handler: [] };
-		loadDataFolderType(mount, folder, reload, target);
+		loadDataFolderType(mount, folder, reload, target, vars);
 		// loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
 		// loadTiddlyWiki(prefixURI, folder);
 	}
@@ -169,18 +169,18 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true
 	return { mount, folder };
 }
 
-function loadDataFolderType(mount: string, folder: string, reload: string, target: string) {
+function loadDataFolderType(mount: string, folder: string, reload: string, target: string, vars:{}) {
 	promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), 'utf8').then((data) => {
 		const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
 		if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-			loadDataFolderTiddlyWiki(mount, folder, reload, target);
+			loadDataFolderTiddlyWiki(mount, folder, reload, target, vars);
 		} else if (wikiInfo.type === "tiddlyserver") {
 			// loadTiddlyServerAdapter(mount, folder, reload)
 		}
 	})
 }
 
-function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string, target: string) {
+function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string, target: string, vars: {}) {
 	console.time('twboot-' + folder);
 	//The bundle in the Tiddlyserver folder
 	// const target = "../tiddlywiki";
@@ -227,8 +227,9 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 			wiki: $tw.wiki,
 			variables: {
 				"path-prefix": mount,
-				"root-tiddler": "$:/core/save/all"
+				"root-tiddler": "$:/core/save/all",
 				// "root-tiddler": "$:/core/save/all-external-js"
+				...vars
 			}
 		});
 		// server.TS_StateObject_Queue = [];
