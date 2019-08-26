@@ -30,6 +30,7 @@ interface ICheckInterface {
     cf: ICheckInterfaceFunction<C>
   ): ICheckInterfaceFunction<A | B | C>;
   checkNull: ICheckInterfaceFunction<null>;
+  checkUnknown: ICheckInterfaceFunction<unknown>;
   checkString: ICheckInterfaceFunction<string>;
   checkStringEnum: <T extends string>(...values: T[]) => ICheckInterfaceFunction<T>;
   checkStringNotEmpty: ICheckInterfaceFunction<string>
@@ -98,7 +99,7 @@ class CheckInterface implements ICheckInterface {
   }
 
   checkNull = this.assignProperties("expected null value", (a): a is null => a === null);
-
+  checkUnknown = this.assignProperties("expected unknown value", (a): a is unknown => true);
   checkString = this.assignProperties("expected string value", (a): a is string => typeof a === "string");
   checkStringEnum = <T extends string>(...values: T[]) => this.assignProperties(
     "expected one string of " + JSON.stringify(values),
@@ -363,6 +364,7 @@ const _checkServerConfig = checker.checkObject<ServerConfig>({
     logToConsoleAlso: checkBoolean
   }),
   putsaver: checker.union(checker.checkObject<ServerConfig["putsaver"]>({}, putsaverOptional), checker.checkBooleanFalse),
+  datafolder: checker.checkRecord(checker.checkString, checker.checkUnknown),
   EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
     alwaysRefreshCache: checkBoolean,
     enabled: checkBoolean,
