@@ -25,7 +25,7 @@ module.exports = {
       GENTLY: false,
       // __webpack_require__: true,
       global: { GENTLY: false },
-      "typeof __webpack_require__": "function"
+      // "typeof __webpack_require__": "function"
       // PRODUCTION: JSON.stringify(true),
       // VERSION: JSON.stringify('5fa3b9'),
       // BROWSER_SUPPORTS_HTML5: true,
@@ -34,7 +34,7 @@ module.exports = {
       // 'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV)
     })
   ],
-  mode: false ? "development" : "production",
+  mode: true ? "development" : "production",
   target: 'node',
   node: {
     __dirname: true,

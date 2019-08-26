@@ -11,24 +11,7 @@ import { promisify } from 'util';
 // Load the core tiddlers
 // $tw.wiki.addTiddler($tw.loadPluginFolder($tw.boot.corePath));
 //load the wiki tiddlers
-export interface PluginInfo {
-	[K: string]: string
-}
-export interface WikiInfo {
-	includeWikis: (string | { path: string, info: { "read-only": boolean } })[]
-	build: string[][]
-	plugins: string[]
-	themes: string[]
-	languages: string[]
-	config?: { [K: string]: any }
-	type: "tiddlywiki" | "tiddlyserver";
-}
-export interface FileInfo {
-	tiddlers?: Hashmap<any>;
-	hasMetaFile: boolean;
-	filepath: string;
-	type: string;
-}
+import { FileInfo, WikiInfo, PluginInfo } from "./boot-startup-types";
 export function loadWikiInfo(wikipath) {
 	let filePath = path.join(wikipath, 'tiddlywiki.info');
 	return promisify(fs.readFile)(filePath, 'utf8').then((data) => {

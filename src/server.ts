@@ -469,7 +469,7 @@ function handleAssetsRoute(state: StateObject) {
 	switch (state.path[2]) {
 		case "static": serveFolder(state, '/assets/static', path.join(settings.__assetsDir, "static")); break;
 		case "icons": serveFolder(state, '/assets/icons', path.join(settings.__assetsDir, "icons")); break;
-		case "tiddlywiki": handleTiddlyWikiRoute(state); break;
+		// case "tiddlywiki": handleTiddlyWikiRoute(state); break;
 		default: state.throw(404);
 	}
 }

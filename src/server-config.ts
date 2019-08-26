@@ -357,7 +357,7 @@ export interface ServerConfigSchema {
 	directoryIndex?: ExcludedPartial<ServerConfig_DirectoryIndex, "types">;
 	/** tiddlyserver specific options */
 	putsaver?: Partial<ServerConfig_TiddlyServer>,
-	datafolder: Record<string, any>,
+	datafolder?: Record<string, any>,
 	/** 
 	 * The Hashmap of accounts which may authenticate on this server.
 	 * Takes either an object or a string to a `require`-able file (such as .js or .json) 

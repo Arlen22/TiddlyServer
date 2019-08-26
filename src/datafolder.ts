@@ -1,11 +1,12 @@
 import {
 	StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag,
-	PathResolverResult, tryParseJSON, JsonError, 
-	serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter, 
+	PathResolverResult, tryParseJSON, JsonError,
+	serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter,
 	resolvePath, statWalkPath, RequestEventWS, serveFolder,
 } from "./server-types";
 // import { Observable, Subject } from "../lib/rx";
 
+declare const __non_webpack_require__: NodeRequire | undefined;
 import * as path from 'path';
 import * as http from 'http';
 import * as fs from 'fs';
@@ -18,7 +19,7 @@ import { inspect, promisify } from "util";
 
 import { gzip } from 'zlib';
 
-import { TiddlyWiki, TiddlyServer, PluginInfo, WikiInfo } from './boot-startup';
+import { PluginInfo, WikiInfo } from './boot-startup-types';
 import { fresh, etag, ws as WebSocket } from '../lib/bundled-lib';
 
 // var settings: ServerConfig = {} as any;
@@ -169,7 +170,7 @@ function loadDataFolderTrigger(result, statPath, pathname: string, reload: "true
 	return { mount, folder };
 }
 
-function loadDataFolderType(mount: string, folder: string, reload: string, target: string, vars:{}) {
+function loadDataFolderType(mount: string, folder: string, reload: string, target: string, vars: {}) {
 	promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), 'utf8').then((data) => {
 		const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
 		if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
@@ -188,11 +189,12 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 	// const target = "..\\..\\TiddlyWiki5-compiled\\Source\\TiddlyWiki5-5.1.19";
 	//Jermolene/TiddlyWiki5@master
 	// const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
-
+	let nodeRequire = __non_webpack_require__ ? __non_webpack_require__ : require;
 	let _wiki = undefined;
-	const $tw = require(target + "/boot/boot.js").TiddlyWiki(
-		require(target + "/boot/bootprefix.js").bootprefix({
-			packageInfo: JSON.parse(fs.readFileSync(path.resolve(__dirname, target + '/package.json'), 'utf8')),
+	// console.log(nodeRequire.resolve(target + "/package.json"));
+	const $tw = nodeRequire(target + "/boot/boot.js").TiddlyWiki(
+		nodeRequire(target + "/boot/bootprefix.js").bootprefix({
+			packageInfo: nodeRequire(target + '/package.json')
 		})
 	);
 	$tw.boot.argv = [folder];
@@ -234,7 +236,12 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 		});
 		// server.TS_StateObject_Queue = [];
 		// server.TS_Request_Queue = [];
-		let auth = new TiddlyServerAuthentication(server);
+		let queue: Record<symbol, StateObject> = {};
+		let auth = new TiddlyServerAuthentication(server, (sym: symbol) => {
+			let res = queue[sym];
+			delete queue[sym];
+			return res;
+		});
 		auth.init();
 		server.authenticators.unshift(auth);
 		//invoke the server start hook so plugins can extend the server or attach to the event handler
@@ -245,10 +252,11 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 		const requests = loadedFolders[mount].handler as StateObject[];
 		loadedFolders[mount].handler = (state: StateObject) => {
 			//pretend to the handler like the path really has a trailing slash
-			let req = new Object(state.req) as http.IncomingMessage & { tsstate: StateObject };
+			let req = new Object(state.req) as http.IncomingMessage & { tsstate: symbol };
 			req.url += ((state.url.pathname === mount && !state.url.pathname.endsWith("/")) ? "/" : "");
-			req.tsstate = state;
-			server.requestHandler(state.req, state.res);
+			req.tsstate = Symbol("state object pointer");
+			queue[req.tsstate] = state;
+			server.requestHandler(req, state.res);
 		};
 		//send queued websocket clients to the event emitter
 		loadedFolders[mount].events.emit('ws-client-preload');
@@ -270,7 +278,7 @@ function doError(debug, mount, folder, err) {
 	} as any;
 	requests.forEach(([req, res]) => {
 		(loadedFolders[mount] as { handler: any }).handler(req, res);
-	})
+	});
 
 }
 declare class TiddlyWikiServer {
@@ -286,8 +294,21 @@ class TiddlyServerAuthentication {
 	 *  
 	 * @param server The server instance that instantiated this authenticator
 	 */
-	constructor(private server: TiddlyWikiServer) {
-
+	constructor(private server: TiddlyWikiServer, retrieve: (sym: symbol) => StateObject) {
+		//make sure nothing can access the state object!
+		this.authenticateRequest = (request, response, state) => {
+			let tsstate = retrieve(request.tsstate);
+			if (!tsstate.authAccountsKey && state.allowAnon) {
+				return true;
+			} else if (tsstate.authAccountsKey) {
+				state.authenticatedUsername = tsstate.username;
+				return true;
+			} else {
+				//The wiki itself may specify that anonymous users cannot access it
+				tsstate.throwReason(403, "Unauthenticated users cannot access this wiki");
+				return false;
+			}
+		}
 	}
 	/**
 	 * Returns true if the authenticator is active, false if it is inactive, 
@@ -303,20 +324,21 @@ class TiddlyServerAuthentication {
 	 * Returns false if the request couldn't be authenticated, 
 	 * having sent an appropriate response to the browser
 	 */
-	authenticateRequest(request: http.IncomingMessage & { tsstate: StateObject }, response: http.ServerResponse, state) {
-		// let index = this.server.TS_Request_Queue.indexOf(request);
-		let tsstate = request.tsstate;
-		if (!tsstate.authAccountsKey && state.allowAnon) {
-			return true;
-		} else if (tsstate.authAccountsKey) {
-			state.authenticatedUsername = tsstate.username;
-			return true;
-		} else {
-			//The wiki itself may specify that anonymous users cannot access it
-			tsstate.throwReason(403, "Unauthenticated users cannot access this wiki");
-			return false;
-		}
-	}
+	authenticateRequest: (request: http.IncomingMessage & { tsstate: symbol }, response: http.ServerResponse, state) => boolean;
+	//  {
+	// 	// let index = this.server.TS_Request_Queue.indexOf(request);
+	// 	let tsstate = request.tsstate;
+	// 	if (!tsstate.authAccountsKey && state.allowAnon) {
+	// 		return true;
+	// 	} else if (tsstate.authAccountsKey) {
+	// 		state.authenticatedUsername = tsstate.username;
+	// 		return true;
+	// 	} else {
+	// 		//The wiki itself may specify that anonymous users cannot access it
+	// 		tsstate.throwReason(403, "Unauthenticated users cannot access this wiki");
+	// 		return false;
+	// 	}
+	// }
 }
 
 
@@ -335,8 +357,8 @@ let global_tw;
 
 function initPluginLoader() {
 	pluginCache = {};
-
-	const $tw = global_tw = TiddlyWiki.loadCore();
+	throw "plugin cache not implemented";
+	const $tw = global_tw;// = TiddlyWiki.loadCore();
 
 	const pluginConfig = {
 		plugin: [$tw.config.pluginsPath, $tw.config.pluginsEnvVar],
@@ -393,10 +415,12 @@ function initPluginLoader() {
 	//     }).reduce((n, e) => n.concat(e), [] as PluginCache[]);
 	// }
 }
-initPluginLoader();
-// mounted at /tiddlywiki
+// initPluginLoader();
+// mounted at /assets/tiddlywiki
 
 export function handleTiddlyWikiRoute(state: StateObject) {
+	state.throw(500);
+	throw "tiddlywiki route not implemented";
 	//number of elements on state.path that are part of the mount path.
 	//the zero-based index of the first subpath is the same as the number of elements
 	let mountLength = 3;

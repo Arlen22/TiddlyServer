@@ -732,6 +732,7 @@ $tw.modules.execute = function(moduleName,moduleRoot) {
 		tiddler = $tw.wiki.getTiddler(name),
 		_exports = {},
 		sandbox = {
+			// global: new Object(global),
 			module: {exports: _exports},
 			//moduleInfo: moduleInfo,
 			exports: _exports,

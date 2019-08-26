@@ -97,6 +97,9 @@
           },
           "type": "object"
         },
+        "datafolder": {
+          "type": "object"
+        },
         "directoryIndex": {
           "additionalProperties": false,
           "description": "directory index options",
