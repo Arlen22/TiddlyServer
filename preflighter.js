@@ -12,7 +12,7 @@ exports.preflighter = async function (ev) {
 		ev.client.close();
 		ev.handled = true;
 	}
-
+	ev.username = USERNAME;
 	return ev;
 }
 /**
