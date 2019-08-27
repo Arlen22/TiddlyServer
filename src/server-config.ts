@@ -479,6 +479,9 @@ export interface ServerConfig_AuthAccountsValue {
 	 */
 	permissions: ServerConfig_AccessOptions
 }
+/**
+ * @default {"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true}
+ */
 export interface ServerConfig_AccessOptions {
 	/** allow the putsaver to be used */
 	putsaver: boolean
@@ -540,8 +543,13 @@ export interface ServerConfig_BindInfo {
 	 * Permissions based on local address: "localhost", "*" (all others), "192.168.0.0/16", etc. 
 	 * This checks the IP address each client connects to (socket.localAddress), 
 	 * not the bind address of the server instance that accepted the request.
+	 * @default {"localhost":{"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true}}
 	 */
-	localAddressPermissions: { [host: string]: ServerConfig_AccessOptions }
+	localAddressPermissions: { 
+		/** 
+		 */
+		[host: string]: ServerConfig_AccessOptions 
+	}
 	/** always bind a separate server instance to 127.0.0.1 regardless of any other settings */
 	_bindLocalhost: boolean;
 
