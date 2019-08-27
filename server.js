@@ -15,13 +15,16 @@ const settingsPath = path.dirname(settingsFile);
 
 /** @type {import("./src/server")} */
 // @ts-ignore
-// const server = require('./lib/compiled-lib');
-const server = require("./src/server");
+const server = false ? require('./lib/compiled-lib') : require("./src/server");
 
 server.libsReady.then(() => {
 	const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
-	// console.log(settings);
-	if(!server.checkServerConfig(settings)) debugger;
+	// console.log(settings.bindInfo.localAddressPermissions.localhost);
+	let check = server.checkServerConfig(settings);
+	if(check !== true) {
+		console.log(JSON.stringify(check, null, 2));
+		debugger;
+	}
 	server.eventer.emit("settings", settings);
 	let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;
 	server.initServer({
