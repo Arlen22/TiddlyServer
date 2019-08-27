@@ -375,6 +375,6 @@ export function checkServerConfig(obj) {
   let res = _checkServerConfig(obj);
   if (res !== true) debugger; //if you hit this breakpoint, it means the settings does 
   //not conform to ServerConfig and the server is about to exit. The error data is in `res`. 
-  console.log("Check server config result: " + JSON.stringify(res, null, 2));
+  // console.log("Check server config result: " + JSON.stringify(res, null, 2));
   return res;
 };
