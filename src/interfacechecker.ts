@@ -142,11 +142,16 @@ class CheckInterface implements ICheckInterface {
     return this.assignProperties("expected a record that " + checker.expected, (a): a is Record<K, T> => {
       const keys = Object.keys(a);
       const errs: Record<K, string> = {} as any;
-      return typeof a === "object" && (keys.filter(k =>
-        this.checkArrayValueResult<any, any>(keychecker(k), errs, k,
-          keychecker.expected ? "key " + keychecker.expected : "")
-        && this.checkArrayValue<K, T>(k as any, checker, a[k], errs)
-      ).length === keys.length) || errs as never;
+      let res = typeof a === "object";
+      res = keys.filter(k =>
+        this.checkArrayValueResult<any, any>(
+          keychecker(k), errs, k,
+          keychecker.expected ? "key " + keychecker.expected : ""
+        ) && this.checkArrayValue<K, T>(
+          k as any, checker, a[k], errs
+        )
+      ).length === keys.length;
+      return res || errs as never;
     });
   }
   private checkArrayValue<K extends string | number | symbol, T>(k: K, checker: ICheckInterfaceFunction<T>, b: any, errs: Record<K, string>) {
@@ -275,7 +280,8 @@ const checkAccessPerms = checker.checkObject<ServerConfig_AccessOptions>({
   upload: checkBoolean,
   websockets: checkBoolean,
   writeErrors: checkBoolean,
-  registerNotice: checkBoolean
+  registerNotice: checkBoolean,
+  putsaver: checkBoolean
 });
 const putsaverOptional = as<OptionalCheckermap<ServerConfig_TiddlyServer, never>>({
   backupFolder: checkString,
@@ -371,10 +377,10 @@ const _checkServerConfig = checker.checkObject<ServerConfig>({
     maxAge_tw_plugins: checkNumber
   })
 });
-export function checkServerConfig(obj) {
+export function checkServerConfig(obj): true | {} {
   let res = _checkServerConfig(obj);
   if (res !== true) debugger; //if you hit this breakpoint, it means the settings does 
   //not conform to ServerConfig and the server is about to exit. The error data is in `res`. 
   // console.log("Check server config result: " + JSON.stringify(res, null, 2));
-  return res;
+  return res as true | {};
 };

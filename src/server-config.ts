@@ -192,23 +192,25 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 	if (!set.tree) throw "tree is required in ServerConfig";
 	let lap = {
 		"localhost": {
-			...{
+			...as<ServerConfig_AccessOptions>({
 				writeErrors: true,
 				mkdir: true,
 				upload: true,
 				websockets: true,
-				registerNotice: true
-			},
+				registerNotice: true,
+				putsaver: true
+			}),
 			...set.bindInfo.localAddressPermissions["localhost"]({} as any)
 		},
 		"*": {
-			...{
+			...as<ServerConfig_AccessOptions>({
 				writeErrors: true,
 				mkdir: false,
 				upload: false,
 				websockets: true,
-				registerNotice: false
-			},
+				registerNotice: false,
+				putsaver: true
+			}),
 			...set.bindInfo.localAddressPermissions["*"]({} as any)
 		}
 	};
@@ -476,6 +478,9 @@ export interface ServerConfig_AuthAccountsValue {
 	permissions: ServerConfig_AccessOptions
 }
 export interface ServerConfig_AccessOptions {
+	/** allow the putsaver to be used */
+	putsaver: boolean
+	/** write error messages to the browser */
 	writeErrors: boolean
 	/** allow uploads on the directory index page */
 	upload: boolean
