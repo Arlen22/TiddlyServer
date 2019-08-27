@@ -29,6 +29,8 @@ const setAuth = (settings: ServerConfig) => {
 	/** Record<hash+username, [authGroup, publicKey, suffix]> */
 	let publicKeyLookup: Record<string, [string, string, string]> = {};
 	let passwordLookup: Record<string, string> = {};
+
+	const authCookieAge = settings.authCookieAge;
 	const {
 		crypto_generichash,
 		crypto_generichash_BYTES,
@@ -74,7 +76,7 @@ const setAuth = (settings: ServerConfig) => {
 		if (!json || json.length !== 6) return false;
 		return validateCookie(json, false);
 	};
-
+	const isoreg = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/;
 	validateCookie = (json: AuthCookie | AuthCookieSet, logRegisterNotice?: string | false) => {
 		let [username, type, timestamp, hash, sig, suffix] = json;
 		if (type === "key" && !publicKeyLookup[hash + username]) {
@@ -90,7 +92,10 @@ const setAuth = (settings: ServerConfig) => {
 			from_base64(sig),
 			username + timestamp + hash,
 			from_base64(pubkey[1])
-		) && (!suffix || suffix === pubkey[2]);
+		)
+			&& (!suffix || suffix === pubkey[2])
+			&& isoreg.test(timestamp)
+			&& (Date.now() - new Date(timestamp).valueOf() < authCookieAge * 1000);
 		// console.log((valid ? "" : "in") + "valid signature")
 		return valid ? [pubkey[0], username, pubkey[2]] : false;
 	};

@@ -33,8 +33,10 @@ server.libsReady.then(() => {
 		settingshttps: httpsSettingsFile && require(httpsSettingsFile).serverOptions,
 		preflighter: fs.existsSync(__dirname + "/preflighter.js")
 			? require("./preflighter.js").preflighter
-			: undefined
+			: undefined,
+		dryRun: args.indexOf("--dry-run") !== -1
 	});
+
 }).catch(e => {
 	console.log("uncaught error during server startup");
 	console.log(e);
@@ -52,7 +54,7 @@ process.on('uncaughtException', err => {
 		});
 	server.eventer.emit('serverClose', "all");
 	//hold it open because all other listeners should close
-	if (args.indexOf("--close-on-error") === -1)
+	if (args.indexOf("--stay-on-error") !== -1)
 		setInterval(function () { }, 1000);
 });
 

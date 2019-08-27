@@ -229,6 +229,10 @@
           "description": "allow create directory on directory index page",
           "type": "boolean"
         },
+        "putsaver": {
+          "description": "allow the putsaver to be used",
+          "type": "boolean"
+        },
         "registerNotice": {
           "description": "login attempts for a public/private key pair which has not been \nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry.",
           "type": "boolean"
@@ -242,10 +246,12 @@
           "type": "boolean"
         },
         "writeErrors": {
+          "description": "write error messages to the browser",
           "type": "boolean"
         }
       },
       "required": [
+        "putsaver",
         "writeErrors",
         "upload",
         "mkdir",
@@ -287,6 +293,14 @@
         },
         "permissions": {
           "$ref": "#/definitions/ServerConfig_AccessOptions",
+          "default": {
+            "mkdir": true,
+            "putsaver": true,
+            "registerNotice": true,
+            "upload": true,
+            "websockets": true,
+            "writeErrors": true
+          },
           "description": "override hostLevelPermissions for users with this account"
         }
       },
