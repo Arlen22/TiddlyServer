@@ -339,7 +339,7 @@ export function loadWikiTiddlers(wikipath: string, wikiInfo: WikiInfo) {
 		var metas = files.filter(e => path.extname(e) === ".meta");
 		var datas = files.filter(e => path.extname(e) !== ".meta");
 
-		return Promise.all(datas.map(e => {
+		return Promise.all<any>(datas.map(e => {
 			return {
 				filepath: path.join(tiddlerFolder, e),
 				hasMetaFile: metas.indexOf(e + ".meta") > -1

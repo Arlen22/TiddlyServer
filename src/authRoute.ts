@@ -39,14 +39,14 @@ const setAuth = (settings: ServerConfig) => {
 		from_base64,
 		crypto_box_SEEDBYTES,
 	} = libsodium;
-	console.log(crypto_box_SEEDBYTES, crypto_generichash_BYTES, crypto_generichash_BYTES_MAX, crypto_generichash_BYTES_MIN);
+	// console.log(crypto_box_SEEDBYTES, crypto_generichash_BYTES, crypto_generichash_BYTES_MAX, crypto_generichash_BYTES_MIN);
 	// let passwordKey = crypto_sign_keypair("uint8array");
 	// console.log(settings.authAccounts);
 	Object.keys(settings.authAccounts).forEach(k => {
 		let e = settings.authAccounts[k];
 		// console.log(k, e, e.clientKeys);
 		if (e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
-			console.log(k, u, e.clientKeys[u]);
+			// console.log(k, u, e.clientKeys[u]);
 			const publicKey = from_base64(e.clientKeys[u].publicKey);
 			// let t = e.clientKeys[u];
 			let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");

@@ -189,7 +189,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
 	// const target = "..\\..\\TiddlyWiki5-compiled\\Source\\TiddlyWiki5-5.1.19";
 	//Jermolene/TiddlyWiki5@master
 	// const target = "..\\..\\_reference\\TiddlyWiki5-Arlen22";
-	let nodeRequire = __non_webpack_require__ ? __non_webpack_require__ : require;
+	let nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 	let _wiki = undefined;
 	// console.log(nodeRequire.resolve(target + "/package.json"));
 	const $tw = nodeRequire(target + "/boot/boot.js").TiddlyWiki(

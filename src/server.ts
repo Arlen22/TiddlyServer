@@ -274,7 +274,8 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 `);
 	}
 	let servers: (http.Server | https.Server)[] = [];
-	console.log("Creating servers as %s", typeof settingshttps === "function" ? "https" : "http")
+	console.log("Creating servers as %s", typeof settingshttps === "function" ? "https" : "http");
+	if(!settingshttps) console.log("Remember that any login credentials are being sent in the clear");
 	Promise.all(hosts.map(host => {
 		let server: any;
 		if (typeof settingshttps === "function") {
