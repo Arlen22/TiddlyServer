@@ -424,7 +424,7 @@ export interface ServerConfig {
 	/** client-side data folder loader which loads datafolders directly into the browser */
 	EXPERIMENTAL_clientside_datafolders: ServerConfig_ClientsideDatafolders,
 	/** 
-	 * Age to set for the auth cookie (default is 30 days)
+	 * Age in seconds to set for the auth cookie (default is 30 days)
 	 * - 24 hours: `86400`
 	 * - 7 days: `604800`
 	 * - 30 days: `2592000`
@@ -452,8 +452,6 @@ export interface ServerConfig_ClientsideDatafolders {
 	alwaysRefreshCache: boolean;
 }
 export interface ServerConfig_AuthAccountsValue {
-	// /** Record[username] = password */
-	// passwords: Record<string, string>,
 	/** 
 	 * @default {"username":{"publicKey":"","cookieSalt":""}}
 	 */
@@ -474,7 +472,11 @@ export interface ServerConfig_AuthAccountsValue {
 			cookieSalt: string
 		}
 	}; // Record<string, [string, string]>,
-	/** override hostLevelPermissions for users with this account */
+	/** 
+	 * override hostLevelPermissions for users with this account 
+	 * 
+	 * @default {"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true}
+	 */
 	permissions: ServerConfig_AccessOptions
 }
 export interface ServerConfig_AccessOptions {

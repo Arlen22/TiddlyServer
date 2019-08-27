@@ -201,7 +201,7 @@ interface ServerEventsListener<THIS> {
 	(event: "settings", listener: (settings: ServerConfig) => void): THIS;
 	(event: "stateError", listener: (state: StateObject) => void): THIS;
 	(event: "stateDebug", listener: (state: StateObject) => void): THIS;
-	(event: "serverOpen", listener: (serverList: any[], hosts: string[], https: boolean) => void): THIS;
+	(event: "serverOpen", listener: (serverList: any[], hosts: string[], https: boolean, dryRun: boolean) => void): THIS;
 	(event: "serverClose", listener: (iface: string) => void): THIS;
 }
 type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
@@ -211,9 +211,9 @@ export interface ServerEventEmitter extends EventEmitter {
 	emit(event: "settings", settings: ServerConfig): boolean;
 	emit(event: "stateError", state: StateObject<any, any>): boolean;
 	emit(event: "stateDebug", state: StateObject<any, any>): boolean;
-	emit(event: "serverOpen", serverList: any[], hosts: string[], https: boolean): boolean;
+	emit(event: "serverOpen", serverList: any[], hosts: string[], https: boolean, dryRun: boolean): boolean;
 	emit(event: "serverClose", iface: string): boolean;
-
+	// emit<T>(event: T, args: Parameters<ServerEventsListener<any>>)
 	addListener: ServerEventsListener<this>;
 	on: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
 	once: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;

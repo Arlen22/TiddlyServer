@@ -223,15 +223,17 @@ export function addRequestHandlers(server: https.Server | http.Server, iface: st
  * @export
  * @param {<T extends RequestEvent>(ev: T) => Promise<T>} preflighter
  * @param {(SecureServerOptions | ((host: string) => https.ServerOptions)) | undefined} settingshttps
+ * @param {boolean} dryRun Creates the servers and sets everything up but does not start listening
  * Either an object containing the settings.server.https from settings.json or a function that
  * takes the host string and returns an https.createServer options object. Undefined if not using https.
  * @returns
  */
-export async function initServer({ preflighter, settingshttps }: {
+export async function initServer({ preflighter, settingshttps, dryRun }: {
 	// env: "electron" | "node",
 	preflighter: <T extends RequestEvent>(ev: T) => Promise<T>,
 	// listenCB: (host: string, port: number) => void,
-	settingshttps: ((host: string) => https.ServerOptions) | undefined
+	settingshttps: ((host: string) => https.ServerOptions) | undefined,
+	dryRun: boolean
 }) {
 	// settings = options.settings;
 	if (!settings) throw "The settings object must be emitted on eventer before starting the server";
@@ -298,10 +300,10 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 		})
 		servers.push(server);
 		return new Promise(resolve => {
-			server.listen(settings.bindInfo.port, host, undefined, () => { resolve(); });
+			dryRun ? resolve() : server.listen(settings.bindInfo.port, host, undefined, () => { resolve(); });
 		});
 	})).then(() => {
-		eventer.emit("serverOpen", servers, hosts, !!settingshttps);
+		eventer.emit("serverOpen", servers, hosts, !!settingshttps, dryRun);
 		let ifaces = networkInterfaces();
 		console.log('Open your browser and type in one of the following:\n' +
 			(settings.bindInfo.bindWildcard
@@ -316,6 +318,7 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 				: hosts
 					.map(e => (settings.bindInfo.https ? "https" : "http") + "://" + e + ":" + settings.bindInfo.port)).join('\n')
 		);
+		if(dryRun) console.log("DRY RUN: No further processing is likely to happen");
 	}, (x) => {
 		console.log("Error thrown while starting server");
 		console.log(x);
