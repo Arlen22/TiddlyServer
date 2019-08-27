@@ -33,7 +33,7 @@
 
 <body>
 	<div id="react-root">
-		<form onsubmit="tiddlyserverLogin()" id="login-form">
+		<div id="login-form">
 			<div id="error-line" style="display:none;">
 				<li></li>
 			</div>
@@ -65,12 +65,12 @@
 					style="align-self:center;">
 					<span class="mdc-button__label">Logout</span>
 				</button>
-				<input type="submit" id="login-button" onclick="tiddlyserverLogin()" class="mdc-button mdc-button--raised"
+				<button id="login-button" onclick="tiddlyserverLogin()" class="mdc-button mdc-button--raised"
 					style="align-self:center;">
-				<!-- <span class="mdc-button__label">Login</span> -->
+					<span class="mdc-button__label">Login</span>
 				</button>
 			</div>
-			<div style="display:flex; flex-direction: column; justify-content: space-evenly;">
+			<!-- <div style="display:flex; flex-direction: column; justify-content: space-evenly;">
 				<p>
 					It doesn't matter what you use for the password, but I recommend that you make it strong.
 					The password is your best security measure here. All the other features in this login page
@@ -86,8 +86,8 @@
 					sent to all localhost servers (kind of scary, eh?) anyway. So just use a different password on 
 					localhost than you would use on a public-facing website.
 				</p>
-			</div>
-		</form>
+			</div> -->
+		</div>
 	</div>
 </body>
 
