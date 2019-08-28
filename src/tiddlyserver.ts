@@ -285,9 +285,8 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 						handleFileError("SER-DIR", state, err);
 						state.redirect(state.url.pathname + "?error=mkdir");
 					} else if (fields.dirtype === "datafolder") {
-						let read = fs.createReadStream(path.join(__dirname, "../tiddlywiki/datafolder-template.json"));
+						let read = fs.createReadStream(path.join(__dirname, "../datafolder-template.json"));
 						let write = fs.createWriteStream(path.join(result.fullfilepath, fields.dirname, "tiddlywiki.info"));
-						read.pipe(write);
 						let error;
 						const errorHandler = (err) => {
 							handleFileError("SER-DIR", state, err);
@@ -301,6 +300,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 						write.on('close', () => {
 							if (!error) state.redirect(state.url.pathname);
 						})
+						read.pipe(write);
 					} else {
 						state.redirect(state.url.pathname);
 					}
