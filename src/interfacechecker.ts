@@ -292,9 +292,9 @@ const putsaverOptional = as<OptionalCheckermap<ServerConfig_TiddlyServer, never>
 const checkOptions = checker.union(
   checker.checkObject<Config.Options_Auth, "$element">(
     {
-      $element: checkStringEnum("auth"),
+      $element: checkStringEnum("auth")
     }, {
-      authError: checkNumberEnum(403, 404),
+      authError: checkNumberEnum(403, 404, 302),
       authList: checker.union(checker.checkArray(checkString), checkNull)
     }, ["$element"]),
   checker.checkObject<Config.Options_Backups, "$element">({
