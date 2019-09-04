@@ -10,10 +10,23 @@ export function checkInterface() {
 }
 class UnionError {
   constructor(
-    public expected: string,
-    public union_result: any[]
+    public expected: string[],
+    public union_result: any[],
+    private funcLength: number,
+    public readonly showUnionNulls: boolean
   ) {
 
+  }
+  toJSON() {
+    let json: any[] = [];
+    let expected = this.expected.map(e => typeof e === "string" ? e.replace(/"/gi, "'") : e);
+    let result = this.union_result;
+    for (let i = 0; i < this.funcLength; i++) {
+      if(result[i] === null) continue;
+      json.push(typeof result[i] === "object" ? result[i] : expected[i]);
+    }
+
+    return json;
   }
 }
 // type CheckInterfaceFunction = { expected: string } & (<T>(a: any, stringError: boolean) => any);
@@ -57,7 +70,7 @@ class CheckInterface implements ICheckInterface {
 
   errorLog: string[][] = [];
 
-  constructor() {
+  constructor(public showUnionNulls: boolean) {
 
   }
 
@@ -79,8 +92,9 @@ class CheckInterface implements ICheckInterface {
     cf: ICheckInterfaceFunction<C>
   ): ICheckInterfaceFunction<A | B | C>;
   union(af, bf, cf?) {
-    const expectedMessage = [af, bf, cf].map(e => e && e.expected).join(', ');
-    return this.assignProperties(expectedMessage, ((item) => {
+    const expectedMessage = [af, bf, cf].map(e => e && e.expected);
+    const funcLength = cf ? 3 : 2;
+    return this.assignProperties(expectedMessage.join(', '), ((item) => {
 
       let errs: (string | false)[] = [];
       let res: boolean | string;
@@ -91,7 +105,7 @@ class CheckInterface implements ICheckInterface {
       if (!!cf && (res = cf(item, true)) === true) return true;
       if (!!cf) errs.push(res);
 
-      return new UnionError(expectedMessage, errs) as never;
+      return new UnionError(expectedMessage, errs, funcLength, this.showUnionNulls) as never;
     }) as ReturnType<ICheckInterface["union"]>);
   }
   checkObjectError(str: string) {
@@ -273,111 +287,113 @@ class CheckInterface implements ICheckInterface {
 
 }
 
-let checker = new CheckInterface();
-let { checkBoolean, checkString, checkStringEnum, checkNumber, checkNumberEnum, checkBooleanFalse, checkNull } = checker;
-const checkAccessPerms = checker.checkObject<ServerConfig_AccessOptions>({
-  mkdir: checkBoolean,
-  upload: checkBoolean,
-  websockets: checkBoolean,
-  writeErrors: checkBoolean,
-  registerNotice: checkBoolean,
-  putsaver: checkBoolean
-});
-const putsaverOptional = as<OptionalCheckermap<ServerConfig_TiddlyServer, never>>({
-  backupFolder: checkString,
-  etag: checkStringEnum("optional", "required", "disabled"),
-  etagAge: checkNumber,
-  gzipBackups: checkBoolean
-});
-const checkOptions = checker.union(
-  checker.checkObject<Config.Options_Auth, "$element">(
-    {
-      $element: checkStringEnum("auth")
-    }, {
-      authError: checkNumberEnum(403, 404, 302),
-      authList: checker.union(checker.checkArray(checkString), checkNull)
-    }, ["$element"]),
-  checker.checkObject<Config.Options_Backups, "$element">({
-    $element: checkStringEnum("putsaver"),
-  }, putsaverOptional, ["$element"]),
-  checker.checkObject<Config.Options_Index, "$element">(
-    {
-      $element: checkStringEnum("index"),
-    }, {
-      defaultType: checker.union(checkStringEnum("html", "json"), checkNumberEnum(404, 403)),
-      indexExts: checker.checkArray(checkString),
-      indexFile: checker.checkArray(checkString)
-    }, ["$element"])
-);
-const GroupChild = checker.union(
-  checker.checkObject<Config.PathElement>({
-    $element: checkStringEnum("folder"),
-    $options: checker.checkArray(checkOptions),
-    key: checkString,
-    noTrailingSlash: checkBoolean,
-    path: checkString
-  }, undefined, ["$element"]),
-  checker.checkObject<Config.GroupElement>({
-    $element: checkStringEnum("group"),
-    $children: checker.checkArray(checker.assignProperties("expected GroupChild", (b): b is Config.GroupElement["$children"][0] => GroupChild(b))),
-    $options: checker.checkArray(checkOptions),
-    key: checkString,
-    indexPath: checker.union(checkString, checkBooleanFalse),
-  }, undefined, ["$element"])
-);
+export function checkServerConfig(obj, showUnionNulls: boolean): true | {} {
 
-const _checkServerConfig = checker.checkObject<ServerConfig>({
-  $schema: checkString,
-  __assetsDir: checkString,
-  __dirname: checkString,
-  __filename: checkString,
-  _datafoldertarget: checkString,
-  _devmode: checkBoolean,
-  authCookieAge: checkNumber,
-  tree: checker.checkArray(checker.checkObject<Config.HostElement>({
-    $element: checkStringEnum<"host">("host"),
-    $mount: GroupChild
-  })),
-  authAccounts: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]>({
-    clientKeys: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
-      publicKey: checkString,
-      cookieSalt: checker.checkStringNotEmpty
+  let checker = new CheckInterface(showUnionNulls);
+  let { checkBoolean, checkString, checkStringEnum, checkNumber, checkNumberEnum, checkBooleanFalse, checkNull } = checker;
+  const checkAccessPerms = checker.checkObject<ServerConfig_AccessOptions>({
+    mkdir: checkBoolean,
+    upload: checkBoolean,
+    websockets: checkBoolean,
+    writeErrors: checkBoolean,
+    registerNotice: checkBoolean,
+    putsaver: checkBoolean,
+    loginlink: checkBoolean
+  });
+  const putsaverOptional = as<OptionalCheckermap<ServerConfig_TiddlyServer, never>>({
+    backupFolder: checkString,
+    etag: checkStringEnum("optional", "required", "disabled"),
+    etagAge: checkNumber,
+    gzipBackups: checkBoolean
+  });
+  const checkOptions = checker.union(
+    checker.checkObject<Config.Options_Auth, "$element">(
+      {
+        $element: checkStringEnum("auth")
+      }, {
+        authError: checkNumberEnum(403, 404),
+        authList: checker.union(checker.checkArray(checkString), checkNull)
+      }, ["$element"]),
+    checker.checkObject<Config.Options_Backups, "$element">({
+      $element: checkStringEnum("putsaver"),
+    }, putsaverOptional, ["$element"]),
+    checker.checkObject<Config.Options_Index, "$element">(
+      {
+        $element: checkStringEnum("index"),
+      }, {
+        defaultType: checker.union(checkStringEnum("html", "json"), checkNumberEnum(404, 403)),
+        indexExts: checker.checkArray(checkString),
+        indexFile: checker.checkArray(checkString)
+      }, ["$element"])
+  );
+  const GroupChild = checker.union(
+    checker.checkObject<Config.PathElement>({
+      $element: checkStringEnum("folder"),
+      $options: checker.checkArray(checkOptions),
+      key: checkString,
+      noTrailingSlash: checkBoolean,
+      path: checkString
+    }, undefined, ["$element"]),
+    checker.checkObject<Config.GroupElement>({
+      $element: checkStringEnum("group"),
+      $children: checker.checkArray(checker.assignProperties("expected GroupChild", (b): b is Config.GroupElement["$children"][0] => GroupChild(b))),
+      $options: checker.checkArray(checkOptions),
+      key: checkString,
+      indexPath: checker.union(checkString, checkBooleanFalse),
+    }, undefined, ["$element"])
+  );
+
+  const _checkServerConfig = checker.checkObject<ServerConfig>({
+    $schema: checkString,
+    __assetsDir: checkString,
+    __dirname: checkString,
+    __filename: checkString,
+    _datafoldertarget: checkString,
+    _devmode: checkBoolean,
+    authCookieAge: checkNumber,
+    tree: checker.checkArray(checker.checkObject<Config.HostElement>({
+      $element: checkStringEnum<"host">("host"),
+      $mount: GroupChild
     })),
-    permissions: checkAccessPerms
-  })),
-  bindInfo: checker.checkObject<ServerConfig["bindInfo"]>({
-    _bindLocalhost: checkBoolean,
-    bindAddress: checker.checkArray(checkString),
-    bindWildcard: checkBoolean,
-    enableIPv6: checkBoolean,
-    filterBindAddress: checkBoolean,
-    https: checkBoolean,
-    localAddressPermissions: checker.checkRecord(checkString, checkAccessPerms),
-    port: checkNumber
-  }),
-  directoryIndex: checker.checkObject<ServerConfig["directoryIndex"]>({
-    defaultType: checkStringEnum("html", "json"),
-    icons: checker.checkRecord(checkString, checker.checkArray(checkString)),
-    mimetypes: checker.checkRecord(checkString, checker.checkArray(checkString)),
-    mixFolders: checkBoolean,
-    types: checker.checkRecord(checkString, checkString)
-  }),
-  logging: checker.checkObject<ServerConfig["logging"]>({
-    debugLevel: checkNumber,
-    logAccess: checker.union(checkString, checkBooleanFalse),
-    logColorsToFile: checkBoolean,
-    logError: checkString,
-    logToConsoleAlso: checkBoolean
-  }),
-  putsaver: checker.union(checker.checkObject<ServerConfig["putsaver"]>({}, putsaverOptional), checker.checkBooleanFalse),
-  datafolder: checker.checkRecord(checker.checkString, checker.checkUnknown),
-  EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
-    alwaysRefreshCache: checkBoolean,
-    enabled: checkBoolean,
-    maxAge_tw_plugins: checkNumber
-  })
-});
-export function checkServerConfig(obj): true | {} {
+    authAccounts: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]>({
+      clientKeys: checker.checkRecord(checkString, checker.checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
+        publicKey: checkString,
+        cookieSalt: checker.checkStringNotEmpty
+      })),
+      permissions: checkAccessPerms
+    })),
+    bindInfo: checker.checkObject<ServerConfig["bindInfo"]>({
+      _bindLocalhost: checkBoolean,
+      bindAddress: checker.checkArray(checkString),
+      bindWildcard: checkBoolean,
+      enableIPv6: checkBoolean,
+      filterBindAddress: checkBoolean,
+      https: checkBoolean,
+      localAddressPermissions: checker.checkRecord(checkString, checkAccessPerms),
+      port: checkNumber
+    }),
+    directoryIndex: checker.checkObject<ServerConfig["directoryIndex"]>({
+      defaultType: checkStringEnum("html", "json"),
+      icons: checker.checkRecord(checkString, checker.checkArray(checkString)),
+      mimetypes: checker.checkRecord(checkString, checker.checkArray(checkString)),
+      mixFolders: checkBoolean,
+      types: checker.checkRecord(checkString, checkString)
+    }),
+    logging: checker.checkObject<ServerConfig["logging"]>({
+      debugLevel: checkNumber,
+      logAccess: checker.union(checkString, checkBooleanFalse),
+      logColorsToFile: checkBoolean,
+      logError: checkString,
+      logToConsoleAlso: checkBoolean
+    }),
+    putsaver: checker.union(checker.checkObject<ServerConfig["putsaver"]>({}, putsaverOptional), checker.checkBooleanFalse),
+    datafolder: checker.checkRecord(checker.checkString, checker.checkUnknown),
+    EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
+      alwaysRefreshCache: checkBoolean,
+      enabled: checkBoolean,
+      maxAge_tw_plugins: checkNumber
+    })
+  });
   let res = _checkServerConfig(obj);
   if (res !== true) debugger; //if you hit this breakpoint, it means the settings does 
   //not conform to ServerConfig and the server is about to exit. The error data is in `res`. 

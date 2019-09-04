@@ -14,6 +14,16 @@ const settingsFile = path.normalize(
 );
 const settingsPath = path.dirname(settingsFile);
 
+
+/**
+ *      DEVELOPERS PLEASE READ
+ * 
+ * This entire codebase is very dirty. 
+ *    It will be cleaned up soon. 
+ *              Enjoy!
+ * 
+ */
+
 /** @type {import("./src/server")} */
 // @ts-ignore
 const server = false ? require('./lib/compiled-lib') : require("./src/server");
@@ -21,9 +31,9 @@ const server = false ? require('./lib/compiled-lib') : require("./src/server");
 server.libsReady.then(() => {
 	const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
 	// console.log(settings.bindInfo.localAddressPermissions.localhost);
-	let check = server.checkServerConfig(settings);
+	let check = server.checkServerConfig(settings, false);
 	if(check !== true) {
-		console.log(JSON.stringify(check, null, 2));
+    console.log(JSON.stringify(check, null, 2));
 		debugger;
 	}
 	server.eventer.emit("settings", settings);

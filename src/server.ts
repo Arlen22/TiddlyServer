@@ -126,7 +126,7 @@ eventer.on('settings', (set) => {
   debug = StateObject.DebugLogger("SERVER ").bind({ debugOutput, settings });
   log = setLog() as any;
   // console.log(JSON.stringify(set, null, 2));
-  if (checkServerConfig(set) !== true) throw "ServerConfig did not pass validator";
+  if (checkServerConfig(set, false) !== true) throw "ServerConfig did not pass validator";
 });
 eventer.on('settingsChanged', (keys) => {
   // let watch: (keyof ServerConfig["server"])[] = ["server.logAccess", "server.logToConsoleAlso", "server.logColorsToFile"];

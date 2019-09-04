@@ -198,7 +198,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
         upload: true,
         websockets: true,
         registerNotice: true,
-        putsaver: true
+        putsaver: true,
+        loginlink: true
       }),
       ...set.bindInfo.localAddressPermissions["localhost"]({} as any)
     },
@@ -209,7 +210,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
         upload: false,
         websockets: true,
         registerNotice: false,
-        putsaver: true
+        putsaver: true,
+        loginlink: true
       }),
       ...set.bindInfo.localAddressPermissions["*"]({} as any)
     }
@@ -497,6 +499,8 @@ export interface ServerConfig_AccessOptions {
 	 * which can be copied into an authAccounts entry. 
 	 */
   registerNotice: boolean;
+  /** link to the login page when returning auth errors */
+  loginlink: boolean;
 }
 export interface ServerConfig_BindInfo {
 	/** 
@@ -709,9 +713,8 @@ export namespace Config {
 		 * Which error code to return for unauthorized (or anonymous) requests
 		 * - 403 Access Denied: Client is not granted permission to access this resouce.
 		 * - 404 Not Found: Client is told that the resource does not exist.
-     * - 302 Temporary Redirect: Client is redirected to the login page
 		 */
-    authError?: 403 | 404 | 302;
+    authError?: 403 | 404;
   }
   export interface Options_Backups extends ServerConfig_TiddlyServer {
     /** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */

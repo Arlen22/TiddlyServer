@@ -243,6 +243,10 @@
         "writeErrors": true
       },
       "properties": {
+        "loginlink": {
+          "description": "link to the login page when returning auth errors",
+          "type": "boolean"
+        },
         "mkdir": {
           "description": "allow create directory on directory index page",
           "type": "boolean"
@@ -274,7 +278,8 @@
         "upload",
         "mkdir",
         "websockets",
-        "registerNotice"
+        "registerNotice",
+        "loginlink"
       ],
       "type": "object"
     },

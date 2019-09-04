@@ -1128,7 +1128,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   statPath: STATPATH;
   /** The tree ancestors in descending order, including the final folder element. */
   //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-  ancestry: (NewTreeGroup | NewTreePath)[];
+  ancestry: Config.MountElement[];
   /** The tree ancestors options as they apply to this request */
   //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
   treeOptions: OptionsConfig;
