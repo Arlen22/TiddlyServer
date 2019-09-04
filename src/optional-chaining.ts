@@ -74,12 +74,12 @@ interface TSOCAny extends TSOCDataAccessor<any> {
  */
 type TSOCDataWrapper<T> =
   0 extends (1 & T) // Is T any? (https://stackoverflow.com/questions/49927523/disallow-call-with-any/49928360#49928360)
-    ? TSOCAny
-    : T extends any[] // Is T array-like?
-      ? TSOCArrayWrapper<T[number]>
-      : T extends object // Is T object-like?
-        ? TSOCObjectWrapper<T>
-        : TSOCDataAccessor<T>;
+  ? TSOCAny
+  : T extends any[] // Is T array-like?
+  ? TSOCArrayWrapper<T[number]>
+  : T extends object // Is T object-like?
+  ? TSOCObjectWrapper<T>
+  : TSOCDataAccessor<T>;
 
 /**
  * An object that supports optional chaining

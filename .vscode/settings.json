@@ -9,5 +9,7 @@
 		},
 		"node_modules": true
 	},
-	"explorer.sortOrder": "type"
+	"explorer.sortOrder": "type",
+  "editor.detectIndentation": false,
+  "editor.tabSize": 2
 }
