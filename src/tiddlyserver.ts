@@ -85,14 +85,16 @@ export function getTreeOptions(state: StateObject) {
     ...(state.settings.putsaver || {})
   });
   let options: OptionsConfig = {
-    auth: { $element: "auth", authError: 302, authList: null },
+    auth: { $element: "auth", authError: 403, authList: null },
     putsaver: { $element: "putsaver", ...putsaver },
     index: { $element: "index", defaultType: state.settings.directoryIndex.defaultType, indexFile: [], indexExts: [] }
   }
+  console.log(state.ancestry);
   state.ancestry.forEach((e) => {
     // console.log(e);
-    e.$children && e.$children.forEach((f: Config.MountElement | Config.OptionElements) => {
+    e.$options && e.$options.forEach((f) => {
       if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
+        // console.log(f);
         Object.keys(f).forEach(k => {
           if (f[k] === undefined) return;
           options[f.$element][k] = f[k];
@@ -103,9 +105,6 @@ export function getTreeOptions(state: StateObject) {
   return options;
 }
 export function handleTiddlyServerRoute(state: StateObject): void {
-  // var result: PathResolverResult | undefined;
-  // const resolvePath = (settings.tree);
-  // Promise.resolve().then(() => {
 
   let result: PathResolverResult = resolvePath(state, state.hostRoot) || null as never;
   if (!result) {
@@ -116,16 +115,21 @@ export function handleTiddlyServerRoute(state: StateObject): void {
   state.treeOptions = getTreeOptions(state);
   //handle route authentication
   let { authList, authError } = state.treeOptions.auth;
+  // console.log(authList, authError, state.authAccountsKey);
   if (authList && authList.indexOf(state.authAccountsKey) === -1) {
-    if(authError === 302){
-      state.redirect("/admin/authenticate/login.html");
-    } else {
-      state.throw<never>(authError);
-    }
-    // return Promise.reject();
+    if(state.allow.loginlink) state.respond(authError).string(`
+<html><body>
+<h2>Error ${authError}</h2>
+<p>
+In this case you are not logged in. Try logging in using the 
+<a href="/admin/authenticate/login.html">login page</a>.
+</p>
+</body></html>
+`);
+    else state.throw<never>(authError);
+    
   } else if (Config.isGroup(result.item)) {
     serveDirectoryIndex(result, state);
-    // return Promise.reject();
   } else {
     const stateItemType = <T extends StatPathResult["itemtype"]>(state: StateObject, itemtype: T): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> => state.statPath.itemtype === itemtype;
     statWalkPath(result).then((statPath) => {
