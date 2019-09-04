@@ -260,12 +260,6 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       etagAge: set.putsaver.etagAge(3),
       backupFolder: set.putsaver.backupFolder(""),
       etag: set.putsaver.etag("optional")
-
-      // },
-      // ...spread(set.putsaver),
-      // ...{
-      // 	etag: set.putsaver && set.putsaver.etag || ""
-      // }
     },
     datafolder: set.datafolder({}),
     directoryIndex: {
@@ -715,8 +709,9 @@ export namespace Config {
 		 * Which error code to return for unauthorized (or anonymous) requests
 		 * - 403 Access Denied: Client is not granted permission to access this resouce.
 		 * - 404 Not Found: Client is told that the resource does not exist.
+     * - 302 Temporary Redirect: Client is redirected to the login page
 		 */
-    authError?: 403 | 404;
+    authError?: 403 | 404 | 302;
   }
   export interface Options_Backups extends ServerConfig_TiddlyServer {
     /** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
