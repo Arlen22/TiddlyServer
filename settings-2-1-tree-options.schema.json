@@ -14,10 +14,11 @@
           "type": "string"
         },
         "authError": {
-          "description": "Which error code to return for unauthorized (or anonymous) requests\n- 403 Access Denied: Client is not granted permission to access this resouce.\n- 404 Not Found: Client is told that the resource does not exist.",
+          "description": "Which error code to return for unauthorized (or anonymous) requests\n- 403 Access Denied: Client is not granted permission to access this resouce.\n- 404 Not Found: Client is told that the resource does not exist.\n - 302 Temporary Redirect: Client is redirected to the login page",
           "enum": [
             403,
-            404
+            404,
+            302
           ],
           "type": "number"
         },
