@@ -89,7 +89,7 @@ export function getTreeOptions(state: StateObject) {
     putsaver: { $element: "putsaver", ...putsaver },
     index: { $element: "index", defaultType: state.settings.directoryIndex.defaultType, indexFile: [], indexExts: [] }
   }
-  console.log(state.ancestry);
+  // console.log(state.ancestry);
   state.ancestry.forEach((e) => {
     // console.log(e);
     e.$options && e.$options.forEach((f) => {
