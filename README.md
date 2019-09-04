@@ -22,6 +22,9 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
  - Loads data folders using TiddlyWiki then forwards all requests to the listen command. All data folders are mounted on the path they are found at (e.g. `/personal/mydatafolder`)
  - Saves a backup of the original everytime a single-file TiddlyWiki is saved (if a backup folder is specified in the settings file).
 
+## Installation
+
+The guide at https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html is the best place to get started. 
 
 ## Short instructions
 
@@ -33,7 +36,7 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 
 ## How to upgrade
 
-Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0.x to 2.1.x, you need to run `node upgrade-settings.json` after you copy it in and follow the instructions.
+Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0.x to 2.1.x, just use the `example-settings.json` file as your starting point and copy the tree over from your old settings file. 
 
 ## FAQ
 
