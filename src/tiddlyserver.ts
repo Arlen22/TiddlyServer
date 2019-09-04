@@ -85,7 +85,7 @@ export function getTreeOptions(state: StateObject) {
     ...(state.settings.putsaver || {})
   });
   let options: OptionsConfig = {
-    auth: { $element: "auth", authError: 403, authList: null },
+    auth: { $element: "auth", authError: 302, authList: null },
     putsaver: { $element: "putsaver", ...putsaver },
     index: { $element: "index", defaultType: state.settings.directoryIndex.defaultType, indexFile: [], indexExts: [] }
   }
@@ -117,7 +117,11 @@ export function handleTiddlyServerRoute(state: StateObject): void {
   //handle route authentication
   let { authList, authError } = state.treeOptions.auth;
   if (authList && authList.indexOf(state.authAccountsKey) === -1) {
-    state.throw<never>(authError);
+    if(authError === 302){
+      state.redirect("/admin/authenticate/login.html");
+    } else {
+      state.throw<never>(authError);
+    }
     // return Promise.reject();
   } else if (Config.isGroup(result.item)) {
     serveDirectoryIndex(result, state);
