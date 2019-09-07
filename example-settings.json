@@ -3,14 +3,18 @@
 	//All relative paths are relative to this file.
 	//The user directory prefix ~ is allowed.
 
-	"tree": "../webroot", //this tree is just going to mount a folder as root: ../webroot
-
-	// That line could also look like this:
-	// { 
-	// 	//this tree is just going to mount a folder as root: ../webroot
-	// 	"$element": "folder",
-	// 	"path": "../webroot",
-	// },
+  //remove one of these
+  "tree": "../webroot", //this tree is just going to mount a folder as root: ../webroot
+  
+  "tree": { //this tree is going to mount a group containing folders and another group
+    "myfolder": "../personal",
+    "workstuff": "../work",
+    "user": "~/Desktop/random",
+    "projects_group": {
+      "tiddlyserver": "~/Desktop/Github/TiddlyServer",
+      "material-theme": "~/Dropbox/Material Theme"
+    }
+  },
 
 	"bindInfo": {
 		// V V V V Uncomment one of the following V V V V 
