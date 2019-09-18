@@ -73,7 +73,8 @@ const setAuth = (settings: ServerConfig) => {
     let auth = cookies["TiddlyServerAuth"] as string;
     if (!auth) return false;
     let json = parseAuthCookie(auth, true);
-    if (!json || json.length !== 6) return false;
+    //we have to make sure the suffix is truthy
+    if (!json || json.length !== 6 || !json[5]) return false;
     return validateCookie(json, false);
   };
   const isoreg = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/;
@@ -93,7 +94,9 @@ const setAuth = (settings: ServerConfig) => {
       username + timestamp + hash,
       from_base64(pubkey[1])
     )
-      && (!suffix || suffix === pubkey[2])
+      //json.length should be 5 if there is no suffix, don't ignore falsy suffix
+      //the calling code must determine whether the subject is needed
+      && (json.length === 5 || suffix === pubkey[2])
       && isoreg.test(timestamp)
       && (Date.now() - new Date(timestamp).valueOf() < authCookieAge * 1000);
     // console.log((valid ? "" : "in") + "valid signature")
