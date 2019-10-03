@@ -1,4 +1,3 @@
-declare var ReactDOM: any;
 
 {
 	window.addEventListener("load", () => {
