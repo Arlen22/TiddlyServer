@@ -314,13 +314,13 @@ $tw.utils.parseDate = function(value) {
 // Stringify an array of tiddler titles into a list string
 $tw.utils.stringifyList = function(value) {
 	if($tw.utils.isArray(value)) {
-		var result = [];
-		for(var t=0; t<value.length; t++) {
+		var result = new Array(value.length);
+		for(var t=0, l=value.length; t<l; t++) {
 			var entry = value[t] || "";
 			if(entry.indexOf(" ") !== -1) {
-				result.push("[[" + entry + "]]");
+				result[t] = "[[" + entry + "]]";
 			} else {
-				result.push(entry);
+				result[t] = entry;
 			}
 		}
 		return result.join(" ");
@@ -486,8 +486,10 @@ $tw.utils.getTypeEncoding = function(ext) {
 	return typeInfo ? typeInfo.encoding : "utf8";
 };
 
-
-$tw.utils.evalMakeModule = function(code,context){
+/*
+Run code globally with specified context variables in scope
+*/
+$tw.utils.evalGlobal = function(code,context,filename) {
 	var contextCopy = $tw.utils.extend(Object.create(null),context);
 	// Get the context variables as a pair of arrays of names and values
 	var contextNames = [], contextValues = [];
@@ -497,31 +499,24 @@ $tw.utils.evalMakeModule = function(code,context){
 	});
 	// Add the code prologue and epilogue
 	code = "(function(" + contextNames.join(",") + ") {(function(){\n" + code + "\n;})();\nreturn exports;\n})\n";
-	return { code, contextNames, contextValues }
-}
-/*
-Run code globally with specified context variables in scope
-*/
-$tw.utils.evalGlobal = function (innercode, context, filename) {
-	var { code, contextNames, contextValues } = $tw.utils.evalMakeModule(innercode, context);
 	// Compile the code into a function
 	var fn;
-	if ($tw.browser) {
-		fn = Function("return " + code + "\n\n//# sourceURL=" + filename)();
+	if($tw.browser) {
+		fn = window["eval"](code + "\n\n//# sourceURL=" + filename);
 	} else {
-		fn = vm.runInThisContext(code, filename);
+		fn = vm.runInThisContext(code,filename);
 	}
 	// Call the function and return the exports
-	return fn.apply(null, contextValues);
+	return fn.apply(null,contextValues);
 };
 
 /*
 Run code in a sandbox with only the specified context variables in scope
 */
-var sandboxContext = $tw.browser ? undefined : vm.createContext();
-$tw.utils.evalSandboxed = $tw.browser ? $tw.utils.evalGlobal : function (innercode, context, filename) {
-	var { code, contextValues } = $tw.utils.evalMakeModule(innercode, context);
-	return vm.runInContext(code, sandboxContext, filename).apply(null, contextValues).exports;
+$tw.utils.evalSandboxed = $tw.browser ? $tw.utils.evalGlobal : function(code,context,filename) {
+	var sandbox = $tw.utils.extend(Object.create(null),context);
+	vm.runInNewContext(code,sandbox,filename);
+	return sandbox.exports;
 };
 
 /*
@@ -732,7 +727,6 @@ $tw.modules.execute = function(moduleName,moduleRoot) {
 		tiddler = $tw.wiki.getTiddler(name),
 		_exports = {},
 		sandbox = {
-			// global: new Object(global),
 			module: {exports: _exports},
 			//moduleInfo: moduleInfo,
 			exports: _exports,
