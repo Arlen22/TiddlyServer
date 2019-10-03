@@ -1,9 +1,5 @@
-import {
-  StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag,
-  PathResolverResult, tryParseJSON, JsonError,
-  serveFolderIndex, sendResponse, canAcceptGzip, Hashmap, ServerEventEmitter,
-  resolvePath, statWalkPath, RequestEventWS, serveFolder,
-} from "./server-types";
+import { AccessPathResult, AccessPathTag, canAcceptGzip, Hashmap, JsonError, keys, PathResolverResult, RequestEventWS, resolvePath, sendResponse, serveFolder, serveFolderIndex, ServerConfig, ServerEventEmitter, StateObject, statWalkPath, tryParseJSON } from "./server-types";
+
 // import { Observable, Subject } from "../lib/rx";
 
 declare const __non_webpack_require__: NodeRequire | undefined;
@@ -230,6 +226,7 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
       variables: {
         "path-prefix": mount,
         "root-tiddler": "$:/core/save/all",
+        "gzip": "yes",
         // "root-tiddler": "$:/core/save/all-external-js"
         ...vars
       }
