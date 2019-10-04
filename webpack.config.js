@@ -6,7 +6,7 @@ const webpack = require('/usr/local/lib/node_modules/webpack');
  * @type {import("webpack").Configuration}
  */
 module.exports = {
-  watch: true,
+  watch: false,
   entry: {
     // "source-map-support": path.resolve(__dirname, './node_modules/source-map-support/register.js'),
     "bundled1": path.resolve(__dirname, './webpack-bundle.js'),
