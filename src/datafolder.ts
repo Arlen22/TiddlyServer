@@ -53,9 +53,7 @@ export function init(e: ServerEventEmitter) {
       //if this is a datafolder, we hand the client and request off directly to it
       //otherwise we stick it in its own section
       if (statPath.itemtype === "datafolder") {
-        const target = settings._datafoldertarget
-          ? path.resolve(settings.__dirname, settings._datafoldertarget)
-          : "../tiddlywiki";
+        const target = settings.__targetTW;
         //trigger the datafolder to load in case it isn't
         const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '', target, settings.datafolder);
         const subpath = pathname.slice(mount.length);
@@ -111,9 +109,7 @@ function quickArrayCheck(obj: any): obj is Array<any> {
 }
 
 export function handleDataFolderRequest(result: PathResolverResult, state: StateObject) {
-  const target = state.settings._datafoldertarget
-    ? path.resolve(state.settings.__dirname, state.settings._datafoldertarget)
-    : "../tiddlywiki";
+  const target = state.settings.__targetTW;
 
   const { mount, folder } = loadDataFolderTrigger(result,
     state.statPath, state.url.pathname, state.url.query.reload as any || "", target, state.settings.datafolder);
