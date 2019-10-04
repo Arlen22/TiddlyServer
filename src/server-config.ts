@@ -228,6 +228,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
     __dirname: "",
     __filename: "",
     __assetsDir: "",
+    __targetTW: "",
     _devmode: !!set._devmode(),
     _datafoldertarget: set._datafoldertarget() || "",
     tree: normalizeSettingsTree(settingsDir, set.tree() as any),
@@ -437,6 +438,7 @@ export interface ServerConfig {
   __dirname: string;
   __filename: string;
   __assetsDir: string;
+  __targetTW: string;
 }
 
 export interface ServerConfig_ClientsideDatafolders {

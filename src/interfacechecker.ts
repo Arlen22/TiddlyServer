@@ -348,6 +348,7 @@ export function checkServerConfig(obj, showUnionNulls: boolean): true | {} {
     __assetsDir: checkString,
     __dirname: checkString,
     __filename: checkString,
+    __targetTW: checkString,
     _datafoldertarget: checkString,
     _devmode: checkBoolean,
     authCookieAge: checkNumber,

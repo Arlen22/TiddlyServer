@@ -9,7 +9,7 @@ import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 import { send, ws as WebSocket, JSON5 } from '../lib/bundled-lib';
 import { Stats, appendFileSync } from 'fs';
-import { gzip } from 'zlib';
+import { gzip, createGzip } from 'zlib';
 import { Writable, Stream } from 'stream';
 // import { TlsOptions } from 'tls';
 import * as https from "https";
@@ -150,6 +150,9 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
   let settingsObj = normalizeSettings(settingsObjSource, settingsFile);
 
   settingsObj.__assetsDir = assets;
+  settingsObj.__targetTW = settingsObj._datafoldertarget
+    ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
+    : path.resolve(__dirname, "../tiddlywiki");
 
   if (typeof settingsObj.tree === "object") {
     let keys: string[] = [];
@@ -1329,20 +1332,38 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         Object.keys(hdrs).forEach(e => {
           let item = hdrs[e];
           if (item) res.setHeader(e, item.toString());
-        })
+        });
       });
+    // sender.on("overrideStream", (tag) => {
+    //   // this._res.setHeader("Transfer-Encoding", "gzip");
+    //   const gz = createGzip();
+    //   const res = tag.dest as http.ServerResponse;
+    //   const buffs: Buffer[] = [];
+    //   let length = 0;
+    //   gz.on("data", (chunk: Buffer) => { length += chunk.length; buffs.push(chunk); });
+    //   gz.on("end", () => {
+    //     this._res.setHeader("Content-Length", length);
+    //     this._res.setHeader("Content-Encoding", "gzip");
+    //     console.log(buffs.length);
+    //     for (let i = 0; i < buffs.length; i++) {
+    //       res.write(buffs[i]);
+    //     }
+    //     res.end();
+    //   })
+    //   tag.dest = gz;
+    // });
     sender.pipe(this._res);
   }
-	/**
-	 * Recieves the body of the request and stores it in body and json. If there is an
-	 * error parsing body as json, the error callback will be called or if the callback
-	 * is boolean true it will send an error response with the json error position.
-	 * 
-	 * @param {(true | ((e: JsonError) => void))} errorCB sends an error response 
-	 * showing the incorrect JSON syntax if true, or calls the function
-	 * @returns {Observable<StateObject>}
-	 * @memberof StateObject
-	 */
+  /**
+   * Recieves the body of the request and stores it in body and json. If there is an
+   * error parsing body as json, the error callback will be called or if the callback
+   * is boolean true it will send an error response with the json error position.
+   * 
+   * @param {(true | ((e: JsonError) => void))} errorCB sends an error response 
+   * showing the incorrect JSON syntax if true, or calls the function
+   * @returns {Observable<StateObject>}
+   * @memberof StateObject
+   */
   recieveBody(parseJSON: boolean, errorCB?: true | ((e: JsonError) => void)) {
 
     return new Promise<Buffer>(resolve => {

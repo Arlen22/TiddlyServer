@@ -471,9 +471,9 @@ eventer.on("stateDebug", (state) => {
 
 function handleAssetsRoute(state: StateObject) {
   switch (state.path[2]) {
-    case "static": serveFolder(state, '/assets/static', path.join(settings.__assetsDir, "static")); break;
-    case "icons": serveFolder(state, '/assets/icons', path.join(settings.__assetsDir, "icons")); break;
-    // case "tiddlywiki": handleTiddlyWikiRoute(state); break;
+    case "static": serveFolder(state, '/assets/static', path.join(state.settings.__assetsDir, "static")); break;
+    case "icons": serveFolder(state, '/assets/icons', path.join(state.settings.__assetsDir, "icons")); break;
+    case "tiddlywiki": serveFolder(state, '/assets/tiddlywiki', state.settings.__targetTW); break;
     default: state.throw(404);
   }
 }
