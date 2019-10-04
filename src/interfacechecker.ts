@@ -1,5 +1,5 @@
 
-import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValue, Config, ServerConfig_TiddlyServer } from "./server-config";
+import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValue, Config, ServerConfig_PutSaver } from "./server-config";
 
 function as<T>(obj: T) {
   return obj;
@@ -300,7 +300,7 @@ export function checkServerConfig(obj, showUnionNulls: boolean): true | {} {
     putsaver: checkBoolean,
     loginlink: checkBoolean
   });
-  const putsaverOptional = as<OptionalCheckermap<ServerConfig_TiddlyServer, never>>({
+  const putsaverOptional = as<OptionalCheckermap<ServerConfig_PutSaver, never>>({
     backupFolder: checkString,
     etag: checkStringEnum("optional", "required", "disabled"),
     etagAge: checkNumber,

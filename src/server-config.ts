@@ -355,7 +355,11 @@ export interface ServerConfigSchema {
   /** directory index options */
   directoryIndex?: ExcludedPartial<ServerConfig_DirectoryIndex, "types">;
   /** tiddlyserver specific options */
-  putsaver?: Partial<ServerConfig_TiddlyServer>,
+  putsaver?: Partial<ServerConfig_PutSaver>,
+  /** 
+   * Options object whose properties will be passed to the tiddlywiki server instance using the spread operator.
+   * If a property specifies an object instead of a string, the object will be shared between all instances. 
+   */
   datafolder?: Record<string, any>,
 	/** 
 	 * The Hashmap of accounts which may authenticate on this server.
@@ -409,7 +413,7 @@ export interface ServerConfig {
   /** directory index */
   directoryIndex: ServerConfig_DirectoryIndex
   /** PUT saver options */
-  putsaver: ServerConfig_TiddlyServer | false,
+  putsaver: ServerConfig_PutSaver | false,
   /** Variables passed directly to TiddlyWiki server instance */
   datafolder: Record<string, unknown>,
 	/** 
@@ -473,7 +477,7 @@ export interface ServerConfig_AuthAccountsValue {
 	/** 
 	 * override hostLevelPermissions for users with this account 
 	 * 
-	 * @default {"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true}
+	 * @default {"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true,"loginlink":true}
 	 */
   permissions: ServerConfig_AccessOptions
 }
@@ -589,10 +593,10 @@ export interface ServerConfig_DirectoryIndex {
 	 */
   icons: { [iconName: string]: string[] }
   types: { [ext: string]: string }
-  /** additional extensions to apply to mime types */
+  /** additional extensions to apply to mime types ["mime/type"]: ["htm", "html"] */
   mimetypes: { [type: string]: string[] }
 }
-export interface ServerConfig_TiddlyServer {
+export interface ServerConfig_PutSaver {
 	/** 
 	 * Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired. 
 	 */
@@ -602,7 +606,9 @@ export interface ServerConfig_TiddlyServer {
 	 */
   gzipBackups?: boolean,
 	/** 
-	 * Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup. 
+	 * Reject an etag with a modified time that is different than the file on disk by this many seconds. 
+   * Sometimes sync or antivirus sofware will "touch" a file and update the modified time without changing anything.
+   * Size difference will still cause the request to be rejected.
 	 */
   etagAge?: number,
 	/** 
@@ -718,7 +724,7 @@ export namespace Config {
 		 */
     authError?: 403 | 404;
   }
-  export interface Options_Backups extends ServerConfig_TiddlyServer {
+  export interface Options_Backups extends ServerConfig_PutSaver {
     /** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
     $element: "putsaver",
 

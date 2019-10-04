@@ -65,7 +65,7 @@
           "type": "string"
         },
         "etagAge": {
-          "description": "Save a backup only if the disk copy is older than this many seconds. If the file on disk is only a few minutes old it can be assumed that very little has changed since the last save. So if this is set to 10 minutes, and your wiki gets saved every 9 minutes, only the first save will trigger a backup. This is a useful option for large wikis that see a lot of daily work but not useful for experimental wikis which might crash at any time and need to be reloaded from the last backup.",
+          "description": "Reject an etag with a modified time that is different than the file on disk by this many seconds. \n Sometimes sync or antivirus sofware will \"touch\" a file and update the modified time without changing anything.\n Size difference will still cause the request to be rejected.",
           "type": "number"
         },
         "gzipBackups": {

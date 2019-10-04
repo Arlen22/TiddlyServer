@@ -117,17 +117,16 @@ export function handleTiddlyServerRoute(state: StateObject): void {
   let { authList, authError } = state.treeOptions.auth;
   // console.log(authList, authError, state.authAccountsKey);
   if (authList && authList.indexOf(state.authAccountsKey) === -1) {
-    if(state.allow.loginlink) state.respond(authError).string(`
+    state.respond(authError).string(`
 <html><body>
 <h2>Error ${authError}</h2>
 <p>
-In this case you are not logged in. Try logging in using the 
-<a href="/admin/authenticate/login.html">login page</a>.
+In this case you are not logged in. 
+${state.allow.loginlink ? ' Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.' : ""}
 </p>
 </body></html>
 `);
-    else state.throw<never>(authError);
-    
+    return; //just for safety
   } else if (Config.isGroup(result.item)) {
     serveDirectoryIndex(result, state);
   } else {

@@ -5,6 +5,7 @@ import { deepStrictEqual, equal } from "assert";
 const SETTINGSDIR = join(__dirname, "settings");
 
 
+
 export function normalizeTree_GroupElement_() {
   return Promise.all([
     Promise.resolve(normalizeTree(SETTINGSDIR, {

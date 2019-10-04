@@ -5,7 +5,24 @@ title: Server Config
 
 The server config is both a TypeScript interface, and a JSON file. The JSON file is loaded and normalized to match the ServerConfig interface definition and then type-checked to make sure all the data is valid. This helps me catch bugs during development and helps everyone make sure their settings.json file has the correct format. 
 
-## `tree`
+```json
+{
+  "$schema": "./settings-2-1.schema.json",
+  "tree": {},
+  "authAccounts": {},
+  "bindInfo": {},
+  "logging": {},
+  "directoryIndex": {},
+  "datafolder": {},
+  "putsaver": {},
+  "authCookieAge": 86400,
+  "maxTransferRequests": 20,
+  "_devmode": false,
+  "_datafoldertarget": ""
+}
+```
+
+## Section `tree`
 
 The tree property has many expressions, but only one format. In it's simplest form, it is expressed as string values specifying folders and files to be served organized into a tree structure using objects.
 
@@ -85,26 +102,14 @@ In this case, backups will be made for all items in the group except for the `/j
 
 `indexFile` and `indexExts` must both apply to the request in order for the index file to be used, but they don't need to be specified on the same element. For instance, one may be specified on a group, and the other may be specified on the folder underneath it. 
 
-## `authAccounts`
+## Section `authAccounts`
 
 Auth accounts is a hashmap. The key is the account ID and the value is an object with two properties. 
 
 - `permissions` - The same permissions object specified in `bindInfo.localAddressPermissions`.
 - `clientKeys` - A hashmap of { [`username`]: { `publicKey`: , `cookieSalt` } }
 
-```json
-{
-  "authAccountKey": {
-    "permsisions": {...},
-    "clientKeys": {
-      "a_username": {
-        "publicKey": "base64string",
-        "cookieSalt": "anystring"
-      }
-    }
-  }
-}
-```
+<div style="color: rgb(0, 0, 0); font-family: Menlo, Monaco, &quot;Courier New&quot;, monospace; font-size: 12px; line-height: 18px; white-space: pre; overflow: auto;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div>&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"authAccounts"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"designteam"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"clientKeys"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"arlen"</span>:&nbsp;{&nbsp;<span style="color: rgb(4, 81, 165);">"publicKey"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">""</span>,&nbsp;<span style="color: rgb(4, 81, 165);">"cookieSalt"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">""</span>&nbsp;}</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;},&nbsp;</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"permissions"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"mkdir"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"putsaver"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"registerNotice"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"upload"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"websockets"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"writeErrors"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"loginlink"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span></div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</div><div>&nbsp;&nbsp;&nbsp;&nbsp;}</div><div>&nbsp;&nbsp;},</div></div></div></div></div></div></div>
 
 The page at `/admin/authenticate/login.html` will generate the public key based on the username and password and use it to log into the server, but the server does not care what method is used to generate the public key. We could just as easily implement a password-protected private key instead of hashing the username and password. 
 
@@ -120,9 +125,11 @@ If the cookie salt is changed to a string which was already used before for that
 
 Running the command `node -e "console.log(Date.now())"` will print the current timestamp. 
 
-## `bindInfo`
+## Section `bindInfo`
 
 The bind info relates to the NodeJS server instances that TiddlyServer uses to recieve requests. 
+
+<div style="color: rgb(0, 0, 0); font-family: Menlo, Monaco, &quot;Courier New&quot;, monospace; font-size: 12px; line-height: 18px; white-space: pre; overflow: auto"><div>&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">bindInfo:</span>&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">port:</span>&nbsp;<span style="color: rgb(9, 136, 90);">8080</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">bindAddress:</span>&nbsp;[<span style="color: rgb(163, 21, 21);">"127.0.0.1"</span>&nbsp;<span style="color: rgb(0, 128, 0);">/*&nbsp;"0.0.0.0"&nbsp;*/</span>&nbsp;<span style="color: rgb(0, 128, 0);">/*&nbsp;"192.168.0.0/16"&nbsp;*/</span>],</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">bindWildcard:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">enableIPv6:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">filterBindAddress:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">https:</span>&nbsp;<span style="color: rgb(163, 21, 21);">"./https.js"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">localAddressPermissions:</span>&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(163, 21, 21);">"*"</span><span style="color: rgb(0, 16, 128);">:</span>&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">loginlink:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">mkdir:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">putsaver:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,&nbsp;</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">registerNotice:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">upload:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,&nbsp;</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">websockets:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">writeErrors:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span></div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</div><div>&nbsp;&nbsp;&nbsp;&nbsp;},</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(0, 16, 128);">_bindLocalhost:</span>&nbsp;<span style="color: rgb(0, 0, 255);">false</span></div><div>&nbsp;&nbsp;}</div></div>
 
 ### port: number;
 
@@ -168,6 +175,7 @@ not the bind address of the server instance that accepted the request, so it wor
 - `mkdir`: allow create directory on directory index page
 - `websockets`: allow websocket connections (default true);
 - `registerNotice`: login attempts for a public/private key pair which has not been registered will be logged at debug level 2 with the full public key which can be copied into an authAccounts entry. 
+- `loginlink`: 403 Access Denied error page will include a link to the login page.
 
 Here is an example of what it could look like, with everything allowed. 
 
@@ -188,9 +196,13 @@ Here is an example of what it could look like, with everything allowed.
 
 Always bind a separate server instance to 127.0.0.1 regardless of any other settings 
 
-## `directoryIndex`
+## Section `directoryIndex`
 
 A group of settings which apply to the directory index. 
+
+The example here demonstrates the difference between `icons` and `mimetypes`. `icons` needs to have _all_ extensions specified, and `mimetypes` only needs _additional_ extensions specified. 
+
+<div style="color: rgb(0, 0, 0); font-family: Menlo, Monaco, &quot;Courier New&quot;, monospace; font-size: 12px; line-height: 18px; white-space: pre; overflow: auto;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div>&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"directoryIndex"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"defaultType"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"html"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"icons"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"htmlfile"</span>:&nbsp;[<span style="color: rgb(163, 21, 21);">"html"</span>,&nbsp;<span style="color: rgb(163, 21, 21);">"htm"</span>,&nbsp;<span style="color: rgb(163, 21, 21);">"tw"</span>]</div><div>&nbsp;&nbsp;&nbsp;&nbsp;},</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"mimetypes"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"text/html"</span>:&nbsp;[<span style="color: rgb(163, 21, 21);">"tw"</span>]</div><div>&nbsp;&nbsp;&nbsp;&nbsp;},</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"mixFolders"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">false</span></div><div>&nbsp;&nbsp;},</div></div></div></div></div></div>
 
 ### defaultType: `html` | `json`
 
@@ -214,15 +226,21 @@ For example: `{ "text/html": [ "tw" ], "example/other": ["any"] }` adds the .tw 
 
 Sort folders separately in directory index or mix them.
 
-## `datafolder`
+## Section `datafolder`
 
 A record of strings which will be added to options.variables object of the TiddlyWiki server instance. 
 
-One security consideration is that if an object is specified instead of a string for any of the properties, then all data folders will be sharing that object. Changes to the object will be seen by all other data folder instances. No type checking is done on the values of the datafolder object. 
+<div style="color: rgb(0, 0, 0); font-family: Menlo, Monaco, &quot;Courier New&quot;, monospace; font-size: 12px; line-height: 18px; white-space: pre; overflow:auto;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div>&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"datafolder"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"root-tiddler"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"$:/core/save/all-external-js&nbsp;or&nbsp;whatever&nbsp;all&nbsp;your&nbsp;wikis&nbsp;use"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"other-tiddlywiki-server-variable"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"anything&nbsp;tiddlywiki&nbsp;server&nbsp;understands"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"incorrect-server-variable"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"tiddlyserver&nbsp;doesn't&nbsp;check&nbsp;the&nbsp;datafolder&nbsp;object"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"spread&nbsp;operator&nbsp;assignment"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"it&nbsp;just&nbsp;...vars&nbsp;it&nbsp;into&nbsp;the&nbsp;tiddlywiki&nbsp;server&nbsp;variables"</span></div><div>&nbsp;&nbsp;},</div></div></div></div>
 
-## `putsaver`
+One security consideration is that if an object is specified instead of a string for any of the properties, then all data folders will be sharing that object. Changes to the object will be seen by all other data folder instances. 
+
+No type checking is done on the values of the datafolder object. 
+
+## Section `putsaver`
 
 Setting this property to false disables the putsaver completely in case this feature is not desired. The properties are the same as the putsaver option element in the tree. This can be considered the top-level `putsaver` option element. 
+
+<div style="color: rgb(0, 0, 0); font-family: Menlo, Monaco, &quot;Courier New&quot;, monospace; font-size: 12px; line-height: 18px; white-space: pre; overflow: auto;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div>&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"putsaver"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"backupFolder"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"../backups"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"etag"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"optional"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"etagAge"</span>:&nbsp;<span style="color: rgb(9, 136, 90);">3</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"gzipBackups"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span></div><div>&nbsp;&nbsp;},</div></div></div></div></div>
 
 ### backupFolder: string
 
@@ -250,7 +268,7 @@ If multiple users are editing the same file, you should probably be using Git or
 
 If the file size has changed, it is always considered stale, regardless of this setting. 
 
-## `logging`
+## Section `logging`
 
 ### debugLevel: number
 
