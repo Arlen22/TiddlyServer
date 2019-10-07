@@ -47,7 +47,7 @@ function as<T>(obj: T) {
 }
 
 function normalizeOptions(keypath: string[], a: OptionsSchema[keyof OptionsSchema]) {
-  if (typeof a.$element !== "string") throw new Error("Missing $element property " + keypath.join('.'));
+  if (typeof a.$element !== "string") throw new Error("Missing $element property in " + keypath.join('.'));
 
   if (a.$element === "auth") {
 
