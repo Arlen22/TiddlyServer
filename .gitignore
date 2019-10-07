@@ -30,3 +30,4 @@ old-settings.json
 *.key
 *.cer
 .DS_Store
+https.js
