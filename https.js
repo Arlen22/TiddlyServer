@@ -16,7 +16,7 @@ This is my issuecert.sh file (The key is RSA 4096)
 
 This is my installcert.sh file
 
-/root/.acme.sh/acme.sh --install-cert -d icedteadrinker.sandsendhand.net \
+/root/.acme.sh/acme.sh --install-cert -d example.com \
 --cert-file      /root/TiddlyServer/tiddlyserver-cert.pem  \
 --key-file       /root/TiddlyServer/tiddlyserver-key.pem  \
 --fullchain-file /root/TiddlyServer/tiddlyserver-fullchain.pem \
