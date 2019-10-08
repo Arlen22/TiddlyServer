@@ -292,7 +292,7 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
         //if normalize changed anything, it's probably bad
         if(normdir !== newdir || normdir.indexOf("..") !== -1) {
           debugState("SER-DIR", state)(2, "mkdir normalized path %s didnt match %s", normdir, newdir);
-          state.throwError(400, new ER("Error recieving request", "invalid path given in dirname"))
+          state.throwError(400, new ER("Error parsing request - invalid name", "invalid path given in dirname"))
           return;
         }
         fs.mkdir(path.join(result.fullfilepath, normdir), (err) => {
