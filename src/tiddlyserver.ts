@@ -287,13 +287,21 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
           state.throwError(500, new ER("Error recieving request", err.toString()))
           return;
         }
-        fs.mkdir(path.join(result.fullfilepath, fields.dirname), (err) => {
+        const newdir = fields.dirname;
+        const normdir = path.basename(path.normalize(fields.dirname));
+        //if normalize changed anything, it's probably bad
+        if(normdir !== newdir || normdir.indexOf("..") !== -1) {
+          debugState("SER-DIR", state)(2, "mkdir normalized path %s didnt match %s", normdir, newdir);
+          state.throwError(400, new ER("Error recieving request", "invalid path given in dirname"))
+          return;
+        }
+        fs.mkdir(path.join(result.fullfilepath, normdir), (err) => {
           if (err) {
             handleFileError("SER-DIR", state, err);
             state.redirect(state.url.pathname + "?error=mkdir");
           } else if (fields.dirtype === "datafolder") {
             let read = fs.createReadStream(path.join(__dirname, "../datafolder-template.json"));
-            let write = fs.createWriteStream(path.join(result.fullfilepath, fields.dirname, "tiddlywiki.info"));
+            let write = fs.createWriteStream(path.join(result.fullfilepath, normdir, "tiddlywiki.info"));
             let error;
             const errorHandler = (err) => {
               handleFileError("SER-DIR", state, err);
