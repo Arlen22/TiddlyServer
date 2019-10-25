@@ -1,0 +1,9 @@
+{
+  "host": "example.com",
+  "privatekey": "./tiddlyserver-key.pem",
+  "certificate": "./tiddlyserver-cert.pem",
+  "fullchain": "./tiddlyserver-fullchain.pem",
+  "passphrase": "",
+  "pfx": "",
+  "restart_cmd": "pm2 restart 7"
+}

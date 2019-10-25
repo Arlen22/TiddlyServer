@@ -6,7 +6,7 @@ title: The Getting Started Guide
 ## Short instructions
 
  - Install or download NodeJS v8+. Only the Node binary is required, nothing else. 
- - Download TiddlyServer and unzip it to an empty directory so you don't merge with an existing directory.
+ - [Download TiddlyServer source code](https://github.com/Arlen22/TiddlyServer/releases/latest) and unzip it to an empty directory so you don't merge with an existing directory. You do not need to run any build commands. 
  - Create your [settings.json](settingsjson) file and put it in the TiddlyServer folder or specify it as the first argument to `server.js`. 
  - Run `node server.js [/path/to/settings.json] [--stay-on-error] [--dry-run]`
  - The working directory is not used by TiddlyServer except for locating the settings file if specified. Otherwise it expects to find it in the TiddlyServer folder with the server.js file. All other paths are relative to the settings file. This does not apply inside the TiddlyWiki data folder environment, but TiddyWiki does not normally use it either because it uses the data folder path and the boot.js path as its reference paths. 

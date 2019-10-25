@@ -1,26 +1,27 @@
 {
-    "compilerOptions": {
-        "outDir": ".",
-        "baseUrl": ".",
-        "module": "commonjs",
-        "target": "es2017",
-        "lib": [
-            "es2017"
-        ],
-        "strict": true,
-        "noImplicitAny": false,
-        "sourceMap": false,
-        "inlineSourceMap": true
-    },
-    "files": [
-        "./src/server.ts",
-        "./test/test.ts",
+  "compilerOptions": {
+    "outDir": ".",
+    "baseUrl": ".",
+    "module": "commonjs",
+    "target": "es2017",
+    "lib": [
+      "es2017"
     ],
-    "exclude": [
-        "node_modules",
-        "new-server",
-        "archive",
-        "static",
-        "./assets/static"
-    ]
+    "strict": true,
+    "noImplicitAny": false,
+    "sourceMap": false,
+    "inlineSourceMap": true,
+    "resolveJsonModule": true
+  },
+  "files": [
+    "./src/server.ts",
+    "./test/test.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "new-server",
+    "archive",
+    "static",
+    "./assets/static"
+  ]
 }
