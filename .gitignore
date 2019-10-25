@@ -32,3 +32,4 @@ old-settings.json
 .DS_Store
 https.js
 *.pem
+settings-*.json
