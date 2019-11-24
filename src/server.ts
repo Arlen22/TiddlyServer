@@ -244,7 +244,7 @@ export async function initServer({ preflighter, settingshttps, dryRun }: {
   const tester = parseHostList([...settings.bindInfo.bindAddress, "-127.0.0.0/8"]);
   const localhostTester = parseHostList(["127.0.0.0/8"]);
 
-  await libsodium.ready;P
+  await libsodium.ready;
   send.mime.define(settings.directoryIndex.mimetypes);
 
   if (bindWildcard) {

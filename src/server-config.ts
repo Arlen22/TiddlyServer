@@ -199,7 +199,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
         websockets: true,
         registerNotice: true,
         putsaver: true,
-        loginlink: true
+        loginlink: true,
+        transfer: false
       }),
       ...set.bindInfo.localAddressPermissions["localhost"]({} as any)
     },
@@ -211,7 +212,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
         websockets: true,
         registerNotice: false,
         putsaver: true,
-        loginlink: true
+        loginlink: true,
+        transfer: false
       }),
       ...set.bindInfo.localAddressPermissions["*"]({} as any)
     }
@@ -287,6 +289,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       // ...spread(set.EXPERIMENTAL_clientside_datafolders)
     },
     authCookieAge: set.authCookieAge(2592000),
+    maxTransferRequests: set.maxTransferRequests(0),
     $schema: "./settings.schema.json"
   }
 
@@ -436,7 +439,8 @@ export interface ServerConfig {
 	 * - 180 days: `15552000`
 	 */
   authCookieAge: number
-
+  /** Max concurrent transfer requests */
+  maxTransferRequests: number
   $schema: string;
 
   __dirname: string;
@@ -507,6 +511,8 @@ export interface ServerConfig_AccessOptions {
   registerNotice: boolean;
   /** link to the login page when returning auth errors */
   loginlink: boolean;
+  /** Allows two clients to communicate through the server */
+  transfer: boolean;
 }
 export interface ServerConfig_BindInfo {
 	/** 
@@ -849,11 +855,12 @@ export namespace Schema {
   }
 }
 namespace Test {
-  type Test<A, T extends { [K in keyof A]: any }> = T;
+  type Test<A, T extends { [K in keyof A]-?: any }> = T;
   //make sure that all keys in the schema are included in the config
   type Host = Test<Schema.HostElement, Config.HostElement>;
   type Group = Test<Schema.ArrayGroupElement, Config.GroupElement>;
   type Path = Test<Schema.ArrayPathElement, Config.PathElement>;
+  type Root1 = Test<ServerConfigSchema, ServerConfig>;
 }
 
 

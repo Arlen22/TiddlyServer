@@ -57,7 +57,13 @@ interface ICheckInterface {
     keychecker: ICheckInterfaceFunction<K>,
     checker: ICheckInterfaceFunction<T>
   )
-  checkObject<T extends {}, REQUIRED extends keyof T = keyof T>(
+  checkObject<T extends {}>(
+    checkermap: { [KEY in keyof T]-?: ((b) => b is T[KEY]) },
+    optionalcheckermap?: undefined,
+    /** if these keys do not pass, the item is assumed to be unrelated */
+    unionKeys?: (string)[]
+  )
+  checkObject<T extends {}, REQUIRED extends keyof T>(
     checkermap: { [KEY in REQUIRED]-?: ((b) => b is T[KEY]) },
     optionalcheckermap?: { [KEY in Exclude<keyof T, keyof typeof checkermap>]?: ((b) => b is T[KEY]) },
     /** if these keys do not pass, the item is assumed to be unrelated */
@@ -302,7 +308,8 @@ export function checkServerConfig(obj, checker: ICheckInterface | boolean): true
     writeErrors: checkBoolean,
     registerNotice: checkBoolean,
     putsaver: checkBoolean,
-    loginlink: checkBoolean
+    loginlink: checkBoolean,
+    transfer: checkBoolean
   });
   const putsaverOptional = as<OptionalCheckermap<ServerConfig_PutSaver, never>>({
     backupFolder: checkString,
@@ -356,6 +363,7 @@ export function checkServerConfig(obj, checker: ICheckInterface | boolean): true
     _datafoldertarget: checkString,
     _devmode: checkBoolean,
     authCookieAge: checkNumber,
+    maxTransferRequests: checkNumber,
     tree: checker.checkArray(checker.checkObject<Config.HostElement>({
       $element: checkStringEnum<"host">("host"),
       $mount: GroupChild
@@ -391,7 +399,7 @@ export function checkServerConfig(obj, checker: ICheckInterface | boolean): true
       logError: checkString,
       logToConsoleAlso: checkBoolean
     }),
-    putsaver: checker.union(checker.checkObject<ServerConfig["putsaver"]>({}, putsaverOptional), checker.checkBooleanFalse),
+    putsaver: checker.union(checker.checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional), checker.checkBooleanFalse),
     datafolder: checker.checkRecord(checker.checkString, checker.checkUnknown),
     EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
       alwaysRefreshCache: checkBoolean,

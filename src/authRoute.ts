@@ -207,13 +207,16 @@ export function handleAuthRoute(state: StateObject) {
   if (state.req.method !== "POST")
     return state.throw(405);
   if (state.path[3] === "transfer") {
+    if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
     handleTransfer(state);
   } else if (state.path[3] === "initpin") {
-    if (Object.keys(pko).length > 1000)
+    if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
+    if (Object.keys(pko).length > state.settings.maxTransferRequests)
       return state.throwReason(509, "Too many transfer requests in progress");
     else
       state.respond(200).json({ initPin: getRandomPin() });
   } else if (state.path[3] === "initshared") {
+    if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
     if (Object.keys(pko).length > 1000)
       return state.throwReason(509, "Too many transfer requests in progress");
     else
@@ -248,59 +251,4 @@ export function handleAuthRoute(state: StateObject) {
     state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", "", false, 0));
     state.respond(200).empty();
   }
-  return;
-	/* Create cookie for authentication. Can only be secured with HTTPS, otherwise anyone can "borrow" it */{
-    const { crypto_generichash_BYTES, crypto_sign_keypair, crypto_sign_detached, crypto_sign_verify_detached, crypto_generichash, from_base64 } = libsodium;
-    let keys = crypto_sign_keypair("uint8array");
-    // Never use the public key included in a message to check its signature.
-    let publicHash = crypto_generichash(crypto_generichash_BYTES, keys.publicKey, undefined, "base64");
-    let cookie = ["key", "my username", new Date().toISOString(), publicHash];
-    let signed = crypto_sign_detached(cookie[0] + cookie[1] + cookie[2], keys.privateKey, "base64");
-    cookie.push(signed);
-    let request = {
-      setCookie: JSON.stringify(signed),
-      publicKey: keys.publicKey
-    }
-    //check the cookie on the server to make sure it is valid
-    let valid = crypto_sign_verify_detached(from_base64(signed), cookie[0] + cookie[1] + cookie[2], keys.publicKey);
-  }
-
-	/* create secure channel for transferring private key */{
-    const { crypto_kx_client_session_keys, crypto_kx_server_session_keys, crypto_kx_keypair, from_base64, to_base64, randombytes_buf, crypto_secretbox_easy } = libsodium;
-
-    let clientKeys = crypto_kx_keypair("uint8array");
-    let clientPublicKey = to_base64(clientKeys.publicKey);
-
-    let senderKeys = crypto_kx_keypair("uint8array");
-    let senderPublicKey = to_base64(senderKeys.publicKey);
-
-    //exchange the public keys here
-
-    let clientSession = crypto_kx_client_session_keys(clientKeys.publicKey, clientKeys.privateKey, from_base64(senderPublicKey), "uint8array");
-    let clientCheck = libsodium.crypto_generichash(
-      Math.max(libsodium.crypto_generichash_BYTES_MIN, 8),
-      //server_to_client + client_to_server
-      to_base64(clientSession.sharedRx) + to_base64(clientSession.sharedTx),
-      undefined, "uint8array"
-    );
-
-    let senderSession = crypto_kx_server_session_keys(senderKeys.publicKey, senderKeys.privateKey, from_base64(clientPublicKey), "uint8array");
-    let senderCheck = libsodium.crypto_generichash(
-      Math.max(libsodium.crypto_generichash_BYTES_MIN, 8),
-      //server_to_client + client_to_server
-      to_base64(senderSession.sharedTx) + to_base64(senderSession.sharedRx),
-      undefined, "uint8array"
-    );
-
-    // compare the two checks, they should be exactly the same
-    if (senderCheck !== clientCheck) throw "aghhhh!! someone messed with our key!!";
-
-    //encrypt the auth key on the sender
-    let nonce = randombytes_buf(16);
-    let encryptedKey = crypto_secretbox_easy("KEY PAIR OBJECT JSON", nonce, senderSession.sharedTx, "base64");
-
-    //decrypt on the client
-    let decryptedKey = libsodium.crypto_secretbox_open_easy(encryptedKey, nonce, clientSession.sharedRx);
-  }
-
 }

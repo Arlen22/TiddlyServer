@@ -260,6 +260,10 @@
           "description": "login attempts for a public/private key pair which has not been \nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry.",
           "type": "boolean"
         },
+        "transfer": {
+          "description": "Allows two clients to communicate through the server",
+          "type": "boolean"
+        },
         "upload": {
           "description": "allow uploads on the directory index page",
           "type": "boolean"
@@ -280,7 +284,8 @@
         "mkdir",
         "websockets",
         "registerNotice",
-        "loginlink"
+        "loginlink",
+        "transfer"
       ],
       "type": "object"
     },
