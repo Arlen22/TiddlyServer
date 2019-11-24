@@ -1,0 +1,17 @@
+name: CI
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Run a one-line script
+      run: node build-schema.js
+    - name: Run a multi-line script
+      run: |
+        node build
+        echo test, and deploy your project.
