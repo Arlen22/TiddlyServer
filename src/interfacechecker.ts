@@ -1,5 +1,4 @@
-
-import { ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValue, Config, ServerConfig_PutSaver } from "./server-config";
+import { Config, ServerConfig, ServerConfig_AccessOptions, ServerConfig_AuthAccountsValue, ServerConfig_PutSaver } from "./server-config";
 
 function as<T>(obj: T) {
   return obj;
@@ -32,6 +31,7 @@ class UnionError {
 // type CheckInterfaceFunction = { expected: string } & (<T>(a: any, stringError: boolean) => any);
 type ICheckInterfaceFunction<A> = { expected: string } & ((a: any) => a is A)
 interface ICheckInterface {
+  assignProperties: (message: string, func: any) => typeof func;
   currentKeyArray: (string | number | symbol)[];
   union<A, B>(
     af: ICheckInterfaceFunction<A>,
@@ -66,7 +66,7 @@ interface ICheckInterface {
 }
 type RequiredCheckermap<T, REQUIRED extends keyof T> = { [KEY in REQUIRED]-?: ICheckInterfaceFunction<T[KEY]> };
 type OptionalCheckermap<T, REQUIRED> = { [KEY in Exclude<keyof T, REQUIRED>]?: ICheckInterfaceFunction<T[KEY]> };
-class CheckInterface implements ICheckInterface {
+export class CheckInterface implements ICheckInterface {
 
   errorLog: string[][] = [];
 
@@ -287,9 +287,13 @@ class CheckInterface implements ICheckInterface {
 
 }
 
-export function checkServerConfig(obj, showUnionNulls: boolean): true | {} {
-
-  let checker = new CheckInterface(showUnionNulls);
+export function checkServerConfig(obj, checker: boolean): true | {};
+export function checkServerConfig(obj, checker: ICheckInterface): true | {};
+export function checkServerConfig(obj, checker: ICheckInterface | boolean): true | {} {
+  if(checker === undefined) checker = new CheckInterface(false);
+  else if (typeof checker === "boolean") checker = new CheckInterface(checker);
+  
+  // let checker = new CheckInterface(showUnionNulls);
   let { checkBoolean, checkString, checkStringEnum, checkNumber, checkNumberEnum, checkBooleanFalse, checkNull } = checker;
   const checkAccessPerms = checker.checkObject<ServerConfig_AccessOptions>({
     mkdir: checkBoolean,
@@ -306,7 +310,7 @@ export function checkServerConfig(obj, showUnionNulls: boolean): true | {} {
     etagAge: checkNumber,
     gzipBackups: checkBoolean
   });
-  const checkOptions = checker.union(
+  const checkOptions:ICheckInterfaceFunction<Config.Options_Auth | Config.Options_Backups | Config.Options_Index> = checker.union(
     checker.checkObject<Config.Options_Auth, "$element">(
       {
         $element: checkStringEnum("auth")
@@ -326,7 +330,7 @@ export function checkServerConfig(obj, showUnionNulls: boolean): true | {} {
         indexFile: checker.checkArray(checkString)
       }, ["$element"])
   );
-  const GroupChild = checker.union(
+  const GroupChild:ICheckInterfaceFunction<Config.PathElement | Config.GroupElement> = checker.union(
     checker.checkObject<Config.PathElement>({
       $element: checkStringEnum("folder"),
       $options: checker.checkArray(checkOptions),
@@ -401,3 +405,4 @@ export function checkServerConfig(obj, showUnionNulls: boolean): true | {} {
   // console.log("Check server config result: " + JSON.stringify(res, null, 2));
   return res as true | {};
 };
+

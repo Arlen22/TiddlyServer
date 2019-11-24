@@ -1,4 +1,3 @@
-const { StateObject } = require("./src/server-types");
 
 const USERNAME = "";
 const PASSWORD = "";

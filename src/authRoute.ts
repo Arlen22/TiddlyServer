@@ -148,6 +148,8 @@ function handleTransfer(state: StateObject) {
   });
   pkop.sender.req.pipe(pkop.reciever.res);
   pkop.cancelTimeout = removePendingPinTimeout(pin);
+  pkop.reciever = undefined;
+  pkop.sender = undefined;
 }
 let randomPin;
 libsodium.ready.then(() => { randomPin = libsodium.randombytes_buf(8) });
