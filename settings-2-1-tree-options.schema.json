@@ -55,6 +55,10 @@
           "description": "Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired.",
           "type": "string"
         },
+        "enabled": {
+          "description": "If false, disables the put saver globally",
+          "type": "boolean"
+        },
         "etag": {
           "description": "Whether to use the etag field -- if not specified then it will check it if presented.\nThis does not affect the backup etagAge option, as the saving mechanism will still \nsend etags back to the browser, regardless of this option.",
           "enum": [
@@ -74,7 +78,12 @@
         }
       },
       "required": [
-        "$element"
+        "$element",
+        "backupFolder",
+        "enabled",
+        "etag",
+        "etagAge",
+        "gzipBackups"
       ],
       "type": "object"
     },

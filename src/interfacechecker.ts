@@ -71,7 +71,7 @@ interface ICheckInterface {
   )
 }
 type RequiredCheckermap<T, REQUIRED extends keyof T> = { [KEY in REQUIRED]-?: ICheckInterfaceFunction<T[KEY]> };
-type OptionalCheckermap<T, REQUIRED> = { [KEY in Exclude<keyof T, REQUIRED>]?: ICheckInterfaceFunction<T[KEY]> };
+type OptionalCheckermap<T, REQUIRED> = { [KEY in Exclude<keyof T, REQUIRED>]-?: ICheckInterfaceFunction<T[KEY]> };
 export class CheckInterface implements ICheckInterface {
 
   errorLog: string[][] = [];
@@ -206,7 +206,7 @@ export class CheckInterface implements ICheckInterface {
    */
   checkObject<T extends {}, REQUIRED extends keyof T = keyof T>(
     checkermap: RequiredCheckermap<T, REQUIRED>,
-    optionalcheckermap: OptionalCheckermap<T, keyof typeof checkermap> = {},
+    optionalcheckermap: OptionalCheckermap<T, REQUIRED> = {} as any,
     /** if these keys do not pass, the item is assumed to be unrelated */
     unionKeys?: (string)[]
   ) {
@@ -315,7 +315,8 @@ export function checkServerConfig(obj, checker: ICheckInterface | boolean): true
     backupFolder: checkString,
     etag: checkStringEnum("optional", "required", "disabled"),
     etagAge: checkNumber,
-    gzipBackups: checkBoolean
+    gzipBackups: checkBoolean,
+    enabled: checkBoolean
   });
   const checkOptions:ICheckInterfaceFunction<Config.Options_Auth | Config.Options_Backups | Config.Options_Index> = checker.union(
     checker.checkObject<Config.Options_Auth, "$element">(
@@ -399,7 +400,7 @@ export function checkServerConfig(obj, checker: ICheckInterface | boolean): true
       logError: checkString,
       logToConsoleAlso: checkBoolean
     }),
-    putsaver: checker.union(checker.checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional), checker.checkBooleanFalse),
+    putsaver: checker.checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional),
     datafolder: checker.checkRecord(checker.checkString, checker.checkUnknown),
     EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
       alwaysRefreshCache: checkBoolean,

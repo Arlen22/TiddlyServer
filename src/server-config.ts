@@ -264,7 +264,9 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       // ...{
       etagAge: set.putsaver.etagAge(3),
       backupFolder: set.putsaver.backupFolder(""),
-      etag: set.putsaver.etag("optional")
+      etag: set.putsaver.etag("optional"),
+      enabled: set.putsaver.enabled(true),
+      gzipBackups: set.putsaver.gzipBackups(true)
     },
     datafolder: set.datafolder({}),
     directoryIndex: {
@@ -416,7 +418,7 @@ export interface ServerConfig {
   /** directory index */
   directoryIndex: ServerConfig_DirectoryIndex
   /** PUT saver options */
-  putsaver: ServerConfig_PutSaver | false,
+  putsaver: ServerConfig_PutSaver,
   /** Variables passed directly to TiddlyWiki server instance */
   datafolder: Record<string, unknown>,
 	/** 
@@ -603,26 +605,28 @@ export interface ServerConfig_DirectoryIndex {
   mimetypes: { [type: string]: string[] }
 }
 export interface ServerConfig_PutSaver {
+  /** If false, disables the put saver globally */
+  enabled: boolean;
 	/** 
 	 * Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired. 
 	 */
-  backupFolder?: string,
+  backupFolder: string,
 	/** 
 	 * GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience).
 	 */
-  gzipBackups?: boolean,
+  gzipBackups: boolean,
 	/** 
 	 * Reject an etag with a modified time that is different than the file on disk by this many seconds. 
    * Sometimes sync or antivirus sofware will "touch" a file and update the modified time without changing anything.
    * Size difference will still cause the request to be rejected.
 	 */
-  etagAge?: number,
+  etagAge: number,
 	/** 
 	 * Whether to use the etag field -- if not specified then it will check it if presented.
 	 * This does not affect the backup etagAge option, as the saving mechanism will still 
 	 * send etags back to the browser, regardless of this option.
 	 */
-  etag?: "required" | "disabled" | "optional"
+  etag: "required" | "disabled" | "optional"
 }
 
 // export interface NewTreeGroupSchema extends NewTreeGroupSchemaHashmap {

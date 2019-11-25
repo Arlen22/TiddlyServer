@@ -76,8 +76,9 @@ type apiListRouteState = [[string, string], string | any, StateObject]
 
 export function getTreeOptions(state: StateObject) {
   //nonsense we have to write because putsaver could be false
-  type putsaverT = Required<typeof state.settings.putsaver>;
-  let putsaver = as<Exclude<putsaverT, false>>({
+  // type putsaverT = Required<typeof state.settings.putsaver>;
+  let putsaver = as<typeof state.settings.putsaver>({
+    enabled: true,
     gzipBackups: true,
     backupFolder: "",
     etag: "optional",
@@ -332,8 +333,8 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
 /// file handler section =============================================
 
 function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
-  if (state.settings.putsaver === false || !state.allow.putsaver) {
-    let message = "PUT saver is disabled on this server";
+  if (!state.settings.putsaver.enabled || !state.allow.putsaver) {
+    let message = "PUT saver is disabled";
     state.log(-2, message);
     state.respond(405, message).string(message);
     return;
