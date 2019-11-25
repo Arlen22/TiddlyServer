@@ -1,5 +1,5 @@
 const path = require('path');
-const webpack = require(path.join(require("os").homedir(), '.npm-packages/lib/node_modules/webpack'));
+const webpack = module.parent.require("webpack");
 /** 
  * @type {import("webpack").Configuration}
  */
