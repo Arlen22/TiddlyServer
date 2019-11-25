@@ -18,8 +18,8 @@ import { createHash } from 'crypto';
 import { STATUS_CODES } from 'http';
 import { EventEmitter } from "events";
 
-import { handleDataFolderRequest, init as initTiddlyWiki, handleTiddlyWikiRoute } from "./datafolder";
-export { handleTiddlyWikiRoute };
+import { handleDataFolderRequest, init as initTiddlyWiki } from "./datafolder";
+// export { handleTiddlyWikiRoute };
 
 import { format, inspect, promisify, puts } from "util";
 import { Stream, Writable } from "stream";

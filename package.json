@@ -31,12 +31,12 @@
     "xml-js": "*"
   },
   "engines": {
-    "node": "^6.11.4"
+    "node": ">=^6.11.4"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js",
-    "build": "tsc && webpack && node build-schema.js"
+    "start": "echo \"Please run 'node server.js' directly to start TiddlyServer\"",
+    "build": "tsc && node build-schema.js && webpack"
   },
   "author": "Arlen Beiler",
   "license": "MIT"

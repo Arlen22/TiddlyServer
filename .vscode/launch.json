@@ -9,11 +9,12 @@
 						"request": "launch",
 						// "preLaunchTask": "Compile",
             "name": "Launch Server",
-            "program": "${workspaceRoot}/server.js",
+            "program": "${workspaceRoot}/lib/compiled_lib.js",
             "outFiles": [
                 "${workspaceRoot}/**/*.js"
             ],
-            "protocol": "inspector"
+            "protocol": "inspector",
+            "cwd": "${workspaceFolder}"
         },
         {
             "type": "node",

@@ -282,14 +282,14 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       // },
       // ...spread(set.directoryIndex)
     },
-    EXPERIMENTAL_clientside_datafolders: {
-      // ...{
-      enabled: set.EXPERIMENTAL_clientside_datafolders.enabled(false),
-      alwaysRefreshCache: set.EXPERIMENTAL_clientside_datafolders.alwaysRefreshCache(true),
-      maxAge_tw_plugins: set.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins(0)
-      // },
-      // ...spread(set.EXPERIMENTAL_clientside_datafolders)
-    },
+    // EXPERIMENTAL_clientside_datafolders: {
+    //   // ...{
+    //   enabled: set.EXPERIMENTAL_clientside_datafolders.enabled(false),
+    //   alwaysRefreshCache: set.EXPERIMENTAL_clientside_datafolders.alwaysRefreshCache(true),
+    //   maxAge_tw_plugins: set.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins(0)
+    //   // },
+    //   // ...spread(set.EXPERIMENTAL_clientside_datafolders)
+    // },
     authCookieAge: set.authCookieAge(2592000),
     maxTransferRequests: set.maxTransferRequests(0),
     $schema: "./settings.schema.json"
@@ -372,8 +372,8 @@ export interface ServerConfigSchema {
 	 * which exports the object
 	 */
   authAccounts?: { [K: string]: ServerConfig_AuthAccountsValue }
-  /** client-side data folder loader which loads datafolders directly into the browser */
-  EXPERIMENTAL_clientside_datafolders?: Partial<ServerConfig_ClientsideDatafolders>,
+  // /** client-side data folder loader which loads datafolders directly into the browser */
+  // EXPERIMENTAL_clientside_datafolders?: Partial<ServerConfig_ClientsideDatafolders>,
 	/** 
 	 * Age to set for the auth cookie (default is 30 days)
 	 * - 24 hours: `86400`
@@ -427,8 +427,8 @@ export interface ServerConfig {
 	 * which exports the object
 	 */
   authAccounts: { [K: string]: ServerConfig_AuthAccountsValue }
-  /** client-side data folder loader which loads datafolders directly into the browser */
-  EXPERIMENTAL_clientside_datafolders: ServerConfig_ClientsideDatafolders,
+  // /** client-side data folder loader which loads datafolders directly into the browser */
+  // EXPERIMENTAL_clientside_datafolders: ServerConfig_ClientsideDatafolders,
 	/** 
 	 * Age in seconds to set for the auth cookie (default is 30 days)
 	 * - 24 hours: `86400`
@@ -1069,11 +1069,11 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
       mixFolders: set.mixFolders,
       // types: {}
     },
-    EXPERIMENTAL_clientside_datafolders: (typeof set.tsa === "object" || typeof set.maxAge === "object") ? {
-      enabled: false,
-      alwaysRefreshCache: typeof set.tsa === "object" ? set.tsa.alwaysRefreshCache : true,
-      maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
-    } : undefined,
+    // EXPERIMENTAL_clientside_datafolders: (typeof set.tsa === "object" || typeof set.maxAge === "object") ? {
+    //   enabled: false,
+    //   alwaysRefreshCache: typeof set.tsa === "object" ? set.tsa.alwaysRefreshCache : true,
+    //   maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
+    // } : undefined,
     authCookieAge: 2592000,
     $schema: "./settings-2-1.schema.json"
   }

@@ -402,11 +402,11 @@ export function checkServerConfig(obj, checker: ICheckInterface | boolean): true
     }),
     putsaver: checker.checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional),
     datafolder: checker.checkRecord(checker.checkString, checker.checkUnknown),
-    EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
-      alwaysRefreshCache: checkBoolean,
-      enabled: checkBoolean,
-      maxAge_tw_plugins: checkNumber
-    })
+    // EXPERIMENTAL_clientside_datafolders: checker.checkObject<ServerConfig["EXPERIMENTAL_clientside_datafolders"]>({
+    //   alwaysRefreshCache: checkBoolean,
+    //   enabled: checkBoolean,
+    //   maxAge_tw_plugins: checkNumber
+    // })
   });
   let res = _checkServerConfig(obj);
   if (res !== true) debugger; //if you hit this breakpoint, it means the settings does 

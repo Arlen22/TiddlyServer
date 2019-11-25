@@ -10,25 +10,6 @@
           "description": "The JSON schema location for this document. This schema is generated \ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with autocomplete, such as VS code, \nwill make editing this file much simpler. \nMost fields include a description like this one. \n\nAll relative paths in this file are resolved relative to this file, so \n`./settings-tree.xml` refers to an XML file in the same folder as this file. \nAll relative paths in included files (such as the XML file) are resolved \nrelative to the included file.",
           "type": "string"
         },
-        "EXPERIMENTAL_clientside_datafolders": {
-          "additionalProperties": false,
-          "description": "client-side data folder loader which loads datafolders directly into the browser",
-          "properties": {
-            "alwaysRefreshCache": {
-              "description": "refresh cache whenever ?refresh=true is called",
-              "type": "boolean"
-            },
-            "enabled": {
-              "description": "temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder)",
-              "type": "boolean"
-            },
-            "maxAge_tw_plugins": {
-              "description": "how long to cache tw_plugins on the server side",
-              "type": "number"
-            }
-          },
-          "type": "object"
-        },
         "_datafoldertarget": {
           "description": "The tiddlywiki folder to use for data folder instances. Defaults to the \ntiddlywiki folder in the TiddlyServer installation regardless of the \nsettings.json location.",
           "type": "string"

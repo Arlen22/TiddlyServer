@@ -72,7 +72,7 @@ var debug: OmitThisParameter<ReturnType<typeof StateObject["DebugLogger"]>>;
 export { loadSettings };
 
 //import and init api-access
-import { handleTiddlyServerRoute, init as initTiddlyServer, handleTiddlyWikiRoute } from './tiddlyserver';
+import { handleTiddlyServerRoute, init as initTiddlyServer } from './tiddlyserver';
 // typescript retains the object reference here ()`authroute_1.checkCookieAuth`)
 import { handleAuthRoute, initAuthRoute, checkCookieAuth } from "./authRoute";
 import { Writable } from 'stream';
