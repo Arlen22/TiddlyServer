@@ -33,3 +33,4 @@ old-settings.json
 https.js
 *.pem
 settings-*.json
+lib/compiled-lib.js
