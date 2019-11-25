@@ -10,8 +10,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Run a one-line script
-      run: node build-schema.js
+      run: echo this was a test
     - name: Run a multi-line script
       run: |
-        node build
+        echo hello world
         echo test, and deploy your project.

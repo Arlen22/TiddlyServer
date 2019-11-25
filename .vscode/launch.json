@@ -9,7 +9,7 @@
 						"request": "launch",
 						// "preLaunchTask": "Compile",
             "name": "Launch Server",
-            "program": "${workspaceRoot}/lib/compiled_lib.js",
+            "program": "${workspaceRoot}/lib/compiled-lib.js",
             "outFiles": [
                 "${workspaceRoot}/**/*.js"
             ],
