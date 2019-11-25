@@ -10,7 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - name: Run a one-line script
-      run: echo this was a test
+      run: ls
     - name: Run a multi-line script
       run: |
         echo hello world
