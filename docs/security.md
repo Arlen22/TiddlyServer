@@ -4,9 +4,10 @@ title: Security Considerations
 sidebar_label: Security Considerations
 ---
 
-- Don't run as root (or sudo/su/etc.). Instead use 8080 and put a permanent port redirect in iptables if desired. 
-- Don't run random datafolders that you download from the internet without looking through them first. They have full access to the file system. 
-- Don't depend on login credentials unless you are using HTTPS. Without encryption, a login will just give you a false sense of security. 
+- Don't run as root (also don't use sudo/su/etc.). Instead use 8080 and put a permanent port redirect in iptables if desired. 
+- Don't run random datafolders that you download from the internet without looking through them first. They have full access to the file system. This also applies to TiddlyWiki. 
+- Don't depend on login credentials unless you are using HTTPS. Without encryption, a login will just give you a false sense of security. The only exception is if you only serve your wiki across your local network AND you have a password on your wifi. There is one other exception, but if you understand the problem well enough to know what it is, then you also know what the solution is and I don't need to talk about it here. 
+- Honestly, if you don't have a password protecting your Wifi then I hope you live somewhere out in the middle of nowhere. Because unprotected wifi is really easy to eavesdrop on. Even protecting it with a password and posting the password on your front door is better than no password at all, because you're protected from SOME eavesdropping methods. Ok, that's practically no better. Just don't have unprotected wifi unless maybe if it is using the actual guest network feature on your router. 
 
 > The list above applies to TiddlyWiki on NodeJS as well.
 
