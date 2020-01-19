@@ -1,6 +1,7 @@
 const fetch = require("node-fetch").default;
 if(!process.argv[2]) {
   throw "Please specify the host as argv[2]";
+  // node server test/directory-index.json
   // node test/directory-index.js http://localhost:8080
 }
 ((host) => Promise.all([
