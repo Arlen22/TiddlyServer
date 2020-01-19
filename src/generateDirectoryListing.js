@@ -10,33 +10,33 @@ const info = require('../package.json');
 
 
 /**
- * @param { {path: string;entries: DirectoryEntry[];type: "group" | "folder";} } directory 
- * @param {import("./server-types").DirectoryIndexOptions} options
+ * @param {{ path: string; entries: import("./server-types").DirectoryEntry[]; type: "group" | "folder"; }} directory 
+ * @param { import("./server-types").DirectoryIndexOptions } options
  */
 exports.generateDirectoryListing = function (directory, options) {
-    function listEntries(entries) {
-        return entries.slice().sort(
-            sortBySelector(e => ((options.mixFolders ? "" : (e.type === 'folder' ? '0-' : '1-')) + e.name.toLocaleLowerCase()))
-        ).map((entry, index) => {
-            const isFile = ['category', 'folder', 'datafolder', 'error', 'other'].indexOf(entry.type) === -1;
-            const showSize = isFile || entry.type === "other";
-            return `
+  function listEntries(entries) {
+    return entries.slice().sort(
+      sortBySelector(e => ((options.mixFolders ? "" : (e.type === 'folder' ? '0-' : '1-')) + e.name.toLocaleLowerCase()))
+    ).map((entry, index) => {
+      const isFile = ['group', 'folder', 'datafolder', 'error', 'other'].indexOf(entry.type) === -1;
+      const showSize = isFile || entry.type === "other";
+      return `
 <li>
     <span class="icon">
-        <img style="width:16px;" src="/assets/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
+        <img style="width:16px;vertical-align: middle;" src="/assets/icons/${(isFile ? 'files/' : '') + entry.type}.png"/>
     </span>
     <span class="size">${showSize ? entry.size : ""}</span>
     <span class="name">
         <a href="${encodeURI(entry.path)}">${entry.name}</a>
     </span>
 </li>`
-        }).join("")
-    }
-    const pathArr = directory.path.split('/').filter(a => a);
-    const parentJoin = ["", pathArr.slice(0, pathArr.length - 1).join('/'), ""].join('/');
-    const parentPath = parentJoin === '//' ? '/' : parentJoin;
-    const name = pathArr.slice(pathArr.length - 1);
-    return `
+    }).join("")
+  }
+  const pathArr = directory.path.split('/').filter(a => a);
+  const parentJoin = ["", pathArr.slice(0, pathArr.length - 1).join('/'), ""].join('/');
+  const parentPath = parentJoin === '//' ? '/' : parentJoin;
+  const name = pathArr.slice(pathArr.length - 1);
+  return `
     <!DOCTYPE html>
 <html>
 <head>
@@ -54,15 +54,15 @@ function logout(){
 </head>
 <body>
 ${
-    options.isLoggedIn 
-    ? `<p>Welcome ${options.isLoggedIn}, <a href="javascript:return false;" onclick="logout()">logout</a></p>`
-    : `<p><a href="/admin/authenticate/login.html">Login</a></p>`
-}
+    options.isLoggedIn
+      ? `<p>Welcome ${options.isLoggedIn}, <a href="javascript:return false;" onclick="logout()">logout</a></p>`
+      : `<p><a href="/admin/authenticate/login.html">Login</a></p>`
+    }
 ${
-        (pathArr.length > 0)
-            ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>`
-            : ``
-        }
+    (pathArr.length > 0)
+      ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>`
+      : ``
+    }
 <ul>${listEntries(directory.entries)}</ul>
 ${(options.upload) ? `<p>
 <form action="?formtype=upload" method="post" enctype="multipart/form-data" name="upload">

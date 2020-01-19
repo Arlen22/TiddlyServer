@@ -43,7 +43,7 @@ server.libsReady.then(() => {
   server.eventer.emit("settings", settings);
   let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;
   server.initServer({
-    // env: "node",
+    settings,
     settingshttps: httpsSettingsFile && require(httpsSettingsFile).serverOptions,
     preflighter: fs.existsSync(__dirname + "/preflighter.js")
       ? require("./preflighter.js").preflighter

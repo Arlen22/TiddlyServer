@@ -6,7 +6,9 @@
     "tiddlyserver": "./server.js"
   },
   "main": "./lib/compiled-lib.js",
-  "dependencies": {},
+  "dependencies": {
+    "node-fetch": "^2.6.0"
+  },
   "devDependencies": {
     "@fidm/x509": "^1.2.0",
     "@material/textfield": "^0.44.0",

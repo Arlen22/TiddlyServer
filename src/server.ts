@@ -132,7 +132,7 @@ export async function initServer({ settings, preflighter, settingshttps, dryRun 
 
   //setup the logging handler
   let log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>;
-  if (settings.logging.logAccess) {
+  if (settings.logging.logAccess !== false) {
     const logger = morgan({
       logFile: settings.logging.logAccess || undefined,
       logToConsole: !settings.logging.logAccess || settings.logging.logToConsoleAlso,
