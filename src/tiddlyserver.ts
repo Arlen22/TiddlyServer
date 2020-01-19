@@ -1,177 +1,120 @@
 // import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
-import {
-  StateObject, keys, ServerConfig, AccessPathResult, AccessPathTag, DirectoryEntry,
-  Directory, sortBySelector, FolderEntryType, obsTruthy,
-  StatPathResult, TreeObject, PathResolverResult, TreePathResult, resolvePath,
-  sendDirectoryIndex, statWalkPath, DirectoryIndexOptions, DirectoryIndexData,
-  ServerEventEmitter, ER, getTreePathFiles, NewTreePathOptions_Auth, StandardResponseHeaders,
-  serveFile, Config, as
-} from "./server-types";
-
 import * as fs from 'fs';
 import * as path from 'path';
-import * as http from 'http';
+import { promisify } from "util";
 import * as zlib from 'zlib';
+import { formidable } from '../lib/bundled-lib';
+import { handleDataFolderRequest, init as initDatafolder } from "./datafolder";
+import { OptionsConfig } from "./server-config";
+import {
+  as, Config, ER, getTreePathFiles,
+  sendDirectoryIndex, serveFile, ServerConfig, ServerEventEmitter,
+  StateObject, StatPathResult, statWalkPath, PathResolverResult, resolvePath, getTreeOptions
+} from "./server-types";
+import { Stats } from 'fs';
 
-import { createHash } from 'crypto';
-
-import { STATUS_CODES } from 'http';
-import { EventEmitter } from "events";
-
-import { handleDataFolderRequest, init as initTiddlyWiki } from "./datafolder";
-// export { handleTiddlyWikiRoute };
-
-import { format, inspect, promisify, puts } from "util";
-import { Stream, Writable } from "stream";
-// import { Subscribable } from "rxjs/Observable";
-// import { NextObserver, ErrorObserver, CompletionObserver } from "rxjs/Observer";
-// import { AnonymousSubscription } from "rxjs/Subscription";
-
-import { send, formidable } from '../lib/bundled-lib';
-import { Stats } from "fs";
-// import { last } from "rxjs/operator/last";
-import { NewTreeOptions, NewTreePathOptions_Backup, NewTreePathOptions_Index, NewTreeOptionsObject, OptionsSchema, OptionsConfig } from "./server-config";
-
-// const debugTag = "SER-API";
-__dirname = path.dirname(module.filename || process.execPath);
-
-function tuple<T1, T2, T3, T4, T5, T6>(a?: T1, b?: T2, c?: T3, d?: T4, e?: T5, f?: T6) {
-  return [a, b, c, d, e, f] as [T1, T2, T3, T4, T5, T6];
-}
-
-export function parsePath(path: string, jsonFile: string) {
-  var regCheck = /${([^}])}/gi;
-  path.replace(regCheck, (str, pathVar) => {
-    switch (pathVar) {
-      case "execPath": return __dirname;
-      case "currDir": return process.cwd();
-      case "jsonDir": return jsonFile;
-      default: return "";
-    }
-  })
-  return path;
-}
-
-// var settings: ServerConfig = {} as any;
-
-export function init(eventer: ServerEventEmitter) {
-  eventer.on('settings', function (set: ServerConfig) {
-    // settings = set;
-  });
-  initTiddlyWiki(eventer);
-}
-
-type apiListRouteState = [[string, string], string | any, StateObject]
-// export function checkRouteAllowed(state: StateObject, result: PathResolverResult) {
-// 	return true;
-// 	type CC = (NewTreeGroup["$children"][0] | NewTreeOptions);
-// 	let lastAuth: NewTreePathOptions_Auth | undefined;
-// 	let findAuth = (f): f is NewTreePathOptions_Auth => f.$element === "auth";
-// 	result.ancestry.concat(result.item).forEach((e) => {
-// 		lastAuth = Array.isArray(e.$children) && (e.$children as CC[]).find(findAuth) || lastAuth;
-// 	});
-// 	// console.log(lastAuth, state.authAccountsKey);
-// 	return !lastAuth || lastAuth.authList.indexOf(state.authAccountsKey) !== -1;
+// export function parsePath(path: string, jsonFile: string) {
+//   var regCheck = /${([^}])}/gi;
+//   path.replace(regCheck, (str, pathVar) => {
+//     switch (pathVar) {
+//       case "execPath": return __dirname;
+//       case "currDir": return process.cwd();
+//       case "jsonDir": return jsonFile;
+//       default: return "";
+//     }
+//   })
+//   return path;
 // }
 
-export function getTreeOptions(state: StateObject) {
-  //nonsense we have to write because putsaver could be false
-  // type putsaverT = Required<typeof state.settings.putsaver>;
-  let putsaver = as<typeof state.settings.putsaver>({
-    enabled: true,
-    gzipBackups: true,
-    backupFolder: "",
-    etag: "optional",
-    etagAge: 3,
-    ...(state.settings.putsaver || {})
-  });
-  let options: OptionsConfig = {
-    auth: { $element: "auth", authError: 403, authList: null },
-    putsaver: { $element: "putsaver", ...putsaver },
-    index: { $element: "index", defaultType: state.settings.directoryIndex.defaultType, indexFile: [], indexExts: [] }
-  }
-  // console.log(state.ancestry);
-  state.ancestry.forEach((e) => {
-    // console.log(e);
-    e.$options && e.$options.forEach((f) => {
-      if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
-        // console.log(f);
-        Object.keys(f).forEach(k => {
-          if (f[k] === undefined) return;
-          options[f.$element][k] = f[k];
-        })
-      }
-    })
-  });
-  return options;
+export function init(eventer: ServerEventEmitter) {
+  eventer.on('settings', function (set: ServerConfig) { });
+  initDatafolder(eventer);
 }
-export function handleTiddlyServerRoute(state: StateObject): void {
+
+export async function handleTiddlyServerRoute(state: StateObject): Promise<void> {
+
+  function catchPromiseError(err) {
+    if (err) {
+      state.log(2, "Error caught " + err.toString());
+      state.throw(500);
+    }
+  }
 
   let result: PathResolverResult = resolvePath(state, state.hostRoot) || null as never;
-  if (!result) {
-    state.throw<never>(404);
-    return;
-  }
+  if (!result) return state.throw<never>(404);
   state.ancestry = [...result.ancestry, result.item];
   state.treeOptions = getTreeOptions(state);
-  //handle route authentication
-  let { authList, authError } = state.treeOptions.auth;
-  // console.log(authList, authError, state.authAccountsKey);
-  if (authList && authList.indexOf(state.authAccountsKey) === -1) {
-    state.respond(authError).string(`
+
+  {
+    //check authList
+    let { authList, authError } = state.treeOptions.auth;
+    let denyAccess = Array.isArray(authList) && authList.indexOf(state.authAccountsKey) === -1;
+    if (denyAccess) return state.respond(authError).string(authAccessDenied(authError, state.allow.loginlink));
+  }
+
+  if (Config.isGroup(result.item))
+    return serveDirectoryIndex(result, state).catch(catchPromiseError);
+
+  function stateItemType<T extends StatPathResult["itemtype"]>(
+    state: StateObject,
+    itemtype: T
+  ): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> {
+    return state.statPath.itemtype === itemtype;
+  }
+
+  state.statPath = await statWalkPath(result);//.then((statPath) => {
+
+  if (stateItemType(state, "folder")) {
+    serveDirectoryIndex(result, state).catch(catchPromiseError);
+  } else if (stateItemType(state, "datafolder")) {
+    handleDataFolderRequest(result, state);
+  } else if (stateItemType(state, "file")) {
+    if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
+      state.send({
+        root: (result.item as Config.PathElement).path,
+        filepath: result.filepathPortion.join('/'),
+        error: err => {
+          state.log(2, '%s %s', err.status, err.message);
+          if (state.allow.writeErrors) state.throw(500);
+        },
+        headers: ((statPath) => (filepath) => {
+          const statItem = statPath.stat;
+          const mtime = Date.parse(statPath.stat.mtime as any);
+          const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
+          return { 'Etag': etag };
+        })(state.statPath)
+      })
+    } else if (['PUT'].indexOf(state.req.method as string) > -1) {
+      handlePUTrequest(state);
+    } else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
+      state.respond(200, "", {
+        'x-api-access-type': 'file',
+        'dav': 'tw5/put'
+      }).string("GET,HEAD,PUT,OPTIONS");
+    } else {
+      state.throw(405);
+    }
+  } else if (state.statPath.itemtype === "error") {
+    state.throw(404);
+  } else {
+    state.throw(500);
+  }
+  // }).catch((err) => {
+  // if (err) { console.log(err); console.log(new Error().stack); }
+  // });
+
+}
+
+function authAccessDenied(authError: number, loginlink: boolean): string {
+  return `
 <html><body>
 <h2>Error ${authError}</h2>
 <p>
 In this case you are not logged in. 
-${state.allow.loginlink ? ' Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.' : ""}
+${loginlink ? ' Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.' : ""}
 </p>
 </body></html>
-`);
-    return; //just for safety
-  } else if (Config.isGroup(result.item)) {
-    serveDirectoryIndex(result, state);
-  } else {
-    const stateItemType = <T extends StatPathResult["itemtype"]>(state: StateObject, itemtype: T): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> => state.statPath.itemtype === itemtype;
-    statWalkPath(result).then((statPath) => {
-      state.statPath = statPath;
-      if (stateItemType(state, "folder")) {
-        serveDirectoryIndex(result, state);
-      } else if (stateItemType(state, "datafolder")) {
-        handleDataFolderRequest(result, state);
-      } else if (stateItemType(state, "file")) {
-        if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
-          state.send({
-            root: (result.item as Config.PathElement).path,
-            filepath: result.filepathPortion.join('/'),
-            error: err => {
-              state.log(2, '%s %s', err.status, err.message);
-              if (state.allow.writeErrors) state.throw(500);
-            },
-            headers: ((statPath) => (filepath) => {
-              const statItem = statPath.stat;
-              const mtime = Date.parse(statPath.stat.mtime as any);
-              const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
-              return { 'Etag': etag };
-            })(state.statPath)
-          })
-        } else if (['PUT'].indexOf(state.req.method as string) > -1) {
-          // state.statPath.itemtype
-          handlePUTrequest(state);
-        } else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
-          state.respond(200, "", {
-            'x-api-access-type': 'file',
-            'dav': 'tw5/put'
-          }).string("GET,HEAD,PUT,OPTIONS");
-        } else state.throw(405);
-      } else if (state.statPath.itemtype === "error") {
-        state.throw(404);
-      } else {
-        state.throw(500);
-      }
-    }).catch((err) => {
-      if (err) { console.log(err); console.log(new Error().stack); }
-    });
-  }
+`;
 }
 
 function handleFileError(debugTag: string, state: StateObject, err: NodeJS.ErrnoException) {
@@ -180,76 +123,73 @@ function handleFileError(debugTag: string, state: StateObject, err: NodeJS.Errno
 function debugState(debugTag: string, state: StateObject) {
   return StateObject.DebugLogger(debugTag).bind(state);
 }
-function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
+async function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
   // const { state } = result;
   const allow = state.allow;
 
   // console.log(state.url);
-  if (!state.url.pathname.endsWith("/")) {
-    state.redirect(state.url.pathname + "/");
-  } else if (state.req.method === "GET") {
+  if (!state.url.pathname.endsWith("/"))
+    return state.redirect(state.url.pathname + "/");
+  if (state.req.method === "GET") {
     const isFolder = result.item.$element === "folder";
-    Promise.resolve().then(async () => {
-      let { indexFile, indexExts, defaultType } = state.treeOptions.index;
+    // Promise.resolve().then(async () => {
+    let { indexFile, indexExts, defaultType } = state.treeOptions.index;
 
-      if (isFolder && indexExts.length && indexFile.length) {
-        let files = await promisify(fs.readdir)(result.fullfilepath);
-        let indexFiles: string[] = [];
-        indexFile.forEach(e => {
-          indexExts.forEach(f => {
-            if (f === "") indexFiles.push(e);
-            else indexFiles.push(e + "." + f);
-          });
+    // check for user-specified index files
+    if (isFolder && indexExts.length && indexFile.length) {
+      let files = await promisify(fs.readdir)(result.fullfilepath);
+      let indexFiles: string[] = [];
+      indexFile.forEach(e => {
+        indexExts.forEach(f => {
+          let g = "";
+          if (f === "") g = e;
+          else g = e + "." + f;
+          if (files.indexOf(g) !== -1) indexFiles.push(g);
         });
-        let index = indexFiles.find((e) => files.indexOf(e) !== -1);
-        if (index) {
-          serveFile(state, index, result.fullfilepath);
-          return false;
-        } else if (defaultType === 403 || defaultType === 404) {
-          state.throw(defaultType);
-          return false;
-        } else {
-          return true;
-        }
-      } else if (result.item.$element === "group" && result.item.indexPath) {
-        let { indexPath } = result.item;
-        state.send({
-          root: undefined,
-          filepath: indexPath,
-          error: (err) => {
-            let error = new ER("error sending index", err.toString());
-            state.log(2, error.message).throwError(500, error);
-          }
-        });
-        return false;
-      } else
-        return true;
-    }).then(async (contin: boolean) => {
-      if (!contin) return;
-      const format = state.treeOptions.index.defaultType as "html" | "json";
-      const options = {
-        upload: isFolder && (allow.upload),
-        mkdir: isFolder && (allow.mkdir),
-        mixFolders: state.settings.directoryIndex.mixFolders,
-        isLoggedIn: state.username ? (state.username + " (group " + state.authAccountsKey + ")") : false as false,
-        format, extTypes: state.settings.directoryIndex.types
-      };
-      let contentType = {
-        html: "text/html",
-        json: "application/json"
-      };
-      let e = await getTreePathFiles(result, state);
-      let res = await sendDirectoryIndex([e, options]);
-      state.respond(200, "", { 'Content-Type': contentType[format], "Content-Encoding": 'utf-8' }).buffer(Buffer.from(res, "utf8"));
-
-    }).catch(err => {
-      if (err) {
-        state.log(2, "Error caught " + err.toString());
-        state.throw(500);
-        //catch all: return nothing
+      });
+      let index = indexFiles[0];
+      if (index) {
+        return serveFile(state, index, result.fullfilepath);
+      } else if (defaultType === 403 || defaultType === 404) {
+        return state.throw(defaultType);
       }
-    });;
+    } else if (result.item.$element === "group" && result.item.indexPath) {
+      let { indexPath } = result.item;
+      state.send({
+        root: undefined,
+        filepath: indexPath,
+        error: (err) => {
+          let error = new ER("error sending index", err.toString());
+          state.log(2, error.message).throwError(500, error);
+        }
+      });
+      return;
+    }
+
+    //check if we can autogenerate the index
+    if (state.treeOptions.index.defaultType === 403 || state.treeOptions.index.defaultType === 404) {
+      return state.throw(state.treeOptions.index.defaultType);
+    }
+
+    //generate the index using generateDirectoryListing.js
+    const format = state.treeOptions.index.defaultType as "html" | "json";
+    const options = {
+      upload: isFolder && (allow.upload),
+      mkdir: isFolder && (allow.mkdir),
+      mixFolders: state.settings.directoryIndex.mixFolders,
+      isLoggedIn: state.username ? (state.username + " (group " + state.authAccountsKey + ")") : false as false,
+      format, extTypes: state.settings.directoryIndex.types
+    };
+    let contentType = {
+      html: "text/html",
+      json: "application/json"
+    };
+    let e = await getTreePathFiles(result, state);
+    let res = await sendDirectoryIndex([e, options]);
+    state.respond(200, "", { 'Content-Type': contentType[format], "Content-Encoding": 'utf-8' }).buffer(Buffer.from(res, "utf8"));
+
   } else if (state.req.method === "POST") {
+
     var form = new formidable.IncomingForm();
     // console.log(state.url);
     if (state.url.query.formtype === "upload") {
@@ -257,82 +197,96 @@ function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
       if (Config.isGroup(result.item))
         return state.throwReason(400, "upload is not possible for tree groups");
       if (!allow.upload)
-        return state.throwReason(403, "upload is not allowed over the network")
+        return state.throwReason(403, "upload is not allowed")
+      uploadPostRequest(form, state, result);
 
-      form.parse(state.req, function (err: Error, fields, files) {
-        if (err) {
-          debugState("SER-DIR", state)(2, "upload %s", err.toString());
-          state.throwError(500, new ER("Error recieving request", err.toString()));
-          return;
-        }
-        // console.log(fields, files);
-        var oldpath = files.filetoupload.path;
-        //get the filename to use
-        let newname = fields.filename || files.filetoupload.name;
-        //sanitize this to make sure we just 
-        newname = path.basename(newname);
-        var newpath = path.join(result.fullfilepath, newname);
-        fs.rename(oldpath, newpath, function (err) {
-          if (err) handleFileError("SER-DIR", state, err)
-          state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
-        });
-      });
     } else if (state.url.query.formtype === "mkdir") {
       if (Config.isGroup(result.item))
         return state.throwReason(400, "mkdir is not possible for tree items");
       if (!allow.mkdir)
-        return state.throwReason(403, "mkdir is not allowed over the network")
-      form.parse(state.req, function (err: Error, fields, files) {
-        if (err) {
-          debugState("SER-DIR", state)(2, "mkdir %s", err.toString());
-          state.throwError(500, new ER("Error recieving request", err.toString()))
-          return;
-        }
-        const newdir = fields.dirname;
-        const normdir = path.basename(path.normalize(fields.dirname));
-        //if normalize changed anything, it's probably bad
-        if(normdir !== newdir || normdir.indexOf("..") !== -1) {
-          debugState("SER-DIR", state)(2, "mkdir normalized path %s didnt match %s", normdir, newdir);
-          state.throwError(400, new ER("Error parsing request - invalid name", "invalid path given in dirname"))
-          return;
-        }
-        fs.mkdir(path.join(result.fullfilepath, normdir), (err) => {
-          if (err) {
-            handleFileError("SER-DIR", state, err);
-            state.redirect(state.url.pathname + "?error=mkdir");
-          } else if (fields.dirtype === "datafolder") {
-            let read = fs.createReadStream(path.join(__dirname, "../datafolder-template.json"));
-            let write = fs.createWriteStream(path.join(result.fullfilepath, normdir, "tiddlywiki.info"));
-            let error;
-            const errorHandler = (err) => {
-              handleFileError("SER-DIR", state, err);
-              error = err;
-              state.redirect(state.url.pathname + "?error=mkdf");
-              read.close();
-              write.close();
-            };
-            write.on('error', errorHandler);
-            read.on('error', errorHandler);
-            write.on('close', () => {
-              if (!error) state.redirect(state.url.pathname);
-            })
-            read.pipe(write);
-          } else {
-            state.redirect(state.url.pathname);
-          }
-        })
-      });
+        return state.throwReason(403, "mkdir is not allowed")
+      mkdirPostRequest(form, state, result);
+
     } else {
-      state.throw(403);
+      state.throw(400);
     }
   } else {
     state.throw(405);
   }
 }
 
+function uploadPostRequest(form: any, state: StateObject<StatPathResult, any>, result: PathResolverResult) {
+  form.parse(state.req, function (err: Error, fields, files) {
+    if (err) {
+      debugState("SER-DIR", state)(2, "upload %s", err.toString());
+      state.throwError(500, new ER("Error recieving request", err.toString()));
+      return;
+    }
+    // console.log(fields, files);
+    var oldpath = files.filetoupload.path;
+    //get the filename to use
+    let newname = fields.filename || files.filetoupload.name;
+    //sanitize this to make sure we just 
+    newname = path.basename(newname);
+    var newpath = path.join(result.fullfilepath, newname);
+    fs.rename(oldpath, newpath, function (err) {
+      if (err)
+        handleFileError("SER-DIR", state, err);
+      state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
+    });
+  });
+}
+
+function mkdirPostRequest(form: any, state: StateObject<StatPathResult, any>, result: PathResolverResult) {
+  form.parse(state.req, async function (err: Error, fields, files) {
+    if (err) {
+      debugState("SER-DIR", state)(2, "mkdir %s", err.toString());
+      state.throwError(500, new ER("Error recieving request", err.toString()));
+      return;
+    }
+    const newdir = fields.dirname;
+    const normdir = path.basename(path.normalize(fields.dirname));
+    //if normalize changed anything, it's probably bad
+    if (normdir !== newdir || normdir.indexOf("..") !== -1) {
+      debugState("SER-DIR", state)(2, "mkdir normalized path %s didnt match %s", normdir, newdir);
+      state.throwError(400, new ER("Error parsing request - invalid name", "invalid path given in dirname"));
+      return;
+    }
+    if (await promisify(fs.mkdir)(path.join(result.fullfilepath, normdir)).catch(err => {
+      handleFileError("SER-DIR", state, err);
+      state.redirect(state.url.pathname + "?error=mkdir");
+      return true;
+    }))
+      return;
+
+    if (fields.dirtype === "datafolder") {
+      let read = fs.createReadStream(path.join(__dirname, "../datafolder-template.json"));
+      let write = fs.createWriteStream(path.join(result.fullfilepath, normdir, "tiddlywiki.info"));
+      let error;
+      const errorHandler = (err) => {
+        handleFileError("SER-DIR", state, err);
+        error = err;
+        state.redirect(state.url.pathname + "?error=mkdf");
+        read.close();
+        write.close();
+      };
+      write.on('error', errorHandler);
+      read.on('error', errorHandler);
+      write.on('close', () => {
+        if (!error)
+          state.redirect(state.url.pathname);
+      });
+      read.pipe(write);
+    }
+    else {
+      state.redirect(state.url.pathname);
+    }
+  });
+}
+
 /// file handler section =============================================
 
-function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
+async function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
   if (!state.settings.putsaver.enabled || !state.allow.putsaver) {
     let message = "PUT saver is disabled";
     state.log(-2, message);
@@ -340,8 +294,7 @@ function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype:
     return;
   }
   // const hash = createHash('sha256').update(fullpath).digest('base64');
-  const first = (header?: string | string[]) =>
-    Array.isArray(header) ? header[0] : header;
+  const first = (header?: string | string[]) => Array.isArray(header) ? header[0] : header;
   const t = state.statPath;
   const fullpath = state.statPath.statpath;
   const statItem = state.statPath.stat;
@@ -363,7 +316,7 @@ function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype:
       return state.throw(412);
     console.log('412 prevented by etagWindow of %s seconds', state.settings.putsaver.etagAge);
   }
-  new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     if (state.treeOptions.putsaver.backupFolder) {
       const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
       const ext = path.extname(backupFile);
@@ -386,40 +339,33 @@ function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype:
       backupWrite.on('error', pipeError);
       fileRead.pipe(gzip).pipe(backupWrite).on('close', () => {
         resolve();
-      })
+      });
     } else {
       resolve();
     }
-  }).then(() => {
-    return new Promise((resolve, reject) => {
-      const write = state.req.pipe(fs.createWriteStream(fullpath));
-      write.on("finish", () => {
-        resolve();
-      });
-      write.on("error", (err: Error) => {
-        state
-          .log(2, "Error writing the updated file to disk")
-          .log(2, err.stack || [err.name, err.message].join(': '))
-          .throw(500);
-        reject();
-      });
-    }).then(() => {
-      return promisify(fs.stat)(fullpath).catch(err => {
-        state.log(2, "statNew target does not exist");
-        state.throw(500);
-        return Promise.reject();
-      });
+  });//.then(() => {
+  await new Promise((resolve, reject) => {
+    const write = state.req.pipe(fs.createWriteStream(fullpath));
+    write.on("finish", () => { resolve(); });
+    write.on("error", (err: Error) => {
+      state
+        .log(2, "Error writing the updated file to disk")
+        .log(2, err.stack || [err.name, err.message].join(': '))
+        .throw(500);
+      reject();
     });
-  }).then((statNew) => {
-    const mtimeNew = Date.parse(statNew.mtime as any);
-    const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
-    state.respond(200, "", {
-      'x-api-access-type': 'file',
-      'etag': etagNew
-    }).empty();
-  }).catch(() => {
-    //this just means the request got handled early
-  })
+  });
+  let statNew = await promisify(fs.stat)(fullpath).catch(err => {
+    state.log(2, "statNew target does not exist");
+    state.throw(500);
+    return Promise.reject();
+  });
+  const mtimeNew = Date.parse(statNew.mtime as any);
+  const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'));
+  state.respond(200, "", { 'x-api-access-type': 'file', 'etag': etagNew }).empty();
+  // }).catch(() => {
+  //   //this just means the request got handled early
+  // })
 }
 
 

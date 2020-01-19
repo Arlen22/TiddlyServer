@@ -30,12 +30,7 @@ import {
 } from "./server-types";
 import { handleTiddlyServerRoute, init as initTiddlyServer } from './tiddlyserver';
 
-export { checkServerConfig };
-// var settings: ServerConfig;
-// var debug: OmitThisParameter<ReturnType<typeof StateObject["DebugLogger"]>>;
-export { loadSettings };
-//we make it a separate line because typescript loses the const if I export
-export { routes, libsReady };
+export { checkServerConfig, loadSettings, routes, libsReady };
 const { Server: WebSocketServer } = WebSocket;
 
 // global settings
@@ -50,35 +45,13 @@ namespace ENV {
   export let disableLocalHost: boolean = false;
 };
 
-
-
 initServerTypes(eventer);
 initTiddlyServer(eventer);
 initAuthRoute(eventer);
 
-
-/**
-Authentication could be done several ways, but the most convenient and secure method is 
-probably to specify a public key instead of a certificate, and then use that public key
-to verify the signiture of the cookie. The cookie would consist of two parts, the first 
-being an info packet containing the desired username and the key fingerprint, the 
-second being the signature of the first using the private key. The info packet should also 
-contain the signature time and should probably be sent to the server in a post request so 
-the server can set it as an HTTP only cookie. Directory Index would display the current user
-info so the user can logout if desired. Data folders would be given the username from the 
-cookie with the request. The private key could be pasted in during login and stored using 
-crypto.subtle. 
- */
-
-
-
 eventer.on('settings', (set) => {
-  //check the server config
   if (checkServerConfig(set, false) !== true)
     throw "ServerConfig did not pass validator";
-
-  // === Setup static routes
-
 });
 
 const routes: Record<string, (state: StateObject) => void> = {

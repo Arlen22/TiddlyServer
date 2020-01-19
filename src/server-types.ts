@@ -16,19 +16,10 @@ import * as https from "https";
 import { networkInterfaces, NetworkInterfaceInfo } from 'os';
 import * as ipcalc from "./ipcalc";
 import {
-  // NewTreeGroup,
-  // NewTreeGroupSchema,
-  // NewTreeHashmapGroupSchema,
-  // NewTreePathHashmap,
-  // NewTreeItem,
-  // NewTreeItemSchema,
-  // NewTreeObjectSchema,
-  // NewTreeObjectSchemaItem,
+
   NewTreeOptions,
-  // NewTreePath,
   NewTreePathOptions_Auth,
   NewTreePathOptions_Index,
-  // NewTreePathSchema,
   ServerConfig,
   ServerConfigBase,
   ServerConfigSchema,
@@ -53,45 +44,10 @@ export {
   ConvertSettings
 }
 let DEBUGLEVEL = -1;
-// let settings: ServerConfig;
-// const colorsRegex = /\x1b\[[0-9]+m/gi
-// let debugOutput: Writable = new Writable({
-// 	write: function (chunk, encoding, callback) {
-// 		// if we're given a buffer, convert it to a string
-// 		if (Buffer.isBuffer(chunk)) chunk = chunk.toString('utf8');
-// 		// remove ending linebreaks for consistency
-// 		chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
 
-// 		if (settings.logging.logError) {
-// 			appendFileSync(
-// 				settings.logging.logError,
-// 				(settings.logging.logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
-// 				{ encoding: "utf8" }
-// 			);
-// 		}
-// 		if (!settings.logging.logError || settings.logging.logToConsoleAlso) {
-// 			console.log(chunk);
-// 		}
-// 		callback && callback();
-// 		return true;
-// 	}
-// });;
-// export let typeLookup: { [k: string]: string };
 export function init(eventer: ServerEventEmitter) {
   eventer.on('settings', function (set: ServerConfig) {
-    // DEBUGLEVEL = set.debugLevel;
-    // settings = set;
-    // typeLookup = {};
-    // Object.keys(set.directoryIndex.icons).forEach(type => {
-    // 	set.directoryIndex.icons[type].forEach(ext => {
-    // 		if (!typeLookup[ext]) {
-    // 			typeLookup[ext] = type;
-    // 		} else {
-    // 			throw format('Multiple types for extension %s: %s', ext, typeLookup[ext], type);
-    // 		}
-    // 	})
-    // });
-    // const myWritable = new stream.
+    
   });
 }
 
@@ -101,11 +57,6 @@ type PromiseReturnType<T extends (...args: any) => any> = ReturnType<T> extends 
 interface Async<T> extends Promise<T> {
   readonly type: T
 }
-
-// export type ServerConfig = NewConfig;
-// export type ServerConfigSchema = NewConfigSchema;
-
-
 
 
 export function as<T>(obj: T) {
@@ -131,18 +82,6 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
   });
 
   if (!settingsObjSource.$schema) throw "The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new"
-
-  // var schemaChecker = new ajv({ allErrors: true, async: false });
-  // schemaChecker.addMetaSchema(require('../lib/json-schema-refs/json-schema-draft-06.json'));
-  // // schemaChecker.addMetaSchema(require("../settings-2-1.schema.json"));
-  // schemaChecker.addMetaSchema(require("../settings-2-1-tree.schema.json"));
-  // schemaChecker.addMetaSchema(require("../settings-2-1-tree-options.schema.json"));
-  // var validate = schemaChecker.compile(require(
-  // 	path.resolve(path.dirname(settingsFile), settingsObjSource.$schema)
-  // ));
-  // var valid = validate(settingsObjSource, "settings");
-  // var validationErrors = validate.errors;
-  // if (!valid) console.log(validationErrors && validationErrors.map(e => [e.keyword.toUpperCase() + ":", e.dataPath, e.message].join(' ')).join('\n'));
 
   if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
   // let routeKeys = Object.keys(routes);
@@ -384,32 +323,6 @@ export function isError(obj): obj is Error {
 export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException {
   return isError(obj);
 }
-// export function DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
-// 	//if(prefix.startsWith("V:")) return function(){};
-// 	return function (msgLevel: number, tempString: any, ...args: any[]) {
-// 		if (!ignoreLevel && settings.logging.debugLevel > msgLevel) return;
-// 		if (isError(args[0])) {
-// 			let err = args[0];
-// 			args = [];
-// 			if (err.stack) args.push(err.stack);
-// 			else args.push("Error %s: %s", err.name, err.message);
-// 		}
-// 		let t = new Date();
-// 		let date = format('%s-%s-%s %s:%s:%s', t.getFullYear(), padLeft(t.getMonth() + 1, '00'), padLeft(t.getDate(), '00'),
-// 			padLeft(t.getHours(), '00'), padLeft(t.getMinutes(), '00'), padLeft(t.getSeconds(), '00'));
-// 		debugOutput.write(' '
-// 			+ (msgLevel >= 3 ? (colors.BgRed + colors.FgWhite) : colors.FgRed) + prefix
-// 			+ ' ' + colors.FgCyan + date + colors.Reset
-// 			+ ' ' + format.apply(null, [tempString, ...args]).split('\n').map((e, i) => {
-// 				if (i > 0) {
-// 					return new Array(23 + prefix.length).join(' ') + e;
-// 				} else {
-// 					return e;
-// 				}
-// 			}).join('\n'), "utf8");
-// 	} as typeof DebugLog;
-// }
-
 
 
 export function sanitizeJSON(key: string, value: any) {
@@ -426,41 +339,6 @@ export interface ServeStaticResult {
   message: string
 }
 
-// export const serveStatic: (path: string, state: StateObject, stat: fs.Stats) => Observable<[
-//     boolean, ServeStaticResult
-// ]> = (function () {
-//     interface Server {
-//         serveFile(pathname: string, status: number, headers: {}, req: http.IncomingMessage, res: http.ServerResponse): EventEmitter
-//         respond(...args: any[]): any;
-//         finish(...args: any[]): any;
-//     }
-//     const staticServer = require('../lib/node-static');
-//     const serve = new staticServer.Server({
-//         mount: '/'
-//         // gzipTransfer: true, 
-//         // gzip:/^(text\/html|application\/javascript|text\/css|application\/json)$/gi 
-//     }) as Server;
-//     const promise = new EventEmitter();
-//     return function (path: string, state: StateObject, stat: fs.Stats) {
-//         const { req, res } = state;
-//         return Observable.create((subs: Subscriber<[boolean, ServeStaticResult]>) => {
-//             serve.respond(null, 200, {
-//                 'x-api-access-type': 'file'
-//             }, [path], stat, req, res, function (status: number, headers: any) {
-//                 serve.finish(status, headers, req, res, promise, (err: ServeStaticResult, res: ServeStaticResult) => {
-//                     if (err) {
-//                         subs.next([true, err]);
-//                     } else {
-//                         subs.next([false, res]);
-//                     }
-//                     subs.complete();
-//                 });
-//             });
-//         })
-//     }
-
-// })();
-
 
 
 export function serveFile(state: StateObject, file: string, root: string | undefined) {
@@ -476,9 +354,6 @@ export function serveFile(state: StateObject, file: string, root: string | undef
   }, err => { state.throw<StateObject>(404); })
 
 }
-// export function serveFileObs(obs: Observable<StateObject>, file: string, root: string) {
-// 	return obs.do(state => serveFile(state, file, root)).ignoreElements();
-// }
 export function serveFolder(state: StateObject, mount: string, root: string, serveIndex?: Function) {
   const pathname = state.url.pathname;
   if (state.url.pathname.slice(0, mount.length) !== mount) {
@@ -498,9 +373,6 @@ export function serveFolder(state: StateObject, mount: string, root: string, ser
     })
   }
 }
-// export function serveFolderObs(obs: Observable<StateObject>, mount: string, root: string, serveIndex?: Function) {
-// 	return obs.do(state => serveFolder(state, mount, root, serveIndex)).ignoreElements();
-// }
 export function serveFolderIndex(options: { type: string }) {
   async function readFolder(folder: string) {
     let files = await promisify(fs.readdir)(folder);
@@ -584,40 +456,39 @@ export function getTreePathFiles(result: PathResolverResult, state: StateObject)
     });
   }
 }
-// /**
-//  * Returns the keys and paths from the PathResolverResult directory. If there
-//  * is an error it will be sent directly to the client and nothing will be emitted. 
-//  * 
-//  * @param {PathResolverResult} result 
-//  * @returns 
-//  */
-// export function getTreeItemFiles(result: PathResolverResult, state: StateObject): Observable<DirectoryIndexData> {
-// 	let dirpath = [
-// 		result.treepathPortion.join('/'),
-// 		result.filepathPortion.join('/')
-// 	].filter(e => e).join('/')
-// 	let type = typeof result.item === "object" ? "group" : "folder";
-// 	if (typeof result.item === "object") {
-// 		const keys = Object.keys(result.item);
-// 		const paths = keys.map(k => 
-// 			typeof result.item[k] === "string" ? result.item[k] : true
-// 		);
-// 		return Observable.of({ keys, paths, dirpath, type });
-// 	} else {
-// 		return obs_readdir()(result.fullfilepath).map(([err, keys]) => {
-// 			if (err) {
-// 				state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
-// 				state.throw(500);
-// 				return;
-// 			}
-// 			const paths = keys.map(k => path.join(result.fullfilepath, k));
-// 			return { keys, paths, dirpath, type };
-// 		}).filter(obsTruthy);
-// 	}
-// }
 
-/// directory handler section =============================================
-//I have this in a JS file so I can edit it without recompiling
+export function getTreeOptions(state: StateObject) {
+  //nonsense we have to write because putsaver could be false
+  // type putsaverT = Required<typeof state.settings.putsaver>;
+  let putsaver = as<typeof state.settings.putsaver>({
+    enabled: true,
+    gzipBackups: true,
+    backupFolder: "",
+    etag: "optional",
+    etagAge: 3,
+    ...(state.settings.putsaver || {})
+  });
+  let options: OptionsConfig = {
+    auth: { $element: "auth", authError: 403, authList: null },
+    putsaver: { $element: "putsaver", ...putsaver },
+    index: { $element: "index", defaultType: state.settings.directoryIndex.defaultType, indexFile: [], indexExts: [] }
+  }
+  // console.log(state.ancestry);
+  state.ancestry.forEach((e) => {
+    // console.log(e);
+    e.$options && e.$options.forEach((f) => {
+      if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
+        // console.log(f);
+        Object.keys(f).forEach(k => {
+          if (f[k] === undefined) return;
+          options[f.$element][k] = f[k];
+        })
+      }
+    })
+  });
+  return options;
+}
+
 const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
 export type DirectoryIndexData = {
   keys: string[],
@@ -658,30 +529,6 @@ export async function sendDirectoryIndex([_r, options]: [DirectoryIndexData, Dir
     return generateDirectoryListing(def, options);
   }
 
-  // return Observable.from(pairs).mergeMap(([key, val]: [string, string | boolean]) => {
-  // 	//if this is a group, just return the key
-  // 	if (typeof val === "boolean") return Observable.of({ key })
-  // 	//otherwise return the statPath result
-  // 	else return statPath(val).then(res => { return { stat: res, key }; });
-  // }).reduce((n, e: { key: string, stat?: StatPathResult }) => {
-  // 	let linkpath = [dirpath, e.key].filter(e => e).join('/');
-  // 	n.push({
-  // 		name: e.key,
-  // 		path: e.key + ((!e.stat || e.stat.itemtype === "folder") ? "/" : ""),
-  // 		type: (!e.stat ? "group" : (e.stat.itemtype === "file"
-  // 			? typeLookup[e.key.split('.').pop() as string] || 'other'
-  // 			: e.stat.itemtype as string)),
-  // 		size: (e.stat && e.stat.stat) ? getHumanSize(e.stat.stat.size) : ""
-  // 	});
-  // 	return n;
-  // }, [] as DirectoryEntry[]).map(entries => {
-  // 	if (options.format === "json") {
-  // 		return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
-  // 	} else {
-  // 		let def = { path: dirpath, entries, type }
-  // 		return generateDirectoryListing(def, options);
-  // 	}
-  // });
 }
 
 /**
@@ -742,26 +589,7 @@ export async function statPath(s: { statpath: string, index: number } | string) 
     infostat: (infostat && infostat.isFile()) ? infostat : undefined
   } as StatPathResult);
 }
-/*
-return new Promise<StatPathResult>(resolve => {
-	// What I wish I could write (so I did)
-	obs_stat(fs.stat)(statpath).chainMap(([err, stat]) => {
-		if (err || stat.isFile()) endStat = true;
-		if (!err && stat.isDirectory())
-			return obs_stat(stat)(path.join(statpath, "tiddlywiki.info"));
-		else resolve({ stat, statpath, index, endStat, itemtype: '' })
-	}).concatAll().subscribe(([err2, infostat, stat]) => {
-		if (!err2 && infostat.isFile()) {
-			endStat = true;
-			resolve({ stat, statpath, infostat, index, endStat, itemtype: '' })
-		} else
-			resolve({ stat, statpath, index, endStat, itemtype: '' });
-	});
-}).then(res => {
-	res.itemtype = getItemType(res.stat, res.infostat)
-	return res;
-})
-*/
+
 
 
 function getItemType(stat: Stats | undefined, infostat: Stats | undefined) {
@@ -799,19 +627,7 @@ export function treeWalker(tree: Config.GroupElement | Config.PathElement, reqpa
   }
   return { item, end, folderPathFound, ancestry } as TreePathResult;
 }
-// export function treeWalkerOld(tree, reqpath) {
-// 	var item: NewTreeItem = tree;
-// 	var folderPathFound = false;
-// 	for (var end = 0; end < reqpath.length; end++) {
 
-// 		if (typeof item !== 'string' && typeof item[reqpath[end]] !== 'undefined') {
-// 			item = item[reqpath[end]];
-// 		} else if (typeof item === "string") {
-// 			folderPathFound = true; break;
-// 		} else break;
-// 	}
-// 	return { item, end, folderPathFound };
-// }
 export function resolvePath(state: StateObject | string[], tree: Config.MountElement): PathResolverResult | undefined {
   var reqpath;
   if (Array.isArray(state)) {
@@ -822,16 +638,6 @@ export function resolvePath(state: StateObject | string[], tree: Config.MountEle
 
   reqpath = decodeURI(reqpath.slice().filter(a => a).join('/')).split('/').filter(a => a);
 
-  //if we're at root, just return it
-  // if (reqpath.length === 0) return {
-  // 	item: tree,
-  // 	ancestry: [],
-  // 	reqpath,
-  // 	treepathPortion: [],
-  // 	filepathPortion: [],
-  // 	fullfilepath: isNewTreePath(tree) ? tree.path : ''
-  // }
-  //check for invalid items (such as ..)
   if (!reqpath.every(a => a !== ".." && a !== ".")) return;
 
   var result = treeWalker(tree, reqpath);
@@ -857,53 +663,6 @@ export function resolvePath(state: StateObject | string[], tree: Config.MountEle
 type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 
 
-// export function obs<S>(state?: S) {
-//     return Observable.bindCallback(fs.stat, (err, stat): NodeCallback<fs.Stats, S> => [err, stat, state] as any);
-// }
-// export type obs_stat_result<T> = [NodeJS.ErrnoException | null, fs.Stats, T, string]
-// export const obs_stat = <T = undefined>(tag: T = undefined as any) =>
-// 	(filepath: string) => new Observable<obs_stat_result<T>>(subs => {
-// 		fs.stat(filepath, (err, data) => {
-// 			subs.next([err, data, tag, filepath]);
-// 			subs.complete();
-// 		})
-// 	})
-
-// export type obs_readdir_result<T> = [NodeJS.ErrnoException | null, string[], T, string]
-// export const obs_readdir = <T>(tag: T = undefined as any) =>
-// 	(filepath: string) => new Observable<obs_readdir_result<T>>(subs => {
-// 		fs.readdir(filepath, (err, data) => {
-// 			subs.next([err, data, tag, filepath]);
-// 			subs.complete();
-// 		})
-// 	})
-
-// export type obs_readFile_result<T> = typeof obs_readFile_inner
-// export const obs_readFile = <T>(tag: T = undefined as any): obs_readFile_result<T> =>
-// 	(filepath: string, encoding?: string) =>
-// 		new Observable(subs => {
-// 			const cb = (err, data) => {
-// 				subs.next([err, data, tag, filepath]);
-// 				subs.complete();
-// 			}
-// 			if (encoding)
-// 				fs.readFile(filepath, encoding, cb);
-// 			else
-// 				fs.readFile(filepath, cb)
-// 		}) as any;
-
-// declare function obs_readFile_inner<T>(filepath: string): Observable<[NodeJS.ErrnoException, Buffer, T, string]>;
-// declare function obs_readFile_inner<T>(filepath: string, encoding: string): Observable<[NodeJS.ErrnoException, string, T, string]>;
-
-
-// // export type obs_writeFile_result<T> = typeof obs_readFile_inner
-// export const obs_writeFile = <T>(tag: T = undefined as any) =>
-// 	(filepath: string, data: any) => new Observable<[NodeJS.ErrnoException | null, T, string]>(subs =>
-// 		fs.writeFile(filepath, data, (err) => {
-// 			subs.next([err, tag, filepath]);
-// 			subs.complete();
-// 		})
-// 	);
 export function fs_move(oldPath, newPath, callback) {
 
   fs.rename(oldPath, newPath, function (err) {
@@ -1101,17 +860,6 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     } else {
       return this.settings.bindInfo.localAddressPermissions[this.hostLevelPermissionsKey];
     }
-    // let localAddress = this._req.socket.localAddress;
-    // let keys = Object.keys(settings.tiddlyserver.hostLevelPermissions);
-    // let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
-    // let matches = parseHostList(keys)(localAddress);
-    // if (isLocalhost) {
-    // 	return settings.tiddlyserver.hostLevelPermissions["localhost"];
-    // } else if (matches.lastMatch > -1) {
-    // 	return settings.tiddlyserver.hostLevelPermissions[keys[matches.lastMatch]]
-    // } else {
-    // 	return settings.tiddlyserver.hostLevelPermissions["*"]
-    // }
   }
 
   get hostRoot() {
@@ -1334,24 +1082,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
           if (item) res.setHeader(e, item.toString());
         });
       });
-    // sender.on("overrideStream", (tag) => {
-    //   // this._res.setHeader("Transfer-Encoding", "gzip");
-    //   const gz = createGzip();
-    //   const res = tag.dest as http.ServerResponse;
-    //   const buffs: Buffer[] = [];
-    //   let length = 0;
-    //   gz.on("data", (chunk: Buffer) => { length += chunk.length; buffs.push(chunk); });
-    //   gz.on("end", () => {
-    //     this._res.setHeader("Content-Length", length);
-    //     this._res.setHeader("Content-Encoding", "gzip");
-    //     console.log(buffs.length);
-    //     for (let i = 0; i < buffs.length; i++) {
-    //       res.write(buffs[i]);
-    //     }
-    //     res.end();
-    //   })
-    //   tag.dest = gz;
-    // });
+    
     sender.pipe(this._res);
   }
   /**
@@ -1392,26 +1123,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         resolve();
       });
     })
-    // return Observable.fromEvent<Buffer>(this._req, 'data')
-    // 	//only take one since we only need one. this will dispose the listener
-    // 	.takeUntil(Observable.fromEvent(this._req, 'end').take(1))
-    // 	//accumulate all the chunks until it completes
-    // 	.reduce<Buffer>((n, e) => { n.push(e); return n; }, [])
-    // 	//convert to json
-    // 	.forEach((e) => {
-    // 		this.body = Buffer.concat(e).toString('utf8');
-    // 		//console.log(state.body);
-    // 		if (this.body.length === 0)
-    // 			return this;
-    // 		let catchHandler = errorCB === true ? (e: JsonError) => {
-    // 			this.respond(400, "", {
-    // 				"Content-Type": "text/plain"
-    // 			}).string(e.errorPosition);
-    // 		} : errorCB;
-    // 		this.json = catchHandler ? tryParseJSON<any>(this.body, catchHandler) : tryParseJSON(this.body);
-    // 	})
-    // 	//returns a promise with the state
-    // 	.then(() => this);
+    
 
   }
   static DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {

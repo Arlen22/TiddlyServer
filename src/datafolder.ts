@@ -30,16 +30,12 @@ let eventer: ServerEventEmitter;
 export function init(e: ServerEventEmitter) {
   eventer = e;
   eventer.on('settings', function (set: ServerConfig) {
-    // settings = set;
+
   })
   eventer.on('settingsChanged', (keys) => {
-    // if (keys.indexOf("username") > -1) {
-    //     debug(1, "The username will not be updated on currently loaded data folders. " +
-    //         "To apply the new username you will need to reload the data folders or restart the server."
-    //     );
-    // }
+
   })
-  eventer.on('websocket-connection', function (data: RequestEventWS) {
+  eventer.on('websocket-connection', async function (data: RequestEventWS) {
 
     const { request, client, settings, treeHostIndex, debugOutput } = data;
     const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
@@ -49,51 +45,51 @@ export function init(e: ServerEventEmitter) {
     var result = resolvePath(pathname.split('/'), root) as PathResolverResult
     if (!result) return client.close(404);
 
-    statWalkPath(result).then(statPath => {
-      //if this is a datafolder, we hand the client and request off directly to it
-      //otherwise we stick it in its own section
-      if (statPath.itemtype === "datafolder") {
-        const target = settings.__targetTW;
-        //trigger the datafolder to load in case it isn't
-        const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '', target, settings.datafolder);
-        const subpath = pathname.slice(mount.length);
-        //event to give the client to the data folder
-        const loadClient = () => {
-          debug(-1, 'ws-client-connect %s', mount);
-          loadedFolders[mount].events.emit('ws-client-connect', client, request, subpath);
-        };
-        //if the data folder is still loading, we wait, otherwise give immediately
-        if (Array.isArray(loadedFolders[mount].handler)) {
-          loadedFolders[mount].events.once('ws-client-preload', loadClient)
-        } else {
-          loadClient();
-        }
+    let statPath = await statWalkPath(result); 
+    //if this is a datafolder, we hand the client and request off directly to it
+    //otherwise we stick it in its own section
+    if (statPath.itemtype === "datafolder") {
+      const target = settings.__targetTW;
+      //trigger the datafolder to load in case it isn't
+      const { mount, folder } = loadDataFolderTrigger(result, statPath, pathname, '', target, settings.datafolder);
+      const subpath = pathname.slice(mount.length);
+      //event to give the client to the data folder
+      const loadClient = () => {
+        debug(-1, 'ws-client-connect %s', mount);
+        loadedFolders[mount].events.emit('ws-client-connect', client, request, subpath);
+      };
+      //if the data folder is still loading, we wait, otherwise give immediately
+      if (Array.isArray(loadedFolders[mount].handler)) {
+        loadedFolders[mount].events.once('ws-client-preload', loadClient)
       } else {
-        client.addEventListener('message', (event) => {
-          console.log('message', event);
-          debug(-3, 'WS-MESSAGE %s', inspect(event));
-          clientsList[pathname].forEach(e => {
-            if (e !== client) e.send(event.data);
-          })
-        });
-
-        client.addEventListener('error', (event) => {
-          debug(-2, 'WS-ERROR %s %s', pathname, event.type)
-          var index = clientsList[pathname].indexOf(client);
-          if (index > -1) clientsList[pathname].splice(index, 1);
-          client.close();
-        })
-
-        client.addEventListener('close', (event) => {
-          debug(-2, 'WS-CLOSE %s %s %s', pathname, event.code, event.reason);
-          var index = clientsList[pathname].indexOf(client);
-          if (index > -1) clientsList[pathname].splice(index, 1);
-        })
-
-        if (!clientsList[pathname]) clientsList[pathname] = [];
-        clientsList[pathname].push(client);
+        loadClient();
       }
-    });
+    } else {
+      client.addEventListener('message', (event) => {
+        console.log('message', event);
+        debug(-3, 'WS-MESSAGE %s', inspect(event));
+        clientsList[pathname].forEach(e => {
+          if (e !== client) e.send(event.data);
+        })
+      });
+
+      client.addEventListener('error', (event) => {
+        debug(-2, 'WS-ERROR %s %s', pathname, event.type)
+        var index = clientsList[pathname].indexOf(client);
+        if (index > -1) clientsList[pathname].splice(index, 1);
+        client.close();
+      })
+
+      client.addEventListener('close', (event) => {
+        debug(-2, 'WS-CLOSE %s %s %s', pathname, event.code, event.reason);
+        var index = clientsList[pathname].indexOf(client);
+        if (index > -1) clientsList[pathname].splice(index, 1);
+      })
+
+      if (!clientsList[pathname]) clientsList[pathname] = [];
+      clientsList[pathname].push(client);
+    }
+
   })
 }
 
@@ -332,44 +328,4 @@ class TiddlyServerAuthentication {
   // 		return false;
   // 	}
   // }
-}
-
-
-function sendPluginResponse(state: StateObject, pluginCache: any | "null") {
-  // const { req, res } = state;
-  if (pluginCache === "null") {
-    state.respond(404).empty();
-    return;
-  }
-  // console.log('pluginCache', pluginCache.plugin.text && pluginCache.plugin.text.length);
-  // let text = pluginCache.plugin.text;
-  // delete pluginCache.plugin.text;
-  let meta = JSON.stringify(pluginCache.meta), text = pluginCache.text;
-
-
-  const body = meta + '\n\n' + text;
-
-  var MAX_MAXAGE = 60 * 60 * 24 * 365 * 1000; //1 year
-  var maxageSetting = 0;
-  var maxAge = Math.min(Math.max(0, maxageSetting), MAX_MAXAGE)
-
-  var cacheControl = 'public, max-age=' + Math.floor(maxageSetting / 1000)
-  StateObject.DebugLogger("").call(state, -3, 'cache-control %s', cacheControl)
-  state.setHeader('Cache-Control', cacheControl)
-
-  var modified = new Date(pluginCache.cacheTime).toUTCString()
-  StateObject.DebugLogger("").call(state, -3, 'modified %s', modified)
-  state.setHeader('Last-Modified', modified)
-
-  var etagStr = etag(body);
-  StateObject.DebugLogger("").call(state, -3, 'etag %s', etagStr)
-  state.setHeader('ETag', etagStr)
-
-  if (fresh(state.req.headers, { 'etag': etagStr, 'last-modified': modified })) {
-    StateObject.DebugLogger("").call(state, -1, "client plugin still fresh")
-    state.respond(304).empty();
-  } else {
-    StateObject.DebugLogger("").call(state, -1, "sending plugin")
-    sendResponse(state, body, { doGzip: canAcceptGzip(state.req) });
-  }
 }

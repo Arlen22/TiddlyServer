@@ -58,7 +58,7 @@ server.libsReady.then(() => {
   process.exitCode = 1;
 })
 
-process.on('uncaughtException', err => {
+const unhandled = (err) => {
   process.exitCode = 1;
   console.error(inspect(err));
   console.error("caught process uncaughtException");
@@ -70,7 +70,15 @@ process.on('uncaughtException', err => {
   //hold it open because all other listeners should close
   if (args.indexOf("--stay-on-error") !== -1)
     setInterval(function () { }, 1000);
+};
+
+// unhandled rejections with no reasons should be ignored
+process.on("unhandledRejection", (err, prom) => {
+  if(!err) return;
+  else unhandled(err);
 });
+process.on('uncaughtException', unhandled);
+
 
 process.on('beforeExit', () => {
   if (process.exitCode) return;
