@@ -32,10 +32,11 @@ const settingsPath = path.dirname(settingsFile);
 const server = false ? require('./lib/compiled-lib') : require("./src/server");
 
 server.libsReady.then(() => {
+  // let [check1, checkErr1] = server.checkServerConfig(require(settingsFile));
+  // if (check1 !== true) { console.log(JSON.stringify(checkErr1, null, 2)); debugger; }
   const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
-  // console.log(settings.bindInfo.localAddressPermissions.localhost);
-  let check = server.checkServerConfig(settings)[0];
-  if (check !== true) { console.log(JSON.stringify(check, null, 2)); debugger; }
+  let [check, checkErr] = server.checkServerConfig(settings);
+  if (check !== true) { console.log(JSON.stringify(checkErr, null, 2)); debugger; }
   // fs.writeFileSync("settings-temp.json", JSON.stringify(settings, null, 2));
   server.eventer.emit("settings", settings);
   let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;

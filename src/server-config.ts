@@ -92,7 +92,7 @@ export function normalizeTree(settingsDir, item: normalizeTree_itemtype, key, ke
   }
   if (typeof item === "string" || item.$element === "folder") {
     if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
-    if (!item.path) throw new Error(format("path must be specified for folder item under '%s'", keypath.join(', ')));
+    if (!item.path) throw format("  Error loading settings: path must be specified for folder item under '%s'", keypath.join(', '));
     item.path = pathResolveWithUser(settingsDir, item.path);
     key = key || path.basename(item.path);
     let $options = item.$options || [];

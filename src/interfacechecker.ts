@@ -11,7 +11,7 @@ abstract class TypeCheck<T> {
   static currentKeyArray: (string | number)[] = [];
   static stack: TypeCheck<any>[] = [];
   public abstract expectedMessage: string;
-  public abstract errHash: Record<string | number, any> | string;
+  public abstract error: Record<string | number, any> | string | undefined;
   public abstract currentKey: string | number | symbol | undefined;
   protected abstract _check(a: any): a is T;
 
@@ -32,13 +32,20 @@ abstract class TypeCheck<T> {
       parent instanceof CheckUnion
     ) {
       let key = parent.currentKey;
+
       res = this._check(a);
-      if (!res) parent.errHash[key] = this.errHash;
+
+      if (!res && typeof parent.error === "object") {
+        parent.error[key] = this.error;
+      } else if (!res) {
+        throw new Error("parent.error is a string. This is a bug in one of the instanceof specified classes.");
+      }
+
     } else if (parent instanceof CheckSimple) {
       throw new Error("CheckSimple instances may not call other checkers. ");
     } else if (parent instanceof CheckRepeat) {
       res = this._check(a);
-      if (!res) parent.errHash = this.errHash;
+      if (!res) parent.error = this.error;
     } else {
       throw new Error("unhandled instance " + this.toString());
     }
@@ -46,16 +53,18 @@ abstract class TypeCheck<T> {
     this.currentKey = undefined;
     return res;
   }
-  static errorMessage(key: symbol): (co: TypeCheck<any>, x: any) => string {
+  static errorMessage(key: symbol): (co: any, x: any) => string {
     switch (key) {
       case CheckObject.wrongUnionKey:
-        return (co, x) => "wrong union key";
+        return (co: CheckObject<any>, x) => "wrong union key " + co.unionKeys?.map(k =>
+          k + ": " + x[k] + " " + co.checkermap[k].expectedMessage
+        ).join(', ');
       case CheckObject.typeofNotObject:
-        return (co, x) => "expected object value";
+        return (co: CheckObject<any>, x) => "expected object value but got " + typeof x;
       case CheckObject.missingRequired:
-        return (co, x) => (co as CheckObject<any>).lastMessage;
+        return (co: CheckObject<any>, x) => (co).lastMessage;
       case CheckObject.unexpectedProperty:
-        return (co, x) => co.expectedMessage + " but got " + JSON.stringify(Object.keys(x));
+        return (co: CheckObject<any>, x) => co.expectedMessage + " but got " + JSON.stringify(Object.keys(x));
       default:
         return (tc, x) => tc.expectedMessage;
     }
@@ -63,7 +72,7 @@ abstract class TypeCheck<T> {
 }
 
 class CheckSimple<T> extends TypeCheck<T> {
-  public errHash: string = "";
+  public error: string = "";
   public currentKey: undefined = undefined;
   protected _check: (a: any) => a is T;
   constructor(
@@ -72,12 +81,12 @@ class CheckSimple<T> extends TypeCheck<T> {
   ) {
     super();
     this._check = check;
-    this.errHash = this.expectedMessage;
+    this.error = this.expectedMessage;
   }
 }
 
 export const checkString =
-  new CheckSimple("expected string value", (a): a is string => typeof a === "string");
+  new CheckSimple("expected a string value", (a): a is string => typeof a === "string");
 export const checkStringEnum = <T extends string>(...val: T[]) =>
   new CheckSimple(
     "expected one string of " + JSON.stringify(val),
@@ -85,36 +94,44 @@ export const checkStringEnum = <T extends string>(...val: T[]) =>
   );
 export const checkStringNotEmpty =
   new CheckSimple(
-    "expected string with non-zero length",
+    "expected a string with non-zero length",
     (a): a is string => typeof a === "string" && a.length > 0
   );
 export const checkNumber =
-  new CheckSimple("expected number value", (a): a is number => typeof a === "number");
+  new CheckSimple("expected a number value", (a): a is number => typeof a === "number");
 export const checkNumberEnum = <T extends number>(...val: T[]) =>
   new CheckSimple(
     "expected one number of " + JSON.stringify(val),
     (a): a is T => typeof a === "number" && (val as number[]).indexOf(a) !== -1
   );
 export const checkBoolean =
-  new CheckSimple("expected boolean value", (a): a is boolean => typeof a === "boolean");
+  new CheckSimple("expected a boolean value", (a): a is boolean => typeof a === "boolean");
 export const checkBooleanTrue =
-  new CheckSimple("expected boolean true", (a): a is true => typeof a === "boolean" && a === true);
+  new CheckSimple("expected a boolean true", (a): a is true => typeof a === "boolean" && a === true);
 export const checkBooleanFalse =
-  new CheckSimple("expected boolean false", (a): a is false => typeof a === "boolean" && a === false);
+  new CheckSimple("expected a boolean false", (a): a is false => typeof a === "boolean" && a === false);
 export const checkNull =
-  new CheckSimple("expected null value", (a): a is null => typeof a === "object" && a === null);
-export const checkUnknown =
-  new CheckSimple("expected unknown value", (a): a is unknown => true);
+  new CheckSimple("expected a null value", (a): a is null => typeof a === "object" && a === null);
+export const checkAny =
+  new CheckSimple("expected any value", (a): a is any => true);
 
 export class CheckMultiple<T extends {}> extends TypeCheck<T>{
-  errHash: Record<string | number, any> = {} as any;
+  error: Record<string | number, any> | string = {} as any;
   currentKey: any;
   protected _check = (a: any): a is T => {
-    return this.checkObject(a, (k) => { this.currentKey = k });
+    this.currentKey = undefined;
+    this.error = {};
+    let res = this.checkObject(a);
+
+    if (!res)
+      return this.error = this.expectedMessage, res;
+    else
+      return this.checkChildren(a, (k) => { this.currentKey = k });
   }
   constructor(
     public expectedMessage: string,
-    private checkObject: (a: any, curKey: (k: any) => void) => a is T,
+    private checkObject: (a: any) => a is T,
+    private checkChildren: (a: any, curKey: (k: any) => void) => a is T,
   ) {
     super();
   }
@@ -123,10 +140,8 @@ export class CheckMultiple<T extends {}> extends TypeCheck<T>{
 type ArrayType<T> = T extends Array<infer X> ? X : never;
 export const checkArray = <V>(checker: TypeCheck<V>) => new CheckMultiple(
   "expected an array that " + checker.expectedMessage,
-  (a, curKey): a is V[] => {
-    if (typeof a !== "object" || !Array.isArray(a)) return false;
-    return (a.filter((b, i) => { curKey(i); return checker.check(b); }).length === a.length);
-  }
+  (a): a is V[] => typeof a === "object" && Array.isArray(a),
+  (a, curKey): a is V[] => a.filter((b, i) => { curKey(i); return checker.check(b); }).length === a.length
 )
 
 export const checkRecord = <K extends string | number, V>(
@@ -134,19 +149,21 @@ export const checkRecord = <K extends string | number, V>(
   checker: TypeCheck<V>
 ) => new CheckMultiple<{ [k in K]: V }>(
   "expected a record that " + checker.expectedMessage,
+  (a): a is { [k in K]: V } => typeof a === "object",
   (a, curKey): a is { [k in K]: V } => {
-    if (typeof a !== "object") return false;
-    return (Object.keys(a).filter((k) => {
+    let keys = Object.keys(a);
+    let arr = keys.filter((k) => {
       curKey(k);
       return keyChecker.check(k) && checker.check(a[k]);
-    }).length === a.length);
+    });
+    return arr.length === keys.length;
   }
 );
 
 
 class CheckUnionWrapper<A, B> extends TypeCheck<A | B> {
   currentKey: number | undefined = undefined;
-  errHash: Record<number, any> = {};
+  error: Record<number, any> = {};
   _check: (x: any) => x is A | B = (a): a is A | B => {
     throw new Error("incorrect usage of CheckUnionWrapper");
   }
@@ -160,8 +177,8 @@ class CheckUnionWrapper<A, B> extends TypeCheck<A | B> {
 }
 
 class CheckUnion<T> extends TypeCheck<T> {
-  currentKey: number | undefined = undefined;
-  errHash: Record<number, any> = {};
+  currentKey: string | number | undefined = undefined;
+  error: Record<number, any> = {};
   expectedMessage: string = "";
 
   constructor(public checks: TypeCheck<any>[]) {
@@ -173,36 +190,39 @@ class CheckUnion<T> extends TypeCheck<T> {
   }
 
   _check = (a: any): a is T => {
-    this.errHash = {};
+    // this.lastResult = undefined;
+    this.currentKey = undefined;
+    this.error = {};
 
     let res = this.checks.map((e, i) => {
-      this.currentKey = i;
-      let [, is, msg, hash] = (() => {
-        if (e instanceof CheckSimple) return T4(e, e.check(a), e.expectedMessage, e.errHash);
-        if (e instanceof CheckMultiple) return T4(e, e.check(a), e.expectedMessage, e.errHash);
-        if (e instanceof CheckObject) return T4(e, e.check(a), objectMessage(e, a), e.lastResult || e.errHash);
-        return T4(e, e.check(a), e.expectedMessage, e.errHash as Record<string | number, any>);
-      })();
-      return T4(e, is, msg, hash);
+      this.currentKey =i;
+      let res = e.check(a);
+      let err = e.error;
+      return [res, err] as const;
     });
 
-    let errs = res.map(([e, is, msg, hash]) => {
-      if (is) return false;
-      if (typeof hash === "symbol") {
-        // if(hash === CheckObject.wrongUnionKey) re;
-        return TypeCheck.errorMessage(hash)(e, a);
-      } else {
-        return hash;
-      }
-    });
-
-    this.errHash = errs;
-
-    return res.filter(([e, is, msg, hash]) => {
-      return is;
-    }).length > 0;
+    let is = res.filter((e) => e[0]).length > 0;
+    // if (!is) res.forEach((e, i) => {
+    //   if (!e[0] && typeof e[1] === "string" && e[1].startsWith("wrong union key")) {
+    //     console.log(this.error[i]);
+    //   }
+    // })
+    return is;
   }
 }
+// function getErrObj(is: boolean, checker: TypeCheck<any>, value: any) {
+//   let errHash = (checker instanceof CheckObject)
+//     ? checker.lastResult || checker.error
+//     : checker.error;
+
+//   if (is) return undefined;
+//   if (typeof errHash === "symbol")
+//     return TypeCheck.errorMessage(errHash)(checker, value);
+//   else
+//     return errHash;
+
+// }
+
 function flattenWrapper(c: TypeCheck<any>): TypeCheck<any>[] {
   if (c instanceof CheckUnionWrapper)
     return [...flattenWrapper(c.checkerA), ...flattenWrapper(c.checkerB)];
@@ -228,7 +248,7 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
     public checkermap: { [K: string]: TypeCheck<T[keyof T]> },
     public optionalcheckermap: { [K: string]: TypeCheck<T[keyof T]> },
     /** if these keys do not pass, the item is assumed to be unrelated */
-    private unionKeys?: (string)[]
+    public unionKeys?: (string)[]
   ) {
     super();
     this.expectedMessage = "expected an object with keys " + [
@@ -244,33 +264,41 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
   public expectedMessage: string;
   public lastResult?: symbol = CheckObject.typeofNotObject;
   public lastMessage: string = "";
-  public errorLog: string[][] = [];
+  // public errorLog: string[][] = [];
   public currentKey: string | number | undefined = undefined;
-  public errHash: Record<string | number, any> = {};
+  public error: Record<string | number, any> | string | undefined = {};
   currentKeyArray: string[] = [];
+  private symbolError(symbol: symbol, value: any, missingkeys?: string[]): false {
+    this.lastResult = symbol;
+    if (missingkeys) this.lastMessage = "missing required keys " + missingkeys.join(',');
+    this.error = symbol === CheckObject.wrongUnionKey ? undefined : TypeCheck.errorMessage(symbol)(this, value);
+    return false;
+  }
   protected _check(a: any): a is T {
     this.lastResult = undefined;
     this.currentKey = undefined;
-    this.errHash = {};
-    if (typeof a !== "object") { this.lastResult = CheckObject.typeofNotObject; return false; }
+    this.lastMessage = "";
+    this.error = {};
+    if (typeof a !== "object") return this.symbolError(CheckObject.typeofNotObject, a);
 
     const keys = Object.keys(a);
     const checkKeys: string[] = [...this.required];
     this.optional.forEach(k => { if (checkKeys.indexOf(k) === -1) checkKeys.push(k); });
 
-    let wrongunionkey = this.unionKeys && !(this.unionKeys.filter(k =>
-      keys.indexOf(k) !== -1 && this.checkermap[k].check(a[k])
-    ).length === this.unionKeys.length);
-
-    if (wrongunionkey) { this.lastResult = CheckObject.wrongUnionKey; return false; }
+    let wrongunionkey = this.unionKeys && !(this.unionKeys.filter(k => {
+      let res = keys.indexOf(k) !== -1 && this.checkermap[k].check(a[k]);
+      return res;
+    }).length === this.unionKeys.length);
+    if (wrongunionkey) return this.symbolError(CheckObject.wrongUnionKey, a);
 
     //check for missing required keys and return a string error if any are missing
     let missingkeys = this.required.filter(k => keys.indexOf(k) === -1);
-    if (missingkeys.length) {
-      this.lastResult = CheckObject.missingRequired;
-      this.lastMessage = "missing required keys " + missingkeys.join(',');
-      return false;
-    }
+    if (missingkeys.length) return this.symbolError(CheckObject.missingRequired, a, missingkeys);
+
+    //make sure there are no extra keys in the object
+    let extraKeys = keys.filter(e => checkKeys.indexOf(e) === -1);
+    if (extraKeys.length) return this.symbolError(CheckObject.unexpectedProperty, a);
+
 
     return (keys.filter((k): boolean => {
       const keylog: string[] = [];
@@ -283,8 +311,8 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
         res = this.optionalcheckermap[k].check(a[k]);
       } else {
         this.currentKey = k;
-        this.lastResult = CheckObject.unexpectedProperty;
         res = false;
+        throw new Error("Something went wrong and an extra key was found. This is a bug in the interface checker.");
       }
       return res;
     }).length === keys.length);
@@ -305,12 +333,9 @@ type OptionalCheckermap<T extends {}, REQUIRED extends keyof T> = { [KEY in Excl
 export function checkResult(e: TypeCheck<any>, a: any) {
   let union = new CheckUnion([e]);
   let res = union.check(a);
-  return [res, union.errHash[0]] as const;
+  return [res, union.error ? union.error[0] : undefined] as const;
 }
 
-function objectMessage(e: CheckObject<any>, a: any): string | boolean | Record<any, any> {
-  return e.lastResult ? CheckObject.errorMessage(e.lastResult)(e, a) : e.expectedMessage;
-}
 
 export function checkObject<T, REQUIRED extends keyof T = keyof T>(
   checkermap: RequiredCheckermap<T, REQUIRED>,
@@ -325,20 +350,26 @@ export function checkObject<T, REQUIRED extends keyof T = keyof T>(
 }
 
 class CheckRepeat<T> extends TypeCheck<T> {
-  public expectedMessage: string = "";
-  public errHash: string | Record<string | number, any> = {};
+  // public expectedMessage: string = "";
+  public error: string | Record<string | number, any> | undefined = {};
   public currentKey: string | number | symbol | undefined;
   protected _check(a: any): a is T {
+    this.error = {};
     return this.innerCheck().check(a);
   }
 
-  constructor(private innerCheck: () => TypeCheck<T>) {
+  constructor(private innerCheck: () => TypeCheck<T>, public expectedMessage: string) {
     super();
   }
 
 }
-
-export const checkRepeat = <T>(cb: () => TypeCheck<T>) => new CheckRepeat(cb);
+/** 
+ * Allows recursive types to be checked. The recursive type 
+ * should be the result of a function so each checker will 
+ * be a unique instance. The callback will be called on each 
+ * recursion. 
+ */
+export const checkRepeat = <T>(cb: () => TypeCheck<T>, expected: string) => new CheckRepeat(cb, expected);
 
 // export function checkServerConfig(obj, checker: boolean): true | {};
 // export function checkServerConfig(obj, checker: TypeCheck<ServerConfig>): true | {};
@@ -387,7 +418,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       }, ["$element"])
     )
   );
-  const GroupChild: TypeCheck<Config.PathElement | Config.GroupElement> = checkUnion(
+  const GroupChild: () => TypeCheck<Config.PathElement | Config.GroupElement> = () => checkUnion(
     checkObject<Config.PathElement>({
       $element: checkStringEnum("folder"),
       $options: checkArray(checkOptions),
@@ -397,7 +428,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
     }, undefined, ["$element"]),
     checkObject<Config.GroupElement>({
       $element: checkStringEnum("group"),
-      $children: checkArray(checkRepeat(() => GroupChild)),
+      $children: checkArray(checkRepeat(() => GroupChild(), "expected a repeat of GroupChild")),
       $options: checkArray(checkOptions),
       key: checkString,
       indexPath: checkUnion(checkString, checkBooleanFalse),
@@ -415,8 +446,8 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
     authCookieAge: checkNumber,
     maxTransferRequests: checkNumber,
     tree: checkArray(checkObject<Config.HostElement>({
-      $element: checkStringEnum<"host">("host"),
-      $mount: GroupChild
+      $element: checkStringEnum("host"),
+      $mount: GroupChild()
     })),
     authAccounts: checkRecord(checkString, checkObject<ServerConfig["authAccounts"][""]>({
       clientKeys: checkRecord(checkString, checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
@@ -450,12 +481,12 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       logToConsoleAlso: checkBoolean
     }),
     putsaver: checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional),
-    datafolder: checkRecord(checkString, checkUnknown),
+    datafolder: checkRecord(checkString, checkAny),
 
   });
   let [res, errHash] = checkResult(_checkServerConfig, obj);
 
-  if (res !== true) console.log(errHash); //if you hit this breakpoint, it means the settings does 
+  // if (res !== true) console.log(errHash); //if you hit this breakpoint, it means the settings does 
   //not conform to ServerConfig and the server is about to exit. The error data is in `res`. 
   // console.log("Check server config result: " + JSON.stringify(res, null, 2));
   return [res, errHash] as const;
