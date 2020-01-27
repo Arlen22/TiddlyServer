@@ -11,11 +11,13 @@
     "noImplicitAny": false,
     "sourceMap": false,
     "inlineSourceMap": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "noErrorTruncation": true
   },
   "files": [
     "./src/server.ts",
-    "./test/test.ts"
+    "./test/test.ts",
+    "./src/interfacechecker3.ts"
   ],
   "exclude": [
     "node_modules",

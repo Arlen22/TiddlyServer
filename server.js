@@ -34,11 +34,8 @@ const server = false ? require('./lib/compiled-lib') : require("./src/server");
 server.libsReady.then(() => {
   const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
   // console.log(settings.bindInfo.localAddressPermissions.localhost);
-  let check = server.checkServerConfig(settings, false);
-  if (check !== true) {
-    console.log(JSON.stringify(check, null, 2));
-    debugger;
-  }
+  let check = server.checkServerConfig(settings)[0];
+  if (check !== true) { console.log(JSON.stringify(check, null, 2)); debugger; }
   // fs.writeFileSync("settings-temp.json", JSON.stringify(settings, null, 2));
   server.eventer.emit("settings", settings);
   let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;
@@ -74,7 +71,7 @@ const unhandled = (err) => {
 
 // unhandled rejections with no reasons should be ignored
 process.on("unhandledRejection", (err, prom) => {
-  if(!err) return;
+  if (!err) return;
   else unhandled(err);
 });
 process.on('uncaughtException', unhandled);

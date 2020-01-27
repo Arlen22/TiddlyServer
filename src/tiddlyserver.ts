@@ -52,8 +52,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
     if (denyAccess) return state.respond(authError).string(authAccessDenied(authError, state.allow.loginlink));
   }
 
-  if (Config.isGroup(result.item))
-    return serveDirectoryIndex(result, state).catch(catchPromiseError);
+  if (Config.isGroup(result.item)) return serveDirectoryIndex(result, state).catch(catchPromiseError);
 
   function stateItemType<T extends StatPathResult["itemtype"]>(
     state: StateObject,
@@ -70,22 +69,9 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
     handleDataFolderRequest(result, state);
   } else if (stateItemType(state, "file")) {
     if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
-      state.send({
-        root: (result.item as Config.PathElement).path,
-        filepath: result.filepathPortion.join('/'),
-        error: err => {
-          state.log(2, '%s %s', err.status, err.message);
-          if (state.allow.writeErrors) state.throw(500);
-        },
-        headers: ((statPath) => (filepath) => {
-          const statItem = statPath.stat;
-          const mtime = Date.parse(statPath.stat.mtime as any);
-          const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
-          return { 'Etag': etag };
-        })(state.statPath)
-      })
+      handleGETfile(state, result);
     } else if (['PUT'].indexOf(state.req.method as string) > -1) {
-      handlePUTrequest(state);
+      handlePUTfile(state);
     } else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
       state.respond(200, "", {
         'x-api-access-type': 'file',
@@ -103,6 +89,24 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   // if (err) { console.log(err); console.log(new Error().stack); }
   // });
 
+}
+
+function handleGETfile(state: StateObject<import("/Users/arlen/Desktop/GitHub/TiddlyServer/src/server-types").IStatPathResult<"file", fs.Stats, undefined, true>, any>, result: PathResolverResult) {
+  state.send({
+    root: (result.item as Config.PathElement).path,
+    filepath: result.filepathPortion.join('/'),
+    error: err => {
+      state.log(2, '%s %s', err.status, err.message);
+      if (state.allow.writeErrors)
+        state.throw(500);
+    },
+    headers: ((statPath) => (filepath) => {
+      const statItem = statPath.stat;
+      const mtime = Date.parse(statPath.stat.mtime as any);
+      const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'));
+      return { 'Etag': etag };
+    })(state.statPath)
+  });
 }
 
 function authAccessDenied(authError: number, loginlink: boolean): string {
@@ -130,6 +134,7 @@ async function serveDirectoryIndex(result: PathResolverResult, state: StateObjec
   // console.log(state.url);
   if (!state.url.pathname.endsWith("/"))
     return state.redirect(state.url.pathname + "/");
+
   if (state.req.method === "GET") {
     const isFolder = result.item.$element === "folder";
     // Promise.resolve().then(async () => {
@@ -286,7 +291,7 @@ function mkdirPostRequest(form: any, state: StateObject<StatPathResult, any>, re
 
 /// file handler section =============================================
 
-async function handlePUTrequest(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
+async function handlePUTfile(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
   if (!state.settings.putsaver.enabled || !state.allow.putsaver) {
     let message = "PUT saver is disabled";
     state.log(-2, message);

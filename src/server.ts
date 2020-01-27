@@ -50,7 +50,7 @@ initTiddlyServer(eventer);
 initAuthRoute(eventer);
 
 eventer.on('settings', (set) => {
-  if (checkServerConfig(set, false) !== true)
+  if (checkServerConfig(set)[0] !== true)
     throw "ServerConfig did not pass validator";
 });
 
