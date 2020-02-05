@@ -1,17 +1,14 @@
 // import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
 import * as fs from 'fs';
+import { Stats } from 'fs';
 import * as path from 'path';
 import { promisify } from "util";
 import * as zlib from 'zlib';
+
 import { formidable } from '../lib/bundled-lib';
 import { handleDataFolderRequest, init as initDatafolder } from "./datafolder";
 import { OptionsConfig } from "./server-config";
-import {
-  as, Config, ER, getTreePathFiles,
-  sendDirectoryIndex, serveFile, ServerConfig, ServerEventEmitter,
-  StateObject, StatPathResult, statWalkPath, PathResolverResult, resolvePath, getTreeOptions
-} from "./server-types";
-import { Stats } from 'fs';
+import { as, Config, ER, getTreeOptions, getTreePathFiles, PathResolverResult, resolvePath, sendDirectoryIndex, serveFile, ServerConfig, ServerEventEmitter, StateObject, StatPathResult, statWalkPath } from "./server-types";
 
 // export function parsePath(path: string, jsonFile: string) {
 //   var regCheck = /${([^}])}/gi;
@@ -49,7 +46,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
     //check authList
     let { authList, authError } = state.treeOptions.auth;
     let denyAccess = Array.isArray(authList) && authList.indexOf(state.authAccountsKey) === -1;
-    if (denyAccess) return state.respond(authError).string(authAccessDenied(authError, state.allow.loginlink));
+    if (denyAccess) return state.respond(authError).string(authAccessDenied(authError, state.allow.loginlink, !!state.authAccountsKey));
   }
 
   if (Config.isGroup(result.item)) return serveDirectoryIndex(result, state).catch(catchPromiseError);
@@ -109,13 +106,13 @@ function handleGETfile(state: StateObject<import("/Users/arlen/Desktop/GitHub/Ti
   });
 }
 
-function authAccessDenied(authError: number, loginlink: boolean): string {
+function authAccessDenied(authError: number, loginlink: boolean, authAccountsKeySet: boolean): string {
   return `
 <html><body>
 <h2>Error ${authError}</h2>
 <p>
-In this case you are not logged in. 
-${loginlink ? ' Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.' : ""}
+${ authAccountsKeySet ? "You do not have access to this URL" : "In this case you are not logged in. " }
+${ loginlink ? '<br/> Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.' : ""}
 </p>
 </body></html>
 `;
