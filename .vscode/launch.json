@@ -19,7 +19,7 @@
         {
             "type": "node",
 						"request": "launch",
-						"preLaunchTask": "tsc",
+						//"preLaunchTask": "tsc",
             "name": "Launch Server (skip libs)",
             "program": "${workspaceRoot}/server.js",
             "smartStep": true,
