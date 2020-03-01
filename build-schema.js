@@ -1,4 +1,4 @@
-const { DEFAULT_CONFIG, BaseError, formatError, createGenerator } = require("../ts-json-schema-generator-master");
+const { DEFAULT_CONFIG, BaseError, formatError, createGenerator } = require("ts-json-schema-generator");
 const { writeFileSync } = require("fs");
 const stringify = require("json-stable-stringify");
 const config = {

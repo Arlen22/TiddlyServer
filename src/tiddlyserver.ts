@@ -88,7 +88,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
 
 }
 
-function handleGETfile(state: StateObject<import("/Users/arlen/Desktop/GitHub/TiddlyServer/src/server-types").IStatPathResult<"file", fs.Stats, undefined, true>, any>, result: PathResolverResult) {
+function handleGETfile(state: StateObject<import("src/server-types").IStatPathResult<"file", fs.Stats, undefined, true>, any>, result: PathResolverResult) {
   state.send({
     root: (result.item as Config.PathElement).path,
     filepath: result.filepathPortion.join('/'),

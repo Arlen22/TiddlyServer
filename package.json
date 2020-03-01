@@ -29,6 +29,10 @@
     "path": "^0.12.7",
     "rxjs": "5.4.3",
     "serve-static": "*",
+    "ts-json-schema-generator": "^0.61.1",
+    "typescript": "^3.8.3",
+    "webpack": "^4.41.6",
+    "webpack-cli": "^3.3.11",
     "ws": "*",
     "xml-js": "*"
   },
