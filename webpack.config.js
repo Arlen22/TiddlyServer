@@ -1,18 +1,17 @@
-const path = require('path');
+const path = require("path");
 const webpack = module.parent.require("webpack");
-/** 
+const CopyPlugin = require("copy-webpack-plugin");
+/**
  * @type {import("webpack").Configuration}
  */
 module.exports = {
   watch: false,
   entry: {
-    "bundled1": path.resolve(__dirname, './webpack-libs-bundle.js'),
-    "morgan": require.resolve("morgan"),
-    "compiled": path.resolve(__dirname, './src/server.js')
+    compiled: path.resolve(__dirname, "./server.js")
   },
   output: {
-    filename: '[name]-lib.js',
-    path: path.resolve(__dirname, './lib'),
+    filename: "[name]-lib.js",
+    path: path.resolve(__dirname, "./lib"),
     library: "[name]",
     libraryTarget: "commonjs2"
   },
@@ -20,16 +19,22 @@ module.exports = {
     new webpack.DefinePlugin({
       GENTLY: false,
       global: { GENTLY: false }
-    })
+    }),
+    new CopyPlugin([
+      { from: "./server.js", to: "./build" },
+      { from: "./tiddlywiki/**/*", to: "./build/" },
+      { from: "./build/src/*", to: "./" },
+      { from: "./build/test/*", to: "./" }
+    ])
   ],
   mode: false ? "development" : "production",
-  target: 'node',
+  target: "node",
   node: {
     __dirname: true,
     __filename: true
   },
   externals: {
-    'utf-8-validate': 'commonjs utf-8-validate',
-    'bufferutil': 'commonjs bufferutil',
+    "utf-8-validate": "commonjs utf-8-validate",
+    bufferutil: "commonjs bufferutil"
   }
 };

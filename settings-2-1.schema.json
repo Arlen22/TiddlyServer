@@ -7,11 +7,11 @@
       "additionalProperties": false,
       "properties": {
         "$schema": {
-          "description": "The JSON schema location for this document. This schema is generated \ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with autocomplete, such as VS code, \nwill make editing this file much simpler. \nMost fields include a description like this one. \n\nAll relative paths in this file are resolved relative to this file, so \n`./settings-tree.xml` refers to an XML file in the same folder as this file. \nAll relative paths in included files (such as the XML file) are resolved \nrelative to the included file.",
+          "description": "The JSON schema location for this document. This schema is generated\ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with autocomplete, such as VS code,\nwill make editing this file much simpler.\nMost fields include a description like this one.\n\nAll relative paths in this file are resolved relative to this file, so\n`./settings-tree.xml` refers to an XML file in the same folder as this file.\nAll relative paths in included files (such as the XML file) are resolved\nrelative to the included file.",
           "type": "string"
         },
         "_datafoldertarget": {
-          "description": "The tiddlywiki folder to use for data folder instances. Defaults to the \ntiddlywiki folder in the TiddlyServer installation regardless of the \nsettings.json location.",
+          "description": "The tiddlywiki folder to use for data folder instances. Defaults to the\ntiddlywiki folder in the TiddlyServer installation regardless of the\nsettings.json location.",
           "type": "string"
         },
         "_devmode": {
@@ -22,7 +22,7 @@
           "additionalProperties": {
             "$ref": "#/definitions/ServerConfig_AuthAccountsValue"
           },
-          "description": "The Hashmap of accounts which may authenticate on this server.\nTakes either an object or a string to a `require`-able file (such as .js or .json) \nwhich exports the object",
+          "description": "The Hashmap of accounts which may authenticate on this server.\nTakes either an object or a string to a `require`-able file (such as .js or .json)\nwhich exports the object",
           "type": "object"
         },
         "authCookieAge": {
@@ -38,14 +38,14 @@
               "type": "boolean"
             },
             "bindAddress": {
-              "description": "An array of IP addresses to accept requests on. Can be any IP address\nassigned to the machine. Default is \"127.0.0.1\".\n\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\non the specified IP addresses and accepts all connections from the operating system. If an IP address\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\n\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range.",
+              "description": "An array of IP addresses to accept requests on. Can be any IP address\nassigned to the machine. Default is \"127.0.0.1\".\n\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\non the specified IP addresses and accepts all connections from the operating system. If an IP address\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\n\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-)\nto block requests incoming to that IP address or range.",
               "items": {
                 "type": "string"
               },
               "type": "array"
             },
             "bindWildcard": {
-              "description": "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.\nThe default is `true`. In many cases this is preferred, however \nAndroid does not support this for some reason. On Android, set this to\n`false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses.",
+              "description": "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order.\nThe default is `true`. In many cases this is preferred, however\nAndroid does not support this for some reason. On Android, set this to\n`false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses.",
               "enum": [
                 true,
                 false
@@ -57,11 +57,11 @@
               "type": "boolean"
             },
             "filterBindAddress": {
-              "description": "IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) \nto block requests incoming to that IP address or range.",
+              "description": "IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-)\nto block requests incoming to that IP address or range.",
               "type": "boolean"
             },
             "https": {
-              "description": "https-only options: a string to a JavaScript file which exports a function of type\n`(iface:string) => https.ServerOptions`. Note that the initServer function will \nchange this to a boolean value indicating whether https is in use once inside TiddlyServer.",
+              "description": "https-only options: a string to a JavaScript file which exports a function of type\n`(iface:string) => https.ServerOptions`. Note that the initServer function will\nchange this to a boolean value indicating whether https is in use once inside TiddlyServer.",
               "type": "string"
             },
             "localAddressPermissions": {
@@ -78,7 +78,7 @@
                   "writeErrors": true
                 }
               },
-              "description": "Permissions based on local address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\", etc. \nThis checks the IP address each client connects to (socket.localAddress), \nnot the bind address of the server instance that accepted the request.",
+              "description": "Permissions based on local address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\", etc.\nThis checks the IP address each client connects to (socket.localAddress),\nnot the bind address of the server instance that accepted the request.",
               "type": "object"
             },
             "port": {
@@ -111,7 +111,7 @@
                 },
                 "type": "array"
               },
-              "description": "Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for. \nIcons are in the TiddlyServer/assets/icons folder.",
+              "description": "Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for.\nIcons are in the TiddlyServer/assets/icons folder.",
               "type": "object"
             },
             "mimetypes": {
@@ -189,7 +189,7 @@
               "type": "boolean"
             },
             "etag": {
-              "description": "Whether to use the etag field -- if not specified then it will check it if presented.\nThis does not affect the backup etagAge option, as the saving mechanism will still \nsend etags back to the browser, regardless of this option.",
+              "description": "Whether to use the etag field -- if not specified then it will check it if presented.\nThis does not affect the backup etagAge option, as the saving mechanism will still\nsend etags back to the browser, regardless of this option.",
               "enum": [
                 "required",
                 "disabled",
@@ -198,7 +198,7 @@
               "type": "string"
             },
             "etagAge": {
-              "description": "Reject an etag with a modified time that is different than the file on disk by this many seconds. \n Sometimes sync or antivirus sofware will \"touch\" a file and update the modified time without changing anything.\n Size difference will still cause the request to be rejected.",
+              "description": "Reject an etag with a modified time that is different than the file on disk by this many seconds.\nSometimes sync or antivirus sofware will \"touch\" a file and update the modified time without changing anything.\nSize difference will still cause the request to be rejected.",
               "type": "number"
             },
             "gzipBackups": {
@@ -242,7 +242,7 @@
           "type": "boolean"
         },
         "registerNotice": {
-          "description": "login attempts for a public/private key pair which has not been \nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry.",
+          "description": "login attempts for a public/private key pair which has not been\nregistered will be logged at debug level 2 with the full public key\nwhich can be copied into an authAccounts entry.",
           "type": "boolean"
         },
         "transfer": {
@@ -283,7 +283,7 @@
             "description": "Changing the public key or cookie suffix will require the user to log in again.",
             "properties": {
               "cookieSalt": {
-                "description": "String which will be added to the cookie by the server.\nChanging it will invalidate all current cookies for this user,\nwhich requires them to login again on each device. \n`node -e \"console.log(Date.now())\"` will print the current timestamp,\nwhich you can use to make sure you get one that you've never used it before.",
+                "description": "String which will be added to the cookie by the server.\nChanging it will invalidate all current cookies for this user,\nwhich requires them to login again on each device.\n`node -e \"console.log(Date.now())\"` will print the current timestamp,\nwhich you can use to make sure you get one that you've never used it before.",
                 "type": "string"
               },
               "publicKey": {

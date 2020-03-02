@@ -1,8 +1,14 @@
-import {Config, Schema, ServerConfig, ServerConfigSchema} from "../src/server-config";
+import {
+  Config,
+  Schema,
+  ServerConfig,
+  ServerConfigSchema
+} from "../src/server-config";
 
 const config: ServerConfigSchema = {
-  tree: [], 
+  tree: [],
   $schema: "",
+  // @ts-ignore
   bindInfo: {
     port: 8080,
     bindAddress: ["127.0.0.1" /* "0.0.0.0" */ /* "192.168.0.0/16" */],
@@ -14,13 +20,14 @@ const config: ServerConfigSchema = {
       "*": {
         loginlink: false,
         mkdir: false,
-        putsaver: false, 
+        putsaver: false,
         registerNotice: false,
-        upload: false, 
+        upload: false,
         websockets: false,
-        writeErrors: false
+        writeErrors: false,
+        transfer: false
       }
     },
     _bindLocalhost: false
   }
-}
+};
