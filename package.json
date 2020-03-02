@@ -9,7 +9,7 @@
   "dependencies": {
     "node-fetch": "^2.6.0",
     "send": "^0.17.1",
-    "tiddlywiki": "file:tiddlywiki"
+    "tiddlywiki": "^5.1.21"
   },
   "devDependencies": {
     "@fidm/x509": "^1.2.0",
