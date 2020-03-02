@@ -1,22 +1,16 @@
-import { StateObject, ServerEventEmitter, tryParseJSON, ER, ServerConfig, serveFile } from "./server-types";
-import { EventEmitter } from "events";
-import * as crypto from "crypto";
+import { StateObject, ServerEventEmitter, ServerConfig, serveFile } from "./server-types";
 import * as libsodium from 'libsodium-wrappers';
-import * as WebSocket from 'ws';
-import { TLSSocket } from "tls";
 import * as http from "http";
 import * as path from "path";
-const sockets: WebSocket[] = [];
-const state: {}[] = [];
+import { ThreeStringArray, AuthCookie, AuthCookieSet } from './types'
+
+const TIDDLY_SERVER_AUTH: string = 'TiddlyServerAuth';
+
 /** [type, username, timestamp, hash, sig] */
-export type AuthCookie = [string, "pw" | "key", string, string, string, string]
-export type AuthCookieSet = [string, "pw" | "key", string, string, string]
 export let checkCookieAuth: (request: http.IncomingMessage, logRegisterNotice: boolean) => ReturnType<typeof validateCookie>;
 /** if the cookie is valid it returns the username, otherwise an empty string. If the public key cannot be found, it will call logRegisterNotice then return an empty string */
-export let validateCookie: (json: AuthCookie | AuthCookieSet, logRegisterNotice?: (string | false)) => [string, string, string] | false;
-// export let parseAuthCookie = ;
-export function parseAuthCookie(cookie: string, suffix: true): AuthCookie;
-export function parseAuthCookie(cookie: string, suffix: false): AuthCookieSet;
+export let validateCookie: (json: AuthCookie | AuthCookieSet, logRegisterNotice?: (string | false)) => ThreeStringArray | false;
+
 export function parseAuthCookie(cookie: string, suffix: boolean): AuthCookie | AuthCookieSet {
   let json: [string, "pw" | "key", string, string, string, string] = cookie.split("|") as any; //tryParseJSON<>(auth);
   if (json.length > (suffix ? 6 : 5)) {
@@ -28,50 +22,34 @@ export function parseAuthCookie(cookie: string, suffix: boolean): AuthCookie | A
 }
 const setAuth = (settings: ServerConfig) => {
   /** Record<hash+username, [authGroup, publicKey, suffix]> */
-  let publicKeyLookup: Record<string, [string, string, string]> = {};
-  let passwordLookup: Record<string, string> = {};
+  let publicKeyLookup: Record<string, ThreeStringArray> = {};
 
   const authCookieAge = settings.authCookieAge;
   const {
     crypto_generichash,
     crypto_generichash_BYTES,
-    crypto_generichash_BYTES_MIN,
-    crypto_generichash_BYTES_MAX,
-    crypto_sign_keypair,
     crypto_sign_verify_detached,
     from_base64,
-    crypto_box_SEEDBYTES,
   } = libsodium;
-  // console.log(crypto_box_SEEDBYTES, crypto_generichash_BYTES, crypto_generichash_BYTES_MAX, crypto_generichash_BYTES_MIN);
-  // let passwordKey = crypto_sign_keypair("uint8array");
-  // console.log(settings.authAccounts);
+
   Object.keys(settings.authAccounts).forEach(k => {
     let e = settings.authAccounts[k];
-    // console.log(k, e, e.clientKeys);
     if (e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
-      // console.log(k, u, e.clientKeys[u]);
       const publicKey = from_base64(e.clientKeys[u].publicKey);
-      // let t = e.clientKeys[u];
       let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
       if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u].publicKey, e.clientKeys[u].cookieSalt];
       else throw "publicKey+username combination is used for more than one authAccount";
     });
-    // if (e.passwords) Object.keys(e.passwords).forEach(u => {
-    // 	const password = e.passwords[u];
-    // 	let passHash = crypto_generichash(crypto_generichash_BYTES, password, undefined, "base64");
-    // 	if (!passwordLookup[u]) passwordLookup[u] = k;
-    // 	else throw "username is used for more than one authAccount password list";
-    // });
   });
 
   checkCookieAuth = (request: http.IncomingMessage, logRegisterNotice: boolean) => {
     if (!request.headers.cookie) return false;
-    var cookies = {}, rc = request.headers.cookie as string;
+    let cookies = {}, rc = request.headers.cookie as string;
     rc.split(';').forEach(function(cookie) {
-      var parts = cookie.split('=');
+      let parts = cookie.split('=');
       cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
     });
-    let auth = cookies["TiddlyServerAuth"] as string;
+    let auth = cookies[TIDDLY_SERVER_AUTH] as string;
     if (!auth) return false;
     let json = parseAuthCookie(auth, true);
     //we have to make sure the suffix is truthy
@@ -242,14 +220,14 @@ export function handleAuthRoute(state: StateObject) {
         "    timestamp: " + json[2]
       ].join("\n"));
       if (valid) {
-        state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie + "|" + valid[2], false, state.settings.authCookieAge));
+        state.setHeader("Set-Cookie", getSetCookie(TIDDLY_SERVER_AUTH, state.json.setCookie + "|" + valid[2], false, state.settings.authCookieAge));
         state.respond(200).empty();
       } else {
         state.throwReason(400, "INVALID_CREDENTIALS");
       }
     })
   } else if (state.path[3] === "logout") {
-    state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", "", false, 0));
+    state.setHeader("Set-Cookie", getSetCookie(TIDDLY_SERVER_AUTH, "", false, 0));
     state.respond(200).empty();
   }
 }

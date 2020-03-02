@@ -1,7 +1,3 @@
-#!/usr/bin/env node
-
-
-
 //@ts-check
 const fs = require('fs');
 const path = require('path');
@@ -19,11 +15,11 @@ const settingsPath = path.dirname(settingsFile);
 
 /**
  *      DEVELOPERS PLEASE READ
- * 
- * This entire codebase is very dirty. 
- *    It will be cleaned up soon. 
+ *
+ * This entire codebase is very dirty.
+ *    It will be cleaned up soon.
  *              Enjoy!
- * 
+ *
  */
 
 /** @type {import("./src/server")} */

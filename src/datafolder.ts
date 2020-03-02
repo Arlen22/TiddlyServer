@@ -19,31 +19,35 @@ import { PluginInfo, WikiInfo } from './boot-startup-types';
 import * as WebSocket from 'ws';
 
 
-// var settings: ServerConfig = {} as any;
+// let settings: ServerConfig = {} as any;
 
 // const debug = DebugLogger('DAT');
 
-const loadedFolders: { [k: string]: FolderData } = {};
-const otherSocketPaths: { [k: string]: WebSocket[] } = {};
-const clientsList: { [k: string]: WebSocket[] } = {};
+interface Records<T> {
+  [k: string]: T
+}
+
+const loadedFolders: Records<FolderData> = {};
+const otherSocketPaths: Records<WebSocket[]> = {};
+const clientsList: Records<WebSocket[]> = {};
 let eventer: ServerEventEmitter;
 
 export function init(e: ServerEventEmitter) {
   eventer = e;
-  eventer.on('settings', function(set: ServerConfig) {
-
-  })
-  eventer.on('settingsChanged', (keys) => {
-
-  })
+  eventer.on('settings', function(set: ServerConfig) { })
+  eventer.on('settingsChanged', (keys) => { })
   eventer.on('websocket-connection', async function(data: RequestEventWS) {
 
     const { request, client, settings, treeHostIndex, debugOutput } = data;
     const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
     const root = settings.tree[treeHostIndex].$mount;
-    let pathname = parse(request.url as string).pathname as string;// new URL(request.url as string);
+    let pathname: string | undefined = parse(request.url as string).pathname;// new URL(request.url as string);
+    if (!pathname) {
+      console.error('[ERROR]: parsing pathname');
+      return
+    }
 
-    var result = resolvePath(pathname.split('/'), root) as PathResolverResult
+    let result: PathResolverResult | undefined = resolvePath(pathname.split('/'), root);
     if (!result) return client.close(404);
 
     let statPath = await statWalkPath(result);
@@ -69,22 +73,22 @@ export function init(e: ServerEventEmitter) {
       client.addEventListener('message', (event) => {
         console.log('message', event);
         debug(-3, 'WS-MESSAGE %s', inspect(event));
-        clientsList[pathname].forEach(e => {
+        clientsList[pathname as string].forEach(e => {
           if (e !== client) e.send(event.data);
         })
       });
 
       client.addEventListener('error', (event) => {
         debug(-2, 'WS-ERROR %s %s', pathname, event.type)
-        var index = clientsList[pathname].indexOf(client);
-        if (index > -1) clientsList[pathname].splice(index, 1);
+        let index = clientsList[pathname as string].indexOf(client);
+        if (index > -1) clientsList[pathname as string].splice(index, 1);
         client.close();
       })
 
       client.addEventListener('close', (event) => {
         debug(-2, 'WS-CLOSE %s %s %s', pathname, event.code, event.reason);
-        var index = clientsList[pathname].indexOf(client);
-        if (index > -1) clientsList[pathname].splice(index, 1);
+        let index = clientsList[pathname as string].indexOf(client);
+        if (index > -1) clientsList[pathname as string].splice(index, 1);
       })
 
       if (!clientsList[pathname]) clientsList[pathname] = [];
@@ -207,14 +211,14 @@ function loadDataFolderTiddlyWiki(mount: string, folder: string, reload: string,
     }
 
     //we use $tw.modules.execute so that the module has its respective $tw variable.
-    var Server: typeof TiddlyWikiServer;
+    let Server: typeof TiddlyWikiServer;
     try {
       Server = $tw.modules.execute('$:/core/modules/server/server.js').Server;
     } catch (e) {
       console.log(mount, folder, e);
       return;
     }
-    var server = new Server({
+    let server = new Server({
       wiki: $tw.wiki,
       variables: {
         "path-prefix": mount,

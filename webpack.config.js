@@ -7,7 +7,7 @@ const CopyPlugin = require('copy-webpack-plugin');
 module.exports = {
   watch: false,
   entry: {
-    "compiled": path.resolve(__dirname, './src/server.js')
+    "compiled": path.resolve(__dirname, './server.js')
   },
   output: {
     filename: '[name]-lib.js',
