@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 //@ts-check
 const fs = require('fs');
 const path = require('path');

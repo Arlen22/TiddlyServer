@@ -3,7 +3,7 @@
   "version": "2.1.6-master",
   "description": "",
   "bin": {
-    "tiddlyserver": "./lib/build/server.js"
+    "tiddlyserver": "./build/server.js"
   },
   "main": "./lib/compiled-lib.js",
   "dependencies": {

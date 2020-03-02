@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
-    "outDir": ".",
+    "outDir": "./build",
     "baseUrl": ".",
+    "rootDirs": ["src", "test"],
     "module": "commonjs",
     "target": "es2017",
     "lib": [
@@ -14,7 +15,7 @@
     "resolveJsonModule": true,
     "noErrorTruncation": true
   },
-  "include": ["src/*", "test/*"],
+  "include": ["./server.ts", "src/*", "test/*"],
   "exclude": [
     "node_modules",
     "new-server",
