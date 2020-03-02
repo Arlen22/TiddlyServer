@@ -8,7 +8,8 @@
   "main": "./lib/compiled-lib.js",
   "dependencies": {
     "node-fetch": "^2.6.0",
-    "send": "^0.17.1"
+    "send": "^0.17.1",
+    "tiddlywiki": "file:tiddlywiki"
   },
   "devDependencies": {
     "@fidm/x509": "^1.2.0",
