@@ -1,5 +1,3 @@
-
-
 import { EventEmitter } from 'events';
 import * as fs from 'fs';
 import * as http from 'http';
@@ -9,8 +7,10 @@ import { NetworkInterfaceInfo, networkInterfaces } from 'os';
 import * as path from 'path';
 import { Writable } from 'stream';
 import { format, inspect } from 'util';
-import { libsodium, send, ws as WebSocket } from '../lib/bundled-lib';
-import { handler as morgan } from "../lib/morgan";
+import * as send from 'send';
+import * as libsodium from 'libsodium-wrappers';
+import * as WebSocket from 'ws';
+import * as morgan from 'morgan';
 import { checkCookieAuth, handleAuthRoute, initAuthRoute } from "./authRoute";
 import { checkServerConfig } from "./interfacechecker";
 import {
@@ -35,7 +35,7 @@ const { Server: WebSocketServer } = WebSocket;
 
 // global settings
 Error.stackTraceLimit = Infinity;
-console.debug = function () { }; //noop console debug;
+console.debug = function() { }; //noop console debug;
 
 // this is the internal communicator
 export const eventer = new EventEmitter() as ServerEventEmitter;
@@ -452,7 +452,7 @@ function MakeDebugOutput(settings) {
   const colorsRegex = /\x1b\[[0-9]+m/gi
 
   return new Writable({
-    write: function (chunk, encoding, callback) {
+    write: function(chunk, encoding, callback) {
       // if we're given a buffer, convert it to a string
       if (Buffer.isBuffer(chunk)) chunk = chunk.toString('utf8');
       // remove ending linebreaks for consistency

@@ -16,7 +16,8 @@ import { inspect, promisify } from "util";
 import { gzip } from 'zlib';
 
 import { PluginInfo, WikiInfo } from './boot-startup-types';
-import { fresh, etag, ws as WebSocket } from '../lib/bundled-lib';
+import * as WebSocket from 'ws';
+
 
 // var settings: ServerConfig = {} as any;
 
@@ -29,13 +30,13 @@ let eventer: ServerEventEmitter;
 
 export function init(e: ServerEventEmitter) {
   eventer = e;
-  eventer.on('settings', function (set: ServerConfig) {
+  eventer.on('settings', function(set: ServerConfig) {
 
   })
   eventer.on('settingsChanged', (keys) => {
 
   })
-  eventer.on('websocket-connection', async function (data: RequestEventWS) {
+  eventer.on('websocket-connection', async function(data: RequestEventWS) {
 
     const { request, client, settings, treeHostIndex, debugOutput } = data;
     const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
@@ -45,7 +46,7 @@ export function init(e: ServerEventEmitter) {
     var result = resolvePath(pathname.split('/'), root) as PathResolverResult
     if (!result) return client.close(404);
 
-    let statPath = await statWalkPath(result); 
+    let statPath = await statWalkPath(result);
     //if this is a datafolder, we hand the client and request off directly to it
     //otherwise we stick it in its own section
     if (statPath.itemtype === "datafolder") {
@@ -258,7 +259,7 @@ function doError(debug, mount, folder, err) {
   debug(3, 'error starting %s at %s: %s', mount, folder, err.stack);
   const requests = loadedFolders[mount].handler as any[];
   loadedFolders[mount] = {
-    handler: function (state: StateObject) {
+    handler: function(state: StateObject) {
       state.respond(500, "TW5 data folder failed").string(
         "The Tiddlywiki data folder failed to load. The error has been logged to the " +
         "terminal with priority level 2. " +

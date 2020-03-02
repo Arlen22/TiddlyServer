@@ -1,13 +1,12 @@
 const path = require('path');
 const webpack = module.parent.require("webpack");
-/** 
+const CopyPlugin = require('copy-webpack-plugin');
+/**
  * @type {import("webpack").Configuration}
  */
 module.exports = {
   watch: false,
   entry: {
-    "bundled1": path.resolve(__dirname, './webpack-libs-bundle.js'),
-    "morgan": require.resolve("morgan"),
     "compiled": path.resolve(__dirname, './src/server.js')
   },
   output: {
@@ -20,7 +19,13 @@ module.exports = {
     new webpack.DefinePlugin({
       GENTLY: false,
       global: { GENTLY: false }
-    })
+    }),
+    new CopyPlugin([
+        { from: './server.js', to: './build' },
+        { from: './tiddlywiki/**/*', to: './build/' },
+        { from: './build/src/*', to: './' },
+        { from: './build/test/*', to: './' }
+    ]),
   ],
   mode: false ? "development" : "production",
   target: 'node',

@@ -7,7 +7,9 @@ import { format, promisify } from "util";
 // import { Observable, Subscriber } from '../lib/rx';
 import { EventEmitter } from "events";
 //import { StateObject } from "./index";
-import { send, ws as WebSocket, JSON5 } from '../lib/bundled-lib';
+import * as JSON5 from 'json5';
+import * as send from 'send';
+import * as WebSocket from 'ws';
 import { Stats, appendFileSync } from 'fs';
 import { gzip, createGzip } from 'zlib';
 import { Writable, Stream } from 'stream';
@@ -46,8 +48,8 @@ export {
 let DEBUGLEVEL = -1;
 
 export function init(eventer: ServerEventEmitter) {
-  eventer.on('settings', function (set: ServerConfig) {
-    
+  eventer.on('settings', function(set: ServerConfig) {
+
   });
 }
 
@@ -258,7 +260,7 @@ export function padLeft(str: any, pad: number | string, padStr?: string): string
   return pad.substr(0, Math.max(pad.length - item.length, 0)) + item;
 }
 export function sortBySelector<T extends { [k: string]: string }>(key: (e: T) => any) {
-  return function (a: T, b: T) {
+  return function(a: T, b: T) {
     var va = key(a);
     var vb = key(b);
 
@@ -384,7 +386,7 @@ export function serveFolderIndex(options: { type: string }) {
     return res;
   }
   if (options.type === "json") {
-    return function (state: StateObject, folder: string) {
+    return function(state: StateObject, folder: string) {
       readFolder(folder).then(item => {
         sendResponse(state, JSON.stringify(item), {
           contentType: "application/json",
@@ -489,7 +491,7 @@ export function getTreeOptions(state: StateObject) {
   return options;
 }
 
-const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
+//const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
 export type DirectoryIndexData = {
   keys: string[],
   paths: (string | true)[],
@@ -665,7 +667,7 @@ type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 
 export function fs_move(oldPath, newPath, callback) {
 
-  fs.rename(oldPath, newPath, function (err) {
+  fs.rename(oldPath, newPath, function(err) {
     if (err) {
       if (err.code === 'EXDEV') {
         copy();
@@ -684,7 +686,7 @@ export function fs_move(oldPath, newPath, callback) {
     readStream.on('error', callback);
     writeStream.on('error', callback);
 
-    readStream.on('close', function () {
+    readStream.on('close', function() {
       fs.unlink(oldPath, callback);
     });
 
@@ -1082,7 +1084,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
           if (item) res.setHeader(e, item.toString());
         });
       });
-    
+
     sender.pipe(this._res);
   }
   /**
@@ -1123,12 +1125,12 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         resolve();
       });
     })
-    
+
 
   }
   static DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
     //if(prefix.startsWith("V:")) return function(){};
-    return function (this: { debugOutput: Writable, settings: ServerConfig }, msgLevel: number, tempString: any, ...args: any[]) {
+    return function(this: { debugOutput: Writable, settings: ServerConfig }, msgLevel: number, tempString: any, ...args: any[]) {
       if (!ignoreLevel && this.settings.logging.debugLevel > msgLevel) return;
       if (isError(args[0])) {
         let err = args[0];

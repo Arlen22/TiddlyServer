@@ -14,10 +14,11 @@
     "resolveJsonModule": true,
     "noErrorTruncation": true
   },
+  "include": ["src/*", "test/*"],
   "files": [
     "./src/server.ts",
     "./test/test.ts",
-    "./src/interfacechecker3.ts"
+    "./src/interfacechecker.ts"
   ],
   "exclude": [
     "node_modules",

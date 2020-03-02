@@ -5,7 +5,7 @@ import * as path from 'path';
 import { promisify } from "util";
 import * as zlib from 'zlib';
 
-import { formidable } from '../lib/bundled-lib';
+import * as formidable from 'formidable';
 import { handleDataFolderRequest, init as initDatafolder } from "./datafolder";
 import { OptionsConfig } from "./server-config";
 import { as, Config, ER, getTreeOptions, getTreePathFiles, PathResolverResult, resolvePath, sendDirectoryIndex, serveFile, ServerConfig, ServerEventEmitter, StateObject, StatPathResult, statWalkPath } from "./server-types";
@@ -24,7 +24,7 @@ import { as, Config, ER, getTreeOptions, getTreePathFiles, PathResolverResult, r
 // }
 
 export function init(eventer: ServerEventEmitter) {
-  eventer.on('settings', function (set: ServerConfig) { });
+  eventer.on('settings', function(set: ServerConfig) { });
   initDatafolder(eventer);
 }
 
@@ -111,7 +111,7 @@ function authAccessDenied(authError: number, loginlink: boolean, authAccountsKey
 <html><body>
 <h2>Error ${authError}</h2>
 <p>
-${ authAccountsKeySet ? "You do not have access to this URL" : "In this case you are not logged in. " }
+${ authAccountsKeySet ? "You do not have access to this URL" : "In this case you are not logged in. "}
 ${ loginlink ? '<br/> Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.' : ""}
 </p>
 </body></html>
@@ -218,7 +218,7 @@ async function serveDirectoryIndex(result: PathResolverResult, state: StateObjec
 }
 
 function uploadPostRequest(form: any, state: StateObject<StatPathResult, any>, result: PathResolverResult) {
-  form.parse(state.req, function (err: Error, fields, files) {
+  form.parse(state.req, function(err: Error, fields, files) {
     if (err) {
       debugState("SER-DIR", state)(2, "upload %s", err.toString());
       state.throwError(500, new ER("Error recieving request", err.toString()));
@@ -231,7 +231,7 @@ function uploadPostRequest(form: any, state: StateObject<StatPathResult, any>, r
     //sanitize this to make sure we just 
     newname = path.basename(newname);
     var newpath = path.join(result.fullfilepath, newname);
-    fs.rename(oldpath, newpath, function (err) {
+    fs.rename(oldpath, newpath, function(err) {
       if (err)
         handleFileError("SER-DIR", state, err);
       state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
@@ -240,7 +240,7 @@ function uploadPostRequest(form: any, state: StateObject<StatPathResult, any>, r
 }
 
 function mkdirPostRequest(form: any, state: StateObject<StatPathResult, any>, result: PathResolverResult) {
-  form.parse(state.req, async function (err: Error, fields, files) {
+  form.parse(state.req, async function(err: Error, fields, files) {
     if (err) {
       debugState("SER-DIR", state)(2, "mkdir %s", err.toString());
       state.throwError(500, new ER("Error recieving request", err.toString()));

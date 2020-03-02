@@ -1,7 +1,8 @@
 import { StateObject, ServerEventEmitter, tryParseJSON, ER, ServerConfig, serveFile } from "./server-types";
 import { EventEmitter } from "events";
 import * as crypto from "crypto";
-import { libsodium, ws as WebSocket } from "../lib/bundled-lib";
+import * as libsodium from 'libsodium-wrappers';
+import * as WebSocket from 'ws';
 import { TLSSocket } from "tls";
 import * as http from "http";
 import * as path from "path";
@@ -66,7 +67,7 @@ const setAuth = (settings: ServerConfig) => {
   checkCookieAuth = (request: http.IncomingMessage, logRegisterNotice: boolean) => {
     if (!request.headers.cookie) return false;
     var cookies = {}, rc = request.headers.cookie as string;
-    rc.split(';').forEach(function (cookie) {
+    rc.split(';').forEach(function(cookie) {
       var parts = cookie.split('=');
       cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
     });
