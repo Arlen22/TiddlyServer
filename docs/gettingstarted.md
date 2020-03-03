@@ -49,6 +49,27 @@ Create a `backups` folder _beside_ the TiddlyServer folder unless you set a diff
 
 Please refer to [settings.json](SettingsJson.md) and [ServerConfig](ServerConfig.md) for more information.
 
+## Create your first wiki
+Now that TiddlyServer is configured, it needs a [TiddlyWiki](https://tiddlywiki.com/).
+
+If you have none then this section will help you starting.
+
+First, within the TiddlerServer directory go into tiddlywiki sub-directory then unzip the file "editions.zip" into the same directory (into tiddlywiki).
+
+Now you should have a new directory called "editions".
+
+An [edition](https://tiddlywiki.com/#Editions) is a template, a wiki, that is awaiting to be installed.
+
+Each directory into the "editions" directory is the edition name.
+
+So for exemple there is an "server" directory in "editions". We will use it.
+
+Then return into the tiddlywiki directory and run `node tiddlywiki.js "Path of one of the tree path in TiddlyServer settings.json" --init server`.
+
+(See the chapter below `Read to run` to know how to run the command)
+
+`Path of one of the tree path in TiddlyServer settings.json` is to be replaced with something like `../webroot` or `../personal` with the default configuration.
+
 ## Ready to Run
 
 You have multiple options depending on your operating system.
