@@ -24,7 +24,8 @@ const config: ServerConfigSchema = {
         registerNotice: false,
         upload: false,
         websockets: false,
-        writeErrors: false
+        writeErrors: false,
+        transfer: false
       }
     },
     _bindLocalhost: false

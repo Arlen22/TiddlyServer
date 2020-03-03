@@ -15,7 +15,7 @@
     "resolveJsonModule": true,
     "noErrorTruncation": true
   },
-  "include": ["./server.ts", "src/*", "test/*"],
+  "include": ["./preflighter.ts", "./server.ts", "src/*", "test/*"],
   "exclude": [
     "node_modules",
     "new-server",

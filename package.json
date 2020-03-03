@@ -9,7 +9,8 @@
   "dependencies": {
     "node-fetch": "^2.6.0",
     "send": "^0.17.1",
-    "tiddlywiki": "^5.1.21"
+    "tiddlywiki": "^5.1.21",
+    "ts-json-schema-generator": "^0.61.1"
   },
   "devDependencies": {
     "@fidm/x509": "^1.2.0",
@@ -43,7 +44,9 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "./server.js",
-    "build": "tsc && node build-schema.js && webpack"
+    "assets": "cp -r ./assets ./build/assets",
+    "build": "tsc && node build-schema.js && npm run assets",
+    "build:clean": "rm -rf build && npm run build"
   },
   "author": "Arlen Beiler",
   "license": "MIT"
