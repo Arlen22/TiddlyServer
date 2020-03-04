@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { inspect } = require('util');
+const { SettingsReader } = require('./src/settingsReader')
 
 var args = process.argv.slice(2);
 // console.log(process.version);
@@ -27,11 +28,14 @@ const settingsPath = path.dirname(settingsFile);
 /** @type {import("./src/server")} */
 // @ts-ignore
 const server = false ? require('./lib/compiled-lib') : require("./src/server");
+const settingsReader = SettingsReader.getInstance()
 
 server.libsReady.then(() => {
   // let [check1, checkErr1] = server.checkServerConfig(require(settingsFile));
   // if (check1 !== true) { console.log(JSON.stringify(checkErr1, null, 2)); debugger; }
   const { settings, settingshttps } = server.loadSettings(settingsFile, Object.keys(server.routes));
+  // Store the settings object into the reader to allow easier access elsewhere
+  settingsReader.storeServerSettings(settings)
   let [check, checkErr] = server.checkServerConfig(settings);
   if (check !== true) { console.log(JSON.stringify(checkErr, null, 2)); debugger; }
   // fs.writeFileSync("settings-temp.json", JSON.stringify(settings, null, 2));

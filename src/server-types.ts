@@ -987,12 +987,13 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   static parseURL(str: string): StateObjectUrl {
     let item = url.parse(str, true);
     let { path, pathname, query, search, href } = item;
-    if (!path) path = "";
-    if (!pathname) pathname = "";
-    if (!query) query = {};
-    if (!search) search = "";
-    if (!href) href = "";
-    return { path, pathname, query, search, href };
+    return {
+      path: path || "",
+      pathname: pathname || "",
+      query: query || "",
+      search: search || "",
+      href: href || ""
+    };
   }
   static errorRoute(status: number, reason?: string) {
     // return (obs: Observable<any>): any => {
