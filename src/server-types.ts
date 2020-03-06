@@ -615,6 +615,7 @@ export function getTreeOptions(state: StateObject) {
   });
   return options;
 }
+import { generateDirectoryListing } from "./generateDirectoryListing.js";
 
 //const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
 export type DirectoryIndexData = {
@@ -660,7 +661,7 @@ export async function sendDirectoryIndex([_r, options]: [
     return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
   } else {
     let def = { path: dirpath, entries, type };
-    return; //generateDirectoryListing(def, options);
+    return generateDirectoryListing(def, options);
   }
 }
 

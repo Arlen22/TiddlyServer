@@ -9,6 +9,7 @@
   "dependencies": {
     "node-fetch": "^2.6.0",
     "send": "^0.17.1",
+    "source-map-support": "^0.5.16",
     "tiddlywiki": "^5.1.21",
     "ts-json-schema-generator": "^0.61.1",
     "typescript": "^3.8.3"
