@@ -1,7 +1,6 @@
 import { PublicKeyCache } from "./publicKeyCache";
 import {
-  SplitCookieWithUserName,
-  SplitCookieWithModifiedUserName
+  SplitCookieWithUserName
 } from "./types";
 import { crypto_sign_verify_detached, from_base64 } from "libsodium-wrappers";
 import * as http from "http";
@@ -31,7 +30,7 @@ export const checkCookieAuth = (request: http.IncomingMessage) => {
 };
 
 export const validateCookie = (
-  cookieData: SplitCookieWithUserName | SplitCookieWithModifiedUserName,
+  cookieData: SplitCookieWithUserName,
   logRegisterNotice?: string | false
 ) => {
   const settings = SettingsReader.getInstance().getServerSettings();
@@ -40,9 +39,10 @@ export const validateCookie = (
   let [username, type, timestamp, hash, sig, suffix] = cookieData;
 
   const key: string = hash + username;
-  if (type === "pw") return false;
-  //passwords are currently not implemented
-  else if (type === "key" && !publicKeyCache.keyExists(key)) {
+  if (type !== "key") {
+    // currently only key is implemented
+    return false;
+  } else if (!publicKeyCache.keyExists(key)) {
     if (logRegisterNotice) console.log(logRegisterNotice);
     return false;
   }
@@ -54,12 +54,12 @@ export const validateCookie = (
     const valid =
       crypto_sign_verify_detached(
         from_base64(sig),
-        username + timestamp + hash,
+        username + type + timestamp + hash,
         from_base64(pubkey[1])
       ) &&
       //cookieData.length should be 5 if there is no suffix, don't ignore falsy suffix
       //the calling code must determine whether the subject is needed
-      (cookieData.length === 5 || suffix === pubkey[2]) &&
+      suffix === pubkey[2] &&
       isoDateRegex.test(timestamp) &&
       Date.now() - new Date(timestamp).valueOf() < authCookieAge * 1000;
     return valid ? [pubkey[0], username, pubkey[2]] : false;
@@ -73,16 +73,22 @@ export const validateCookie = (
 export const parseAuthCookie = (
   cookie: string,
   suffix: boolean
-): SplitCookieWithUserName | SplitCookieWithModifiedUserName => {
+) => {
   let splitCookie = cookie.split("|");
   const length = splitCookie.length;
-  if (length > (suffix ? 6 : 5)) {
-    // Concat the username with the auth-type (key or pw), e.g. "morty|pw""
-    const nameAndAuthType: string = splitCookie.slice(0, length - 4).join("|");
-    const rest: string[] = splitCookie.slice(length - 4);
-    return [nameAndAuthType, ...rest] as SplitCookieWithModifiedUserName;
+  const expectLength = suffix ? 6 : 5
+  if (length > expectLength) {
+    // This is a workaround in case the username happens to contain a pipe
+    // other code still checks the signature of the cookie, so it's all good
+    const nameLength = splitCookie.length - expectLength - 1;
+    const name: string = splitCookie.slice(0, nameLength).join("|");
+    const rest = splitCookie.slice(nameLength);
+    return [name, ...rest] as unknown as SplitCookieWithUserName;
+  } else if(length === expectLength) {
+    return splitCookie as unknown as SplitCookieWithUserName;
+  } else {
+    return false;
   }
-  return splitCookie as SplitCookieWithUserName;
 };
 
 export const getSetCookie = (

@@ -5,21 +5,15 @@ export type ThreeStringArray = [string, string, string];
 // Array index type aliases for better readability
 type UserName = string;
 type UserNameWithPw = string;
-type KeyOrPw = "key" | "pw";
+type KeyOrPw = "key" | "pw" | "";
 type Date = string;
 type PublicKey = string;
 type Cookie = string;
-type Salt = string;
-export type SplitCookieWithUserName = [
+type Salt = string | undefined;
+/** This is always 6 long, but the last may be empty */
+export type SplitCookieWithUserName = readonly [
   UserName,
   KeyOrPw,
-  Date,
-  PublicKey,
-  Cookie,
-  Salt
-];
-export type SplitCookieWithModifiedUserName = [
-  UserNameWithPw,
   Date,
   PublicKey,
   Cookie,

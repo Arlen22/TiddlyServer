@@ -86,7 +86,7 @@
       let cookie = [username, "key", new Date().toISOString(), publicHash];
       console.log(cookie[0] + cookie[2] + cookie[3]);
       let signed = crypto_sign_detached(
-        cookie[0] + cookie[2] + cookie[3],
+        cookie[0] + cookie[1] + cookie[2] + cookie[3],
         keys.privateKey,
         "base64"
       );

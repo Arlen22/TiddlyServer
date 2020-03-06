@@ -166,7 +166,8 @@ const handleLogin = async (state: StateObject) => {
   }
   /** [username, type, timestamp, hash, sig] */
   let cookieData = parseAuthCookie(state.json.setCookie, false);
-  if (cookieData.length !== 5) {
+
+  if (!cookieData || typeof cookieData[5] !== "undefined") {
     return state.throwReason(400, "Bad cookie format");
   }
   let { registerNotice } = state.settings.bindInfo.localAddressPermissions[
