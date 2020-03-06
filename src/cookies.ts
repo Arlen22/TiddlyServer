@@ -57,9 +57,9 @@ export const validateCookie = (
         username + type + timestamp + hash,
         from_base64(pubkey[1])
       ) &&
-      //cookieData.length should be 5 if there is no suffix, don't ignore falsy suffix
+      //suffix should undefined or valid, not an empty string
       //the calling code must determine whether the subject is needed
-      suffix === pubkey[2] &&
+      (suffix === undefined || suffix === pubkey[2]) &&
       isoDateRegex.test(timestamp) &&
       Date.now() - new Date(timestamp).valueOf() < authCookieAge * 1000;
     return valid ? [pubkey[0], username, pubkey[2]] : false;
