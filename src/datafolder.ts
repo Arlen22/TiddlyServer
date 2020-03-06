@@ -8,7 +8,6 @@ import {
   statWalkPath,
   tryParseJSON
 } from "./server-types";
-import * as $tw from "tiddlywiki/boot/boot.js";
 
 import * as path from "path";
 import * as http from "http";
@@ -227,7 +226,7 @@ function loadDataFolderType(
     }
   );
 }
-
+declare const __non_webpack_require__: NodeRequire | undefined;
 function loadDataFolderTiddlyWiki(
   mount: string,
   folder: string,
@@ -237,7 +236,14 @@ function loadDataFolderTiddlyWiki(
 ) {
   console.time("twboot-" + folder);
   let _wiki = undefined;
-  const tw = $tw.TiddlyWiki();
+  
+  let nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
+  const tw = nodeRequire(target + "/boot/boot.js").TiddlyWiki(
+    nodeRequire(target + "/boot/bootprefix.js").bootprefix({
+      packageInfo: nodeRequire(target + '/package.json')
+    })
+  );
+
   tw.boot.argv = [folder];
   tw.preloadTiddler({
     text: "$protocol$//$host$" + mount + "/",

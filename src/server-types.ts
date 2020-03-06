@@ -102,9 +102,14 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
   let settingsObj = normalizeSettings(settingsObjSource, settingsFile);
 
   settingsObj.__assetsDir = assets;
-  settingsObj.__targetTW = settingsObj._datafoldertarget
-    ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
-    : path.resolve(__dirname, "../tiddlywiki");
+  try {
+    settingsObj.__targetTW = settingsObj._datafoldertarget
+      ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
+      : path.join(require.resolve("tiddlywiki/boot/boot.js"), "../..");
+  } catch (e) {
+    console.log(e);
+    throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";
+  }
 
   if (typeof settingsObj.tree === "object") {
     let keys: string[] = [];
