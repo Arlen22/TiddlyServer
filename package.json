@@ -47,7 +47,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "./server.js",
-    "assets": "mkdir ./build/assets && cp -r ./assets/* ./build/assets",
+    "assets": "mkdir -p ./build/assets ; cp -r ./assets/* ./build/assets",
     "build": "tsc && node build-schema.js && npm run assets",
     "build:clean": "rm -rf build && npm run build"
   },
