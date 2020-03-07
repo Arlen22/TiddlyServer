@@ -2,8 +2,7 @@
  * This file is copied from the root of the repository 
  * (beside /server.ts) if it does not exist in build. 
  * It is recommended to make any changes there rather 
- * than in the build directory. Running build:clean 
- * will delete the build directory and lose the file.
+ * than in the build directory.
  */
 const USERNAME = "";
 const PASSWORD = "";
