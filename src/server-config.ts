@@ -1,6 +1,9 @@
 import path = require("path");
 declare const __non_webpack_require__: NodeRequire | undefined;
-const nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
+const nodeRequire =
+  typeof __non_webpack_require__ !== "undefined"
+    ? __non_webpack_require__
+    : require;
 import { oc } from "./optional-chaining";
 // type AlwaysDefined<T> = {
 // 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
@@ -111,7 +114,7 @@ export function normalizeTree(
       );
     item = as<Schema.GroupElement>({
       $element: "group",
-      $children: item as any
+      $children: item as any,
     });
   }
   if (typeof item === "string" || item.$element === "folder") {
@@ -131,7 +134,7 @@ export function normalizeTree(
       $options,
       path: item.path,
       key,
-      noTrailingSlash: !!item.noTrailingSlash
+      noTrailingSlash: !!item.noTrailingSlash,
     });
   } else if (item.$element === "group") {
     if (!key) key = (item as Schema.ArrayGroupElement).key;
@@ -181,7 +184,7 @@ export function normalizeTree(
       $options,
       indexPath: item.indexPath
         ? pathResolveWithUser(settingsDir, item.indexPath)
-        : false
+        : false,
     });
   } else {
     return item;
@@ -195,7 +198,7 @@ export function normalizeTreeHost(
     throw "Tree array must not mix host elements with other elements";
   return {
     ...host,
-    $mount: normalizeTree(settingsDir, host.$mount as any, "$mount", [])
+    $mount: normalizeTree(settingsDir, host.$mount as any, "$mount", []),
   };
 }
 export function normalizeSettingsTree(
@@ -209,7 +212,7 @@ export function normalizeSettingsTree(
     // 	"domain": ["*"]
     // },
     // includeSubdomains: true,
-    $mount: normalizeTree(settingsDir, tree2, "$mount", [])
+    $mount: normalizeTree(settingsDir, tree2, "$mount", []),
   });
   if (typeof tree === "string" && tree.endsWith(".xml")) {
     //read the xml file and parse it as the tree structure
@@ -259,9 +262,9 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
         registerNotice: true,
         putsaver: true,
         loginlink: true,
-        transfer: false
+        transfer: false,
       }),
-      ...set.bindInfo.localAddressPermissions["localhost"]({} as any)
+      ...set.bindInfo.localAddressPermissions["localhost"]({} as any),
     },
     "*": {
       ...as<ServerConfig_AccessOptions>({
@@ -272,10 +275,10 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
         registerNotice: false,
         putsaver: true,
         loginlink: true,
-        transfer: false
+        transfer: false,
       }),
-      ...set.bindInfo.localAddressPermissions["*"]({} as any)
-    }
+      ...set.bindInfo.localAddressPermissions["*"]({} as any),
+    },
   };
 
   Object.keys(set.bindInfo.localAddressPermissions({})).forEach(k => {
@@ -302,7 +305,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       port: set.bindInfo.port(8080),
       localAddressPermissions: lap,
       _bindLocalhost: set.bindInfo._bindLocalhost(false),
-      https: !!set.bindInfo.https("")
+      https: !!set.bindInfo.https(""),
       // },
       // ...spread(set.bindInfo),
       // ...{
@@ -315,7 +318,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       logAccess: set.logging.logAccess(""),
       logError: set.logging.logError(""),
       logColorsToFile: set.logging.logColorsToFile(false),
-      logToConsoleAlso: set.logging.logToConsoleAlso(true)
+      logToConsoleAlso: set.logging.logToConsoleAlso(true),
       // }
     },
     authAccounts: set.authAccounts({}),
@@ -325,7 +328,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       backupFolder: set.putsaver.backupFolder(""),
       etag: set.putsaver.etag("optional"),
       enabled: set.putsaver.enabled(true),
-      gzipBackups: set.putsaver.gzipBackups(true)
+      gzipBackups: set.putsaver.gzipBackups(true),
     },
     datafolder: set.datafolder({}),
     directoryIndex: {
@@ -333,11 +336,11 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       defaultType: set.directoryIndex.defaultType("html"),
       icons: {
         ...set.directoryIndex.icons({}),
-        htmlfile: set.directoryIndex.icons["htmlfile"](["htm", "html"])
+        htmlfile: set.directoryIndex.icons["htmlfile"](["htm", "html"]),
       },
       types: {},
       mixFolders: set.directoryIndex.mixFolders(true),
-      mimetypes: {}
+      mimetypes: {},
       // },
       // ...spread(set.directoryIndex)
     },
@@ -351,7 +354,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
     // },
     authCookieAge: set.authCookieAge(2592000),
     maxTransferRequests: set.maxTransferRequests(0),
-    $schema: "./settings.schema.json"
+    $schema: "./settings.schema.json",
   };
 
   Object.keys(newset.directoryIndex.icons).forEach(type => {
@@ -873,7 +876,7 @@ export namespace Schema {
   function defstring(enumArr?: string[]) {
     return {
       type: "string",
-      enum: ["group"]
+      enum: ["group"],
     };
   }
   export type GroupChildElements =
@@ -1079,7 +1082,7 @@ export function OldDefaultSettings(set: OldServerConfig) {
   if (!set.host) set.host = "127.0.0.1";
   if (!set.types)
     set.types = {
-      htmlfile: ["htm", "html"]
+      htmlfile: ["htm", "html"],
     };
   if (!set.etag) set.etag = "";
   if (!set.etagWindow) set.etagWindow = 0;
@@ -1120,29 +1123,29 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
       bindWildcard: set.host === "0.0.0.0" || set.host === "::",
       localAddressPermissions: {
         localhost: set.allowLocalhost,
-        "*": set.allowNetwork
+        "*": set.allowNetwork,
       },
       https: undefined,
-      _bindLocalhost: set._disableLocalHost === false
+      _bindLocalhost: set._disableLocalHost === false,
     },
     logging: {
       logAccess: set.logAccess,
       logError: set.logError,
       logColorsToFile: set.logColorsToFile,
       logToConsoleAlso: set.logToConsoleAlso,
-      debugLevel: set.debugLevel
+      debugLevel: set.debugLevel,
     },
     putsaver: {
       etag: set.etag || "optional",
       etagAge: set.etagWindow,
-      backupFolder: ""
+      backupFolder: "",
     },
     datafolder: {},
     authAccounts: {},
     directoryIndex: {
       defaultType: "html",
       icons: set.types,
-      mixFolders: set.mixFolders
+      mixFolders: set.mixFolders,
       // types: {}
     },
     // EXPERIMENTAL_clientside_datafolders: (typeof set.tsa === "object" || typeof set.maxAge === "object") ? {
@@ -1151,6 +1154,6 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
     //   maxAge_tw_plugins: typeof set.maxAge === "object" ? set.maxAge.tw_plugins : 0
     // } : undefined,
     authCookieAge: 2592000,
-    $schema: "./settings-2-1.schema.json"
+    $schema: "./settings-2-1.schema.json",
   };
 }

@@ -1,7 +1,5 @@
 import { PublicKeyCache } from "./publicKeyCache";
-import {
-  SplitCookieWithUserName
-} from "./types";
+import { SplitCookieWithUserName } from "./types";
 import { crypto_sign_verify_detached, from_base64 } from "libsodium-wrappers";
 import * as http from "http";
 import { SettingsReader } from "./settingsReader";
@@ -70,22 +68,19 @@ export const validateCookie = (
 /*
   [userName, 'key' | 'pw', date, publicKey, cookie, salt]
 */
-export const parseAuthCookie = (
-  cookie: string,
-  suffix: boolean
-) => {
+export const parseAuthCookie = (cookie: string, suffix: boolean) => {
   let splitCookie = cookie.split("|");
   const length = splitCookie.length;
-  const expectLength = suffix ? 6 : 5
+  const expectLength = suffix ? 6 : 5;
   if (length > expectLength) {
     // This is a workaround in case the username happens to contain a pipe
     // other code still checks the signature of the cookie, so it's all good
     const nameLength = splitCookie.length - expectLength - 1;
     const name: string = splitCookie.slice(0, nameLength).join("|");
     const rest = splitCookie.slice(nameLength);
-    return [name, ...rest] as unknown as SplitCookieWithUserName;
-  } else if(length === expectLength) {
-    return splitCookie as unknown as SplitCookieWithUserName;
+    return ([name, ...rest] as unknown) as SplitCookieWithUserName;
+  } else if (length === expectLength) {
+    return (splitCookie as unknown) as SplitCookieWithUserName;
   } else {
     return false;
   }
@@ -103,13 +98,13 @@ export const getSetCookie = (
     HttpOnly: true,
     "Max-Age": age.toString(),
     SameSite: "Strict",
-    Path: "/"
+    Path: "/",
   };
 
   return [
     name + "=" + value,
     ...Object.keys(flags)
       .filter(k => !!flags[k])
-      .map(k => k + (typeof flags[k] === "string" ? "=" + flags[k] : ""))
+      .map(k => k + (typeof flags[k] === "string" ? "=" + flags[k] : "")),
   ].join("; ");
 };

@@ -3,7 +3,7 @@ import {
   StateObject,
   ServerEventEmitter,
   ServerConfig,
-  serveFile
+  serveFile,
 } from "./server-types";
 import { getSetCookie, validateCookie, parseAuthCookie } from "./cookies";
 import {
@@ -12,7 +12,7 @@ import {
   from_base64,
   randombytes_buf,
   ready,
-  to_hex
+  to_hex,
 } from "libsodium-wrappers";
 import * as path from "path";
 
@@ -67,7 +67,7 @@ const setAuth = (settings: ServerConfig) => {
           publicKeyCache.setVal(publicHash + user, [
             accountId,
             clientKeysAndPermissions.clientKeys[user].publicKey,
-            clientKeysAndPermissions.clientKeys[user].cookieSalt
+            clientKeysAndPermissions.clientKeys[user].cookieSalt,
           ]);
         else
           throw "publicKey+username combination is used for more than one authAccount";
@@ -109,13 +109,13 @@ const handleTransfer = (state: StateObject) => {
   pkop.sender.res.writeHead(200, undefined, {
     "x-tiddlyserver-transfer-count": pkop.step,
     "content-type": pkop.reciever.req.headers["content-type"],
-    "content-length": pkop.reciever.req.headers["content-length"]
+    "content-length": pkop.reciever.req.headers["content-length"],
   });
   pkop.reciever.req.pipe(pkop.sender.res);
   pkop.reciever.res.writeHead(200, undefined, {
     "x-tiddlyserver-transfer-count": pkop.step,
     "content-type": pkop.sender.req.headers["content-type"],
-    "content-length": pkop.sender.req.headers["content-length"]
+    "content-length": pkop.sender.req.headers["content-length"],
   });
   pkop.sender.req.pipe(pkop.reciever.res);
   pkop.cancelTimeout = removePendingPinTimeout(pin);
@@ -159,7 +159,7 @@ const handleLogin = async (state: StateObject) => {
   if (
     !expect<{ setCookie: string; publicKey: string }>(state.json, [
       "setCookie",
-      "publicKey"
+      "publicKey",
     ])
   ) {
     return state.throwReason(400, "Improper request body");
@@ -180,7 +180,7 @@ const handleLogin = async (state: StateObject) => {
         "    login attempted with unknown public key",
         "    " + state.json.publicKey,
         "    username: " + cookieData[0],
-        "    timestamp: " + cookieData[2]
+        "    timestamp: " + cookieData[2],
       ].join("\n")
   );
   if (valid) {

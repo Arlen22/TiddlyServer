@@ -27,11 +27,11 @@ import {
   ServerConfig,
   ServerEventEmitter,
   StateObject,
-  testAddress
+  testAddress,
 } from "./server-types";
 import {
   handleTiddlyServerRoute,
-  init as initTiddlyServer
+  init as initTiddlyServer,
 } from "./tiddlyserver";
 
 export { checkServerConfig, loadSettings, routes, libsReady };
@@ -64,7 +64,7 @@ const routes: Record<string, (state: StateObject) => void> = {
   "favicon.ico": state =>
     serveFile(state, "favicon.ico", state.settings.__assetsDir),
   "directory.css": state =>
-    serveFile(state, "directory.css", state.settings.__assetsDir)
+    serveFile(state, "directory.css", state.settings.__assetsDir),
 };
 
 function handleAssetsRoute(state: StateObject) {
@@ -139,7 +139,7 @@ export async function initServer({
   settings,
   preflighter,
   settingshttps,
-  dryRun
+  dryRun,
 }: {
   settings: ServerConfig;
   preflighter: <T extends RequestEvent>(ev: T) => Promise<T>;
@@ -148,7 +148,7 @@ export async function initServer({
 }) {
   const debug = StateObject.DebugLogger("STARTER").bind({
     debugOutput: MakeDebugOutput(settings),
-    settings
+    settings,
   });
 
   // if (!settings) throw "The settings object must be emitted on eventer before starting the server";
@@ -160,11 +160,11 @@ export async function initServer({
     bindAddress,
     _bindLocalhost,
     port,
-    https: isHttps
+    https: isHttps,
   } = settings.bindInfo;
   const tester = parseHostList([
     ...settings.bindInfo.bindAddress,
-    "-127.0.0.0/8"
+    "-127.0.0.0/8",
   ]);
   const localhostTester = parseHostList(["127.0.0.0/8"]);
 
@@ -182,7 +182,7 @@ export async function initServer({
       logFile: settings.logging.logAccess || undefined,
       logToConsole:
         !settings.logging.logAccess || settings.logging.logToConsoleAlso,
-      logColorsToFile: settings.logging.logColorsToFile
+      logColorsToFile: settings.logging.logColorsToFile,
     });
     log = (req, res) => new Promise(resolve => logger(req, res, resolve));
   } else {
@@ -429,7 +429,7 @@ async function websocketHandler(
     debugOutput: undefined,
     request,
     client,
-    settings
+    settings,
   };
 
   let ev2 = await requestHandlerHostLevelChecks<RequestEventWS>(
@@ -474,7 +474,7 @@ async function requestHandler(
     debugOutput: undefined,
     request,
     response,
-    settings
+    settings,
   };
   //send it to the preflighter
   let ev2 = await requestHandlerHostLevelChecks<RequestEventHTTP>(
@@ -598,7 +598,7 @@ function MakeDebugOutput(settings) {
       }
       callback && callback();
       return true;
-    }
+    },
   });
 }
 
@@ -640,7 +640,7 @@ function handleBasicAuth(
     state
       .respond(401, "", {
         "WWW-Authenticate": 'Basic realm="TiddlyServer"',
-        "Content-Type": "text/plain"
+        "Content-Type": "text/plain",
       })
       .empty();
     return false;

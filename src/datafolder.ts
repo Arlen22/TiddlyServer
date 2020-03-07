@@ -6,7 +6,7 @@ import {
   ServerEventEmitter,
   StateObject,
   statWalkPath,
-  tryParseJSON
+  tryParseJSON,
 } from "./server-types";
 
 import * as path from "path";
@@ -36,7 +36,7 @@ export function init(e: ServerEventEmitter) {
     const { request, client, settings, treeHostIndex, debugOutput } = data;
     const debug = StateObject.DebugLogger("WEBSOCK").bind({
       settings,
-      debugOutput
+      debugOutput,
     });
     const root = settings.tree[treeHostIndex].$mount;
     let pathname: string | undefined = parse(request.url as string).pathname; // new URL(request.url as string);
@@ -149,7 +149,7 @@ export function handleDataFolderRequest(
     let redirect = mount + (!state.pathOptions.noTrailingSlash ? "/" : "");
     state
       .respond(302, "", {
-        Location: redirect
+        Location: redirect,
       })
       .empty();
     return;
@@ -196,7 +196,7 @@ function loadDataFolderTrigger(
       mount,
       folder,
       events: new EventEmitter(),
-      handler: []
+      handler: [],
     };
     loadDataFolderType(mount, folder, reload, target, vars);
     // loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
@@ -227,7 +227,10 @@ function loadDataFolderType(
   );
 }
 declare const __non_webpack_require__: NodeRequire | undefined;
-const nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
+const nodeRequire =
+  typeof __non_webpack_require__ !== "undefined"
+    ? __non_webpack_require__
+    : require;
 
 function loadDataFolderTiddlyWiki(
   mount: string,
@@ -241,14 +244,14 @@ function loadDataFolderTiddlyWiki(
 
   const tw = nodeRequire(target + "/boot/boot.js").TiddlyWiki(
     nodeRequire(target + "/boot/bootprefix.js").bootprefix({
-      packageInfo: nodeRequire(target + '/package.json')
+      packageInfo: nodeRequire(target + "/package.json"),
     })
   );
 
   tw.boot.argv = [folder];
   tw.preloadTiddler({
     text: "$protocol$//$host$" + mount + "/",
-    title: "$:/config/tiddlyweb/host"
+    title: "$:/config/tiddlyweb/host",
   });
 
   try {
@@ -280,8 +283,8 @@ function loadDataFolderTiddlyWiki(
         "root-tiddler": "$:/core/save/all",
         gzip: "yes",
         // "root-tiddler": "$:/core/save/all-external-js"
-        ...vars
-      }
+        ...vars,
+      },
     });
     // server.TS_StateObject_Queue = [];
     // server.TS_Request_Queue = [];
@@ -336,7 +339,7 @@ function doError(debug, mount, folder, err) {
             "terminal with priority level 2. " +
             "To try again, use ?reload=true after making any necessary corrections."
         );
-    }
+    },
   } as any;
   requests.forEach(([req, res]) => {
     (loadedFolders[mount] as { handler: any }).handler(req, res);

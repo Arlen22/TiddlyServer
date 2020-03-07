@@ -1,13 +1,13 @@
 export interface PluginInfo {
-  [K: string]: string
+  [K: string]: string;
 }
 export interface WikiInfo {
-  includeWikis: (string | { path: string, info: { "read-only": boolean } })[]
-  build: string[][]
-  plugins: string[]
-  themes: string[]
-  languages: string[]
-  config?: { [K: string]: any }
+  includeWikis: (string | { path: string; info: { "read-only": boolean } })[];
+  build: string[][];
+  plugins: string[];
+  themes: string[];
+  languages: string[];
+  config?: { [K: string]: any };
   type: "tiddlywiki" | "tiddlyserver";
 }
 export interface FileInfo {

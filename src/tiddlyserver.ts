@@ -22,7 +22,7 @@ import {
   ServerEventEmitter,
   StateObject,
   StatPathResult,
-  statWalkPath
+  statWalkPath,
 } from "./server-types";
 
 // export function parsePath(path: string, jsonFile: string) {
@@ -103,7 +103,7 @@ export async function handleTiddlyServerRoute(
       state
         .respond(200, "", {
           "x-api-access-type": "file",
-          dav: "tw5/put"
+          dav: "tw5/put",
         })
         .string("GET,HEAD,PUT,OPTIONS");
     } else {
@@ -140,7 +140,7 @@ function handleGETfile(
         [statItem.ino, statItem.size, mtime].join("-")
       );
       return { Etag: etag };
-    })(state.statPath)
+    })(state.statPath),
   });
 }
 
@@ -227,7 +227,7 @@ async function serveDirectoryIndex(
         error: err => {
           let error = new ER("error sending index", err.toString());
           state.log(2, error.message).throwError(500, error);
-        }
+        },
       });
       return;
     }
@@ -250,18 +250,18 @@ async function serveDirectoryIndex(
         ? state.username + " (group " + state.authAccountsKey + ")"
         : (false as false),
       format,
-      extTypes: state.settings.directoryIndex.types
+      extTypes: state.settings.directoryIndex.types,
     };
     let contentType = {
       html: "text/html",
-      json: "application/json"
+      json: "application/json",
     };
     let e = await getTreePathFiles(result, state);
     let res = await sendDirectoryIndex([e, options]);
     state
       .respond(200, "", {
         "Content-Type": contentType[format],
-        "Content-Encoding": "utf-8"
+        "Content-Encoding": "utf-8",
       })
       // @ts-ignore
       .buffer(Buffer.from(res, "utf8"));

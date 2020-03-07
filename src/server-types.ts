@@ -30,7 +30,7 @@ import {
   ConvertSettings,
   NewTreeOptionsObject,
   Config,
-  OptionsConfig
+  OptionsConfig,
 } from "./server-config";
 export {
   Config,
@@ -42,7 +42,7 @@ export {
   ServerConfigSchema,
   ServerConfig_AccessOptions,
   normalizeSettings,
-  ConvertSettings
+  ConvertSettings,
 };
 let DEBUGLEVEL = -1;
 
@@ -418,7 +418,7 @@ export function serveFile(
         filepath: file,
         error: err => {
           state.log(2, "%s %s", err.status, err.message).throw(500);
-        }
+        },
       });
       // return Observable.empty<StateObject>();
     },
@@ -449,7 +449,7 @@ export function serveFolder(
         } else {
           state.throw(403);
         }
-      }
+      },
     });
   }
 }
@@ -479,7 +479,7 @@ export function serveFolderIndex(options: { type: string }) {
       readFolder(folder).then(item => {
         sendResponse(state, JSON.stringify(item), {
           contentType: "application/json",
-          doGzip: canAcceptGzip(state.req)
+          doGzip: canAcceptGzip(state.req),
         });
       });
     };
@@ -524,7 +524,7 @@ export function sendResponse(
       "Content-Length": Buffer.isBuffer(body)
         ? body.length.toString()
         : Buffer.byteLength(body, "utf8").toString(),
-      "Content-Type": options.contentType || "text/plain; charset=utf-8"
+      "Content-Type": options.contentType || "text/plain; charset=utf-8",
     });
     if (isGzip) state.setHeaders({ "Content-Encoding": "gzip" });
     state.respond(200).buffer(body);
@@ -543,7 +543,7 @@ export function getTreePathFiles(
 ): Promise<DirectoryIndexData> {
   let dirpath = [
     result.treepathPortion.join("/"),
-    result.filepathPortion.join("/")
+    result.filepathPortion.join("/"),
   ]
     .filter(e => e)
     .join("/");
@@ -557,7 +557,7 @@ export function getTreePathFiles(
       keys,
       paths,
       dirpath,
-      type: type as "group" | "folder"
+      type: type as "group" | "folder",
     });
   } else {
     return promisify(fs.readdir)(result.fullfilepath)
@@ -588,7 +588,7 @@ export function getTreeOptions(state: StateObject) {
     backupFolder: "",
     etag: "optional",
     etagAge: 3,
-    ...(state.settings.putsaver || {})
+    ...(state.settings.putsaver || {}),
   });
   let options: OptionsConfig = {
     auth: { $element: "auth", authError: 403, authList: null },
@@ -597,8 +597,8 @@ export function getTreeOptions(state: StateObject) {
       $element: "index",
       defaultType: state.settings.directoryIndex.defaultType,
       indexFile: [],
-      indexExts: []
-    }
+      indexExts: [],
+    },
   };
   // console.log(state.ancestry);
   state.ancestry.forEach(e => {
@@ -658,7 +658,7 @@ export async function sendDirectoryIndex([_r, options]: [
           : stat.itemtype === "file"
           ? options.extTypes[key.split(".").pop() as string] || "other"
           : (stat.itemtype as string),
-        size: stat && stat.stat ? getHumanSize(stat.stat.size) : ""
+        size: stat && stat.stat ? getHumanSize(stat.stat.size) : "",
       };
     })
   );
@@ -683,7 +683,7 @@ export async function statWalkPath(test: PathResolverResult) {
     return (n = {
       statpath: path.join(n.statpath, e),
       index: n.index + 1,
-      endStat: false
+      endStat: false,
     });
   });
   while (true) {
@@ -735,7 +735,7 @@ export async function statPath(
     index,
     endStat,
     itemtype: getItemType(stat, infostat),
-    infostat: infostat && infostat.isFile() ? infostat : undefined
+    infostat: infostat && infostat.isFile() ? infostat : undefined,
   } as StatPathResult;
 }
 
@@ -819,7 +819,7 @@ export function resolvePath(
     treepathPortion: reqpath.slice(0, result.end),
     filepathPortion,
     reqpath,
-    fullfilepath
+    fullfilepath,
   };
 }
 
@@ -998,7 +998,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       pathname: pathname || "",
       query: query || "",
       search: search || "",
-      href: href || ""
+      href: href || "",
     };
   }
   static errorRoute(status: number, reason?: string) {
@@ -1061,7 +1061,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   pathOptions: {
     noTrailingSlash: boolean;
   } = {
-    noTrailingSlash: false
+    noTrailingSlash: false,
   };
 
   req: http.IncomingMessage;
@@ -1196,7 +1196,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         ? {
             "Set-Cookie": (this.responseHeaders["Set-Cookie"] || []).concat(
               headers["Set-Cookie"] || []
-            )
+            ),
           }
         : {}
     );
@@ -1235,14 +1235,14 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         this._res.writeHead(code, message, this.responseHeaders as any);
         this._res.end();
         this.responseSent = true;
-      }
+      },
     };
     return subthis;
   }
 
   redirect(redirect: string) {
     this.respond(302, "", {
-      Location: redirect
+      Location: redirect,
     }).empty();
   }
   send(options: {
@@ -1297,7 +1297,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
           errorCB === true
             ? (e: JsonError) => {
                 this.respond(400, "", {
-                  "Content-Type": "text/plain"
+                  "Content-Type": "text/plain",
                 }).string(e.errorPosition);
                 //return undefined;
               }
@@ -1454,7 +1454,7 @@ export function obsTruthy<T>(
 }
 
 const ERRORS = {
-  PROGRAMMER_EXCEPTION: "A programmer exception occurred: %s"
+  PROGRAMMER_EXCEPTION: "A programmer exception occurred: %s",
 };
 
 export function getError(code: "PRIMARY_KEYS_REQUIRED"): any;
