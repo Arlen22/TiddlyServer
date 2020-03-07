@@ -8,10 +8,16 @@ const { SettingsReader } = require("./src/settingsReader");
 
 var args = process.argv.slice(2);
 // console.log(process.version);
+
 const settingsFile = path.normalize(
   args[0] && args[0].indexOf("--") !== 0
     ? path.resolve(args.shift())
-    : path.join(__dirname, "./settings.json")
+    : path.join(
+        __dirname,
+        //if we're in the TiddlyServer/build directory the default is in the root
+        __dirname.endsWith("TiddlyServer/build") ? ".." : "",
+        "settings.json"
+      )
 );
 const settingsPath = path.dirname(settingsFile);
 
