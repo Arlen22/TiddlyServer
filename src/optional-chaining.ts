@@ -12,13 +12,14 @@
  */
 export function oc<T>(data?: T): TSOCType<T> {
   return new Proxy(
-    ((defaultValue?: Defined<T>) => (data == null ? defaultValue : data)) as TSOCType<T>,
+    ((defaultValue?: Defined<T>) =>
+      data == null ? defaultValue : data) as TSOCType<T>,
     {
       get: (target, key) => {
         const obj: any = target();
-        return oc(typeof obj === 'object' ? obj[key] : undefined);
+        return oc(typeof obj === "object" ? obj[key] : undefined);
       },
-    },
+    }
   );
 }
 
@@ -72,8 +73,7 @@ interface TSOCAny extends TSOCDataAccessor<any> {
  * `TSOCDataWrapper` selects between `TSOCArrayWrapper`, `TSOCObjectWrapper`, and `TSOCDataAccessor`
  * to wrap Arrays, Objects and all other types respectively.
  */
-type TSOCDataWrapper<T> =
-  0 extends (1 & T) // Is T any? (https://stackoverflow.com/questions/49927523/disallow-call-with-any/49928360#49928360)
+type TSOCDataWrapper<T> = 0 extends 1 & T // Is T any? (https://stackoverflow.com/questions/49927523/disallow-call-with-any/49928360#49928360)
   ? TSOCAny
   : T extends any[] // Is T array-like?
   ? TSOCArrayWrapper<T[number]>

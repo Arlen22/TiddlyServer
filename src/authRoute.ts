@@ -1,133 +1,104 @@
-import { StateObject, ServerEventEmitter, tryParseJSON, ER, ServerConfig, serveFile } from "./server-types";
-import { EventEmitter } from "events";
-import * as crypto from "crypto";
-import { libsodium, ws as WebSocket } from "../lib/bundled-lib";
-import { TLSSocket } from "tls";
-import * as http from "http";
+import { PublicKeyCache } from "./publicKeyCache";
+import {
+  StateObject,
+  ServerEventEmitter,
+  ServerConfig,
+  serveFile,
+} from "./server-types";
+import { getSetCookie, validateCookie, parseAuthCookie } from "./cookies";
+import {
+  crypto_generichash,
+  crypto_generichash_BYTES,
+  from_base64,
+  randombytes_buf,
+  ready,
+  to_hex,
+} from "libsodium-wrappers";
 import * as path from "path";
-const sockets: WebSocket[] = [];
-const state: {}[] = [];
-/** [type, username, timestamp, hash, sig] */
-export type AuthCookie = [string, "pw" | "key", string, string, string, string]
-export type AuthCookieSet = [string, "pw" | "key", string, string, string]
-export let checkCookieAuth: (request: http.IncomingMessage, logRegisterNotice: boolean) => ReturnType<typeof validateCookie>;
-/** if the cookie is valid it returns the username, otherwise an empty string. If the public key cannot be found, it will call logRegisterNotice then return an empty string */
-export let validateCookie: (json: AuthCookie | AuthCookieSet, logRegisterNotice?: (string | false)) => [string, string, string] | false;
-// export let parseAuthCookie = ;
-export function parseAuthCookie(cookie: string, suffix: true): AuthCookie;
-export function parseAuthCookie(cookie: string, suffix: false): AuthCookieSet;
-export function parseAuthCookie(cookie: string, suffix: boolean): AuthCookie | AuthCookieSet {
-  let json: [string, "pw" | "key", string, string, string, string] = cookie.split("|") as any; //tryParseJSON<>(auth);
-  if (json.length > (suffix ? 6 : 5)) {
-    let name = json.slice(0, json.length - 4);
-    let rest = json.slice(json.length - 4);
-    json = [name.join("|"), ...rest] as any;
+
+const TIDDLY_SERVER_AUTH_COOKIE: string = "TiddlyServerAuth";
+
+/** Handles the /admin/authenticate route */
+export const handleAuthRoute = (state: StateObject) => {
+  if (state.req.method === "GET" || state.req.method === "HEAD") {
+    return handleHEADorGETFileServe(state);
   }
-  return json;
+  if (state.req.method !== "POST") return state.throw(405);
+  switch (state.path[3]) {
+    case "transfer":
+      return handleTransfer(state);
+    case "initpin":
+      return handleInitPin(state);
+    case "initshared":
+      return handleInitShared(state);
+    case "login":
+      return handleLogin(state);
+    case "logout":
+      return handleLogout(state);
+    default:
+      console.log("Case not handled for authRoute");
+  }
+};
+
+export function initAuthRoute(eventer: ServerEventEmitter) {
+  eventer.on("settings", serverSettings => {
+    setAuth(serverSettings);
+  });
 }
+
 const setAuth = (settings: ServerConfig) => {
   /** Record<hash+username, [authGroup, publicKey, suffix]> */
-  let publicKeyLookup: Record<string, [string, string, string]> = {};
-  let passwordLookup: Record<string, string> = {};
+  let publicKeyCache = PublicKeyCache.getCache();
 
-  const authCookieAge = settings.authCookieAge;
-  const {
-    crypto_generichash,
-    crypto_generichash_BYTES,
-    crypto_generichash_BYTES_MIN,
-    crypto_generichash_BYTES_MAX,
-    crypto_sign_keypair,
-    crypto_sign_verify_detached,
-    from_base64,
-    crypto_box_SEEDBYTES,
-  } = libsodium;
-  // console.log(crypto_box_SEEDBYTES, crypto_generichash_BYTES, crypto_generichash_BYTES_MAX, crypto_generichash_BYTES_MIN);
-  // let passwordKey = crypto_sign_keypair("uint8array");
-  // console.log(settings.authAccounts);
-  Object.keys(settings.authAccounts).forEach(k => {
-    let e = settings.authAccounts[k];
-    // console.log(k, e, e.clientKeys);
-    if (e.clientKeys) Object.keys(e.clientKeys).forEach(u => {
-      // console.log(k, u, e.clientKeys[u]);
-      const publicKey = from_base64(e.clientKeys[u].publicKey);
-      // let t = e.clientKeys[u];
-      let publicHash = crypto_generichash(crypto_generichash_BYTES, publicKey, undefined, "base64");
-      if (!publicKeyLookup[publicHash + u]) publicKeyLookup[publicHash + u] = [k, e.clientKeys[u].publicKey, e.clientKeys[u].cookieSalt];
-      else throw "publicKey+username combination is used for more than one authAccount";
-    });
-    // if (e.passwords) Object.keys(e.passwords).forEach(u => {
-    // 	const password = e.passwords[u];
-    // 	let passHash = crypto_generichash(crypto_generichash_BYTES, password, undefined, "base64");
-    // 	if (!passwordLookup[u]) passwordLookup[u] = k;
-    // 	else throw "username is used for more than one authAccount password list";
-    // });
+  Object.keys(settings.authAccounts).forEach(accountId => {
+    let clientKeysAndPermissions = settings.authAccounts[accountId];
+    if (clientKeysAndPermissions.clientKeys)
+      Object.keys(clientKeysAndPermissions.clientKeys).forEach(user => {
+        const publicKey = from_base64(
+          clientKeysAndPermissions.clientKeys[user].publicKey
+        );
+        let publicHash = crypto_generichash(
+          crypto_generichash_BYTES,
+          publicKey,
+          undefined,
+          "base64"
+        );
+        if (!publicKeyCache.keyExists(publicHash + user))
+          publicKeyCache.setVal(publicHash + user, [
+            accountId,
+            clientKeysAndPermissions.clientKeys[user].publicKey,
+            clientKeysAndPermissions.clientKeys[user].cookieSalt,
+          ]);
+        else
+          throw "publicKey+username combination is used for more than one authAccount";
+      });
   });
+};
 
-  checkCookieAuth = (request: http.IncomingMessage, logRegisterNotice: boolean) => {
-    if (!request.headers.cookie) return false;
-    var cookies = {}, rc = request.headers.cookie as string;
-    rc.split(';').forEach(function (cookie) {
-      var parts = cookie.split('=');
-      cookies[(parts.shift() as string).trim()] = parts.length ? decodeURI(parts.join('=')) : "";
-    });
-    let auth = cookies["TiddlyServerAuth"] as string;
-    if (!auth) return false;
-    let json = parseAuthCookie(auth, true);
-    //we have to make sure the suffix is truthy
-    if (!json || json.length !== 6 || !json[5]) return false;
-    return validateCookie(json, false);
-  };
-  const isoreg = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/;
-  validateCookie = (json: AuthCookie | AuthCookieSet, logRegisterNotice?: string | false) => {
-    let [username, type, timestamp, hash, sig, suffix] = json;
-    if (type === "key" && !publicKeyLookup[hash + username]) {
-      if (logRegisterNotice) console.log(logRegisterNotice);
-      return false;
-    }
-    // console.log(username + timestamp + hash);
-    if (type === "pw") return false; //passwords are currently not implemented
-    let pubkey = publicKeyLookup[hash + username];
-    //don't check suffix unless it is provided, other code checks whether it is provided or not
-    //check it after the signiture to prevent brute-force suffix checking
-    let valid = crypto_sign_verify_detached(
-      from_base64(sig),
-      username + timestamp + hash,
-      from_base64(pubkey[1])
-    )
-      //json.length should be 5 if there is no suffix, don't ignore falsy suffix
-      //the calling code must determine whether the subject is needed
-      && (json.length === 5 || suffix === pubkey[2])
-      && isoreg.test(timestamp)
-      && (Date.now() - new Date(timestamp).valueOf() < authCookieAge * 1000);
-    // console.log((valid ? "" : "in") + "valid signature")
-    return valid ? [pubkey[0], username, pubkey[2]] : false;
-  };
+const pko: Record<
+  string,
+  {
+    step: number;
+    cancelTimeout: NodeJS.Timer;
+    sender?: StateObject;
+    reciever?: StateObject;
+  }
+> = {};
 
-}
-const expect = function <T>(a: any, keys: (string | number | symbol)[]): a is T {
-  return keys.every(k => Object.prototype.hasOwnProperty.call(a, k))
-    && Object.keys(a).every(k => keys.indexOf(k) !== -1);
-}
-export function initAuthRoute(eventer: ServerEventEmitter) {
-  // eventer.on("websocket-connection", (client, request) => {
-  // 	if (request.url === "/admin/authenticate") {
-  // 		sockets.push(client);
-  // 		client.on("message", handleSocketMessage);
-  // 	}
-  // });
-  eventer.on("settings", (set) => {
-    setAuth(set);
-  })
-}
+const removePendingPinTimeout = (pin: string) => {
+  return setTimeout(() => {
+    delete pko[pin];
+  }, 10 * 60 * 1000);
+};
 
-const pko: Record<string, { step: number, cancelTimeout: NodeJS.Timer, sender?: StateObject, reciever?: StateObject }> = {};
-
-function removePendingPinTimeout(pin: string) {
-  return setTimeout(() => { delete pko[pin] }, 10 * 60 * 1000)
-}
-function handleTransfer(state: StateObject) {
+const handleTransfer = (state: StateObject) => {
+  if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
   let pin = state.path[4];
-  if (!state.path[4] || !pko[pin] || (state.path[5] !== "sender" && state.path[5] !== "reciever"))
+  if (
+    !state.path[4] ||
+    !pko[pin] ||
+    (state.path[5] !== "sender" && state.path[5] !== "reciever")
+  )
     return state.throwReason(400, "Invalid request parameters");
   let direction: "sender" | "reciever" = state.path[5] as any;
   let pkop = pko[pin];
@@ -138,117 +109,144 @@ function handleTransfer(state: StateObject) {
   pkop.sender.res.writeHead(200, undefined, {
     "x-tiddlyserver-transfer-count": pkop.step,
     "content-type": pkop.reciever.req.headers["content-type"],
-    "content-length": pkop.reciever.req.headers["content-length"]
+    "content-length": pkop.reciever.req.headers["content-length"],
   });
   pkop.reciever.req.pipe(pkop.sender.res);
   pkop.reciever.res.writeHead(200, undefined, {
     "x-tiddlyserver-transfer-count": pkop.step,
     "content-type": pkop.sender.req.headers["content-type"],
-    "content-length": pkop.sender.req.headers["content-length"]
+    "content-length": pkop.sender.req.headers["content-length"],
   });
   pkop.sender.req.pipe(pkop.reciever.res);
   pkop.cancelTimeout = removePendingPinTimeout(pin);
   pkop.reciever = undefined;
   pkop.sender = undefined;
-}
-let randomPin;
-libsodium.ready.then(() => { randomPin = libsodium.randombytes_buf(8) });
-function getRandomPin() {
-  let pin = "";
-  while (!pin || pko[pin])
-    pin = libsodium.to_hex(
-      randomPin = libsodium.crypto_generichash(8, randomPin, undefined, "uint8array")
-    );
-  pko[pin] = { step: 1, cancelTimeout: removePendingPinTimeout(pin) };
-  return pin;
-}
-let sharedKeyList: Record<string, string> = {};
-function setSharedKey(key: string) {
-  // let pin = getRandomPin();
-  if (!sharedKeyList[key]) sharedKeyList[key] = getRandomPin();
-  return sharedKeyList[key];
-}
-const DEFAULT_AGE = "2592000";
-export function getSetCookie(name: string, value: string, secure: boolean, age: number) {
-  // let flags = ["Secure", "HttpOnly", "Max-Age=2592000", "SameSite=Strict"];
-  let flags = {
-    "Secure": secure,
-    "HttpOnly": true,
-    "Max-Age": age.toString(),
-    "SameSite": "Strict",
-    "Path": "/"
-  };
+};
 
-  return [
-    name + "=" + value,
-    ...Object.keys(flags).filter(k => !!flags[k]).map(k => k + (typeof flags[k] === "string" ? "=" + flags[k] : ""))
-  ].join("; ");
-}
-interface TiddlyServerResponses {
-  "POST /admin/authenticate/initPin": { initPin: string },
-  "POST /admin/authenticate/initShared/{shared}": { initPin: string },
-  "POST /admin/authenticate/login": undefined,
-  "POST /admin/authenticate/logout": undefined,
-  "POST /admin/authenticate/transfer": any
-}
-/** Handles the /admin/authenticate route */
-export function handleAuthRoute(state: StateObject) {
-  if (state.req.method === "GET" || state.req.method === "HEAD") {
-    if (state.path.length === 4 && state.path[3] === "login.html") {
-      serveFile(state, "login.html", path.join(state.settings.__assetsDir, "authenticate"));
-    } else if (state.path.length === 4 && state.path[3] === "transfer.html") {
-      serveFile(state, "transfer.html", path.join(state.settings.__assetsDir, "authenticate"));
-    } else {
-      state.throw(404);
-    }
-    return;
+const expect = function<T>(a: any, keys: (string | number | symbol)[]): a is T {
+  return (
+    keys.every(k => Object.prototype.hasOwnProperty.call(a, k)) &&
+    Object.keys(a).every(k => keys.indexOf(k) !== -1)
+  );
+};
+
+const handleHEADorGETFileServe = (state: StateObject) => {
+  const pathLength = state.path.length;
+  if (pathLength === 4 && state.path[3] === "login.html") {
+    serveFile(
+      state,
+      "login.html",
+      path.join(state.settings.__assetsDir, "authenticate")
+    );
+  } else if (pathLength === 4 && state.path[3] === "transfer.html") {
+    serveFile(
+      state,
+      "transfer.html",
+      path.join(state.settings.__assetsDir, "authenticate")
+    );
+  } else {
+    state.throw(404);
   }
-  //state.path[3]: "sendkey" | "recievekey" | "login" | "logout" | "pendingpin"
-  if (state.req.method !== "POST")
-    return state.throw(405);
-  if (state.path[3] === "transfer") {
-    if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
-    handleTransfer(state);
-  } else if (state.path[3] === "initpin") {
-    if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
-    if (Object.keys(pko).length > state.settings.maxTransferRequests)
-      return state.throwReason(509, "Too many transfer requests in progress");
-    else
-      state.respond(200).json({ initPin: getRandomPin() });
-  } else if (state.path[3] === "initshared") {
-    if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
-    if (Object.keys(pko).length > 1000)
-      return state.throwReason(509, "Too many transfer requests in progress");
-    else
-      state.respond(200).json({ initPin: setSharedKey(state.path[4]) });
-  } else if (state.path[3] === "login") {
-    state.recieveBody(true, true).then(() => {
-      if (state.body.length && !state.json)
-        return; //recieve body sent a response already
-      if (!state.body.length) {
-        return state.throwReason(400, "Empty request body");
-      }
-      if (!expect<{ setCookie: string, publicKey: string }>(state.json, ["setCookie", "publicKey"]))
-        return state.throwReason(400, "Improper request body");
-      /** [username, type, timestamp, hash, sig] */
-      let json = parseAuthCookie(state.json.setCookie, false);
-      if (json.length !== 5) return state.throwReason(400, "Bad cookie format");
-      let { registerNotice } = state.settings.bindInfo.localAddressPermissions[state.hostLevelPermissionsKey];
-      let valid = validateCookie(json, registerNotice && [
+  return;
+};
+
+const handleLogin = async (state: StateObject) => {
+  await state.recieveBody(true, true);
+  if (state.body.length && !state.json) return; //recieve body sent a response already
+  if (!state.body.length) {
+    return state.throwReason(400, "Empty request body");
+  }
+  if (
+    !expect<{ setCookie: string; publicKey: string }>(state.json, [
+      "setCookie",
+      "publicKey",
+    ])
+  ) {
+    return state.throwReason(400, "Improper request body");
+  }
+  /** [username, type, timestamp, hash, sig] */
+  let cookieData = parseAuthCookie(state.json.setCookie, false);
+
+  if (!cookieData || typeof cookieData[5] !== "undefined") {
+    return state.throwReason(400, "Bad cookie format");
+  }
+  let { registerNotice } = state.settings.bindInfo.localAddressPermissions[
+    state.hostLevelPermissionsKey
+  ];
+  let valid = validateCookie(
+    cookieData,
+    registerNotice &&
+      [
         "    login attempted with unknown public key",
         "    " + state.json.publicKey,
-        "    username: " + json[0],
-        "    timestamp: " + json[2]
-      ].join("\n"));
-      if (valid) {
-        state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", state.json.setCookie + "|" + valid[2], false, state.settings.authCookieAge));
-        state.respond(200).empty();
-      } else {
-        state.throwReason(400, "INVALID_CREDENTIALS");
-      }
-    })
-  } else if (state.path[3] === "logout") {
-    state.setHeader("Set-Cookie", getSetCookie("TiddlyServerAuth", "", false, 0));
+        "    username: " + cookieData[0],
+        "    timestamp: " + cookieData[2],
+      ].join("\n")
+  );
+  if (valid) {
+    state.setHeader(
+      "Set-Cookie",
+      getSetCookie(
+        TIDDLY_SERVER_AUTH_COOKIE,
+        state.json.setCookie + "|" + valid[2],
+        false,
+        state.settings.authCookieAge
+      )
+    );
     state.respond(200).empty();
+  } else {
+    state.throwReason(400, "INVALID_CREDENTIALS");
   }
-}
+};
+
+const getRandomPin = async (): Promise<string> => {
+  // Wait for libsodium.ready
+  await ready;
+  let randomPin = randombytes_buf(8);
+  let pin = "";
+  while (!pin || pko[pin]) {
+    pin = to_hex(
+      (randomPin = crypto_generichash(8, randomPin, undefined, "uint8array"))
+    );
+  }
+  pko[pin] = { step: 1, cancelTimeout: removePendingPinTimeout(pin) };
+  return pin;
+};
+
+const handleInitPin = (state: StateObject) => {
+  if (!state.allow.transfer) {
+    state.throwReason(403, "Access Denied");
+  } else if (Object.keys(pko).length > state.settings.maxTransferRequests) {
+    state.throwReason(509, "Too many transfer requests in progress");
+  } else {
+    state.respond(200).json({ initPin: getRandomPin() });
+  }
+  return;
+};
+
+let sharedKeyList: Record<string, string> = {};
+const setSharedKey = async (key: string) => {
+  const pin = await getRandomPin();
+  if (!sharedKeyList[key]) sharedKeyList[key] = pin;
+  return sharedKeyList[key];
+};
+
+const handleInitShared = (state: StateObject) => {
+  if (!state.allow.transfer) {
+    state.throwReason(403, "Access Denied");
+  } else if (Object.keys(pko).length > 1000) {
+    state.throwReason(509, "Too many transfer requests in progress");
+  } else {
+    state.respond(200).json({ initPin: setSharedKey(state.path[4]) });
+  }
+  return;
+};
+
+const handleLogout = (state: StateObject) => {
+  state.setHeader(
+    "Set-Cookie",
+    getSetCookie(TIDDLY_SERVER_AUTH_COOKIE, "", false, 0)
+  );
+  state.respond(200).empty();
+  return;
+};

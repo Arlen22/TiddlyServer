@@ -1,24 +1,24 @@
 {
   "compilerOptions": {
-    "outDir": ".",
+    "outDir": "./build",
     "baseUrl": ".",
+    "rootDirs": ["src", "test"],
     "module": "commonjs",
     "target": "es2017",
     "lib": [
-      "es2017"
+      "es2017",
+      "dom"
     ],
     "strict": true,
     "noImplicitAny": false,
     "sourceMap": false,
     "inlineSourceMap": true,
     "resolveJsonModule": true,
-    "noErrorTruncation": true
+    "noErrorTruncation": true,
+    "declaration": true
   },
-  "files": [
-    "./src/server.ts",
-    "./test/test.ts",
-    "./src/interfacechecker3.ts"
-  ],
+  "files": ["./server.ts"],
+  // "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/*", "test/*"],
   "exclude": [
     "node_modules",
     "new-server",

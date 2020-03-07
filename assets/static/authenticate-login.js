@@ -1,15 +1,18 @@
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
 {
     window.addEventListener("load", () => {
         let field = document.getElementById("password");
-        field.addEventListener("keyup", (ev) => {
+        if (!field)
+            return;
+        field.addEventListener("keyup", ev => {
             if (ev.key === "Enter")
                 window.tiddlyserverLogin();
         });
@@ -18,7 +21,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     const byID = (id) => {
         return document.getElementById(id);
     };
-    window.keyhandler = (e) => {
+    window.keyhandler = e => {
         console.log(e);
         if ((e && e.keyCode == 13) || e == 0) {
             window.tiddlyserverLogin();
@@ -30,7 +33,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         }).then(() => {
             byID("error-line").style.display = "none";
             byID("success-line").style.display = "";
-            byID("success-line").innerHTML = "<li>" + new Date().toISOString().slice(11, 19) + " - Successfully logged out, you may press Back to return to your previous page, then refresh" + "</li>";
+            byID("success-line").innerHTML =
+                "<li>" +
+                    new Date().toISOString().slice(11, 19) +
+                    " - Successfully logged out, you may press Back to return to your previous page, then refresh" +
+                    "</li>";
         });
     });
     window.tiddlyserverLogin = () => {
@@ -55,25 +62,37 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                 let publicHash = crypto_generichash(crypto_generichash_BYTES, keys.publicKey, undefined, "base64");
                 let cookie = [username, "key", new Date().toISOString(), publicHash];
                 console.log(cookie[0] + cookie[2] + cookie[3]);
-                let signed = crypto_sign_detached(cookie[0] + cookie[2] + cookie[3], keys.privateKey, "base64");
+                let signed = crypto_sign_detached(cookie[0] + cookie[1] + cookie[2] + cookie[3], keys.privateKey, "base64");
                 cookie.push(signed);
-                let request = { setCookie: (cookie.join("|")), publicKey: to_base64(keys.publicKey) };
+                let request = {
+                    setCookie: cookie.join("|"),
+                    publicKey: to_base64(keys.publicKey)
+                };
                 let loginFailed = [to_base64(keys.publicKey), username, cookie[2]].join("\n");
                 console.log(cookie);
                 console.log(to_base64(keys.publicKey));
                 let res = yield fetch("/admin/authenticate/login", {
-                    method: "POST", body: JSON.stringify(request)
+                    method: "POST",
+                    body: JSON.stringify(request)
                 });
                 if (res.status >= 400) {
                     if (res.statusText === "INVALID_CREDENTIALS") {
                         byID("success-line").style.display = "none";
                         byID("error-line").style.display = "";
-                        byID("error-line").innerHTML = "<li>" + new Date().toISOString().slice(11, 19) + " - Invalid username or password" + "</li>";
+                        byID("error-line").innerHTML =
+                            "<li>" +
+                                new Date().toISOString().slice(11, 19) +
+                                " - Invalid username or password" +
+                                "</li>";
                     }
                     else {
                         byID("success-line").style.display = "none";
                         byID("error-line").style.display = "";
-                        byID("error-line").innerHTML = "<li>" + new Date().toISOString().slice(11, 19) + " - An unknown error occured" + "</li>";
+                        byID("error-line").innerHTML =
+                            "<li>" +
+                                new Date().toISOString().slice(11, 19) +
+                                " - An unknown error occured" +
+                                "</li>";
                     }
                     let body = yield res.text();
                     console.log("Login failed for some reason", res.status, res.statusText);
@@ -82,9 +101,14 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
                     console.log(loginFailed);
                 }
                 else {
+                    console.log("***** RES STATUS *******", res);
                     byID("error-line").style.display = "none";
                     byID("success-line").style.display = "";
-                    byID("success-line").innerHTML = "<li>" + new Date().toISOString().slice(11, 19) + " - Successfully logged in, you may press Back to return to your previous page, then refresh" + "</li>";
+                    byID("success-line").innerHTML =
+                        "<li>" +
+                            new Date().toISOString().slice(11, 19) +
+                            " - Successfully logged in, you may press Back to return to your previous page, then refresh" +
+                            "</li>";
                 }
             });
         })();

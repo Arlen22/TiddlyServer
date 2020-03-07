@@ -1,23 +1,33 @@
 {
   "name": "tiddlyserver",
-  "version": "2.1.6-master",
+  "version": "2.2.0-master",
   "description": "",
   "bin": {
-    "tiddlyserver": "./server.js"
+    "tiddlyserver": "./build/server.js"
   },
   "main": "./lib/compiled-lib.js",
   "dependencies": {
-    "node-fetch": "^2.6.0"
+    "@types/prettier": "^1.19.0",
+    "node-fetch": "^2.6.0",
+    "prettier": "1.19.1",
+    "send": "^0.17.1",
+    "source-map-support": "^0.5.16",
+    "tiddlywiki": "^5.1.21",
+    "ts-json-schema-generator": "^0.61.1",
+    "typescript": "^3.8.3"
   },
   "devDependencies": {
     "@fidm/x509": "^1.2.0",
     "@material/textfield": "^0.44.0",
+    "@types/angular": "^1.6.57",
     "@types/libsodium-wrappers": "^0.7.5",
     "@types/node": "^8.10.59",
     "@types/send": "^0.14.4",
+    "@types/webpack": "^4.41.7",
     "@types/ws": "^6.0.1",
     "ajv": "^6.6.2",
     "asn1.js": "^5.0.1",
+    "copy-webpack-plugin": "^5.1.1",
     "etag": "^1.8.1",
     "formidable": "^1.1.1",
     "fresh": "^0.5.2",
@@ -29,7 +39,9 @@
     "path": "^0.12.7",
     "rxjs": "5.4.3",
     "serve-static": "*",
-    "ws": "*",
+    "webpack": "^4.41.6",
+    "webpack-cli": "^3.3.11",
+    "ws": "^7.2.1",
     "xml-js": "*"
   },
   "engines": {
@@ -37,8 +49,10 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "echo \"Please run 'node server.js' directly to start TiddlyServer\"",
-    "build": "tsc && node build-schema.js && webpack"
+    "start": "./server.js",
+    "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/assets",
+    "build": "tsc && node build-schema.js && npm run assets",
+    "build:clean": "rm -rf build && npm run build"
   },
   "author": "Arlen Beiler",
   "license": "MIT"
