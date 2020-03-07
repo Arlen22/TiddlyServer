@@ -20,11 +20,10 @@ import {
   serveFile,
   ServerConfig,
   ServerEventEmitter,
-  StateObject,
   StatPathResult,
   statWalkPath,
 } from "./server-types";
-
+import { StateObject } from "./StateObject";
 // export function parsePath(path: string, jsonFile: string) {
 //   var regCheck = /${([^}])}/gi;
 //   path.replace(regCheck, (str, pathVar) => {
@@ -497,7 +496,4 @@ async function handlePUTfile(
   state
     .respond(200, "", { "x-api-access-type": "file", etag: etagNew })
     .empty();
-  // }).catch(() => {
-  //   //this just means the request got handled early
-  // })
 }

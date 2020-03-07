@@ -390,7 +390,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 
   newset.__dirname = settingsDir;
   newset.__filename = settingsFile;
-
+  
   if (
     newset.putsaver &&
     newset.putsaver.etag === "disabled" &&

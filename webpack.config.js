@@ -1,6 +1,7 @@
 const path = require("path");
 const webpack = module.parent.require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
+
 /**
  * @type {import("webpack").Configuration}
  */
@@ -18,7 +19,7 @@ const options = {
       global: { GENTLY: false }
     }),
     new CopyPlugin([
-
+      // { from: "./"}
     ])
   ],
   mode: false ? "development" : "production",
@@ -35,3 +36,5 @@ const options = {
 };
 
 module.exports = options;
+
+throw "Webpack is not setup for TiddlyServer yet";

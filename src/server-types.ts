@@ -44,16 +44,14 @@ export {
   normalizeSettings,
   ConvertSettings,
 };
-let DEBUGLEVEL = -1;
+
 
 export function init(eventer: ServerEventEmitter) {
   eventer.on("settings", function(set: ServerConfig) {});
 }
 
 type PromiseType<T> = T extends Promise<infer R> ? R : any;
-type PromiseReturnType<T extends (...args: any) => any> = ReturnType<
-  T
-> extends Promise<infer R>
+type PromiseReturnType<T extends (...args: any) => any> = ReturnType<T> extends Promise<infer R>
   ? R
   : any;
 
@@ -94,11 +92,9 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
   if (!settingsObjSource.$schema)
     throw "The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new";
 
-  if (!settingsObjSource.tree)
-    throw "tree is not specified in the settings file";
+  if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
   // let routeKeys = Object.keys(routes);
-  let settingshttps =
-    settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;
+  let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;
   let settingsObj = normalizeSettings(settingsObjSource, settingsFile);
 
   settingsObj.__assetsDir = assets;
@@ -125,64 +121,21 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
   return { settings: settingsObj, settingshttps };
 }
 
-export interface RequestEvent {
-  /** mark the request as handled, canceling any further processing */
-  handled: boolean;
-  /** the username to give to data folders and anywhere else it is needed */
-  username: string;
-  /** auth account key to be applied to this request */
-  authAccountKey: string;
-  /** hostLevelPermissions key to be applied to this request */
-  localAddressPermissionsKey: string;
-  interface: {
-    /** HTTP server "host" option for this request (i.e. server.listen bind address) */
-    iface: string;
-    /** the host header */
-    host: string | undefined;
-    /** socket.localAddress */
-    addr: string;
-  };
-  /** tree hosts array index to be applied to this request */
-  treeHostIndex: number;
-  /** the ServerConfig currently in use on the server */
-  readonly settings: ServerConfig;
-  request: http.IncomingMessage;
-  /** A custom debug output may be set, otherwise the default is used */
-  debugOutput: Writable;
-}
-export interface RequestEventHTTP extends RequestEvent {
-  response: http.ServerResponse;
-}
-export interface RequestEventWS extends RequestEvent {
-  client: WebSocket;
-}
-
 interface ServerEventsListener<THIS> {
-  (
-    event: "websocket-connection",
-    listener: (data: RequestEventWS) => void
-  ): THIS;
-  (
-    event: "settingsChanged",
-    listener: (keys: (keyof ServerConfig)[]) => void
-  ): THIS;
+  (event: "websocket-connection", listener: (data: RequestEvent) => void): THIS;
+  (event: "settingsChanged", listener: (keys: (keyof ServerConfig)[]) => void): THIS;
   (event: "settings", listener: (settings: ServerConfig) => void): THIS;
   (event: "stateError", listener: (state: StateObject) => void): THIS;
   (event: "stateDebug", listener: (state: StateObject) => void): THIS;
   (
     event: "serverOpen",
-    listener: (
-      serverList: any[],
-      hosts: string[],
-      https: boolean,
-      dryRun: boolean
-    ) => void
+    listener: (serverList: any[], hosts: string[], https: boolean, dryRun: boolean) => void
   ): THIS;
   (event: "serverClose", listener: (iface: string) => void): THIS;
 }
 type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
 export interface ServerEventEmitter extends EventEmitter {
-  emit(event: "websocket-connection", data: RequestEventWS): boolean;
+  emit(event: "websocket-connection", data: RequestEvent): boolean;
   emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
   emit(event: "settings", settings: ServerConfig): boolean;
   emit(event: "stateError", state: StateObject<any, any>): boolean;
@@ -221,12 +174,7 @@ export function getHumanSize(size: number) {
 
 export type Hashmap<T> = { [K: string]: T };
 
-export type FolderEntryType =
-  | "folder"
-  | "datafolder"
-  | "htmlfile"
-  | "other"
-  | "error";
+export type FolderEntryType = "folder" | "datafolder" | "htmlfile" | "other" | "error";
 
 export interface DirectoryEntry {
   name: string;
@@ -248,26 +196,11 @@ export interface Directory {
  * returns. If there is no error handler, undefined is returned.
  * The string "undefined" is not a valid JSON document.
  */
-export function tryParseJSON<T = any>(
-  str: string,
-  onerror: (e: JsonError) => never
-): T;
-export function tryParseJSON<T = any>(
-  str: string,
-  onerror: (e: JsonError) => T
-): T;
-export function tryParseJSON<T = any>(
-  str: string,
-  onerror: (e: JsonError) => void
-): T | undefined;
-export function tryParseJSON<T = any>(
-  str: string,
-  onerror?: undefined
-): T | undefined;
-export function tryParseJSON<T = any>(
-  str: string,
-  onerror?: (e: JsonError) => T
-): T | undefined {
+export function tryParseJSON<T = any>(str: string, onerror: (e: JsonError) => never): T;
+export function tryParseJSON<T = any>(str: string, onerror: (e: JsonError) => T): T;
+export function tryParseJSON<T = any>(str: string, onerror: (e: JsonError) => void): T | undefined;
+export function tryParseJSON<T = any>(str: string, onerror?: undefined): T | undefined;
+export function tryParseJSON<T = any>(str: string, onerror?: (e: JsonError) => T): T | undefined {
   function findJSONError(message: string, json: string) {
     console.log(message);
     const res: string[] = [];
@@ -304,11 +237,7 @@ export class JsonError {
 export function keys<T>(o: T): (keyof T)[] {
   return Object.keys(o) as (keyof T)[];
 }
-export function padLeft(
-  str: any,
-  pad: number | string,
-  padStr?: string
-): string {
+export function padLeft(str: any, pad: number | string, padStr?: string): string {
   var item = str.toString();
   if (typeof padStr === "undefined") padStr = " ";
   if (typeof pad === "number") {
@@ -317,9 +246,7 @@ export function padLeft(
   //pad: 000000 val: 6543210 => 654321
   return pad.substr(0, Math.max(pad.length - item.length, 0)) + item;
 }
-export function sortBySelector<T extends { [k: string]: string }>(
-  key: (e: T) => any
-) {
+export function sortBySelector<T extends { [k: string]: string }>(key: (e: T) => any) {
   return function(a: T, b: T) {
     var va = key(a);
     var vb = key(b);
@@ -360,31 +287,13 @@ export namespace colors {
   export const BgWhite = "\x1b[47m";
 }
 
-/**
- *  4 - Errors that require the process to exit for restart
- *  3 - Major errors that are handled and do not require a server restart
- *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
- *  1 - Info - Most startup messages
- *  0 - Normal debug messages and all software and request-side error messages
- * -1 - Detailed debug messages from high level apis
- * -2 - Response status messages and error response data
- * -3 - Request and response data for all messages (verbose)
- * -4 - Protocol details and full data dump (such as encryption steps and keys)
- */
-declare function DebugLog(
-  this: { debugOutput: Writable; settings: ServerConfig },
-  level: number,
-  str: string | NodeJS.ErrnoException,
-  ...args: any[]
-);
+
 // declare function DebugLog(str: string, ...args: any[]);
 export function isError(obj): obj is Error {
   return !!obj && obj.constructor === Error;
   // return [obj.message, obj.name].every(e => typeof e !== "undefined");
 }
-export function isErrnoException(
-  obj: NodeJS.ErrnoException
-): obj is NodeJS.ErrnoException {
+export function isErrnoException(obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException {
   return isError(obj);
 }
 
@@ -406,11 +315,7 @@ export interface ServeStaticResult {
   message: string;
 }
 
-export function serveFile(
-  state: StateObject,
-  file: string,
-  root: string | undefined
-) {
+export function serveFile(state: StateObject, file: string, root: string | undefined) {
   promisify(fs.stat)(root ? path.join(root, file) : file).then(
     (stat): any => {
       state.send({
@@ -461,11 +366,7 @@ export function serveFolderIndex(options: { type: string }) {
       files.map(file =>
         promisify(fs.stat)(path.join(folder, file)).then(
           stat => {
-            let itemtype = stat.isDirectory()
-              ? "directory"
-              : stat.isFile()
-              ? "file"
-              : "other";
+            let itemtype = stat.isDirectory() ? "directory" : stat.isFile() ? "file" : "other";
             res[itemtype].push(file);
           },
           x => undefined
@@ -485,14 +386,8 @@ export function serveFolderIndex(options: { type: string }) {
     };
   }
 }
-export function canAcceptGzip(
-  header: string | { headers: http.IncomingHttpHeaders }
-) {
-  if (
-    ((a): a is { headers: http.IncomingHttpHeaders } => typeof a === "object")(
-      header
-    )
-  ) {
+export function canAcceptGzip(header: string | { headers: http.IncomingHttpHeaders }) {
+  if (((a): a is { headers: http.IncomingHttpHeaders } => typeof a === "object")(header)) {
     header = header.headers["accept-encoding"] as string;
   }
   var gzip = header
@@ -541,10 +436,7 @@ export function getTreePathFiles(
   result: PathResolverResult,
   state: StateObject
 ): Promise<DirectoryIndexData> {
-  let dirpath = [
-    result.treepathPortion.join("/"),
-    result.filepathPortion.join("/"),
-  ]
+  let dirpath = [result.treepathPortion.join("/"), result.filepathPortion.join("/")]
     .filter(e => e)
     .join("/");
   const type = Config.isGroup(result.item) ? "group" : "folder";
@@ -567,12 +459,7 @@ export function getTreePathFiles(
       })
       .catch(err => {
         if (!err) return Promise.reject(err);
-        state.log(
-          2,
-          'Error calling readdir on folder "%s": %s',
-          result.fullfilepath,
-          err.message
-        );
+        state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
         state.throw(500);
         return Promise.reject(false);
       });
@@ -605,11 +492,7 @@ export function getTreeOptions(state: StateObject) {
     // console.log(e);
     e.$options &&
       e.$options.forEach(f => {
-        if (
-          f.$element === "auth" ||
-          f.$element === "putsaver" ||
-          f.$element === "index"
-        ) {
+        if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
           // console.log(f);
           Object.keys(f).forEach(k => {
             if (f[k] === undefined) return;
@@ -621,6 +504,7 @@ export function getTreeOptions(state: StateObject) {
   return options;
 }
 import { generateDirectoryListing } from "./generateDirectoryListing.js";
+import { RequestEvent } from "./RequestEvent";
 
 //const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
 export type DirectoryIndexData = {
@@ -716,9 +600,7 @@ export function statsafe(p: string) {
  * @param {({ statpath: string, index: number, endStat: boolean } | string)} s
  * @returns
  */
-export async function statPath(
-  s: { statpath: string; index: number } | string
-) {
+export async function statPath(s: { statpath: string; index: number } | string) {
   if (typeof s === "string") s = { statpath: s, index: 0 };
   const { statpath, index } = s;
   let stat = await statsafe(statpath);
@@ -749,10 +631,7 @@ function getItemType(stat: Stats | undefined, infostat: Stats | undefined) {
 
   return itemtype;
 }
-export function treeWalker(
-  tree: Config.GroupElement | Config.PathElement,
-  reqpath
-) {
+export function treeWalker(tree: Config.GroupElement | Config.PathElement, reqpath) {
   function getAncesterEntry(a) {
     return Object.assign({}, a, { $children: undefined });
   }
@@ -989,378 +868,8 @@ export interface StandardResponseHeaders {
   dav?: string;
   etag?: string;
 }
-export class StateObject<STATPATH = StatPathResult, T = any> {
-  static parseURL(str: string): StateObjectUrl {
-    let item = url.parse(str, true);
-    let { path, pathname, query, search, href } = item;
-    return {
-      path: path || "",
-      pathname: pathname || "",
-      query: query || "",
-      search: search || "",
-      href: href || "",
-    };
-  }
-  static errorRoute(status: number, reason?: string) {
-    // return (obs: Observable<any>): any => {
-    // 	return obs.mergeMap((state: StateObject) => {
-    // 		if (reason)
-    // 			return state.throwReason(status, reason);
-    // 		else
-    // 			return state.throw(status);
-    // 	})
-    // }
-  }
 
-  get allow(): ServerConfig_AccessOptions {
-    if (this.authAccountsKey) {
-      return this.settings.authAccounts[this.authAccountsKey].permissions;
-    } else {
-      return this.settings.bindInfo.localAddressPermissions[
-        this.hostLevelPermissionsKey
-      ];
-    }
-  }
-
-  get hostRoot() {
-    return this.settings.tree[this.treeHostIndex].$mount;
-  }
-
-  // req: http.IncomingMessage;
-  // res: http.ServerResponse;
-  startTime: [number, number];
-  timestamp: string;
-
-  body: string = "";
-  json: any | undefined;
-
-  /** The StatPathResult if this request resolves to a path */
-  //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-  statPath: STATPATH;
-  /** The tree ancestors in descending order, including the final folder element. */
-  //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-  ancestry: Config.MountElement[];
-  /** The tree ancestors options as they apply to this request */
-  //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-  treeOptions: OptionsConfig;
-
-  url: StateObjectUrl;
-
-  path: string[];
-
-  // maxid: number;
-
-  // where: string;
-  query: any;
-  // errorThrown: Error;
-
-  restrict: any;
-
-  // expressNext: ((err?: any) => void) | false;
-
-  pathOptions: {
-    noTrailingSlash: boolean;
-  } = {
-    noTrailingSlash: false,
-  };
-
-  req: http.IncomingMessage;
-  res: http.ServerResponse;
-
-  responseHeaders: StandardResponseHeaders = {} as any;
-  responseSent: boolean = false;
-
-  constructor(
-    private _req: http.IncomingMessage,
-    private _res: http.ServerResponse,
-
-    private eventer: ServerEventEmitter,
-    public hostLevelPermissionsKey: string,
-    public authAccountsKey: string,
-    /** The HostElement array index in settings.tree */
-    public treeHostIndex: number,
-    public username: string,
-    public readonly settings: Readonly<ServerConfig>,
-    public debugOutput: Writable
-  ) {
-    this.startTime = process.hrtime();
-    this.req = _req;
-    this.res = _res;
-    //parse the url and store in state.
-    this.url = StateObject.parseURL(this.req.url as string);
-    //parse the path for future use
-    this.path = (this.url.pathname as string).split("/");
-
-    let t = new Date();
-    this.timestamp = format(
-      "%s-%s-%s %s:%s:%s",
-      t.getFullYear(),
-      padLeft(t.getMonth() + 1, "00"),
-      padLeft(t.getDate(), "00"),
-      padLeft(t.getHours(), "00"),
-      padLeft(t.getMinutes(), "00"),
-      padLeft(t.getSeconds(), "00")
-    );
-    const interval = setInterval(() => {
-      this.log(-2, "LONG RUNNING RESPONSE");
-      this.log(-2, "%s %s ", this.req.method, this.req.url);
-    }, 60000);
-    _res.on("finish", () => {
-      clearInterval(interval);
-      if (this.hasCriticalLogs) this.eventer.emit("stateError", this);
-      else this.eventer.emit("stateDebug", this);
-    });
-  }
-  // debug(str: string, ...args: any[]) {
-  //     this.debugLog('[' +
-  //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-  //         this.req.socket.remoteAddress + colors.Reset + '] ' +
-  //         format.apply(null, arguments)
-  //     );
-  // }
-
-  loglevel: number = DEBUGLEVEL;
-  doneMessage: string[] = [];
-  hasCriticalLogs: boolean = false;
-  /**
-   *  4 - Errors that require the process to exit for restart
-   *  3 - Major errors that are handled and do not require a server restart
-   *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
-   *  1 - Info - Most startup messages
-   *  0 - Normal debug messages and all software and request-side error messages
-   * -1 - Detailed debug messages from high level apis
-   * -2 - Response status messages and error response data
-   * -3 - Request and response data for all messages (verbose)
-   * -4 - Protocol details and full data dump (such as encryption steps and keys)
-   */
-  log(level: number, template: any, ...args: any[]) {
-    if (level < this.loglevel) return this;
-    if (level > 1) {
-      this.hasCriticalLogs = true;
-      debugger;
-    }
-    this.doneMessage.push(format(template, ...args));
-    return this;
-  }
-  // error() {
-  //     this.errorThrown = new Error(this.doneMessage.join('\n'));
-  //     this.errorThrown.name = "StateObjectError";
-  //     return this;
-  // }
-  /**
-   * if the client is allowed to recieve error info, sends `message`, otherwise sends `reason`.
-   * `reason` is always sent as the status header.
-   */
-  throwError<T = StateObject>(
-    statusCode: number,
-    error: ER,
-    headers?: StandardResponseHeaders
-  ) {
-    return this.throwReason(
-      statusCode,
-      this.allow.writeErrors ? error : error.reason,
-      headers
-    );
-  }
-  throwReason<T = StateObject>(
-    statusCode: number,
-    reason: string | ER,
-    headers?: StandardResponseHeaders
-  ) {
-    if (!this.responseSent) {
-      if (typeof reason === "string") {
-        let res = this.respond(statusCode, reason, headers);
-        if (statusCode !== 204) res.string(reason);
-      } else {
-        let res = this.respond(statusCode, reason.reason, headers);
-        if (statusCode !== 204) res.string(reason.message);
-      }
-    }
-    // return Observable.empty<T>();
-  }
-  throw<T = never>(statusCode: number, headers?: StandardResponseHeaders) {
-    if (!this.responseSent) {
-      if (headers) this.setHeaders(headers);
-      this.respond(statusCode).empty();
-    }
-    // return Observable.empty<T>();
-  }
-  setHeader(key: keyof StandardResponseHeaders, val: string) {
-    this.setHeaders({ [key]: val } as any);
-  }
-  setHeaders(headers: StandardResponseHeaders) {
-    Object.assign(
-      this.responseHeaders,
-      headers,
-      headers["Set-Cookie"]
-        ? {
-            "Set-Cookie": (this.responseHeaders["Set-Cookie"] || []).concat(
-              headers["Set-Cookie"] || []
-            ),
-          }
-        : {}
-    );
-  }
-  respond(code: number, message?: string, headers?: StandardResponseHeaders) {
-    if (headers) this.setHeaders(headers);
-    if (!message) message = http.STATUS_CODES[code];
-    if (this.settings._devmode) {
-      let stack = new Error().stack;
-      setTimeout(() => {
-        if (!this.responseSent)
-          this.debugOutput.write("Response not sent syncly\n " + stack);
-      }, 0);
-    }
-    var subthis = {
-      json: (data: any) => {
-        this.setHeader("Content-Type", "application/json");
-        subthis.string(JSON.stringify(data));
-      },
-      string: (data: string) => {
-        subthis.buffer(Buffer.from(data, "utf8"));
-      },
-      stream: (data: Stream) => {
-        this._res.writeHead(code, message, this.responseHeaders as any);
-        data.pipe(this._res);
-        this.responseSent = true;
-      },
-      buffer: (data: Buffer) => {
-        this.setHeader("Content-Length", data.byteLength.toString());
-        this._res.writeHead(code, message, this.responseHeaders as any);
-        this._res.write(data);
-        this._res.end();
-        this.responseSent = true;
-      },
-      empty: () => {
-        this._res.writeHead(code, message, this.responseHeaders as any);
-        this._res.end();
-        this.responseSent = true;
-      },
-    };
-    return subthis;
-  }
-
-  redirect(redirect: string) {
-    this.respond(302, "", {
-      Location: redirect,
-    }).empty();
-  }
-  send(options: {
-    root: string | undefined;
-    filepath: string;
-    error?: (err: any) => void;
-    directory?: (filepath: string) => void;
-    headers?: (filepath: string) => http.OutgoingHttpHeaders;
-  }) {
-    const { filepath, root, error, directory, headers } = options;
-    const sender = send(this._req, filepath, { root });
-    if (error) sender.on("error", error);
-    if (directory)
-      sender.on("directory", (res: http.ServerResponse, fp) => directory(fp));
-    if (headers)
-      sender.on("headers", (res: http.ServerResponse, fp) => {
-        const hdrs = headers(fp);
-        Object.keys(hdrs).forEach(e => {
-          let item = hdrs[e];
-          if (item) res.setHeader(e, item.toString());
-        });
-      });
-
-    sender.pipe(this._res);
-  }
-  /**
-   * Recieves the body of the request and stores it in body and json. If there is an
-   * error parsing body as json, the error callback will be called or if the callback
-   * is boolean true it will send an error response with the json error position.
-   *
-   * @param {(true | ((e: JsonError) => void))} errorCB sends an error response
-   * showing the incorrect JSON syntax if true, or calls the function
-   * @returns {Observable<StateObject>}
-   * @memberof StateObject
-   */
-  recieveBody(parseJSON: boolean, errorCB?: true | ((e: JsonError) => void)) {
-    return new Promise<Buffer>(resolve => {
-      let chunks: Buffer[] = [];
-      this._req.on("data", chunk => {
-        if (typeof chunk === "string") {
-          chunks.push(Buffer.from(chunk));
-        } else {
-          chunks.push(chunk);
-        }
-      });
-      this._req.on("end", () => {
-        this.body = Buffer.concat(chunks).toString("utf8");
-
-        if (this.body.length === 0 || !parseJSON) return resolve();
-
-        let catchHandler =
-          errorCB === true
-            ? (e: JsonError) => {
-                this.respond(400, "", {
-                  "Content-Type": "text/plain",
-                }).string(e.errorPosition);
-                //return undefined;
-              }
-            : errorCB;
-
-        this.json = catchHandler
-          ? tryParseJSON<any>(this.body, catchHandler)
-          : tryParseJSON(this.body);
-        resolve();
-      });
-    });
-  }
-  static DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
-    //if(prefix.startsWith("V:")) return function(){};
-    return function(
-      this: { debugOutput: Writable; settings: ServerConfig },
-      msgLevel: number,
-      tempString: any,
-      ...args: any[]
-    ) {
-      if (!ignoreLevel && this.settings.logging.debugLevel > msgLevel) return;
-      if (isError(args[0])) {
-        let err = args[0];
-        args = [];
-        if (err.stack) args.push(err.stack);
-        else args.push("Error %s: %s", err.name, err.message);
-      }
-      let t = new Date();
-      let date = format(
-        "%s-%s-%s %s:%s:%s",
-        t.getFullYear(),
-        padLeft(t.getMonth() + 1, "00"),
-        padLeft(t.getDate(), "00"),
-        padLeft(t.getHours(), "00"),
-        padLeft(t.getMinutes(), "00"),
-        padLeft(t.getSeconds(), "00")
-      );
-      this.debugOutput.write(
-        " " +
-          (msgLevel >= 3 ? colors.BgRed + colors.FgWhite : colors.FgRed) +
-          prefix +
-          " " +
-          colors.FgCyan +
-          date +
-          colors.Reset +
-          " " +
-          format
-            .apply(null, [tempString, ...args])
-            .split("\n")
-            .map((e, i) => {
-              if (i > 0) {
-                return new Array(23 + prefix.length).join(" ") + e;
-              } else {
-                return e;
-              }
-            })
-            .join("\n"),
-        "utf8"
-      );
-    };
-  }
-  // private debugLog: typeof DebugLog = StateObject.DebugLogger("STATE  ");
-}
+import { StateObject } from "./StateObject";
 
 export class ER extends Error {
   constructor(public reason: string, message: string) {
@@ -1422,24 +931,16 @@ export type TreePathResult =
   // TreePathResultObject<NewTreeItem, number, false>
   | TreePathResultObject<Config.GroupElement, number, false>
   | TreePathResultObject<Config.PathElement, number, true>;
-export function createHashmapString<T>(
-  keys: string[],
-  values: T[]
-): { [id: string]: T } {
-  if (keys.length !== values.length)
-    throw "keys and values must be the same length";
+export function createHashmapString<T>(keys: string[], values: T[]): { [id: string]: T } {
+  if (keys.length !== values.length) throw "keys and values must be the same length";
   var obj: { [id: string]: T } = {};
   keys.forEach((e, i) => {
     obj[e] = values[i];
   });
   return obj;
 }
-export function createHashmapNumber<T>(
-  keys: number[],
-  values: T[]
-): { [id: number]: T } {
-  if (keys.length !== values.length)
-    throw "keys and values must be the same length";
+export function createHashmapNumber<T>(keys: number[], values: T[]): { [id: number]: T } {
+  if (keys.length !== values.length) throw "keys and values must be the same length";
   var obj: { [id: number]: T } = {};
   keys.forEach((e, i) => {
     obj[e] = values[i];
@@ -1447,9 +948,7 @@ export function createHashmapNumber<T>(
   return obj;
 }
 
-export function obsTruthy<T>(
-  a: T | undefined | null | false | "" | 0 | void
-): a is T {
+export function obsTruthy<T>(a: T | undefined | null | false | "" | 0 | void): a is T {
   return !!a;
 }
 
@@ -1479,20 +978,10 @@ export function getError(code: string, ...args: string[]): any {
  */
 export function testAddress(ip: string, range: string, netmask: number) {
   let netmaskBinStr = ipcalc.IPv4_bitsNM_to_binstrNM(netmask);
-  let addressBinStr = ipcalc.IPv4_intA_to_binstrA(
-    ipcalc.IPv4_dotquadA_to_intA(ip)
-  );
-  let netaddrBinStr = ipcalc.IPv4_intA_to_binstrA(
-    ipcalc.IPv4_dotquadA_to_intA(range)
-  );
-  let netaddrBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(
-    netaddrBinStr,
-    netmaskBinStr
-  );
-  let addressBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(
-    addressBinStr,
-    netmaskBinStr
-  );
+  let addressBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(ip));
+  let netaddrBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(range));
+  let netaddrBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(netaddrBinStr, netmaskBinStr);
+  let addressBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(addressBinStr, netmaskBinStr);
   return netaddrBinStrMasked === addressBinStrMasked;
   // 	this.addressInteger = IPv4_dotquadA_to_intA( this.addressDotQuad );
   // //	this.addressDotQuad  = IPv4_intA_to_dotquadA( this.addressInteger );
@@ -1522,8 +1011,7 @@ export function parseHostList(hosts: string[]) {
         let allow = !test[1];
         let ip = test[2];
         let netmask = +test[3];
-        if (netmask < 0 || netmask > 32)
-          console.log("Host %s has an invalid netmask", test[0]);
+        if (netmask < 0 || netmask > 32) console.log("Host %s has an invalid netmask", test[0]);
         if (testAddress(addr, ip, netmask)) {
           usable = allow;
           lastMatch = i;
@@ -1557,8 +1045,7 @@ export function getUsableAddresses(hosts: string[]) {
         let allow = !test[1];
         let ip = test[2];
         let netmask = +test[3];
-        if (netmask < 0 || netmask > 32)
-          console.log("Host %s has an invalid netmask", test[0]);
+        if (netmask < 0 || netmask > 32) console.log("Host %s has an invalid netmask", test[0]);
         if (testAddress(addr.address, ip, netmask)) usable = allow;
       } else {
         let ip = test.startsWith("-") ? test.slice(1) : test;
@@ -1571,9 +1058,7 @@ export function getUsableAddresses(hosts: string[]) {
   return usableArray;
 }
 
-export function NodePromise<T>(
-  body: (cb: (err: NodeJS.ErrnoException, data: T) => void) => void
-) {
+export function NodePromise<T>(body: (cb: (err: NodeJS.ErrnoException, data: T) => void) => void) {
   return new Promise<T>((resolve, reject) => {
     body((err, data) => (err ? reject(err) : resolve(data)));
   });

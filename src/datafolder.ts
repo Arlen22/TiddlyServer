@@ -1,14 +1,14 @@
 import {
   PathResolverResult,
-  RequestEventWS,
+  // RequestEventWS,
   resolvePath,
   ServerConfig,
   ServerEventEmitter,
-  StateObject,
+  // StateObject,
   statWalkPath,
   tryParseJSON,
 } from "./server-types";
-
+import { StateObject } from "./StateObject";
 import * as path from "path";
 import * as http from "http";
 import * as fs from "fs";
@@ -18,6 +18,7 @@ import { parse } from "url";
 import { inspect, promisify } from "util";
 import { WikiInfo } from "./boot-startup-types";
 import * as WebSocket from "ws";
+import { RequestEvent } from "./RequestEvent";
 
 interface Records<T> {
   [k: string]: T;
@@ -32,12 +33,9 @@ export function init(e: ServerEventEmitter) {
   eventer = e;
   eventer.on("settings", function(set: ServerConfig) {});
   eventer.on("settingsChanged", keys => {});
-  eventer.on("websocket-connection", async function(data: RequestEventWS) {
+  eventer.on("websocket-connection", async function(data: RequestEvent) {
     const { request, client, settings, treeHostIndex, debugOutput } = data;
-    const debug = StateObject.DebugLogger("WEBSOCK").bind({
-      settings,
-      debugOutput,
-    });
+    const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
     const root = settings.tree[treeHostIndex].$mount;
     let pathname: string | undefined = parse(request.url as string).pathname; // new URL(request.url as string);
     if (!pathname) {
@@ -45,10 +43,7 @@ export function init(e: ServerEventEmitter) {
       return;
     }
 
-    let result: PathResolverResult | undefined = resolvePath(
-      pathname.split("/"),
-      root
-    );
+    let result: PathResolverResult | undefined = resolvePath(pathname.split("/"), root);
     if (!result) return client.close(404);
 
     let statPath = await statWalkPath(result);
@@ -69,12 +64,7 @@ export function init(e: ServerEventEmitter) {
       //event to give the client to the data folder
       const loadClient = () => {
         debug(-1, "ws-client-connect %s", mount);
-        loadedFolders[mount].events.emit(
-          "ws-client-connect",
-          client,
-          request,
-          subpath
-        );
+        loadedFolders[mount].events.emit("ws-client-connect", client, request, subpath);
       };
       //if the data folder is still loading, we wait, otherwise give immediately
       if (Array.isArray(loadedFolders[mount].handler)) {
@@ -121,10 +111,7 @@ function quickArrayCheck(obj: any): obj is Array<any> {
   return typeof obj.length === "number";
 }
 
-export function handleDataFolderRequest(
-  result: PathResolverResult,
-  state: StateObject
-) {
+export function handleDataFolderRequest(result: PathResolverResult, state: StateObject) {
   const target = state.settings.__targetTW;
 
   const { mount, folder } = loadDataFolderTrigger(
@@ -141,9 +128,7 @@ export function handleDataFolderRequest(
   //redirect ?reload requests to the same, to prevent it being
   //reloaded multiple times for the same page load.
   if (
-    (isFullpath &&
-      state.pathOptions.noTrailingSlash !==
-        !state.url.pathname.endsWith("/")) ||
+    (isFullpath && state.pathOptions.noTrailingSlash !== !state.url.pathname.endsWith("/")) ||
     state.url.query.reload
   ) {
     let redirect = mount + (!state.pathOptions.noTrailingSlash ? "/" : "");
@@ -171,9 +156,7 @@ function loadDataFolderTrigger(
   target: string,
   vars: {}
 ) {
-  let filepathPrefix = result.filepathPortion
-    .slice(0, statPath.index)
-    .join("/");
+  let filepathPrefix = result.filepathPortion.slice(0, statPath.index).join("/");
   //get the tree path, and add the file path (none if the tree path is a datafolder)
   let fullPrefix = ["", result.treepathPortion.join("/")];
   if (statPath.index > 0) fullPrefix.push(filepathPrefix);
@@ -213,24 +196,20 @@ function loadDataFolderType(
   target: string,
   vars: {}
 ) {
-  promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(
-    data => {
-      const wikiInfo = tryParseJSON<WikiInfo>(data, e => {
-        throw e;
-      });
-      if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-        loadDataFolderTiddlyWiki(mount, folder, reload, target, vars);
-      } else if (wikiInfo.type === "tiddlyserver") {
-        // loadTiddlyServerAdapter(mount, folder, reload)
-      }
+  promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(data => {
+    const wikiInfo = tryParseJSON<WikiInfo>(data, e => {
+      throw e;
+    });
+    if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
+      loadDataFolderTiddlyWiki(mount, folder, reload, target, vars);
+    } else if (wikiInfo.type === "tiddlyserver") {
+      // loadTiddlyServerAdapter(mount, folder, reload)
     }
-  );
+  });
 }
 declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
-  typeof __non_webpack_require__ !== "undefined"
-    ? __non_webpack_require__
-    : require;
+  typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 
 function loadDataFolderTiddlyWiki(
   mount: string,
@@ -312,10 +291,7 @@ function loadDataFolderTiddlyWiki(
       let req = new Object(state.req) as http.IncomingMessage & {
         tsstate: symbol;
       };
-      req.url +=
-        state.url.pathname === mount && !state.url.pathname.endsWith("/")
-          ? "/"
-          : "";
+      req.url += state.url.pathname === mount && !state.url.pathname.endsWith("/") ? "/" : "";
       req.tsstate = Symbol("state object pointer");
       queue[req.tsstate] = state;
       server.requestHandler(req, state.res);
@@ -350,10 +326,7 @@ declare class TiddlyWikiServer {
   // TS_Request_Queue: http.IncomingMessage[];
   addAuthenticator: any;
   authenticators: TiddlyServerAuthentication[];
-  requestHandler: (
-    request: http.IncomingMessage,
-    response: http.ServerResponse
-  ) => void;
+  requestHandler: (request: http.IncomingMessage, response: http.ServerResponse) => void;
   constructor(...args: any[]);
 }
 class TiddlyServerAuthentication {
@@ -361,10 +334,7 @@ class TiddlyServerAuthentication {
    *
    * @param server The server instance that instantiated this authenticator
    */
-  constructor(
-    private server: TiddlyWikiServer,
-    retrieve: (sym: symbol) => StateObject
-  ) {
+  constructor(private server: TiddlyWikiServer, retrieve: (sym: symbol) => StateObject) {
     //make sure nothing can access the state object!
     this.authenticateRequest = (request, response, state) => {
       let tsstate = retrieve(request.tsstate);
@@ -375,10 +345,7 @@ class TiddlyServerAuthentication {
         return true;
       } else {
         //The wiki itself may specify that anonymous users cannot access it
-        tsstate.throwReason(
-          403,
-          "Unauthenticated users cannot access this wiki"
-        );
+        tsstate.throwReason(403, "Unauthenticated users cannot access this wiki");
         return false;
       }
     };

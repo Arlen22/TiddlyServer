@@ -1,13 +1,19 @@
 import { PublicKeyCache } from "./publicKeyCache";
 import { SplitCookieWithUserName } from "./types";
-import { crypto_sign_verify_detached, from_base64 } from "libsodium-wrappers";
+import {
+  crypto_sign_verify_detached,
+  from_base64,
+  crypto_generichash,
+  crypto_generichash_BYTES,
+} from "libsodium-wrappers";
 import * as http from "http";
 import { SettingsReader } from "./settingsReader";
+import { ServerConfig } from "./server-config";
 
 const TIDDLY_SERVER_AUTH_COOKIE: string = "TiddlyServerAuth";
 const isoDateRegex = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/;
 
-export const checkCookieAuth = (request: http.IncomingMessage) => {
+export const checkCookieAuth = (request: http.IncomingMessage, settings: ServerConfig) => {
   if (!request.headers.cookie) return false;
   const cookies: { [k: string]: string } = {};
 
@@ -24,45 +30,52 @@ export const checkCookieAuth = (request: http.IncomingMessage) => {
   let cookieData = parseAuthCookie(auth, true);
   // We have to make sure the suffix is truthy
   if (!cookieData || cookieData.length !== 6 || !cookieData[5]) return false;
-  return validateCookie(cookieData, false);
+  return validateCookie(cookieData, false, settings);
 };
+
+export function lookupAccount(settings: ServerConfig, hash: string, username: string) {
+  return Object.keys(settings.authAccounts).find(groupID => {
+    let _key = from_base64(settings.authAccounts[groupID].clientKeys[username].publicKey);
+    let _hash = crypto_generichash(crypto_generichash_BYTES, _key, undefined, "base64");
+    return hash === _hash;
+  });
+}
 
 export const validateCookie = (
   cookieData: SplitCookieWithUserName,
-  logRegisterNotice?: string | false
+  logRegisterNotice: string | false,
+  settings: ServerConfig
 ) => {
-  const settings = SettingsReader.getInstance().getServerSettings();
+  // const settings = SettingsReader.getInstance().getServerSettings();
   const authCookieAge = settings?.authCookieAge || 0;
   let publicKeyCache = PublicKeyCache.getCache();
   let [username, type, timestamp, hash, sig, suffix] = cookieData;
-
-  const key: string = hash + username;
-  if (type !== "key") {
-    // currently only key is implemented
-    return false;
-  } else if (!publicKeyCache.keyExists(key)) {
+  if (type !== "key") return false;
+  const account = lookupAccount(settings, hash, username);
+  if (!account) {
     if (logRegisterNotice) console.log(logRegisterNotice);
     return false;
   }
+  try {
+    let { publicKey, cookieSalt } = settings.authAccounts[account].clientKeys[username];
 
-  let pubkey = publicKeyCache.getVal(key);
-  if (pubkey) {
     //don't check suffix unless it is provided, other code checks whether it is provided or not
     //check it after the signiture to prevent brute-force suffix checking
     const valid =
       crypto_sign_verify_detached(
         from_base64(sig),
         username + type + timestamp + hash,
-        from_base64(pubkey[1])
+        from_base64(publicKey)
       ) &&
       //suffix should undefined or valid, not an empty string
       //the calling code must determine whether the subject is needed
-      (suffix === undefined || suffix === pubkey[2]) &&
+      (suffix === undefined || suffix === cookieSalt) &&
       isoDateRegex.test(timestamp) &&
       Date.now() - new Date(timestamp).valueOf() < authCookieAge * 1000;
-    return valid ? [pubkey[0], username, pubkey[2]] : false;
+    return valid ? [account, username, cookieSalt] : false;
+  } catch (e) {
+    return false;
   }
-  return false;
 };
 
 /*
@@ -86,12 +99,7 @@ export const parseAuthCookie = (cookie: string, suffix: boolean) => {
   }
 };
 
-export const getSetCookie = (
-  name: string,
-  value: string,
-  secure: boolean,
-  age: number
-) => {
+export const getSetCookie = (name: string, value: string, secure: boolean, age: number) => {
   // let flags = ["Secure", "HttpOnly", "Max-Age=2592000", "SameSite=Strict"];
   let flags = {
     Secure: secure,

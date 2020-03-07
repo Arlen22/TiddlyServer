@@ -4,7 +4,7 @@ const options = {
   tabWidth: 2,
   semi: true,
   singleQuote: false,
-  printWidth: 80
+  printWidth: 100
 };
 
 module.exports = options;

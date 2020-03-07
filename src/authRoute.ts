@@ -1,6 +1,6 @@
 import { PublicKeyCache } from "./publicKeyCache";
 import {
-  StateObject,
+  
   ServerEventEmitter,
   ServerConfig,
   serveFile,
@@ -15,6 +15,7 @@ import {
   to_hex,
 } from "libsodium-wrappers";
 import * as path from "path";
+import { StateObject } from "./StateObject";
 
 const TIDDLY_SERVER_AUTH_COOKIE: string = "TiddlyServerAuth";
 
@@ -181,7 +182,8 @@ const handleLogin = async (state: StateObject) => {
         "    " + state.json.publicKey,
         "    username: " + cookieData[0],
         "    timestamp: " + cookieData[2],
-      ].join("\n")
+      ].join("\n"),
+      state.settings
   );
   if (valid) {
     state.setHeader(
