@@ -1,6 +1,6 @@
-/** @type { import("path") } */
-const path: typeof import("path") = require("path");
+import path = require("path");
 declare const __non_webpack_require__: NodeRequire | undefined;
+const nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 import { oc } from "./optional-chaining";
 // type AlwaysDefined<T> = {
 // 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
@@ -219,9 +219,6 @@ export function normalizeSettingsTree(
   ) {
     //require the json or js file and use it directly
     let filepath = pathResolveWithUser(settingsDir, tree);
-    let nodeRequire = __non_webpack_require__
-      ? __non_webpack_require__
-      : require;
     tree = nodeRequire(filepath).tree;
   }
   //otherwise just assume we're using the value itself.

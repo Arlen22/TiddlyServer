@@ -25,10 +25,10 @@ const settingsPath = path.dirname(settingsFile);
  *
  */
 
-/** @type {import("./src/server")} */
-// @ts-ignore
-const server = false ? require('./lib/compiled-lib') : require("./src/server");
+import server = require("./src/server");
 const settingsReader = SettingsReader.getInstance()
+declare const __non_webpack_require__: NodeRequire | undefined;
+const nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 
 server.libsReady.then(() => {
   // let [check1, checkErr1] = server.checkServerConfig(require(settingsFile));
@@ -43,9 +43,9 @@ server.libsReady.then(() => {
   let httpsSettingsFile = settingshttps ? path.resolve(settingsPath, settingshttps) : false;
   server.initServer({
     settings,
-    settingshttps: httpsSettingsFile && require(httpsSettingsFile).serverOptions,
+    settingshttps: httpsSettingsFile && nodeRequire(httpsSettingsFile).serverOptions,
     preflighter: fs.existsSync(__dirname + "/preflighter.js")
-      ? require("./preflighter.js").preflighter
+      ? nodeRequire("./preflighter.js").preflighter
       : undefined,
     dryRun: args.indexOf("--dry-run") !== -1
   });

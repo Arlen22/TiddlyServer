@@ -227,6 +227,8 @@ function loadDataFolderType(
   );
 }
 declare const __non_webpack_require__: NodeRequire | undefined;
+const nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
+
 function loadDataFolderTiddlyWiki(
   mount: string,
   folder: string,
@@ -236,8 +238,7 @@ function loadDataFolderTiddlyWiki(
 ) {
   console.time("twboot-" + folder);
   let _wiki = undefined;
-  
-  let nodeRequire = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
+
   const tw = nodeRequire(target + "/boot/boot.js").TiddlyWiki(
     nodeRequire(target + "/boot/bootprefix.js").bootprefix({
       packageInfo: nodeRequire(target + '/package.json')

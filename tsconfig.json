@@ -14,7 +14,8 @@
     "sourceMap": false,
     "inlineSourceMap": true,
     "resolveJsonModule": true,
-    "noErrorTruncation": true
+    "noErrorTruncation": true,
+    "declaration": true
   },
   "files": ["./server.ts"],
   // "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/*", "test/*"],
