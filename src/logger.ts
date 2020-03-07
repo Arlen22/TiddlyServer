@@ -54,20 +54,7 @@ namespace colors {
   export const BgWhite = "\x1b[47m";
 }
 
-var clfmonth = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+var clfmonth = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function pad2(num) {
   var str = String(num);
 
@@ -125,16 +112,13 @@ exports.getLocalDate = getLocalDate;
 morgan.token("localdate", function getDateToken(req, res, format) {
   var dt = new Date();
   var tzo: any = dt.getTimezoneOffset() / 60;
-  tzo =
-    (tzo < 0 ? "+" : "-") + pad2(tzo.toFixed(0)) + tzo.toFixed(2).split(".")[1];
+  tzo = (tzo < 0 ? "+" : "-") + pad2(tzo.toFixed(0)) + tzo.toFixed(2).split(".")[1];
   return getLocalDate(format, dt, tzo, true);
 });
 
 morgan.token("local-addr", (req, res) => {
   const addr = req.connection.localAddress;
-  return addr
-    ? addr + new Array(15 - addr.length + 1).join(" ")
-    : "               ";
+  return addr ? addr + new Array(15 - addr.length + 1).join(" ") : "               ";
 });
 
 morgan.format("mydevcolor", function developmentFormatLine(tokens, req, res) {
@@ -192,11 +176,7 @@ export function handler(options: {
   stream?: Writable;
   logToConsole?: boolean;
   logColorsToFile?: boolean;
-}): (
-  req: IncomingMessage,
-  res: ServerResponse,
-  next: (err?: any) => void
-) => void {
+}): (req: IncomingMessage, res: ServerResponse, next: (err?: any) => void) => void {
   const { logFile, logToConsole, logColorsToFile } = options;
   const colorsRegex = /\x1b\[[0-9]+m/gi;
   const myWritable = new stream.Writable({
@@ -204,10 +184,7 @@ export function handler(options: {
       // if we're given a buffer, convert it to a string
       if (Buffer.isBuffer(chunk)) chunk = chunk.toString("utf8");
       // remove ending linebreaks for consistency
-      chunk = chunk.slice(
-        0,
-        chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n"))
-      );
+      chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
       if (logFile) {
         try {
           fs.appendFileSync(

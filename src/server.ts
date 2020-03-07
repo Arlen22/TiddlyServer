@@ -401,7 +401,7 @@ async function requestHandler(
   let ev1 = new RequestEvent(settings, request, { host, addr, iface }, "response", response);
 
   //send it to the preflighter
-  let ev2 = await ev1.requestHandlerHostLevelChecks(preflighter); 
+  let ev2 = await ev1.requestHandlerHostLevelChecks(preflighter);
   // }).then(ev => {
   // check if the preflighter handled it
   if (ev2.handled) return;

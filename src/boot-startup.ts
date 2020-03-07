@@ -1,11 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import {
-  tryParseJSON,
-  JsonError,
-  JsonErrorContainer,
-  Hashmap,
-} from "./server-types";
+import { tryParseJSON, JsonError, JsonErrorContainer, Hashmap } from "./server-types";
 import { promisify } from "util";
 // import { Observable } from '../lib/rx';
 // const MULTILEVEL = false;
@@ -57,18 +52,12 @@ export async function loadTiddlersFromFile(
     getMetaFile = ext !== ".json" && options.hasMetaFile !== false;
 
   let [data1, data2] = await Promise.all([
-    promisify(fs.readFile)(filepath, encoding).catch(
-      (x: NodeJS.ErrnoException) => x
-    ),
-    getMetaFile
-      ? promisify(fs.readFile)(filepath + ".meta", "utf8")
-      : Promise.resolve(undefined),
+    promisify(fs.readFile)(filepath, encoding).catch((x: NodeJS.ErrnoException) => x),
+    getMetaFile ? promisify(fs.readFile)(filepath + ".meta", "utf8") : Promise.resolve(undefined),
   ]);
   //.then(([data1, data2]) => {
   let tiddlers =
-    typeof data1 === "string"
-      ? global_tw.wiki.deserializeTiddlers(ext, data1, {})
-      : [];
+    typeof data1 === "string" ? global_tw.wiki.deserializeTiddlers(ext, data1, {}) : [];
   let metadata = data2 ? global_tw.utils.parseFields(data2) : false;
   if (metadata && tiddlers.length === 1)
     tiddlers = [global_tw.utils.extend({}, tiddlers[0], metadata)];
@@ -107,10 +96,7 @@ export namespace TiddlyWiki {
     const $tw = require("../tiddlywiki/boot/boot.js").TiddlyWiki(
       require("../tiddlywiki/boot/bootprefix.js").bootprefix({
         packageInfo: JSON.parse(
-          fs.readFileSync(
-            path.join(__dirname, "../tiddlywiki/package.json"),
-            "utf8"
-          )
+          fs.readFileSync(path.join(__dirname, "../tiddlywiki/package.json"), "utf8")
         ),
       })
     );
@@ -168,16 +154,8 @@ export namespace TiddlyWiki {
     $tw.utils.registerFileType("text/vnd.tiddlywiki", "utf8", ".tid");
     $tw.utils.registerFileType("application/x-tiddler", "utf8", ".tid");
     $tw.utils.registerFileType("application/x-tiddlers", "utf8", ".multids");
-    $tw.utils.registerFileType(
-      "application/x-tiddler-html-div",
-      "utf8",
-      ".tiddler"
-    );
-    $tw.utils.registerFileType(
-      "text/vnd.tiddlywiki2-recipe",
-      "utf8",
-      ".recipe"
-    );
+    $tw.utils.registerFileType("application/x-tiddler-html-div", "utf8", ".tiddler");
+    $tw.utils.registerFileType("text/vnd.tiddlywiki2-recipe", "utf8", ".recipe");
     $tw.utils.registerFileType("text/plain", "utf8", ".txt");
     $tw.utils.registerFileType("text/css", "utf8", ".css");
     $tw.utils.registerFileType("text/html", "utf8", [".html", ".htm"]);
@@ -235,15 +213,10 @@ export namespace TiddlyWiki {
     // Create the wiki store for the app
     $tw.wiki = new $tw.Wiki();
     // Install built in tiddler fields modules
-    $tw.Tiddler.fieldModules = $tw.modules.getModulesByTypeAsHashmap(
-      "tiddlerfield"
-    );
+    $tw.Tiddler.fieldModules = $tw.modules.getModulesByTypeAsHashmap("tiddlerfield");
     // Install the tiddler deserializer modules
     $tw.Wiki.tiddlerDeserializerModules = Object.create(null);
-    $tw.modules.applyMethods(
-      "tiddlerdeserializer",
-      $tw.Wiki.tiddlerDeserializerModules
-    );
+    $tw.modules.applyMethods("tiddlerdeserializer", $tw.Wiki.tiddlerDeserializerModules);
     return $tw;
   }
 
@@ -275,15 +248,9 @@ export namespace TiddlyWiki {
             readOnly: info["read-only"],
           });
           // Merge the build targets
-          wikiInfo.build = $tw.utils.extend(
-            [],
-            subWikiInfo.build,
-            wikiInfo.build
-          );
+          wikiInfo.build = $tw.utils.extend([], subWikiInfo.build, wikiInfo.build);
         } else {
-          $tw.utils.error(
-            "Cannot recursively include wiki " + resolvedIncludedWikiPath
-          );
+          $tw.utils.error("Cannot recursively include wiki " + resolvedIncludedWikiPath);
         }
       });
     }
@@ -292,13 +259,8 @@ export namespace TiddlyWiki {
     // $tw.loadPlugins(wikiInfo.themes, $tw.config.themesPath, $tw.config.themesEnvVar);
     // $tw.loadPlugins(wikiInfo.languages, $tw.config.languagesPath, $tw.config.languagesEnvVar);
     // Load the wiki files, registering them as writable
-    var resolvedWikiPath = path.resolve(
-      wikiPath,
-      $tw.config.wikiTiddlersSubDir
-    );
-    $tw.utils.each($tw.loadTiddlersFromPath(resolvedWikiPath), function(
-      tiddlerFile
-    ) {
+    var resolvedWikiPath = path.resolve(wikiPath, $tw.config.wikiTiddlersSubDir);
+    $tw.utils.each($tw.loadTiddlersFromPath(resolvedWikiPath), function(tiddlerFile) {
       if (!options.readOnly && tiddlerFile.filepath) {
         $tw.utils.each(tiddlerFile.tiddlers, function(tiddler) {
           $tw.boot.files[tiddler.title] = {
@@ -315,10 +277,7 @@ export namespace TiddlyWiki {
     if (config["retain-original-tiddler-path"]) {
       var output = {};
       for (var title in $tw.boot.files) {
-        output[title] = path.relative(
-          resolvedWikiPath,
-          $tw.boot.files[title].filepath
-        );
+        output[title] = path.relative(resolvedWikiPath, $tw.boot.files[title].filepath);
       }
       $tw.wiki.addTiddler({
         title: "$:/config/OriginalTiddlerPaths",
@@ -336,9 +295,7 @@ export namespace TiddlyWiki {
     if (fs.existsSync(wikiPluginsPath)) {
       var pluginFolders = fs.readdirSync(wikiPluginsPath);
       for (var t = 0; t < pluginFolders.length; t++) {
-        pluginFields = $tw.loadPluginFolder(
-          path.resolve(wikiPluginsPath, "./" + pluginFolders[t])
-        );
+        pluginFields = $tw.loadPluginFolder(path.resolve(wikiPluginsPath, "./" + pluginFolders[t]));
         if (pluginFields) {
           $tw.wiki.addTiddler(pluginFields);
         }
@@ -349,19 +306,14 @@ export namespace TiddlyWiki {
     if (fs.existsSync(wikiThemesPath)) {
       var themeFolders = fs.readdirSync(wikiThemesPath);
       for (var t = 0; t < themeFolders.length; t++) {
-        pluginFields = $tw.loadPluginFolder(
-          path.resolve(wikiThemesPath, "./" + themeFolders[t])
-        );
+        pluginFields = $tw.loadPluginFolder(path.resolve(wikiThemesPath, "./" + themeFolders[t]));
         if (pluginFields) {
           $tw.wiki.addTiddler(pluginFields);
         }
       }
     }
     // Load any languages within the wiki folder
-    var wikiLanguagesPath = path.resolve(
-      wikiPath,
-      $tw.config.wikiLanguagesSubDir
-    );
+    var wikiLanguagesPath = path.resolve(wikiPath, $tw.config.wikiLanguagesSubDir);
     if (fs.existsSync(wikiLanguagesPath)) {
       var languageFolders = fs.readdirSync(wikiLanguagesPath);
       for (var t = 0; t < languageFolders.length; t++) {
@@ -381,11 +333,7 @@ export namespace TiddlyServer {
     public files: any[] = [];
     public tiddlers: Hashmap<any> = {};
   }
-  export async function loadWiki(
-    wikiPath: string,
-    wikiInfo: WikiInfo,
-    fallback: boolean
-  ) {
+  export async function loadWiki(wikiPath: string, wikiInfo: WikiInfo, fallback: boolean) {
     if (wikiInfo.type !== "tiddlyserver") {
       if (fallback) {
         loadWikiFolder(wikiPath, wikiInfo);
@@ -413,8 +361,7 @@ export namespace TiddlyServer {
         $tw.wiki.each((tiddler, title) => {
           let fields = {};
           let keys = Object.keys(tiddler.fields).forEach(key => {
-            if (skipFields.indexOf(key) === -1)
-              fields[key] = tiddler.fields[key];
+            if (skipFields.indexOf(key) === -1) fields[key] = tiddler.fields[key];
           });
           wiki.tiddlers[title] = fields;
         });
@@ -484,8 +431,7 @@ export function getTiddlerFileInfo(
 ) {
   let { type, extension } = getFileType(fields.type);
 
-  var hasMetaFile =
-    type !== "application/x-tiddler" && type !== "application/json";
+  var hasMetaFile = type !== "application/x-tiddler" && type !== "application/json";
   if (!hasMetaFile) {
     extension = ".tid";
   }
@@ -495,10 +441,7 @@ export function getTiddlerFileInfo(
     return "_" + str.charCodeAt(0).toString(16);
   });
 
-  if (
-    filename.substr(-extension.length).toLocaleLowerCase() !==
-    extension.toLocaleLowerCase()
-  ) {
+  if (filename.substr(-extension.length).toLocaleLowerCase() !== extension.toLocaleLowerCase()) {
     filename = filename + extension;
   }
 

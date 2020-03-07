@@ -42,9 +42,7 @@ export function init(eventer: ServerEventEmitter) {
   initDatafolder(eventer);
 }
 
-export async function handleTiddlyServerRoute(
-  state: StateObject
-): Promise<void> {
+export async function handleTiddlyServerRoute(state: StateObject): Promise<void> {
   function catchPromiseError(err) {
     if (err) {
       state.log(2, "Error caught " + err.toString());
@@ -52,8 +50,7 @@ export async function handleTiddlyServerRoute(
     }
   }
 
-  let result: PathResolverResult =
-    resolvePath(state, state.hostRoot) || (null as never);
+  let result: PathResolverResult = resolvePath(state, state.hostRoot) || (null as never);
   if (!result) return state.throw<never>(404);
   state.ancestry = [...result.ancestry, result.item];
   state.treeOptions = getTreeOptions(state);
@@ -61,18 +58,11 @@ export async function handleTiddlyServerRoute(
   {
     //check authList
     let { authList, authError } = state.treeOptions.auth;
-    let denyAccess =
-      Array.isArray(authList) && authList.indexOf(state.authAccountsKey) === -1;
+    let denyAccess = Array.isArray(authList) && authList.indexOf(state.authAccountsKey) === -1;
     if (denyAccess)
       return state
         .respond(authError)
-        .string(
-          authAccessDenied(
-            authError,
-            state.allow.loginlink,
-            !!state.authAccountsKey
-          )
-        );
+        .string(authAccessDenied(authError, state.allow.loginlink, !!state.authAccountsKey));
   }
 
   if (Config.isGroup(result.item))
@@ -81,9 +71,7 @@ export async function handleTiddlyServerRoute(
   function stateItemType<T extends StatPathResult["itemtype"]>(
     state: StateObject,
     itemtype: T
-  ): state is StateObject<
-    Extract<StatPathResult, { itemtype: typeof itemtype }>
-  > {
+  ): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> {
     return state.statPath.itemtype === itemtype;
   }
 
@@ -135,9 +123,7 @@ function handleGETfile(
     headers: (statPath => filepath => {
       const statItem = statPath.stat;
       const mtime = Date.parse(statPath.stat.mtime as any);
-      const etag = JSON.stringify(
-        [statItem.ino, statItem.size, mtime].join("-")
-      );
+      const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join("-"));
       return { Etag: etag };
     })(state.statPath),
   });
@@ -153,9 +139,7 @@ function authAccessDenied(
 <h2>Error ${authError}</h2>
 <p>
 ${
-  authAccountsKeySet
-    ? "You do not have access to this URL"
-    : "In this case you are not logged in. "
+  authAccountsKeySet ? "You do not have access to this URL" : "In this case you are not logged in. "
 }
 ${
   loginlink
@@ -167,33 +151,18 @@ ${
 `;
 }
 
-function handleFileError(
-  debugTag: string,
-  state: StateObject,
-  err: NodeJS.ErrnoException
-) {
-  StateObject.DebugLogger(debugTag).call(
-    state,
-    2,
-    "%s %s\n%s",
-    err.code,
-    err.message,
-    err.path
-  );
+function handleFileError(debugTag: string, state: StateObject, err: NodeJS.ErrnoException) {
+  StateObject.DebugLogger(debugTag).call(state, 2, "%s %s\n%s", err.code, err.message, err.path);
 }
 function debugState(debugTag: string, state: StateObject) {
   return StateObject.DebugLogger(debugTag).bind(state);
 }
-async function serveDirectoryIndex(
-  result: PathResolverResult,
-  state: StateObject
-) {
+async function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
   // const { state } = result;
   const allow = state.allow;
 
   // console.log(state.url);
-  if (!state.url.pathname.endsWith("/"))
-    return state.redirect(state.url.pathname + "/");
+  if (!state.url.pathname.endsWith("/")) return state.redirect(state.url.pathname + "/");
 
   if (state.req.method === "GET") {
     const isFolder = result.item.$element === "folder";
@@ -325,39 +294,25 @@ function mkdirPostRequest(
     const normdir = path.basename(path.normalize(fields.dirname));
     //if normalize changed anything, it's probably bad
     if (normdir !== newdir || normdir.indexOf("..") !== -1) {
-      debugState("SER-DIR", state)(
-        2,
-        "mkdir normalized path %s didnt match %s",
-        normdir,
-        newdir
-      );
+      debugState("SER-DIR", state)(2, "mkdir normalized path %s didnt match %s", normdir, newdir);
       state.throwError(
         400,
-        new ER(
-          "Error parsing request - invalid name",
-          "invalid path given in dirname"
-        )
+        new ER("Error parsing request - invalid name", "invalid path given in dirname")
       );
       return;
     }
     if (
-      await promisify(fs.mkdir)(path.join(result.fullfilepath, normdir)).catch(
-        err => {
-          handleFileError("SER-DIR", state, err);
-          state.redirect(state.url.pathname + "?error=mkdir");
-          return true;
-        }
-      )
+      await promisify(fs.mkdir)(path.join(result.fullfilepath, normdir)).catch(err => {
+        handleFileError("SER-DIR", state, err);
+        state.redirect(state.url.pathname + "?error=mkdir");
+        return true;
+      })
     )
       return;
 
     if (fields.dirtype === "datafolder") {
-      let read = fs.createReadStream(
-        path.join(__dirname, "../datafolder-template.json")
-      );
-      let write = fs.createWriteStream(
-        path.join(result.fullfilepath, normdir, "tiddlywiki.info")
-      );
+      let read = fs.createReadStream(path.join(__dirname, "../datafolder-template.json"));
+      let write = fs.createWriteStream(path.join(result.fullfilepath, normdir, "tiddlywiki.info"));
       let error;
       const errorHandler = err => {
         handleFileError("SER-DIR", state, err);
@@ -380,9 +335,7 @@ function mkdirPostRequest(
 
 /// file handler section =============================================
 
-async function handlePUTfile(
-  state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>
-) {
+async function handlePUTfile(state: StateObject<Extract<StatPathResult, { itemtype: "file" }>>) {
   if (!state.settings.putsaver.enabled || !state.allow.putsaver) {
     let message = "PUT saver is disabled";
     state.log(-2, message);
@@ -390,8 +343,7 @@ async function handlePUTfile(
     return;
   }
   // const hash = createHash('sha256').update(fullpath).digest('base64');
-  const first = (header?: string | string[]) =>
-    Array.isArray(header) ? header[0] : header;
+  const first = (header?: string | string[]) => (Array.isArray(header) ? header[0] : header);
   const t = state.statPath;
   const fullpath = state.statPath.statpath;
   const statItem = state.statPath.stat;
@@ -409,10 +361,7 @@ async function handlePUTfile(
     console.log("412 etag %s", etag);
     ifmatch.forEach((e, i) => {
       if (_etag[i] !== e)
-        console.log(
-          "412 caused by difference in %s",
-          ["inode", "size", "modified"][i]
-        );
+        console.log("412 caused by difference in %s", ["inode", "size", "modified"][i]);
     });
     let headTime = +ifmatch[2];
     let diskTime = mtime;
@@ -422,23 +371,14 @@ async function handlePUTfile(
       diskTime - state.settings.putsaver.etagAge * 1000 > headTime
     )
       return state.throw(412);
-    console.log(
-      "412 prevented by etagWindow of %s seconds",
-      state.settings.putsaver.etagAge
-    );
+    console.log("412 prevented by etagWindow of %s seconds", state.settings.putsaver.etagAge);
   }
   await new Promise((resolve, reject) => {
     if (state.treeOptions.putsaver.backupFolder) {
-      const backupFile = state.url.pathname.replace(
-        /[^A-Za-z0-9_\-+()\%]/gi,
-        "_"
-      );
+      const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
       const ext = path.extname(backupFile);
       const backupWrite = fs.createWriteStream(
-        path.join(
-          state.treeOptions.putsaver.backupFolder,
-          backupFile + "-" + mtime + ext + ".gz"
-        )
+        path.join(state.treeOptions.putsaver.backupFolder, backupFile + "-" + mtime + ext + ".gz")
       );
       const fileRead = fs.createReadStream(fullpath);
       const gzip = zlib.createGzip();
@@ -490,10 +430,6 @@ async function handlePUTfile(
     return Promise.reject();
   });
   const mtimeNew = Date.parse(statNew.mtime as any);
-  const etagNew = JSON.stringify(
-    [statNew.ino, statNew.size, mtimeNew].join("-")
-  );
-  state
-    .respond(200, "", { "x-api-access-type": "file", etag: etagNew })
-    .empty();
+  const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join("-"));
+  state.respond(200, "", { "x-api-access-type": "file", etag: etagNew }).empty();
 }

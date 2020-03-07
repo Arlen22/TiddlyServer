@@ -12,8 +12,7 @@
  */
 export function oc<T>(data?: T): TSOCType<T> {
   return new Proxy(
-    ((defaultValue?: Defined<T>) =>
-      data == null ? defaultValue : data) as TSOCType<T>,
+    ((defaultValue?: Defined<T>) => (data == null ? defaultValue : data)) as TSOCType<T>,
     {
       get: (target, key) => {
         const obj: any = target();

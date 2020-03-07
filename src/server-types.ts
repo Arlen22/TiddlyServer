@@ -45,7 +45,6 @@ export {
   ConvertSettings,
 };
 
-
 export function init(eventer: ServerEventEmitter) {
   eventer.on("settings", function(set: ServerConfig) {});
 }
@@ -286,7 +285,6 @@ export namespace colors {
   export const BgCyan = "\x1b[46m";
   export const BgWhite = "\x1b[47m";
 }
-
 
 // declare function DebugLog(str: string, ...args: any[]);
 export function isError(obj): obj is Error {

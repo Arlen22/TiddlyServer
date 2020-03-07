@@ -50,17 +50,11 @@ export function IPv4_Address(this: any, addressDotQuad, netmaskBits) {
   this.netmaskInteger = IPv4_binstrA_to_intA(this.netmaskBinStr);
   this.netmaskDotQuad = IPv4_intA_to_dotquadA(this.netmaskInteger);
 
-  this.netaddressBinStr = IPv4_Calc_netaddrBinStr(
-    this.addressBinStr,
-    this.netmaskBinStr
-  );
+  this.netaddressBinStr = IPv4_Calc_netaddrBinStr(this.addressBinStr, this.netmaskBinStr);
   this.netaddressInteger = IPv4_binstrA_to_intA(this.netaddressBinStr);
   this.netaddressDotQuad = IPv4_intA_to_dotquadA(this.netaddressInteger);
 
-  this.netbcastBinStr = IPv4_Calc_netbcastBinStr(
-    this.addressBinStr,
-    this.netmaskBinStr
-  );
+  this.netbcastBinStr = IPv4_Calc_netbcastBinStr(this.addressBinStr, this.netmaskBinStr);
   this.netbcastInteger = IPv4_binstrA_to_intA(this.netbcastBinStr);
   this.netbcastDotQuad = IPv4_intA_to_dotquadA(this.netbcastInteger);
 }

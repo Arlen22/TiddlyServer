@@ -54,7 +54,8 @@
     "start": "node build/server",
     "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/assets",
     "build": "tsc && node build-schema.js && npm run assets",
-    "build:clean": "rm -rf build && npm run build"
+    "build:clean": "rm -rf build && npm run build",
+    "prettier": "prettier --write src/*.ts"
   },
   "author": "Arlen Beiler",
   "license": "MIT"

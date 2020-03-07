@@ -21,12 +21,10 @@ abstract class TypeCheck<T> {
   public abstract currentKey: string | number | symbol | undefined;
   protected abstract _check(a: any): a is T;
 
-  private errMessage = (err: any) =>
-    JSON.stringify(TypeCheck.currentKeyArray) + " " + err + "\n";
+  private errMessage = (err: any) => JSON.stringify(TypeCheck.currentKeyArray) + " " + err + "\n";
 
   public check(a: any): a is T {
-    let parent: TypeCheck<any> | undefined =
-      TypeCheck.stack[TypeCheck.stack.length - 1];
+    let parent: TypeCheck<any> | undefined = TypeCheck.stack[TypeCheck.stack.length - 1];
     TypeCheck.stack.push(this);
     this.currentKey = undefined;
 
@@ -71,8 +69,7 @@ abstract class TypeCheck<T> {
             ?.map(k => k + ": " + x[k] + " " + co.checkermap[k].expectedMessage)
             .join(", ");
       case CheckObject.typeofNotObject:
-        return (co: CheckObject<any>, x) =>
-          "expected object value but got " + typeof x;
+        return (co: CheckObject<any>, x) => "expected object value but got " + typeof x;
       case CheckObject.missingRequired:
         return (co: CheckObject<any>, x) => co.lastMessage;
       case CheckObject.unexpectedProperty:
@@ -133,10 +130,7 @@ export const checkNull = new CheckSimple(
   "expected a null value",
   (a): a is null => typeof a === "object" && a === null
 );
-export const checkAny = new CheckSimple(
-  "expected any value",
-  (a): a is any => true
-);
+export const checkAny = new CheckSimple("expected any value", (a): a is any => true);
 
 export class CheckMultiple<T extends {}> extends TypeCheck<T> {
   error: Record<string | number, any> | string = {} as any;
@@ -268,8 +262,7 @@ export const checkUnion = <A, B>(ca: TypeCheck<A>, cb: TypeCheck<B>) => {
   );
   return new CheckUnion<A | B>(checks);
 };
-checkUnion.cu = <A, B>(ca: TypeCheck<A>, cb: TypeCheck<B>) =>
-  new CheckUnionWrapper(ca, cb);
+checkUnion.cu = <A, B>(ca: TypeCheck<A>, cb: TypeCheck<B>) => new CheckUnionWrapper(ca, cb);
 
 class CheckObject<T extends {}> extends TypeCheck<T> {
   private required = Object.keys(this.checkermap);
@@ -302,14 +295,9 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
   public currentKey: string | number | undefined = undefined;
   public error: Record<string | number, any> | string | undefined = {};
   currentKeyArray: string[] = [];
-  private symbolError(
-    symbol: symbol,
-    value: any,
-    missingkeys?: string[]
-  ): false {
+  private symbolError(symbol: symbol, value: any, missingkeys?: string[]): false {
     this.lastResult = symbol;
-    if (missingkeys)
-      this.lastMessage = "missing required keys " + missingkeys.join(",");
+    if (missingkeys) this.lastMessage = "missing required keys " + missingkeys.join(",");
     this.error =
       symbol === CheckObject.wrongUnionKey
         ? undefined
@@ -321,8 +309,7 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
     this.currentKey = undefined;
     this.lastMessage = "";
     this.error = {};
-    if (typeof a !== "object")
-      return this.symbolError(CheckObject.typeofNotObject, a);
+    if (typeof a !== "object") return this.symbolError(CheckObject.typeofNotObject, a);
 
     const keys = Object.keys(a);
     const checkKeys: string[] = [...this.required];
@@ -342,13 +329,11 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
 
     //check for missing required keys and return a string error if any are missing
     let missingkeys = this.required.filter(k => keys.indexOf(k) === -1);
-    if (missingkeys.length)
-      return this.symbolError(CheckObject.missingRequired, a, missingkeys);
+    if (missingkeys.length) return this.symbolError(CheckObject.missingRequired, a, missingkeys);
 
     //make sure there are no extra keys in the object
     let extraKeys = keys.filter(e => checkKeys.indexOf(e) === -1);
-    if (extraKeys.length)
-      return this.symbolError(CheckObject.unexpectedProperty, a);
+    if (extraKeys.length) return this.symbolError(CheckObject.unexpectedProperty, a);
 
     return (
       keys.filter((k): boolean => {
@@ -409,10 +394,7 @@ class CheckRepeat<T> extends TypeCheck<T> {
     return this.innerCheck().check(a);
   }
 
-  constructor(
-    private innerCheck: () => TypeCheck<T>,
-    public expectedMessage: string
-  ) {
+  constructor(private innerCheck: () => TypeCheck<T>, public expectedMessage: string) {
     super();
   }
 }
@@ -443,15 +425,13 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
     loginlink: checkBoolean,
     transfer: checkBoolean,
   });
-  const putsaverOptional = as<OptionalCheckermap<ServerConfig_PutSaver, never>>(
-    {
-      backupFolder: checkString,
-      etag: checkStringEnum("optional", "required", "disabled"),
-      etagAge: checkNumber,
-      gzipBackups: checkBoolean,
-      enabled: checkBoolean,
-    }
-  );
+  const putsaverOptional = as<OptionalCheckermap<ServerConfig_PutSaver, never>>({
+    backupFolder: checkString,
+    etag: checkStringEnum("optional", "required", "disabled"),
+    etagAge: checkNumber,
+    gzipBackups: checkBoolean,
+    enabled: checkBoolean,
+  });
   const checkOptions: TypeCheck<
     Config.Options_Auth | Config.Options_Backups | Config.Options_Index
   > = checkUnion(
@@ -478,10 +458,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
           $element: checkStringEnum("index"),
         },
         {
-          defaultType: checkUnion(
-            checkStringEnum("html", "json"),
-            checkNumberEnum(404, 403)
-          ),
+          defaultType: checkUnion(checkStringEnum("html", "json"), checkNumberEnum(404, 403)),
           indexExts: checkArray(checkString),
           indexFile: checkArray(checkString),
         },
@@ -489,9 +466,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       )
     )
   );
-  const GroupChild: () => TypeCheck<
-    Config.PathElement | Config.GroupElement
-  > = () =>
+  const GroupChild: () => TypeCheck<Config.PathElement | Config.GroupElement> = () =>
     checkUnion(
       checkObject<Config.PathElement>(
         {
@@ -507,9 +482,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       checkObject<Config.GroupElement>(
         {
           $element: checkStringEnum("group"),
-          $children: checkArray(
-            checkRepeat(() => GroupChild(), "expected a repeat of GroupChild")
-          ),
+          $children: checkArray(checkRepeat(() => GroupChild(), "expected a repeat of GroupChild")),
           $options: checkArray(checkOptions),
           key: checkString,
           indexPath: checkUnion(checkString, checkBooleanFalse),
@@ -572,10 +545,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       logError: checkString,
       logToConsoleAlso: checkBoolean,
     }),
-    putsaver: checkObject<ServerConfig["putsaver"], never>(
-      {},
-      putsaverOptional
-    ),
+    putsaver: checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional),
     datafolder: checkRecord(checkString, checkAny),
   });
   let [res, errHash] = checkResult(_checkServerConfig, obj);

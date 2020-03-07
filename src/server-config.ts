@@ -1,9 +1,7 @@
 import path = require("path");
 declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
-  typeof __non_webpack_require__ !== "undefined"
-    ? __non_webpack_require__
-    : require;
+  typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 import { oc } from "./optional-chaining";
 // type AlwaysDefined<T> = {
 // 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
@@ -32,8 +30,7 @@ import { oc } from "./optional-chaining";
 // oc.empty = Object.create(null);
 
 function format(str: string, ...args: any[]) {
-  while (args.length && str.indexOf("%s") !== -1)
-    str = str.replace("%s", args.shift());
+  while (args.length && str.indexOf("%s") !== -1) str = str.replace("%s", args.shift());
   args.unshift(str);
   return args.join(",");
 }
@@ -49,10 +46,7 @@ function as<T>(obj: T) {
   return obj;
 }
 
-function normalizeOptions(
-  keypath: string[],
-  a: OptionsSchema[keyof OptionsSchema]
-) {
+function normalizeOptions(keypath: string[], a: OptionsSchema[keyof OptionsSchema]) {
   if (typeof a.$element !== "string")
     throw new Error("Missing $element property in " + keypath.join("."));
 
@@ -61,9 +55,7 @@ function normalizeOptions(
   } else if (a.$element === "index") {
   } else {
     let { $element } = a;
-    throw new Error(
-      "Invalid element " + $element + " found at " + keypath.join(".")
-    );
+    throw new Error("Invalid element " + $element + " found at " + keypath.join("."));
   }
 }
 
@@ -109,8 +101,7 @@ export function normalizeTree(
     //@ts-ignore
     if (Object.keys(item).findIndex(e => e.startsWith("$")) !== -1)
       console.log(
-        "Is this a mistake? Found keys starting with the dollar sign under /" +
-          keypath.join("/")
+        "Is this a mistake? Found keys starting with the dollar sign under /" + keypath.join("/")
       );
     item = as<Schema.GroupElement>({
       $element: "group",
@@ -118,8 +109,7 @@ export function normalizeTree(
     });
   }
   if (typeof item === "string" || item.$element === "folder") {
-    if (typeof item === "string")
-      item = { $element: "folder", path: item } as Config.PathElement;
+    if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
     if (!item.path)
       throw format(
         "  Error loading settings: path must be specified for folder item under '%s'",
@@ -138,19 +128,15 @@ export function normalizeTree(
     });
   } else if (item.$element === "group") {
     if (!key) key = (item as Schema.ArrayGroupElement).key;
-    if (!key)
-      throw "key not provided for group element at /" + keypath.join("/");
+    if (!key) throw "key not provided for group element at /" + keypath.join("/");
     let tc = item.$children;
     let $options: Config.OptionElements[] = [];
     let $children: (Config.PathElement | Config.GroupElement)[] = [];
     if (Array.isArray(item.$children)) {
       $children = item.$children
-        .filter((e: any): e is
-          | Schema.ArrayGroupElement
-          | Schema.ArrayPathElement => {
+        .filter((e: any): e is Schema.ArrayGroupElement | Schema.ArrayPathElement => {
           if (Config.isOption(e)) {
-            throw "specifying options in $children is unsupported at " +
-              keypath.join(".");
+            throw "specifying options in $children is unsupported at " + keypath.join(".");
           } else {
             return true;
           }
@@ -160,13 +146,10 @@ export function normalizeTree(
     } else {
       // let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
       if (item.$children.$options)
-        throw "specifying options in $children is unsupported at " +
-          keypath.join(".");
+        throw "specifying options in $children is unsupported at " + keypath.join(".");
       $children = Object.keys(tc)
         .map(k =>
-          k === "$options"
-            ? undefined
-            : normalizeTree(settingsDir, tc[k], k, [...keypath, k])
+          k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k])
         )
         .filter((e): e is NonNullable<typeof e> => !!e);
       $options = (e => {
@@ -182,29 +165,20 @@ export function normalizeTree(
       key,
       $children,
       $options,
-      indexPath: item.indexPath
-        ? pathResolveWithUser(settingsDir, item.indexPath)
-        : false,
+      indexPath: item.indexPath ? pathResolveWithUser(settingsDir, item.indexPath) : false,
     });
   } else {
     return item;
   }
 }
-export function normalizeTreeHost(
-  settingsDir: string,
-  host: Schema.HostElement
-) {
-  if (host.$element !== "host")
-    throw "Tree array must not mix host elements with other elements";
+export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement) {
+  if (host.$element !== "host") throw "Tree array must not mix host elements with other elements";
   return {
     ...host,
     $mount: normalizeTree(settingsDir, host.$mount as any, "$mount", []),
   };
 }
-export function normalizeSettingsTree(
-  settingsDir: string,
-  tree: ServerConfigSchema["tree"]
-) {
+export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
   let defaultHost = (tree2: any): Config.HostElement => ({
     $element: "host",
     // patterns: {
@@ -216,10 +190,7 @@ export function normalizeSettingsTree(
   });
   if (typeof tree === "string" && tree.endsWith(".xml")) {
     //read the xml file and parse it as the tree structure
-  } else if (
-    typeof tree === "string" &&
-    (tree.endsWith(".js") || tree.endsWith(".json"))
-  ) {
+  } else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
     //require the json or js file and use it directly
     let filepath = pathResolveWithUser(settingsDir, tree);
     tree = nodeRequire(filepath).tree;
@@ -231,9 +202,7 @@ export function normalizeSettingsTree(
   //host array.
   return [defaultHost(tree)];
 }
-export function normalizeSettingsAuthAccounts(
-  auth: ServerConfigSchema["authAccounts"]
-) {
+export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
   if (!auth) return {};
   let newAuth: ServerConfig["authAccounts"] = {};
 
@@ -373,29 +342,16 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
   });
 
   if (newset.putsaver && newset.putsaver.backupFolder)
-    newset.putsaver.backupFolder = pathResolveWithUser(
-      settingsDir,
-      newset.putsaver.backupFolder
-    );
+    newset.putsaver.backupFolder = pathResolveWithUser(settingsDir, newset.putsaver.backupFolder);
   if (newset.logging.logAccess)
-    newset.logging.logAccess = pathResolveWithUser(
-      settingsDir,
-      newset.logging.logAccess
-    );
+    newset.logging.logAccess = pathResolveWithUser(settingsDir, newset.logging.logAccess);
   if (newset.logging.logError)
-    newset.logging.logError = pathResolveWithUser(
-      settingsDir,
-      newset.logging.logError
-    );
+    newset.logging.logError = pathResolveWithUser(settingsDir, newset.logging.logError);
 
   newset.__dirname = settingsDir;
   newset.__filename = settingsFile;
-  
-  if (
-    newset.putsaver &&
-    newset.putsaver.etag === "disabled" &&
-    !newset.putsaver.backupFolder
-  ) {
+
+  if (newset.putsaver && newset.putsaver.etag === "disabled" && !newset.putsaver.backupFolder) {
     console.log(
       "Etag checking is disabled, but a backup folder is not set. " +
         "Changes made in multiple tabs/windows/browsers/computers can overwrite each " +
@@ -820,9 +776,7 @@ export namespace Config {
   }
 
   export function isOption(a: any): a is OptionElements {
-    return (
-      !!a.$element && ["auth", "backups", "index"].indexOf(a.$element) !== -1
-    );
+    return !!a.$element && ["auth", "backups", "index"].indexOf(a.$element) !== -1;
   }
   export function isElement(
     a: any
@@ -1094,16 +1048,14 @@ export function OldDefaultSettings(set: OldServerConfig) {
     if (!set[key].mkdir) set[key].mkdir = false;
     if (!set[key].upload) set[key].upload = false;
     if (!set[key].settings) set[key].settings = false;
-    if (!set[key].WARNING_all_settings_WARNING)
-      set[key].WARNING_all_settings_WARNING = false;
+    if (!set[key].WARNING_all_settings_WARNING) set[key].WARNING_all_settings_WARNING = false;
   });
 
   if (!set.logColorsToFile) set.logColorsToFile = false;
   if (!set.logToConsoleAlso) set.logToConsoleAlso = false;
 
   if (!set.maxAge) set.maxAge = {} as any;
-  if (typeof set.maxAge.tw_plugins !== "number")
-    set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
+  if (typeof set.maxAge.tw_plugins !== "number") set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000; //1 year of milliseconds
 }
 
 export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
@@ -1115,8 +1067,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
     _datafoldertarget: undefined,
     tree: set.tree,
     bindInfo: {
-      bindAddress:
-        set.host === "0.0.0.0" || set.host === "::" ? undefined : [set.host],
+      bindAddress: set.host === "0.0.0.0" || set.host === "::" ? undefined : [set.host],
       filterBindAddress: undefined,
       enableIPv6: set.host === "::",
       port: set.port,

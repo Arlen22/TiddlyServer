@@ -1,10 +1,5 @@
 import { PublicKeyCache } from "./publicKeyCache";
-import {
-  
-  ServerEventEmitter,
-  ServerConfig,
-  serveFile,
-} from "./server-types";
+import { ServerEventEmitter, ServerConfig, serveFile } from "./server-types";
 import { getSetCookie, validateCookie, parseAuthCookie } from "./cookies";
 import {
   crypto_generichash,
@@ -55,9 +50,7 @@ const setAuth = (settings: ServerConfig) => {
     let clientKeysAndPermissions = settings.authAccounts[accountId];
     if (clientKeysAndPermissions.clientKeys)
       Object.keys(clientKeysAndPermissions.clientKeys).forEach(user => {
-        const publicKey = from_base64(
-          clientKeysAndPermissions.clientKeys[user].publicKey
-        );
+        const publicKey = from_base64(clientKeysAndPermissions.clientKeys[user].publicKey);
         let publicHash = crypto_generichash(
           crypto_generichash_BYTES,
           publicKey,
@@ -70,8 +63,7 @@ const setAuth = (settings: ServerConfig) => {
             clientKeysAndPermissions.clientKeys[user].publicKey,
             clientKeysAndPermissions.clientKeys[user].cookieSalt,
           ]);
-        else
-          throw "publicKey+username combination is used for more than one authAccount";
+        else throw "publicKey+username combination is used for more than one authAccount";
       });
   });
 };
@@ -95,11 +87,7 @@ const removePendingPinTimeout = (pin: string) => {
 const handleTransfer = (state: StateObject) => {
   if (!state.allow.transfer) return state.throwReason(403, "Access Denied");
   let pin = state.path[4];
-  if (
-    !state.path[4] ||
-    !pko[pin] ||
-    (state.path[5] !== "sender" && state.path[5] !== "reciever")
-  )
+  if (!state.path[4] || !pko[pin] || (state.path[5] !== "sender" && state.path[5] !== "reciever"))
     return state.throwReason(400, "Invalid request parameters");
   let direction: "sender" | "reciever" = state.path[5] as any;
   let pkop = pko[pin];
@@ -134,17 +122,9 @@ const expect = function<T>(a: any, keys: (string | number | symbol)[]): a is T {
 const handleHEADorGETFileServe = (state: StateObject) => {
   const pathLength = state.path.length;
   if (pathLength === 4 && state.path[3] === "login.html") {
-    serveFile(
-      state,
-      "login.html",
-      path.join(state.settings.__assetsDir, "authenticate")
-    );
+    serveFile(state, "login.html", path.join(state.settings.__assetsDir, "authenticate"));
   } else if (pathLength === 4 && state.path[3] === "transfer.html") {
-    serveFile(
-      state,
-      "transfer.html",
-      path.join(state.settings.__assetsDir, "authenticate")
-    );
+    serveFile(state, "transfer.html", path.join(state.settings.__assetsDir, "authenticate"));
   } else {
     state.throw(404);
   }
@@ -157,12 +137,7 @@ const handleLogin = async (state: StateObject) => {
   if (!state.body.length) {
     return state.throwReason(400, "Empty request body");
   }
-  if (
-    !expect<{ setCookie: string; publicKey: string }>(state.json, [
-      "setCookie",
-      "publicKey",
-    ])
-  ) {
+  if (!expect<{ setCookie: string; publicKey: string }>(state.json, ["setCookie", "publicKey"])) {
     return state.throwReason(400, "Improper request body");
   }
   /** [username, type, timestamp, hash, sig] */
@@ -183,7 +158,7 @@ const handleLogin = async (state: StateObject) => {
         "    username: " + cookieData[0],
         "    timestamp: " + cookieData[2],
       ].join("\n"),
-      state.settings
+    state.settings
   );
   if (valid) {
     state.setHeader(
@@ -207,9 +182,7 @@ const getRandomPin = async (): Promise<string> => {
   let randomPin = randombytes_buf(8);
   let pin = "";
   while (!pin || pko[pin]) {
-    pin = to_hex(
-      (randomPin = crypto_generichash(8, randomPin, undefined, "uint8array"))
-    );
+    pin = to_hex((randomPin = crypto_generichash(8, randomPin, undefined, "uint8array")));
   }
   pko[pin] = { step: 1, cancelTimeout: removePendingPinTimeout(pin) };
   return pin;
@@ -245,10 +218,7 @@ const handleInitShared = (state: StateObject) => {
 };
 
 const handleLogout = (state: StateObject) => {
-  state.setHeader(
-    "Set-Cookie",
-    getSetCookie(TIDDLY_SERVER_AUTH_COOKIE, "", false, 0)
-  );
+  state.setHeader("Set-Cookie", getSetCookie(TIDDLY_SERVER_AUTH_COOKIE, "", false, 0));
   state.respond(200).empty();
   return;
 };

@@ -26,9 +26,7 @@ export function generateDirectoryListing(directory, options) {
       )
       .map((entry, index) => {
         const isFile =
-          ["group", "folder", "datafolder", "error", "other"].indexOf(
-            entry.type
-          ) === -1;
+          ["group", "folder", "datafolder", "error", "other"].indexOf(entry.type) === -1;
         const showSize = isFile || entry.type === "other";
         return `
 <li>
@@ -46,11 +44,7 @@ export function generateDirectoryListing(directory, options) {
       .join("");
   }
   const pathArr = directory.path.split("/").filter(a => a);
-  const parentJoin = [
-    "",
-    pathArr.slice(0, pathArr.length - 1).join("/"),
-    "",
-  ].join("/");
+  const parentJoin = ["", pathArr.slice(0, pathArr.length - 1).join("/"), ""].join("/");
   const parentPath = parentJoin === "//" ? "/" : parentJoin;
   const name = pathArr.slice(pathArr.length - 1);
   return `
@@ -75,11 +69,7 @@ ${
     ? `<p>Welcome ${options.isLoggedIn}, <a href="javascript:return false;" onclick="logout()">logout</a></p>`
     : `<p><a href="/admin/authenticate/login.html">Login</a></p>`
 }
-${
-  pathArr.length > 0
-    ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>`
-    : ``
-}
+${pathArr.length > 0 ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>` : ``}
 <ul>${listEntries(directory.entries)}</ul>
 ${
   options.upload
@@ -111,9 +101,7 @@ ${
 <p><a href="${fixPutSaver}">Fix Put Saver</a>  Bookmarklet</p>
 <p>After executing the bookmarklet, drag this <a href="${updatedPutSaver}">updated Put Saver</a> into your wiki to fix it permenantly.</p>
 <p style="color:grey; font-family:sans-serif; font-size:0.8em;">
-<a href="https://github.com/Arlen22/TiddlyServer">TiddlyServer</a> v${
-    info.version
-  }</p>
+<a href="https://github.com/Arlen22/TiddlyServer">TiddlyServer</a> v${info.version}</p>
 </body>
 </html>
 `;
