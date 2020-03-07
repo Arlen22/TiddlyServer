@@ -8,7 +8,7 @@ import * as zlib from 'zlib';
 import { formidable } from '../lib/bundled-lib';
 import { handleDataFolderRequest, init as initDatafolder } from "./datafolder";
 import { OptionsConfig } from "./server-config";
-import { as, Config, ER, getTreeOptions, getTreePathFiles, PathResolverResult, resolvePath, sendDirectoryIndex, serveFile, ServerConfig, ServerEventEmitter, StateObject, StatPathResult, statWalkPath } from "./server-types";
+import { as, Config, ER, getTreeOptions, getTreePathFiles, PathResolverResult, resolvePath, sendDirectoryIndex, serveFile, ServerConfig, ServerEventEmitter, StateObject, StatPathResult, statWalkPath, IStatPathResult } from "./server-types";
 
 // export function parsePath(path: string, jsonFile: string) {
 //   var regCheck = /${([^}])}/gi;
@@ -88,7 +88,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
 
 }
 
-function handleGETfile(state: StateObject<import("/Users/arlen/Desktop/GitHub/TiddlyServer/src/server-types").IStatPathResult<"file", fs.Stats, undefined, true>, any>, result: PathResolverResult) {
+function handleGETfile(state: StateObject<IStatPathResult<"file", fs.Stats, undefined, true>, any>, result: PathResolverResult) {
   state.send({
     root: (result.item as Config.PathElement).path,
     filepath: result.filepathPortion.join('/'),
