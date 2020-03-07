@@ -17,7 +17,7 @@
   "files": [
     "./src/server.ts",
     "./test/test.ts",
-    "./src/interfacechecker3.ts"
+    // "./src/interfacechecker3.ts"
   ],
   "exclude": [
     "node_modules",

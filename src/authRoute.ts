@@ -16,14 +16,25 @@ export let validateCookie: (json: AuthCookie | AuthCookieSet, logRegisterNotice?
 // export let parseAuthCookie = ;
 export function parseAuthCookie(cookie: string, suffix: true): AuthCookie;
 export function parseAuthCookie(cookie: string, suffix: false): AuthCookieSet;
-export function parseAuthCookie(cookie: string, suffix: boolean): AuthCookie | AuthCookieSet {
-  let json: [string, "pw" | "key", string, string, string, string] = cookie.split("|") as any; //tryParseJSON<>(auth);
-  if (json.length > (suffix ? 6 : 5)) {
-    let name = json.slice(0, json.length - 4);
-    let rest = json.slice(json.length - 4);
-    json = [name.join("|"), ...rest] as any;
+export function parseAuthCookie(cookie: string, suffix: boolean): AuthCookie | AuthCookieSet | false {
+
+  let splitCookie = cookie.split("|");
+  const length = splitCookie.length;
+  const expectLength = suffix ? 6 : 5;
+  if (length > expectLength) {
+    // This is a workaround in case the username happens to contain a pipe
+    // other code still checks the signature of the cookie, so it's all good
+    const nameLength = splitCookie.length - expectLength - 1;
+    const name: string = splitCookie.slice(0, nameLength).join("|");
+    const rest = splitCookie.slice(nameLength);
+    return ([name, ...rest] as unknown) as any;
+  } else if (length === expectLength) {
+    return (splitCookie as unknown) as any;
+  } else {
+    return false;
   }
-  return json;
+
+  
 }
 const setAuth = (settings: ServerConfig) => {
   /** Record<hash+username, [authGroup, publicKey, suffix]> */
@@ -232,7 +243,7 @@ export function handleAuthRoute(state: StateObject) {
         return state.throwReason(400, "Improper request body");
       /** [username, type, timestamp, hash, sig] */
       let json = parseAuthCookie(state.json.setCookie, false);
-      if (json.length !== 5) return state.throwReason(400, "Bad cookie format");
+      if (!json || json.length !== 5) return state.throwReason(400, "Bad cookie format");
       let { registerNotice } = state.settings.bindInfo.localAddressPermissions[state.hostLevelPermissionsKey];
       let valid = validateCookie(json, registerNotice && [
         "    login attempted with unknown public key",
