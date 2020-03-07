@@ -15,7 +15,7 @@ const settingsFile = path.normalize(
     : path.join(
         __dirname,
         //if we're in the TiddlyServer/build directory the default is in the root
-        __dirname.endsWith("TiddlyServer/build") ? ".." : "",
+        __dirname.endsWith("/build") ? ".." : "",
         "settings.json"
       )
 );
