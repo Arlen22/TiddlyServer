@@ -4,15 +4,12 @@ const CopyPlugin = require("copy-webpack-plugin");
 /**
  * @type {import("webpack").Configuration}
  */
-module.exports = {
+const options = {
   watch: false,
-  entry: {
-    compiled: path.resolve(__dirname, "./server.js")
-  },
+  entry: path.resolve(__dirname, "./build/server.js"),
   output: {
-    filename: "[name]-lib.js",
-    path: path.resolve(__dirname, "./lib"),
-    library: "[name]",
+    filename: "server-bin.js",
+    path: path.resolve(__dirname, "./build/"),
     libraryTarget: "commonjs2"
   },
   plugins: [
@@ -21,20 +18,20 @@ module.exports = {
       global: { GENTLY: false }
     }),
     new CopyPlugin([
-      { from: "./server.js", to: "./build" },
-      { from: "./tiddlywiki/**/*", to: "./build/" },
-      { from: "./build/src/*", to: "./" },
-      { from: "./build/test/*", to: "./" }
+
     ])
   ],
   mode: false ? "development" : "production",
   target: "node",
   node: {
-    __dirname: true,
-    __filename: true
+    global: true,
+    __dirname: false,
+    __filename: false
   },
   externals: {
     "utf-8-validate": "commonjs utf-8-validate",
     bufferutil: "commonjs bufferutil"
   }
 };
+
+module.exports = options;
