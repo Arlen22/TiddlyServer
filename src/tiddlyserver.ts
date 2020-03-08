@@ -24,18 +24,6 @@ import {
   statWalkPath,
 } from "./server-types";
 import { StateObject } from "./StateObject";
-// export function parsePath(path: string, jsonFile: string) {
-//   var regCheck = /${([^}])}/gi;
-//   path.replace(regCheck, (str, pathVar) => {
-//     switch (pathVar) {
-//       case "execPath": return __dirname;
-//       case "currDir": return process.cwd();
-//       case "jsonDir": return jsonFile;
-//       default: return "";
-//     }
-//   })
-//   return path;
-// }
 
 export function init(eventer: ServerEventEmitter) {
   eventer.on("settings", function(set: ServerConfig) {});
@@ -101,9 +89,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   } else {
     state.throw(500);
   }
-  // }).catch((err) => {
-  // if (err) { console.log(err); console.log(new Error().stack); }
-  // });
+
 }
 
 function handleGETfile(

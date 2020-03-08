@@ -369,17 +369,15 @@ async function websocketHandler(
   settings: ServerConfig,
   preflighter: (ev: RequestEvent) => Promise<RequestEvent>
 ) {
-  // return async () => {
-  let host = request.headers.host;
-  let addr = request.socket.localAddress;
+
   //check host level permissions and the preflighter
-  let ev = new RequestEvent(settings, request, { host, addr, iface }, "client", client);
+  let ev = new RequestEvent(settings, request, iface, "client", client);
 
   let ev2 = await ev.requestHandlerHostLevelChecks(preflighter);
 
   if (ev2.handled) return;
 
-  // we give the preflighter the option to handle the websocket on its own
+  //this should also be checking the username and permissions but currently it doesn't
   if (!settings.bindInfo.localAddressPermissions[ev2.localAddressPermissionsKey].websockets)
     client.close();
   else eventer.emit("websocket-connection", ev);
@@ -393,12 +391,11 @@ async function requestHandler(
   settings: ServerConfig
   // debug: DebugLogger
 ) {
-  let host = request.headers.host;
-  let addr = request.socket.localAddress;
+
 
   await log(request, response);
 
-  let ev1 = new RequestEvent(settings, request, { host, addr, iface }, "response", response);
+  let ev1 = new RequestEvent(settings, request,iface, "response", response);
 
   //send it to the preflighter
   let ev2 = await ev1.requestHandlerHostLevelChecks(preflighter);

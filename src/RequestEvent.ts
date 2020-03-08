@@ -13,31 +13,36 @@ export class RequestEvent {
   localAddressPermissionsKey: string = "";
   treeHostIndex: number = 0;
   debugOutput: Writable;
-
+  network: { iface: string; host: string | undefined; addr: string };
   client: WebSocket = undefined as any;
   response: ServerResponse = undefined as any;
 
   constructor(
     settings: ServerConfig,
     request: IncomingMessage,
-    network: { iface: string; host: string | undefined; addr: string },
+    iface: string,
+    // network: { iface: string; host: string | undefined; addr: string },
     type: "client",
     response: WebSocket
   );
   constructor(
     settings: ServerConfig,
     request: IncomingMessage,
-    network: { iface: string; host: string | undefined; addr: string },
+    iface: string,
     type: "response",
     response: ServerResponse
   );
   constructor(
     public settings: ServerConfig,
     public request: IncomingMessage,
-    public network: { iface: string; host: string | undefined; addr: string },
+    iface: string,
+
     public type: "client" | "response",
     response: WebSocket | ServerResponse
   ) {
+    let host = request.headers.host;
+    let addr = request.socket.localAddress;
+    this.network = { host, addr, iface };
     this.debugOutput = RequestEvent.MakeDebugOutput(settings);
     switch (type) {
       case "client":

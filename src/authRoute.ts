@@ -1,4 +1,3 @@
-import { PublicKeyCache } from "./publicKeyCache";
 import { ServerEventEmitter, ServerConfig, serveFile } from "./server-types";
 import { getSetCookie, validateCookie, parseAuthCookie } from "./cookies";
 import {
@@ -38,35 +37,11 @@ export const handleAuthRoute = (state: StateObject) => {
 
 export function initAuthRoute(eventer: ServerEventEmitter) {
   eventer.on("settings", serverSettings => {
-    setAuth(serverSettings);
+    // setAuth(serverSettings);
   });
 }
 
-const setAuth = (settings: ServerConfig) => {
-  /** Record<hash+username, [authGroup, publicKey, suffix]> */
-  let publicKeyCache = PublicKeyCache.getCache();
 
-  Object.keys(settings.authAccounts).forEach(accountId => {
-    let clientKeysAndPermissions = settings.authAccounts[accountId];
-    if (clientKeysAndPermissions.clientKeys)
-      Object.keys(clientKeysAndPermissions.clientKeys).forEach(user => {
-        const publicKey = from_base64(clientKeysAndPermissions.clientKeys[user].publicKey);
-        let publicHash = crypto_generichash(
-          crypto_generichash_BYTES,
-          publicKey,
-          undefined,
-          "base64"
-        );
-        if (!publicKeyCache.keyExists(publicHash + user))
-          publicKeyCache.setVal(publicHash + user, [
-            accountId,
-            clientKeysAndPermissions.clientKeys[user].publicKey,
-            clientKeysAndPermissions.clientKeys[user].cookieSalt,
-          ]);
-        else throw "publicKey+username combination is used for more than one authAccount";
-      });
-  });
-};
 
 const pko: Record<
   string,

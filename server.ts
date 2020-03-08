@@ -44,10 +44,7 @@ const settingsFile = userSettings
       "settings.json"
     );
 
-import { SettingsReader } from "./src/settingsReader";
 
-// import server = require("./src/server");
-const settingsReader = SettingsReader.getInstance();
 declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
   typeof __non_webpack_require__ !== "undefined"
@@ -93,7 +90,7 @@ async function runServer() {
     settingsFile,
     Object.keys(server.routes)
   );
-  settingsReader.storeServerSettings(settings);
+  
   const [check, checkErr] = server.checkServerConfig(settings);
 
   if (!check) {

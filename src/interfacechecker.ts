@@ -6,13 +6,6 @@ import {
 } from "./server-config";
 import { as } from "./server-types";
 
-function mapItem<K, V>(k: K, v: V): readonly [K, V] {
-  return Object.freeze<[K, V]>([k, v]);
-}
-function T4<A, B, C, D>(A: A, B: B, C: C, D: D): [A, B, C, D] {
-  return [A, B, C, D];
-}
-
 abstract class TypeCheck<T> {
   static currentKeyArray: (string | number)[] = [];
   static stack: TypeCheck<any>[] = [];

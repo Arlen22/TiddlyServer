@@ -1,4 +1,3 @@
-import { PublicKeyCache } from "./publicKeyCache";
 import { SplitCookieWithUserName } from "./types";
 import {
   crypto_sign_verify_detached,
@@ -7,7 +6,6 @@ import {
   crypto_generichash_BYTES,
 } from "libsodium-wrappers";
 import * as http from "http";
-import { SettingsReader } from "./settingsReader";
 import { ServerConfig } from "./server-config";
 
 const TIDDLY_SERVER_AUTH_COOKIE: string = "TiddlyServerAuth";
@@ -46,9 +44,7 @@ export const validateCookie = (
   logRegisterNotice: string | false,
   settings: ServerConfig
 ) => {
-  // const settings = SettingsReader.getInstance().getServerSettings();
   const authCookieAge = settings?.authCookieAge || 0;
-  let publicKeyCache = PublicKeyCache.getCache();
   let [username, type, timestamp, hash, sig, suffix] = cookieData;
   if (type !== "key") return false;
   const account = lookupAccount(settings, hash, username);
