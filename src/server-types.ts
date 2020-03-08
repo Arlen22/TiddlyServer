@@ -100,7 +100,7 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
   try {
     settingsObj.__targetTW = settingsObj._datafoldertarget
       ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
-      : path.join(require.resolve("tiddlywiki/boot/boot.js"), "../..");
+      : path.join(require.resolve("tiddlywiki-production/boot/boot.js"), "../..");
   } catch (e) {
     console.log(e);
     throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";
