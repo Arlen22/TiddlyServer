@@ -369,7 +369,6 @@ async function websocketHandler(
   settings: ServerConfig,
   preflighter: (ev: RequestEvent) => Promise<RequestEvent>
 ) {
-
   //check host level permissions and the preflighter
   let ev = new RequestEvent(settings, request, iface, "client", client);
 
@@ -391,11 +390,9 @@ async function requestHandler(
   settings: ServerConfig
   // debug: DebugLogger
 ) {
-
-
   await log(request, response);
 
-  let ev1 = new RequestEvent(settings, request,iface, "response", response);
+  let ev1 = new RequestEvent(settings, request, iface, "response", response);
 
   //send it to the preflighter
   let ev2 = await ev1.requestHandlerHostLevelChecks(preflighter);

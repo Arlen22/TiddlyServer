@@ -89,7 +89,6 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   } else {
     state.throw(500);
   }
-
 }
 
 function handleGETfile(

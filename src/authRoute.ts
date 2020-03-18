@@ -41,8 +41,6 @@ export function initAuthRoute(eventer: ServerEventEmitter) {
   });
 }
 
-
-
 const pko: Record<
   string,
   {

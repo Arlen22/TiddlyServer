@@ -35,3 +35,4 @@ https.js
 settings-*.json
 lib/compiled-lib.js
 build/
+.DS_Store
