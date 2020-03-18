@@ -55,6 +55,7 @@
     "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/assets",
     "build": "tsc && node build-schema.js && npm run assets",
     "build:clean": "rm -rf build && npm run build",
+    "dev:run": "tsc && node build/server",
     "prettier": "prettier --write src/*.ts"
   },
   "author": "Arlen Beiler",
