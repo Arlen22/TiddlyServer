@@ -42,7 +42,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   if (!result) return state.throw<never>(404);
   state.ancestry = [...result.ancestry, result.item];
   state.treeOptions = getTreeOptions(state);
-
+  
   {
     //check authList
     let { authList, authError } = state.treeOptions.auth;
@@ -64,8 +64,14 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   }
 
   state.statPath = await statWalkPath(result); //.then((statPath) => {
-
-  if (stateItemType(state, "folder")) {
+  if(Config.isPath(result.item)) {
+    state.pathOptions = {
+      noDataFolder: result.item.noDataFolder,
+      noTrailingSlash: result.item.noTrailingSlash
+    }
+  }
+  const {noDataFolder} = state.pathOptions;
+  if (stateItemType(state, "folder") || (stateItemType(state, "datafolder") && noDataFolder)) {
     serveDirectoryIndex(result, state).catch(catchPromiseError);
   } else if (stateItemType(state, "datafolder")) {
     handleDataFolderRequest(result, state);

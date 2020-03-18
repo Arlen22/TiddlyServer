@@ -125,6 +125,7 @@ export function normalizeTree(
       path: item.path,
       key,
       noTrailingSlash: !!item.noTrailingSlash,
+      noDataFolder: !!item.noDataFolder
     });
   } else if (item.$element === "group") {
     if (!key) key = (item as Schema.ArrayGroupElement).key;
@@ -813,6 +814,7 @@ export namespace Config {
     key: string;
     path: string;
     noTrailingSlash: boolean;
+    noDataFolder: boolean;
     // $children: never;
     $options: OptionElements[];
   }
@@ -888,6 +890,7 @@ export namespace Schema {
      * index.html file, and adding an index option to this element.
      */
     noTrailingSlash?: boolean;
+    noDataFolder?: boolean;
     $options?: OptionElements[];
   }
   export interface ArrayPathElement extends PathElement {

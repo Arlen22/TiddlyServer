@@ -105,8 +105,10 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
 
   pathOptions: {
     noTrailingSlash: boolean;
+    noDataFolder: boolean;
   } = {
     noTrailingSlash: false,
+    noDataFolder: false
   };
 
   req: http.IncomingMessage;

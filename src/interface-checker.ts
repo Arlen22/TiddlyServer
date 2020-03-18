@@ -467,6 +467,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
           $options: checkArray(checkOptions),
           key: checkString,
           noTrailingSlash: checkBoolean,
+          noDataFolder: checkBoolean,
           path: checkString,
         },
         undefined,
