@@ -11,10 +11,10 @@ import * as send from "send";
 import * as libsodium from "libsodium-wrappers";
 import * as WebSocket from "ws";
 import { handler as morgan } from "./logger";
-import { handleAuthRoute, initAuthRoute } from "./authRoute";
+import { handleAuthRoute, initAuthRoute } from "./auth-route";
 import { checkCookieAuth } from "./cookies";
-import { checkServerConfig } from "./interfacechecker";
-import { RequestEvent } from "./RequestEvent";
+import { checkServerConfig } from "./interface-checker";
+import { RequestEvent } from "./request-event";
 import {
   init as initServerTypes,
   keys,
@@ -26,7 +26,7 @@ import {
   ServerEventEmitter,
   testAddress,
 } from "./server-types";
-import { StateObject } from "./StateObject";
+import { StateObject } from "./state-object";
 import { handleTiddlyServerRoute, init as initTiddlyServer } from "./tiddlyserver";
 
 export { checkServerConfig, loadSettings, routes, libsReady };
@@ -369,7 +369,6 @@ async function websocketHandler(
   settings: ServerConfig,
   preflighter: (ev: RequestEvent) => Promise<RequestEvent>
 ) {
-
   //check host level permissions and the preflighter
   let ev = new RequestEvent(settings, request, iface, "client", client);
 
@@ -391,11 +390,9 @@ async function requestHandler(
   settings: ServerConfig
   // debug: DebugLogger
 ) {
-
-
   await log(request, response);
 
-  let ev1 = new RequestEvent(settings, request,iface, "response", response);
+  let ev1 = new RequestEvent(settings, request, iface, "response", response);
 
   //send it to the preflighter
   let ev2 = await ev1.requestHandlerHostLevelChecks(preflighter);

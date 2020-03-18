@@ -4,7 +4,7 @@ import * as send from "send";
 import { Stream, Writable } from "stream";
 import * as url from "url";
 import { format } from "util";
-import { RequestEvent } from "./RequestEvent";
+import { RequestEvent } from "./request-event";
 import { Config, OptionsConfig, ServerConfig, ServerConfig_AccessOptions } from "./server-config";
 import {
   colors,

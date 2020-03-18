@@ -501,10 +501,10 @@ export function getTreeOptions(state: StateObject) {
   });
   return options;
 }
-import { generateDirectoryListing } from "./generateDirectoryListing.js";
-import { RequestEvent } from "./RequestEvent";
+import { generateDirectoryListing } from "./generate-directory-listing.js";
+import { RequestEvent } from "./request-event";
 
-//const generateDirectoryListing: (...args: any[]) => string = require('./generateDirectoryListing').generateDirectoryListing;
+//const generateDirectoryListing: (...args: any[]) => string = require('./generate-directory-listing').generateDirectoryListing;
 export type DirectoryIndexData = {
   keys: string[];
   paths: (string | true)[];
@@ -867,7 +867,7 @@ export interface StandardResponseHeaders {
   etag?: string;
 }
 
-import { StateObject } from "./StateObject";
+import { StateObject } from "./state-object";
 
 export class ER extends Error {
   constructor(public reason: string, message: string) {

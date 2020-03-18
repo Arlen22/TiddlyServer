@@ -8,7 +8,7 @@ import {
   statWalkPath,
   tryParseJSON,
 } from "./server-types";
-import { StateObject } from "./StateObject";
+import { StateObject } from "./state-object";
 import * as path from "path";
 import * as http from "http";
 import * as fs from "fs";
@@ -18,7 +18,7 @@ import { parse } from "url";
 import { inspect, promisify } from "util";
 import { WikiInfo } from "./boot-startup-types";
 import * as WebSocket from "ws";
-import { RequestEvent } from "./RequestEvent";
+import { RequestEvent } from "./request-event";
 
 interface Records<T> {
   [k: string]: T;
