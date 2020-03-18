@@ -6,7 +6,7 @@ import { promisify } from "util";
 import * as zlib from "zlib";
 
 import * as formidable from "formidable";
-import { handleDataFolderRequest, init as initDatafolder } from "./datafolder";
+import { handleDataFolderRequest, init as initDatafolder } from "./data-folder";
 import { OptionsConfig } from "./server-config";
 import {
   as,
@@ -23,7 +23,7 @@ import {
   StatPathResult,
   statWalkPath,
 } from "./server-types";
-import { StateObject } from "./StateObject";
+import { StateObject } from "./state-object";
 
 export function init(eventer: ServerEventEmitter) {
   eventer.on("settings", function(set: ServerConfig) {});
@@ -89,7 +89,6 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   } else {
     state.throw(500);
   }
-
 }
 
 function handleGETfile(

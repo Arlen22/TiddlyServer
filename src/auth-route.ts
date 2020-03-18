@@ -9,7 +9,7 @@ import {
   to_hex,
 } from "libsodium-wrappers";
 import * as path from "path";
-import { StateObject } from "./StateObject";
+import { StateObject } from "./state-object";
 
 const TIDDLY_SERVER_AUTH_COOKIE: string = "TiddlyServerAuth";
 
@@ -40,8 +40,6 @@ export function initAuthRoute(eventer: ServerEventEmitter) {
     // setAuth(serverSettings);
   });
 }
-
-
 
 const pko: Record<
   string,
