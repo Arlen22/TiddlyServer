@@ -73,9 +73,11 @@ export function init(e: ServerEventEmitter) {
         loadClient();
       }
     } else {
+      console.log("add client", pathname);
+
       client.addEventListener("message", event => {
-        console.log("message", event);
-        debug(-3, "WS-MESSAGE %s", inspect(event));
+        // console.log("message", event.data);
+        debug(-3, "WS-MESSAGE %s", inspect(event.data));
         clientsList[pathname as string].forEach(e => {
           if (e !== client) e.send(event.data);
         });
