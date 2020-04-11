@@ -26,10 +26,90 @@ import {
 import { StateObject } from "./state-object";
 
 export function init(eventer: ServerEventEmitter) {
-  eventer.on("settings", function(set: ServerConfig) {});
+  eventer.on("settings", function (set: ServerConfig) { });
   initDatafolder(eventer);
 }
 
+// export class TreeRequest {
+//   static async create(state: StateObject) {
+//     function catchPromiseError(err) {
+//       if (err) {
+//         state.log(2, "Error caught " + err.toString());
+//         state.throw(500);
+//       }
+//     }
+//     let result: PathResolverResult = resolvePath(state, state.hostRoot) || (null as never);
+//     if (!result) return state.throw<never>(404);
+//     state.ancestry = [...result.ancestry, result.item];
+//     state.treeOptions = getTreeOptions(state);
+
+//     {
+//       //check authList
+//       let { authList, authError } = state.treeOptions.auth;
+//       let denyAccess = Array.isArray(authList) && authList.indexOf(state.authAccountsKey) === -1;
+//       if (denyAccess)
+//         return state
+//           .respond(authError)
+//           .string(authAccessDenied(authError, state.allow.loginlink, !!state.authAccountsKey));
+//     }
+
+//     if (Config.isGroup(result.item))
+//       return serveDirectoryIndex(result, state).catch(catchPromiseError);
+
+//     function stateItemType<T extends StatPathResult["itemtype"]>(
+//       state: StateObject,
+//       itemtype: T
+//     ): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> {
+//       return state.statPath.itemtype === itemtype;
+//     }
+
+//     state.statPath = await statWalkPath(result); //.then((statPath) => {
+//     if (Config.isPath(result.item)) {
+//       state.pathOptions = {
+//         noDataFolder: result.item.noDataFolder,
+//         noTrailingSlash: result.item.noTrailingSlash
+//       }
+//     }
+//   }
+//   ancestry: StateObject["ancestry"];
+//   treeOptions: StateObject["treeOptions"];
+
+//   checkAccess() {
+
+
+//   }
+//   stateItemType<T extends StatPathResult["itemtype"]>(
+//     state: StateObject,
+//     itemtype: T
+//   ): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> {
+//     return state.statPath.itemtype === itemtype;
+//   }
+//   async other() {
+//     //.then((statPath) => {
+//     if (Config.isPath(this.result.item)) {
+//       this.state.pathOptions = {
+//         noDataFolder: this.result.item.noDataFolder,
+//         noTrailingSlash: this.result.item.noTrailingSlash
+//       }
+//     }
+//   }
+//   constructor(
+//     private state: StateObject,
+//     private result: PathResolverResult,
+//     private statPath: StateObject["statPath"]
+//   ) {
+//     this.ancestry = [...result.ancestry, result.item];
+//     this.treeOptions = getTreeOptions(state);
+//   }
+//   catchPromiseError(err) {
+//     if (err) {
+//       this.state.log(2, "Error caught " + err.toString());
+//       this.state.throw(500);
+//     }
+//   }
+// }
+
+// it isn't pretty but I can't find a way to improve it - Arlen 2020/04/10
 export async function handleTiddlyServerRoute(state: StateObject): Promise<void> {
   function catchPromiseError(err) {
     if (err) {
@@ -42,7 +122,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   if (!result) return state.throw<never>(404);
   state.ancestry = [...result.ancestry, result.item];
   state.treeOptions = getTreeOptions(state);
-  
+
   {
     //check authList
     let { authList, authError } = state.treeOptions.auth;
@@ -64,14 +144,13 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   }
 
   state.statPath = await statWalkPath(result); //.then((statPath) => {
-  if(Config.isPath(result.item)) {
+  if (Config.isPath(result.item)) {
     state.pathOptions = {
       noDataFolder: result.item.noDataFolder,
       noTrailingSlash: result.item.noTrailingSlash
     }
   }
-  const {noDataFolder} = state.pathOptions;
-  if (stateItemType(state, "folder") || (stateItemType(state, "datafolder") && noDataFolder)) {
+  if (stateItemType(state, "folder")) {
     serveDirectoryIndex(result, state).catch(catchPromiseError);
   } else if (stateItemType(state, "datafolder")) {
     handleDataFolderRequest(result, state);
@@ -82,10 +161,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
       handlePUTfile(state);
     } else if (["OPTIONS"].indexOf(state.req.method as string) > -1) {
       state
-        .respond(200, "", {
-          "x-api-access-type": "file",
-          dav: "tw5/put",
-        })
+        .respond(200, "", { "x-api-access-type": "file", dav: "tw5/put", })
         .string("GET,HEAD,PUT,OPTIONS");
     } else {
       state.throw(405);
@@ -129,14 +205,12 @@ function authAccessDenied(
 <html><body>
 <h2>Error ${authError}</h2>
 <p>
-${
-  authAccountsKeySet ? "You do not have access to this URL" : "In this case you are not logged in. "
-}
-${
-  loginlink
-    ? '<br/> Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.'
-    : ""
-}
+${authAccountsKeySet 
+  ? "You do not have access to this URL" 
+  : "In this case you are not logged in. "}
+${loginlink
+  ? '<br/> Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.'
+  : ""}
 </p>
 </body></html>
 `;
@@ -250,7 +324,7 @@ function uploadPostRequest(
   state: StateObject<StatPathResult, any>,
   result: PathResolverResult
 ) {
-  form.parse(state.req, function(err: Error, fields, files) {
+  form.parse(state.req, function (err: Error, fields, files) {
     if (err) {
       debugState("SER-DIR", state)(2, "upload %s", err.toString());
       state.throwError(500, new ER("Error recieving request", err.toString()));
@@ -263,7 +337,7 @@ function uploadPostRequest(
     //sanitize this to make sure we just
     newname = path.basename(newname);
     var newpath = path.join(result.fullfilepath, newname);
-    fs.rename(oldpath, newpath, function(err) {
+    fs.rename(oldpath, newpath, function (err) {
       if (err) handleFileError("SER-DIR", state, err);
       state.redirect(state.url.pathname + (err ? "?error=upload" : ""));
     });
@@ -275,7 +349,7 @@ function mkdirPostRequest(
   state: StateObject<StatPathResult, any>,
   result: PathResolverResult
 ) {
-  form.parse(state.req, async function(err: Error, fields, files) {
+  form.parse(state.req, async function (err: Error, fields, files) {
     if (err) {
       debugState("SER-DIR", state)(2, "mkdir %s", err.toString());
       state.throwError(500, new ER("Error recieving request", err.toString()));
@@ -380,8 +454,8 @@ async function handlePUTfile(state: StateObject<Extract<StatPathResult, { itemty
           state.url.pathname,
           err.message,
           "Please make sure the backup directory actually exists or else make the " +
-            "backupDirectory key falsy in your settings file (e.g. set it to a " +
-            "zero length string or false, or remove it completely)"
+          "backupDirectory key falsy in your settings file (e.g. set it to a " +
+          "zero length string or false, or remove it completely)"
         );
         state.log(3, "Backup could not be saved, see server output").throw(500);
         fileRead.close();

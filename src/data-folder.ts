@@ -7,59 +7,132 @@ import {
   // StateObject,
   statWalkPath,
   tryParseJSON,
+  StatPathResult,
+  IStatPathResult,
 } from "./server-types";
 import { StateObject } from "./state-object";
 import * as path from "path";
 import * as http from "http";
 import * as fs from "fs";
 
-import { EventEmitter } from "events";
+import { EventEmitter } from "./event-emitter-types";
 import { parse } from "url";
 import { inspect, promisify } from "util";
 import { WikiInfo } from "./boot-startup-types";
 import * as WebSocket from "ws";
 import { RequestEvent } from "./request-event";
 
-interface Records<T> {
-  [k: string]: T;
-}
+interface Records<T> { [k: string]: T; }
 
-const loadedFolders: Records<FolderData> = {};
+const loadedFolders: Records<DataFolder> = {};
 const otherSocketPaths: Records<WebSocket[]> = {};
 const clientsList: Records<WebSocket[]> = {};
 let eventer: ServerEventEmitter;
 
+type DataFolderEvents = {
+  "ws-client-connect": readonly [WebSocket, DataFolderRequest, string]
+  "ws-client-preload": readonly [() => void]
+
+}
+export function handleDataFolderRequest(result: PathResolverResult, state: StateObject<DataFolderStatPath>) {
+  const reload = !!state.url.query.reload;
+  let request = new DataFolderRequest(
+    result,
+    state.statPath,
+    state.url.pathname,
+    state.settings.__targetTW,
+    state.settings.datafolder,
+  );
+  DataFolder.trigger(request, reload);
+  const { mount } = request;
+  const isFullpath = result.filepathPortion.length === state.statPath.index;
+  // if we are at the datafolder root, we need to correctly set the trailing slash based on user preference
+  const redirect = isFullpath && state.pathOptions.noTrailingSlash !== !state.url.pathname.endsWith("/");
+  //set the trailing slash correctly if this is the actual page load
+  //redirect ?reload requests to the same, to prevent it being
+  //reloaded multiple times for the same page load.
+  if (redirect || reload) {
+    let redirect = mount + (!state.pathOptions.noTrailingSlash ? "/" : "");
+    state.redirect(redirect)
+    return;
+  }
+  loadedFolders[mount].handler(state);
+}
+class DataFolder {
+  /** Creates a DataFolder if there is none on loadedFolders[mount] then loads the datafolder asyncly */
+  static trigger(request: DataFolderRequest, reloadParam: boolean) {
+    let { mount, folder, target, vars } = request;
+    //initialize the tiddlywiki instance
+    if (!loadedFolders[mount] || reloadParam) {
+      if (reloadParam) loadedFolders[mount].events.emit("reload");
+      loadedFolders[mount] = new DataFolder(mount, folder);
+      promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(data => {
+        const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
+        if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
+          loadDataFolderTiddlyWiki(mount, folder, target, vars);
+        }
+      });
+    }
+  }
+  pending: StateObject[] = [];
+  events = new EventEmitter<DataFolderEvents>();
+  handler: (state: StateObject) => void = (state) => { this.pending.push(state); }
+  constructor(
+    public mount: string,
+    public folder: string
+  ) {
+
+  }
+}
+type DataFolderStatPath = IStatPathResult<"datafolder", fs.Stats, fs.Stats, true>;
+class DataFolderRequest {
+  mount: string;
+  folder: string;
+  constructor(
+    private result: PathResolverResult,
+    private statPath: IStatPathResult<"datafolder", fs.Stats, fs.Stats, true>,
+    private pathname: string,
+    public target: string,
+    public vars: {}
+  ) {
+    let filepathPrefix = this.result.filepathPortion.slice(0, this.statPath.index).join("/");
+    //get the tree path, and add the file path (none if the tree path is a datafolder)
+    let fullPrefix = ["", this.result.treepathPortion.join("/")];
+    if (this.statPath.index > 0) fullPrefix.push(filepathPrefix);
+    //join the parts and split into an array
+    fullPrefix = fullPrefix.join("/").split("/");
+    //use the unaltered path in the url as the tiddlywiki prefix
+    this.mount = this.pathname.split("/").slice(0, fullPrefix.length).join("/");
+    //get the full path to the folder as specified in the tree
+    this.folder = this.statPath.statpath;
+  }
+}
+
 export function init(e: ServerEventEmitter) {
   eventer = e;
-  eventer.on("settings", function(set: ServerConfig) {});
-  eventer.on("settingsChanged", keys => {});
-  eventer.on("websocket-connection", async function(data: RequestEvent) {
+  eventer.on("settings", function (set: ServerConfig) { });
+  eventer.on("settingsChanged", keys => { });
+  eventer.on("websocket-connection", async function (data: RequestEvent) {
     const { request, client, settings, treeHostIndex, debugOutput } = data;
     const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
     const root = settings.tree[treeHostIndex].$mount;
-    let pathname: string | undefined = parse(request.url as string).pathname; // new URL(request.url as string);
-    if (!pathname) {
-      console.error("[ERROR]: parsing pathname");
-      return;
-    }
-
+    let pathname: string | undefined = parse(request.url as string).pathname;
+    if (!pathname) { console.error("[ERROR]: parsing pathname"); return; }
     let result: PathResolverResult | undefined = resolvePath(pathname.split("/"), root);
     if (!result) return client.close(404);
-
     let statPath = await statWalkPath(result);
     //if this is a datafolder, we hand the client and request off directly to it
     //otherwise we stick it in its own section
     if (statPath.itemtype === "datafolder") {
-      const target = settings.__targetTW;
       //trigger the datafolder to load in case it isn't
-      const { mount, folder } = loadDataFolderTrigger(
+      const request = new DataFolderRequest(
         result,
         statPath,
         pathname,
-        "",
-        target,
+        settings.__targetTW,
         settings.datafolder
       );
+      const { mount, folder } = request;
       const subpath = pathname.slice(mount.length);
       //event to give the client to the data folder
       const loadClient = () => {
@@ -102,113 +175,6 @@ export function init(e: ServerEventEmitter) {
   });
 }
 
-type FolderData = {
-  mount: string;
-  folder: string;
-  handler: ((state: StateObject) => void) | StateObject[];
-  events: EventEmitter;
-};
-
-function quickArrayCheck(obj: any): obj is Array<any> {
-  return typeof obj.length === "number";
-}
-
-export function handleDataFolderRequest(result: PathResolverResult, state: StateObject) {
-  const target = state.settings.__targetTW;
-
-  const { mount, folder } = loadDataFolderTrigger(
-    result,
-    state.statPath,
-    state.url.pathname,
-    (state.url.query.reload as any) || "",
-    target,
-    state.settings.datafolder
-  );
-
-  const isFullpath = result.filepathPortion.length === state.statPath.index;
-  //set the trailing slash correctly if this is the actual page load
-  //redirect ?reload requests to the same, to prevent it being
-  //reloaded multiple times for the same page load.
-  if (
-    (isFullpath && state.pathOptions.noTrailingSlash !== !state.url.pathname.endsWith("/")) ||
-    state.url.query.reload
-  ) {
-    let redirect = mount + (!state.pathOptions.noTrailingSlash ? "/" : "");
-    state
-      .respond(302, "", {
-        Location: redirect,
-      })
-      .empty();
-    return;
-    // return Observable.empty();
-  }
-
-  const load = loadedFolders[mount];
-  if (Array.isArray(load.handler)) {
-    load.handler.push(state);
-  } else {
-    load.handler(state);
-  }
-}
-function loadDataFolderTrigger(
-  result,
-  statPath,
-  pathname: string,
-  reload: "true" | "force" | "",
-  target: string,
-  vars: {}
-) {
-  let filepathPrefix = result.filepathPortion.slice(0, statPath.index).join("/");
-  //get the tree path, and add the file path (none if the tree path is a datafolder)
-  let fullPrefix = ["", result.treepathPortion.join("/")];
-  if (statPath.index > 0) fullPrefix.push(filepathPrefix);
-  //join the parts and split into an array
-  fullPrefix = fullPrefix.join("/").split("/");
-  //use the unaltered path in the url as the tiddlywiki prefix
-  let mount = pathname
-    .split("/")
-    .slice(0, fullPrefix.length)
-    .join("/");
-  //get the full path to the folder as specified in the tree
-  let folder = statPath.statpath;
-
-  // reload the plugin cache if requested
-  // if (reload === "plugins") initPluginLoader();
-
-  //initialize the tiddlywiki instance
-  if (!loadedFolders[mount] || reload === "true") {
-    loadedFolders[mount] = {
-      mount,
-      folder,
-      events: new EventEmitter(),
-      handler: [],
-    };
-    loadDataFolderType(mount, folder, reload, target, vars);
-    // loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
-    // loadTiddlyWiki(prefixURI, folder);
-  }
-
-  return { mount, folder };
-}
-
-function loadDataFolderType(
-  mount: string,
-  folder: string,
-  reload: string,
-  target: string,
-  vars: {}
-) {
-  promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(data => {
-    const wikiInfo = tryParseJSON<WikiInfo>(data, e => {
-      throw e;
-    });
-    if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-      loadDataFolderTiddlyWiki(mount, folder, reload, target, vars);
-    } else if (wikiInfo.type === "tiddlyserver") {
-      // loadTiddlyServerAdapter(mount, folder, reload)
-    }
-  });
-}
 declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
   typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
@@ -216,7 +182,6 @@ const nodeRequire =
 function loadDataFolderTiddlyWiki(
   mount: string,
   folder: string,
-  reload: string,
   target: string,
   vars: {}
 ) {
@@ -284,10 +249,10 @@ function loadDataFolderTiddlyWiki(
       loadedFolders[mount].events,
       "tiddlyserver"
     );
-    //add the event emitter to the $tw variable
-    $tw.wss = loadedFolders[mount].events;
+    // //add the event emitter to the $tw variable
+    // $tw.wss = loadedFolders[mount].events;
     //set the request handler, indicating we are now ready to recieve requests
-    const requests = loadedFolders[mount].handler as StateObject[];
+    const requests = loadedFolders[mount].pending;
     loadedFolders[mount].handler = (state: StateObject) => {
       //pretend to the handler like the path really has a trailing slash
       let req = new Object(state.req) as http.IncomingMessage & {
@@ -301,31 +266,27 @@ function loadDataFolderTiddlyWiki(
     //send queued websocket clients to the event emitter
     loadedFolders[mount].events.emit("ws-client-preload");
     //send the queued requests to the handler
-    requests.forEach(e => (loadedFolders[mount].handler as Function)(e));
+    requests.forEach(e => loadedFolders[mount].handler(e));
+    loadedFolders[mount].pending = [];
   }
 }
 
 function doError(debug, mount, folder, err) {
   debug(3, "error starting %s at %s: %s", mount, folder, err.stack);
-  const requests = loadedFolders[mount].handler as any[];
+  const requests = loadedFolders[mount].pending;
   loadedFolders[mount] = {
-    handler: function(state: StateObject) {
-      state
-        .respond(500, "TW5 data folder failed")
-        .string(
-          "The Tiddlywiki data folder failed to load. The error has been logged to the " +
-            "terminal with priority level 2. " +
-            "To try again, use ?reload=true after making any necessary corrections."
-        );
+    handler: function (state: StateObject) {
+      state.respond(500, "TW5 data folder failed").string(
+        "The Tiddlywiki data folder failed to load. The error has been " +
+        "logged to the terminal with priority level 2. To try again, " +
+        "use ?reload=true after making any necessary corrections."
+      );
     },
   } as any;
-  requests.forEach(([req, res]) => {
-    (loadedFolders[mount] as { handler: any }).handler(req, res);
-  });
+  requests.forEach(e => loadedFolders[mount].handler(e));
 }
+
 declare class TiddlyWikiServer {
-  // TS_StateObject_Queue: StateObject[];
-  // TS_Request_Queue: http.IncomingMessage[];
   addAuthenticator: any;
   authenticators: TiddlyServerAuthentication[];
   requestHandler: (request: http.IncomingMessage, response: http.ServerResponse) => void;
@@ -371,18 +332,4 @@ class TiddlyServerAuthentication {
     response: http.ServerResponse,
     state
   ) => boolean;
-  //  {
-  // 	// let index = this.server.TS_Request_Queue.indexOf(request);
-  // 	let tsstate = request.tsstate;
-  // 	if (!tsstate.authAccountsKey && state.allowAnon) {
-  // 		return true;
-  // 	} else if (tsstate.authAccountsKey) {
-  // 		state.authenticatedUsername = tsstate.username;
-  // 		return true;
-  // 	} else {
-  // 		//The wiki itself may specify that anonymous users cannot access it
-  // 		tsstate.throwReason(403, "Unauthenticated users cannot access this wiki");
-  // 		return false;
-  // 	}
-  // }
 }

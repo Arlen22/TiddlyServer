@@ -527,11 +527,8 @@ export async function sendDirectoryIndex([_r, options]: [
   let pairs = keys.map((k, i) => [k, paths[i]] as [string, string | boolean]);
   let entries = await Promise.all(
     keys.map(async (key, i) => {
-      // if(paths[key] == null) debugger;
       let statpath = paths[i];
-      let stat = statpath === true ? undefined : await statPath(statpath);
-      // let e = { stat, key };
-      // let linkpath = [dirpath, e.key].filter(e => e).join('/');
+      let stat = statpath === true ? undefined : await statPath(statpath, false);
       return {
         name: key,
         path: key + (!stat || stat.itemtype === "folder" ? "/" : ""),
@@ -560,6 +557,7 @@ export async function statWalkPath(test: PathResolverResult) {
     console.log(test.item);
     throw "property item must be a TreePath";
   }
+  let noDataFolder = Config.isPath(test.item) ? !!test.item.noDataFolder : false;
   let n = { statpath: "", index: -1, endStat: false };
   let stats = [test.item.path, ...test.filepathPortion].map(e => {
     return (n = {
@@ -573,7 +571,7 @@ export async function statWalkPath(test: PathResolverResult) {
     /* should never be undefined because we always do at least
      * 1 loop and then exit if stats.length is 0 */
     if (!s) throw new Error("PROGRAMMER ERROR");
-    let res = await statPath(s);
+    let res = await statPath(s, noDataFolder);
     if (res.endStat || stats.length === 0) return res;
   }
 
@@ -598,13 +596,13 @@ export function statsafe(p: string) {
  * @param {({ statpath: string, index: number, endStat: boolean } | string)} s
  * @returns
  */
-export async function statPath(s: { statpath: string; index: number } | string) {
+export async function statPath(s: { statpath: string; index: number } | string, noDataFolder: boolean) {
   if (typeof s === "string") s = { statpath: s, index: 0 };
   const { statpath, index } = s;
   let stat = await statsafe(statpath);
   let endStat = !stat || !stat.isDirectory();
   let infostat: fs.Stats | undefined = undefined;
-  if (!endStat) {
+  if (!endStat && !noDataFolder) {
     infostat = await statsafe(path.join(statpath, "tiddlywiki.info"));
     endStat = !!infostat && infostat.isFile();
   }
@@ -614,12 +612,12 @@ export async function statPath(s: { statpath: string; index: number } | string) 
     statpath,
     index,
     endStat,
-    itemtype: getItemType(stat, infostat),
-    infostat: infostat && infostat.isFile() ? infostat : undefined,
+    itemtype: getItemType(stat, !noDataFolder && infostat),
+    infostat: noDataFolder && infostat && infostat.isFile() ? infostat : undefined,
   } as StatPathResult;
 }
 
-function getItemType(stat: Stats | undefined, infostat: Stats | undefined) {
+function getItemType(stat: Stats | undefined, infostat: Stats | false | undefined) {
   let itemtype;
 
   if (!stat) itemtype = "error";
@@ -753,8 +751,9 @@ export type StatPathResult =
   | IStatPathResult<"folder", fs.Stats, undefined, false>
   | IStatPathResult<"datafolder", fs.Stats, fs.Stats, true>
   | IStatPathResult<"file", fs.Stats, undefined, true>;
-// export interface
-// export type LoggerFunc = (str: string, ...args: any[]) => void;
+
+
+  
 export class URLSearchParams {
   constructor(str: string) {}
 }

@@ -1,6 +1,6 @@
 My work on tools related to TiddlyWiki is entirely a side project for me that does not generate any income. If you want to help cover the cost of the time it takes to make these tools, you are welcome to donate at https://www.paypal.me/Arlen22. 
 
-# TiddlyServer 2.1
+# TiddlyServer 2.2
 
 https://arlen22.github.io/tiddlyserver/
 
@@ -31,8 +31,8 @@ The guide at https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html is 
  - Install or download NodeJS v8+. Only the Node binary is required, nothing else. 
  - Download TiddlyServer and unzip it to an empty directory so you don't merge with an existing directory.
  - Create your [settings.json](https://arlen22.github.io/tiddlyserver/docs/settingsjson) file and put it in the TiddlyServer folder or specify it as the first argument to `server.js`. 
- - Run `node server.js [/path/to/settings.json] [--stay-on-error] [--dry-run]`
- - The working directory is not used by TiddlyServer except for locating the settings file if specified. Otherwise it expects to find it in the TiddlyServer folder with the server.js file. All other paths are relative to the settings file. This does not apply inside the TiddlyWiki data folder environment, but TiddyWiki does not normally use it either because it uses the data folder path and the boot.js path as its reference paths. 
+ - Run `node server.js [--config /path/to/settings.json] [--stay-on-error] [--dry-run]`
+ - The working directory is not used by TiddlyServer except for locating the config file if specified. Otherwise it expects to find it in the TiddlyServer folder with the server.js file. All other paths are relative to the settings file. This does not apply inside the TiddlyWiki data folder environment, but TiddyWiki does not normally use it either because it uses the data folder path and the boot.js path as its reference paths. 
 
 ## How to upgrade
 
