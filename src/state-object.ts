@@ -1,9 +1,10 @@
 import * as http from "http";
 import * as send from "send";
-// import { url } from "inspector";
+import * as fs from "fs";
+import * as path from "path";
 import { Stream, Writable } from "stream";
 import * as url from "url";
-import { format } from "util";
+import { format, promisify } from "util";
 import { RequestEvent } from "./request-event";
 import { Config, OptionsConfig, ServerConfig, ServerConfig_AccessOptions } from "./server-config";
 import {
@@ -17,6 +18,9 @@ import {
   StateObjectUrl,
   StatPathResult,
   tryParseJSON,
+  PathResolverResult,
+  as,
+  DirectoryIndexData,
 } from "./server-types";
 import { ParsedUrlQuery, parse } from "querystring";
 let DEBUGLEVEL = -1;
@@ -37,7 +41,8 @@ declare function DebugLog(
   str: string | NodeJS.ErrnoException,
   ...args: any[]
 );
-export class StateObject<STATPATH = StatPathResult, T = any> {
+export class StateObject {
+  static eventer: ServerEventEmitter
   static parseURL(str: string): StateObjectUrl {
     let item = url.parse(str, true);
     let { path, pathname, query, search, href } = item;
@@ -80,15 +85,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   body: string = "";
   json: any | undefined;
 
-  /** The StatPathResult if this request resolves to a path */
-  //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-  statPath: STATPATH;
-  /** The tree ancestors in descending order, including the final folder element. */
-  //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-  ancestry: Config.MountElement[];
-  /** The tree ancestors options as they apply to this request */
-  //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
-  treeOptions: OptionsConfig;
+
 
   url: { pathname: string, query: ParsedUrlQuery }
 
@@ -103,13 +100,6 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
 
   // expressNext: ((err?: any) => void) | false;
 
-  pathOptions: {
-    noTrailingSlash: boolean;
-    noDataFolder: boolean;
-  } = {
-      noTrailingSlash: false,
-      noDataFolder: false
-    };
 
   req: http.IncomingMessage;
   res: http.ServerResponse;
@@ -125,7 +115,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   public username: string;
   public readonly settings: Readonly<ServerConfig>;
   public debugOutput: Writable;
-  constructor(private eventer: ServerEventEmitter, ev2: RequestEvent) {
+  constructor(public eventer: ServerEventEmitter, ev2: RequestEvent) {
     this.req = this._req = ev2.request;
     this.res = this._res = ev2.response;
     this.localAddressPermissionsKey = ev2.localAddressPermissionsKey;
@@ -136,9 +126,6 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     this.debugOutput = ev2.debugOutput || RequestEvent.MakeDebugOutput(ev2.settings);
     this.startTime = process.hrtime();
 
-    //parse the url and store in state.
-    // this.url = StateObject.parseURL(this.req.url as string);
-    //parse the path for future use
     let parsed = url.parse(ev2.url as string, true);
     this.url = { pathname: parsed.pathname || "/", query: parsed.query };
     this.path = this.url.pathname.split("/");
@@ -401,4 +388,44 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     };
   }
   // private debugLog: typeof DebugLog = StateObject.DebugLogger("STATE  ");
+}
+
+
+function getTreeOptions(event: RequestEvent, result: PathResolverResult) {
+  let ancestry = [...result.ancestry, result.item];
+  //nonsense we have to write because putsaver could be false
+  // type putsaverT = Required<typeof state.settings.putsaver>;
+  let putsaver = as<ServerConfig["putsaver"]>({
+    enabled: true,
+    gzipBackups: true,
+    backupFolder: "",
+    etag: "optional",
+    etagAge: 3,
+    ...(event.settings.putsaver || {}),
+  });
+  let options: OptionsConfig = {
+    auth: { $element: "auth", authError: 403, authList: null },
+    putsaver: { $element: "putsaver", ...putsaver },
+    index: {
+      $element: "index",
+      defaultType: event.settings.directoryIndex.defaultType,
+      indexFile: [],
+      indexExts: [],
+    },
+  };
+  // console.log(state.ancestry);
+  ancestry.forEach(e => {
+    // console.log(e);
+    e.$options &&
+      e.$options.forEach(f => {
+        if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
+          // console.log(f);
+          Object.keys(f).forEach(k => {
+            if (f[k] === undefined) return;
+            options[f.$element][k] = f[k];
+          });
+        }
+      });
+  });
+  return options;
 }

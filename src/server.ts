@@ -367,17 +367,14 @@ class Startup {
 
     //send it to the preflighter
     let ev2 = await ev1.requestHandlerHostLevelChecks(this.preflighter);
-    // }).then(ev => {
     // check if the preflighter handled it
     if (ev2.handled) return;
-    //create the state object
-    const state = new StateObject(eventer, ev2);
+
+    const key = ev2.url.split('/')[1];
     //check for static routes
-    const route = routes[state.path[1]];
-    //if so, handle it
-    if (route) route(state);
+    if (routes[key]) routes[key](new StateObject(eventer, ev2));
     //otherwise forward to TiddlyServer
-    else handleTiddlyServerRoute(state);
+    else handleTiddlyServerRoute(ev2, eventer);
   }
 }
 

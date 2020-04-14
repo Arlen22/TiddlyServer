@@ -142,8 +142,8 @@ export interface ServerEventEmitter extends EventEmitter {
   emit(event: "websocket-connection", data: RequestEvent): boolean;
   emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
   emit(event: "settings", settings: ServerConfig): boolean;
-  emit(event: "stateError", state: StateObject<any, any>): boolean;
-  emit(event: "stateDebug", state: StateObject<any, any>): boolean;
+  emit(event: "stateError", state: StateObject): boolean;
+  emit(event: "stateDebug", state: StateObject): boolean;
   emit(
     event: "serverOpen",
     serverList: any[],
@@ -428,84 +428,7 @@ export function sendResponse(
     state.respond(200).buffer(body);
   }
 }
-/**
- * Returns the keys and paths from the PathResolverResult directory. If there
- * is an error it will be sent directly to the client and nothing will be emitted.
- *
- * @param {PathResolverResult} result
- * @returns
- */
-export function getTreePathFiles(
-  result: PathResolverResult,
-  state: StateObject
-): Promise<DirectoryIndexData> {
-  let dirpath = [result.treepathPortion.join("/"), result.filepathPortion.join("/")]
-    .filter(e => e)
-    .join("/");
-  const type = Config.isGroup(result.item) ? "group" : "folder";
-  if (Config.isGroup(result.item)) {
-    let $c = result.item.$children;
-    const keys = $c.map(e => e.key);
-    // const keys = Object.keys(result.item);
-    const paths = $c.map(e => (Config.isPath(e) ? e.path : true));
-    return Promise.resolve({
-      keys,
-      paths,
-      dirpath,
-      type: type as "group" | "folder",
-    });
-  } else {
-    return promisify(fs.readdir)(result.fullfilepath)
-      .then(keys => {
-        const paths = keys.map(k => path.join(result.fullfilepath, k));
-        return { keys, paths, dirpath, type: type as "group" | "folder" };
-      })
-      .catch(err => {
-        if (!err) return Promise.reject(err);
-        state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message);
-        state.throw(500);
-        return Promise.reject(false);
-      });
-  }
-}
 
-export function getTreeOptions(state: StateObject) {
-  //nonsense we have to write because putsaver could be false
-  // type putsaverT = Required<typeof state.settings.putsaver>;
-  let putsaver = as<typeof state.settings.putsaver>({
-    enabled: true,
-    gzipBackups: true,
-    backupFolder: "",
-    etag: "optional",
-    etagAge: 3,
-    ...(state.settings.putsaver || {}),
-  });
-  let options: OptionsConfig = {
-    auth: { $element: "auth", authError: 403, authList: null },
-    putsaver: { $element: "putsaver", ...putsaver },
-    index: {
-      $element: "index",
-      defaultType: state.settings.directoryIndex.defaultType,
-      indexFile: [],
-      indexExts: [],
-    },
-  };
-  // console.log(state.ancestry);
-  state.ancestry.forEach(e => {
-    // console.log(e);
-    e.$options &&
-      e.$options.forEach(f => {
-        if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
-          // console.log(f);
-          Object.keys(f).forEach(k => {
-            if (f[k] === undefined) return;
-            options[f.$element][k] = f[k];
-          });
-        }
-      });
-  });
-  return options;
-}
 import { generateDirectoryListing } from "./generate-directory-listing.js";
 import { RequestEvent } from "./request-event";
 
@@ -758,6 +681,7 @@ export type StatPathResult =
   | IStatPathResult<"file", fs.Stats, undefined, true>;
 
 
+export type getStatPathResult<T extends StatPathResult["itemtype"]> = Extract<StatPathResult, { itemtype: T }>;
 
 export class URLSearchParams {
   constructor(str: string) { }
@@ -1094,3 +1018,5 @@ export function NodePromise<T>(body: (cb: (err: NodeJS.ErrnoException, data: T) 
     body((err, data) => (err ? reject(err) : resolve(data)));
   });
 }
+
+// import { TreeStateObject } from "./tiddlyserver";

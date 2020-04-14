@@ -10,6 +10,7 @@ import {
   StatPathResult,
   IStatPathResult,
   Resolved,
+  getStatPathResult,
 } from "./server-types";
 import { StateObject } from "./state-object";
 import * as path from "path";
@@ -35,7 +36,10 @@ type DataFolderEvents = {
   "ws-client-preload": readonly [() => void]
   "reload": readonly any[]
 }
-export function handleDataFolderRequest(result: PathResolverResult, state: StateObject<DataFolderStatPath>) {
+export function handleDataFolderRequest(
+  result: PathResolverResult,
+  state: import("./tiddlyserver").TreeStateObject<getStatPathResult<"datafolder">>
+) {
   const reload = !!state.url.query.reload;
   let request = new DataFolderRequest(
     result,
@@ -85,14 +89,14 @@ class DataFolder {
 
   }
 }
-type DataFolderStatPath = IStatPathResult<"datafolder", fs.Stats, fs.Stats, true>;
+
 class DataFolderRequest {
   mount: string;
   folder: string;
   constructor(
-    private result: PathResolverResult,
-    private statPath: IStatPathResult<"datafolder", fs.Stats, fs.Stats, true>,
-    private pathname: string,
+    public result: PathResolverResult,
+    public statPath: getStatPathResult<"datafolder">,
+    public pathname: string,
     public target: string,
     public vars: {}
   ) {
@@ -117,7 +121,7 @@ export function init(e: ServerEventEmitter) {
     const { client, settings, debugOutput } = data;
     const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
     let pathname = parse(data.request.url as string).pathname;
-    if(!pathname) return client.close(400);
+    if (!pathname) return client.close(400);
     let result = data.resolvePath();
     if (!result) return client.close(404);
     let statPath = await statWalkPath(result);
@@ -334,3 +338,5 @@ class TiddlyServerAuthentication {
     state
   ) => boolean;
 }
+
+// import { TreeStateObject } from "./tiddlyserver";

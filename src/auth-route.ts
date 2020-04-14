@@ -10,11 +10,13 @@ import {
 } from "libsodium-wrappers";
 import * as path from "path";
 import { StateObject } from "./state-object";
+import { RequestEvent } from "./request-event";
 
 const TIDDLY_SERVER_AUTH_COOKIE: string = "TiddlyServerAuth";
 
 /** Handles the /admin/authenticate route */
 export const handleAuthRoute = (state: StateObject) => {
+  // let state = new StateObject(req)
   if (state.req.method === "GET" || state.req.method === "HEAD") {
     return handleHEADorGETFileServe(state);
   }
@@ -85,7 +87,7 @@ const handleTransfer = (state: StateObject) => {
   pkop.sender = undefined;
 };
 
-const expect = function<T>(a: any, keys: (string | number | symbol)[]): a is T {
+const expect = function <T>(a: any, keys: (string | number | symbol)[]): a is T {
   return (
     keys.every(k => Object.prototype.hasOwnProperty.call(a, k)) &&
     Object.keys(a).every(k => keys.indexOf(k) !== -1)
@@ -125,12 +127,12 @@ const handleLogin = async (state: StateObject) => {
   let valid = validateCookie(
     cookieData,
     registerNotice &&
-      [
-        "    login attempted with unknown public key",
-        "    " + state.json.publicKey,
-        "    username: " + cookieData[0],
-        "    timestamp: " + cookieData[2],
-      ].join("\n"),
+    [
+      "    login attempted with unknown public key",
+      "    " + state.json.publicKey,
+      "    username: " + cookieData[0],
+      "    timestamp: " + cookieData[2],
+    ].join("\n"),
     state.settings
   );
   if (valid) {

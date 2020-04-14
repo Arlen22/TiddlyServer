@@ -3,8 +3,8 @@ import { IncomingMessage, ServerResponse } from "http";
 import { Writable } from "stream";
 import { format } from "util";
 import * as WebSocket from "ws";
-import { ServerConfig, ServerConfig_AccessOptions, Config } from "./server-config";
-import { parseHostList, testAddress, resolvePath } from "./server-types";
+import { ServerConfig, ServerConfig_AccessOptions, Config, OptionsConfig } from "./server-config";
+import { parseHostList, testAddress, resolvePath, PathResolverResult, as } from "./server-types";
 import { checkCookieAuth } from "./cookies";
 import { parse } from "url";
 export class RequestEvent {
@@ -46,7 +46,7 @@ export class RequestEvent {
     let addr = request.socket.localAddress;
     this.network = { host, addr, iface };
     this.debugOutput = RequestEvent.MakeDebugOutput(settings);
-    this.url = this.request.url || "/"; 
+    this.url = this.request.url || "/";
     switch (type) {
       case "client":
         this.client = response as WebSocket;
@@ -126,6 +126,55 @@ export class RequestEvent {
     } else {
       return this.settings.bindInfo.localAddressPermissions[this.localAddressPermissionsKey];
     }
+  }
+  get hostRoot() {
+    return this.settings.tree[this.treeHostIndex];
+  }
+  close(code: number) {
+    if (this.type === "response") {
+      this.response.writeHead(code);
+      this.response.end();
+    } else if (this.type === "client") {
+      this.client.close(code);
+    }
+  }
+  getTreeOptions(result: PathResolverResult) {
+    let ancestry = [...result.ancestry, result.item];
+    //nonsense we have to write because putsaver could be false
+    // type putsaverT = Required<typeof state.settings.putsaver>;
+    let putsaver = as<ServerConfig["putsaver"]>({
+      enabled: true,
+      gzipBackups: true,
+      backupFolder: "",
+      etag: "optional",
+      etagAge: 3,
+      ...(this.settings.putsaver || {}),
+    });
+    let options: OptionsConfig = {
+      auth: { $element: "auth", authError: 403, authList: null },
+      putsaver: { $element: "putsaver", ...putsaver },
+      index: {
+        $element: "index",
+        defaultType: this.settings.directoryIndex.defaultType,
+        indexFile: [],
+        indexExts: [],
+      },
+    };
+    // console.log(state.ancestry);
+    ancestry.forEach(e => {
+      // console.log(e);
+      e.$options &&
+        e.$options.forEach(f => {
+          if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
+            // console.log(f);
+            Object.keys(f).forEach(k => {
+              if (f[k] === undefined) return;
+              options[f.$element][k] = f[k];
+            });
+          }
+        });
+    });
+    return options;
   }
   static MakeDebugOutput(settings: ServerConfig) {
     const colorsRegex = /\x1b\[[0-9]+m/gi;
