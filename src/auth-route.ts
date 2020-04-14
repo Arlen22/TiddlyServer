@@ -120,7 +120,7 @@ const handleLogin = async (state: StateObject) => {
     return state.throwReason(400, "Bad cookie format");
   }
   let { registerNotice } = state.settings.bindInfo.localAddressPermissions[
-    state.hostLevelPermissionsKey
+    state.localAddressPermissionsKey
   ];
   let valid = validateCookie(
     cookieData,

@@ -46,7 +46,7 @@ export {
 };
 
 export function init(eventer: ServerEventEmitter) {
-  eventer.on("settings", function(set: ServerConfig) {});
+  eventer.on("settings", function (set: ServerConfig) { });
 }
 
 type PromiseType<T> = T extends Promise<infer R> ? R : any;
@@ -79,8 +79,8 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
     e => {
       console.error(
         /*colors.BgWhite + */ colors.FgRed +
-          "The settings file could not be parsed: %s" +
-          colors.Reset,
+        "The settings file could not be parsed: %s" +
+        colors.Reset,
         e.originalError.message
       );
       console.error(e.errorPosition);
@@ -88,9 +88,14 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
     }
   );
 
-  if (!settingsObjSource.$schema)
-    throw "The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new";
+  if (!settingsObjSource.$schema) throw "The settings file is v2.0 and must be upgraded.";
 
+  if (settingsObjSource.$schema.startsWith("settings-2-1")) {
+    console.log(
+      "The settins file needs to be upgraded from 2.1 if errors are thrown. "
+      + "Please set the $schema property to settings-2-2.schema.json to get proper intellisense."
+    );
+  }
   if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
   // let routeKeys = Object.keys(routes);
   let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;
@@ -230,7 +235,7 @@ export class JsonError {
     public errorPosition: string,
     /** The original error return by JSON.parse */
     public originalError: Error
-  ) {}
+  ) { }
 }
 
 export function keys<T>(o: T): (keyof T)[] {
@@ -246,7 +251,7 @@ export function padLeft(str: any, pad: number | string, padStr?: string): string
   return pad.substr(0, Math.max(pad.length - item.length, 0)) + item;
 }
 export function sortBySelector<T extends { [k: string]: string }>(key: (e: T) => any) {
-  return function(a: T, b: T) {
+  return function (a: T, b: T) {
     var va = key(a);
     var vb = key(b);
 
@@ -374,7 +379,7 @@ export function serveFolderIndex(options: { type: string }) {
     return res;
   }
   if (options.type === "json") {
-    return function(state: StateObject, folder: string) {
+    return function (state: StateObject, folder: string) {
       readFolder(folder).then(item => {
         sendResponse(state, JSON.stringify(item), {
           contentType: "application/json",
@@ -535,8 +540,8 @@ export async function sendDirectoryIndex([_r, options]: [
         type: !stat
           ? "group"
           : stat.itemtype === "file"
-          ? options.extTypes[key.split(".").pop() as string] || "other"
-          : (stat.itemtype as string),
+            ? options.extTypes[key.split(".").pop() as string] || "other"
+            : (stat.itemtype as string),
         size: stat && stat.stat ? getHumanSize(stat.stat.size) : "",
       };
     })
@@ -685,8 +690,8 @@ export function resolvePath(
   const fullfilepath = result.folderPathFound
     ? path.join(result.item.path, ...filepathPortion)
     : Config.isPath(result.item)
-    ? result.item.path
-    : "";
+      ? result.item.path
+      : "";
 
   return {
     item: result.item,
@@ -701,7 +706,7 @@ export function resolvePath(
 type NodeCallback<T, S> = [NodeJS.ErrnoException, T, S];
 
 export function fs_move(oldPath, newPath, callback) {
-  fs.rename(oldPath, newPath, function(err) {
+  fs.rename(oldPath, newPath, function (err) {
     if (err) {
       if (err.code === "EXDEV") {
         copy();
@@ -720,7 +725,7 @@ export function fs_move(oldPath, newPath, callback) {
     readStream.on("error", callback);
     writeStream.on("error", callback);
 
-    readStream.on("close", function() {
+    readStream.on("close", function () {
       fs.unlink(oldPath, callback);
     });
 
@@ -753,9 +758,9 @@ export type StatPathResult =
   | IStatPathResult<"file", fs.Stats, undefined, true>;
 
 
-  
+
 export class URLSearchParams {
-  constructor(str: string) {}
+  constructor(str: string) { }
 }
 export interface StateObjectUrl {
   path: string;
@@ -916,6 +921,35 @@ export interface PathResolverResult {
   fullfilepath: string;
   // state: StateObject;
 }
+
+export class Resolved implements PathResolverResult {
+  static resolve(
+    pathname: string[],
+    root: Config.GroupElement | Config.PathElement
+  ) {
+    let res = resolvePath(pathname, root);
+    if (!res) return false;
+    else return new Resolved(res);
+  }
+  public item: Config.MountElement
+  public ancestry: Config.MountElement[]
+  public reqpath: string[]
+  public treepathPortion: string[]
+  public filepathPortion: string[]
+  public fullfilepath: string
+  constructor(
+    res: PathResolverResult
+  ) {
+    this.item = res.item;
+    this.ancestry = res.ancestry;
+    this.reqpath = res.reqpath;
+    this.treepathPortion = res.treepathPortion;
+    this.filepathPortion = res.filepathPortion;
+    this.fullfilepath = res.fullfilepath;
+  }
+
+}
+
 export type TreeObject = { [K: string]: string | TreeObject };
 export type TreePathResultObject<T, U, V> = {
   item: T;

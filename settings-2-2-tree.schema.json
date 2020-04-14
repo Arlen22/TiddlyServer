@@ -101,7 +101,7 @@
         },
         "noDataFolder": {
           "type": "boolean",
-          "description": "Set to true to prevent data folders inside this folder from being mounted. Useful for your downloads folder, for instance."
+          "description": "Handle data folders like regular folders. Useful for your downloads folder, for instance, in case you download a tiddlywiki.info file."
         },
         "noTrailingSlash": {
           "type": "boolean",

@@ -30,85 +30,6 @@ export function init(eventer: ServerEventEmitter) {
   initDatafolder(eventer);
 }
 
-// export class TreeRequest {
-//   static async create(state: StateObject) {
-//     function catchPromiseError(err) {
-//       if (err) {
-//         state.log(2, "Error caught " + err.toString());
-//         state.throw(500);
-//       }
-//     }
-//     let result: PathResolverResult = resolvePath(state, state.hostRoot) || (null as never);
-//     if (!result) return state.throw<never>(404);
-//     state.ancestry = [...result.ancestry, result.item];
-//     state.treeOptions = getTreeOptions(state);
-
-//     {
-//       //check authList
-//       let { authList, authError } = state.treeOptions.auth;
-//       let denyAccess = Array.isArray(authList) && authList.indexOf(state.authAccountsKey) === -1;
-//       if (denyAccess)
-//         return state
-//           .respond(authError)
-//           .string(authAccessDenied(authError, state.allow.loginlink, !!state.authAccountsKey));
-//     }
-
-//     if (Config.isGroup(result.item))
-//       return serveDirectoryIndex(result, state).catch(catchPromiseError);
-
-//     function stateItemType<T extends StatPathResult["itemtype"]>(
-//       state: StateObject,
-//       itemtype: T
-//     ): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> {
-//       return state.statPath.itemtype === itemtype;
-//     }
-
-//     state.statPath = await statWalkPath(result); //.then((statPath) => {
-//     if (Config.isPath(result.item)) {
-//       state.pathOptions = {
-//         noDataFolder: result.item.noDataFolder,
-//         noTrailingSlash: result.item.noTrailingSlash
-//       }
-//     }
-//   }
-//   ancestry: StateObject["ancestry"];
-//   treeOptions: StateObject["treeOptions"];
-
-//   checkAccess() {
-
-
-//   }
-//   stateItemType<T extends StatPathResult["itemtype"]>(
-//     state: StateObject,
-//     itemtype: T
-//   ): state is StateObject<Extract<StatPathResult, { itemtype: typeof itemtype }>> {
-//     return state.statPath.itemtype === itemtype;
-//   }
-//   async other() {
-//     //.then((statPath) => {
-//     if (Config.isPath(this.result.item)) {
-//       this.state.pathOptions = {
-//         noDataFolder: this.result.item.noDataFolder,
-//         noTrailingSlash: this.result.item.noTrailingSlash
-//       }
-//     }
-//   }
-//   constructor(
-//     private state: StateObject,
-//     private result: PathResolverResult,
-//     private statPath: StateObject["statPath"]
-//   ) {
-//     this.ancestry = [...result.ancestry, result.item];
-//     this.treeOptions = getTreeOptions(state);
-//   }
-//   catchPromiseError(err) {
-//     if (err) {
-//       this.state.log(2, "Error caught " + err.toString());
-//       this.state.throw(500);
-//     }
-//   }
-// }
-
 // it isn't pretty but I can't find a way to improve it - Arlen 2020/04/10
 export async function handleTiddlyServerRoute(state: StateObject): Promise<void> {
   function catchPromiseError(err) {
@@ -126,11 +47,11 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   {
     //check authList
     let { authList, authError } = state.treeOptions.auth;
-    let denyAccess = Array.isArray(authList) && authList.indexOf(state.authAccountsKey) === -1;
+    let denyAccess = Array.isArray(authList) && authList.indexOf(state.authAccountKey) === -1;
     if (denyAccess)
       return state
         .respond(authError)
-        .string(authAccessDenied(authError, state.allow.loginlink, !!state.authAccountsKey));
+        .string(authAccessDenied(authError, state.allow.loginlink, !!state.authAccountKey));
   }
 
   if (Config.isGroup(result.item))
@@ -153,7 +74,8 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   if (stateItemType(state, "folder")) {
     serveDirectoryIndex(result, state).catch(catchPromiseError);
   } else if (stateItemType(state, "datafolder")) {
-    handleDataFolderRequest(result, state);
+    if (!state.allow.datafolder) state.respond(403).empty();
+    else handleDataFolderRequest(result, state);
   } else if (stateItemType(state, "file")) {
     if (["HEAD", "GET"].indexOf(state.req.method as string) > -1) {
       handleGETfile(state, result);
@@ -205,12 +127,12 @@ function authAccessDenied(
 <html><body>
 <h2>Error ${authError}</h2>
 <p>
-${authAccountsKeySet 
-  ? "You do not have access to this URL" 
-  : "In this case you are not logged in. "}
+${authAccountsKeySet
+      ? "You do not have access to this URL"
+      : "In this case you are not logged in. "}
 ${loginlink
-  ? '<br/> Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.'
-  : ""}
+      ? '<br/> Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.'
+      : ""}
 </p>
 </body></html>
 `;
@@ -280,7 +202,7 @@ async function serveDirectoryIndex(result: PathResolverResult, state: StateObjec
       mkdir: isFolder && allow.mkdir,
       mixFolders: state.settings.directoryIndex.mixFolders,
       isLoggedIn: state.username
-        ? state.username + " (group " + state.authAccountsKey + ")"
+        ? state.username + " (group " + state.authAccountKey + ")"
         : (false as false),
       format,
       extTypes: state.settings.directoryIndex.types,

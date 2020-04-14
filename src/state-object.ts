@@ -18,6 +18,7 @@ import {
   StatPathResult,
   tryParseJSON,
 } from "./server-types";
+import { ParsedUrlQuery, parse } from "querystring";
 let DEBUGLEVEL = -1;
 /**
  *  4 - Errors that require the process to exit for restart
@@ -60,10 +61,10 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   }
 
   get allow(): ServerConfig_AccessOptions {
-    if (this.authAccountsKey) {
-      return this.settings.authAccounts[this.authAccountsKey].permissions;
+    if (this.authAccountKey) {
+      return this.settings.authAccounts[this.authAccountKey].permissions;
     } else {
-      return this.settings.bindInfo.localAddressPermissions[this.hostLevelPermissionsKey];
+      return this.settings.bindInfo.localAddressPermissions[this.localAddressPermissionsKey];
     }
   }
 
@@ -89,14 +90,13 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
   treeOptions: OptionsConfig;
 
-  url: StateObjectUrl;
+  url: { pathname: string, query: ParsedUrlQuery }
 
   path: string[];
-
   // maxid: number;
 
   // where: string;
-  query: any;
+  // query: any;
   // errorThrown: Error;
 
   restrict: any;
@@ -107,9 +107,9 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     noTrailingSlash: boolean;
     noDataFolder: boolean;
   } = {
-    noTrailingSlash: false,
-    noDataFolder: false
-  };
+      noTrailingSlash: false,
+      noDataFolder: false
+    };
 
   req: http.IncomingMessage;
   res: http.ServerResponse;
@@ -118,8 +118,8 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   responseSent: boolean = false;
   private _req: http.IncomingMessage;
   private _res: http.ServerResponse;
-  public hostLevelPermissionsKey: string;
-  public authAccountsKey: string;
+  public localAddressPermissionsKey: string;
+  public authAccountKey: string;
   /** The HostElement array index in settings.tree */
   public treeHostIndex: number;
   public username: string;
@@ -128,8 +128,8 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   constructor(private eventer: ServerEventEmitter, ev2: RequestEvent) {
     this.req = this._req = ev2.request;
     this.res = this._res = ev2.response;
-    this.hostLevelPermissionsKey = ev2.localAddressPermissionsKey;
-    this.authAccountsKey = ev2.authAccountKey;
+    this.localAddressPermissionsKey = ev2.localAddressPermissionsKey;
+    this.authAccountKey = ev2.authAccountKey;
     this.treeHostIndex = ev2.treeHostIndex;
     this.username = ev2.username;
     this.settings = ev2.settings;
@@ -137,10 +137,11 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     this.startTime = process.hrtime();
 
     //parse the url and store in state.
-    this.url = StateObject.parseURL(this.req.url as string);
+    // this.url = StateObject.parseURL(this.req.url as string);
     //parse the path for future use
-    this.path = (this.url.pathname as string).split("/");
-
+    let parsed = url.parse(ev2.url as string, true);
+    this.url = { pathname: parsed.pathname || "/", query: parsed.query };
+    this.path = this.url.pathname.split("/");
     let t = new Date();
     this.timestamp = format(
       "%s-%s-%s %s:%s:%s",
@@ -236,10 +237,10 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       headers,
       headers["Set-Cookie"]
         ? {
-            "Set-Cookie": (this.responseHeaders["Set-Cookie"] || []).concat(
-              headers["Set-Cookie"] || []
-            ),
-          }
+          "Set-Cookie": (this.responseHeaders["Set-Cookie"] || []).concat(
+            headers["Set-Cookie"] || []
+          ),
+        }
         : {}
     );
   }
@@ -336,11 +337,11 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         let catchHandler =
           errorCB === true
             ? (e: JsonError) => {
-                this.respond(400, "", {
-                  "Content-Type": "text/plain",
-                }).string(e.errorPosition);
-                //return undefined;
-              }
+              this.respond(400, "", {
+                "Content-Type": "text/plain",
+              }).string(e.errorPosition);
+              //return undefined;
+            }
             : errorCB;
 
         this.json = catchHandler
@@ -352,7 +353,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   }
   static DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
     //if(prefix.startsWith("V:")) return function(){};
-    return function(
+    return function (
       this: { debugOutput: Writable; settings: ServerConfig },
       msgLevel: number,
       tempString: any,
@@ -377,24 +378,24 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       );
       this.debugOutput.write(
         " " +
-          (msgLevel >= 3 ? colors.BgRed + colors.FgWhite : colors.FgRed) +
-          prefix +
-          " " +
-          colors.FgCyan +
-          date +
-          colors.Reset +
-          " " +
-          format
-            .apply(null, [tempString, ...args])
-            .split("\n")
-            .map((e, i) => {
-              if (i > 0) {
-                return new Array(23 + prefix.length).join(" ") + e;
-              } else {
-                return e;
-              }
-            })
-            .join("\n"),
+        (msgLevel >= 3 ? colors.BgRed + colors.FgWhite : colors.FgRed) +
+        prefix +
+        " " +
+        colors.FgCyan +
+        date +
+        colors.Reset +
+        " " +
+        format
+          .apply(null, [tempString, ...args])
+          .split("\n")
+          .map((e, i) => {
+            if (i > 0) {
+              return new Array(23 + prefix.length).join(" ") + e;
+            } else {
+              return e;
+            }
+          })
+          .join("\n"),
         "utf8"
       );
     };

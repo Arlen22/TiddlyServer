@@ -8,15 +8,15 @@ const config = {
   type: "ServerConfigSchema",
   sortProps: true
 };
-
+const prefix = "settings-2-2";
 try {
   let root = createGenerator(config).createSchema("ServerConfigSchema");
-  root["$id"] = "settings-2-1.schema.json";
-  root["definitions"]['ServerConfigSchema']['properties']['tree'] = {'$ref': 'settings-2-1-tree.schema.json'}
+  root["$id"] = prefix + ".schema.json";
+  root["definitions"]['ServerConfigSchema']['properties']['tree'] = {'$ref': prefix + '-tree.schema.json'}
   let options = createGenerator(config).createSchema("OptionsArraySchema");
-  options["$id"] = "settings-2-1-tree-options.schema.json";
-  writeFileSync("settings-2-1.schema.json", stringify(root, {space: 2}));
-  writeFileSync("settings-2-1-tree-options.schema.json", stringify(options, {space: 2}));
+  options["$id"] = prefix + "-tree-options.schema.json";
+  writeFileSync(prefix + ".schema.json", stringify(root, {space: 2}));
+  writeFileSync(prefix + "-tree-options.schema.json", stringify(options, {space: 2}));
 } catch (error) {
   if (error instanceof BaseError) {
     process.stderr.write(formatError(error));

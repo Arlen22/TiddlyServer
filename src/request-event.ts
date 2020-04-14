@@ -3,9 +3,10 @@ import { IncomingMessage, ServerResponse } from "http";
 import { Writable } from "stream";
 import { format } from "util";
 import * as WebSocket from "ws";
-import { ServerConfig } from "./server-config";
-import { parseHostList, testAddress } from "./server-types";
+import { ServerConfig, ServerConfig_AccessOptions, Config } from "./server-config";
+import { parseHostList, testAddress, resolvePath } from "./server-types";
 import { checkCookieAuth } from "./cookies";
+import { parse } from "url";
 export class RequestEvent {
   handled: boolean = false;
   username: string = "";
@@ -16,6 +17,7 @@ export class RequestEvent {
   network: { iface: string; host: string | undefined; addr: string };
   client: WebSocket = undefined as any;
   response: ServerResponse = undefined as any;
+  url: string;
 
   constructor(
     settings: ServerConfig,
@@ -44,6 +46,7 @@ export class RequestEvent {
     let addr = request.socket.localAddress;
     this.network = { host, addr, iface };
     this.debugOutput = RequestEvent.MakeDebugOutput(settings);
+    this.url = this.request.url || "/"; 
     switch (type) {
       case "client":
         this.client = response as WebSocket;
@@ -112,11 +115,23 @@ export class RequestEvent {
     // if (!ev2.debugOutput) ev2.debugOutput = MakeDebugOutput(ev2.settings);
     return ev2 as any;
   }
+  resolvePath() {
+    let root = this.settings.tree[this.treeHostIndex].$mount;
+    let pathname = (parse(this.request.url as string).pathname || "/").split("/");
+    return resolvePath(pathname, root);
+  }
+  get allow(): ServerConfig_AccessOptions {
+    if (this.authAccountKey) {
+      return this.settings.authAccounts[this.authAccountKey].permissions;
+    } else {
+      return this.settings.bindInfo.localAddressPermissions[this.localAddressPermissionsKey];
+    }
+  }
   static MakeDebugOutput(settings: ServerConfig) {
     const colorsRegex = /\x1b\[[0-9]+m/gi;
     const { logError, logColorsToFile, logToConsoleAlso } = settings.logging;
     return new Writable({
-      write: function(chunk, encoding, callback) {
+      write: function (chunk, encoding, callback) {
         // if we're given a buffer, convert it to a string
         if (Buffer.isBuffer(chunk)) chunk = chunk.toString("utf8");
         // remove ending linebreaks for consistency

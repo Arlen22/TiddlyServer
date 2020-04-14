@@ -9,6 +9,7 @@ import {
   tryParseJSON,
   StatPathResult,
   IStatPathResult,
+  Resolved,
 } from "./server-types";
 import { StateObject } from "./state-object";
 import * as path from "path";
@@ -32,7 +33,7 @@ let eventer: ServerEventEmitter;
 type DataFolderEvents = {
   "ws-client-connect": readonly [WebSocket, DataFolderRequest, string]
   "ws-client-preload": readonly [() => void]
-
+  "reload": readonly any[]
 }
 export function handleDataFolderRequest(result: PathResolverResult, state: StateObject<DataFolderStatPath>) {
   const reload = !!state.url.query.reload;
@@ -113,17 +114,17 @@ export function init(e: ServerEventEmitter) {
   eventer.on("settings", function (set: ServerConfig) { });
   eventer.on("settingsChanged", keys => { });
   eventer.on("websocket-connection", async function (data: RequestEvent) {
-    const { request, client, settings, treeHostIndex, debugOutput } = data;
+    const { client, settings, debugOutput } = data;
     const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
-    const root = settings.tree[treeHostIndex].$mount;
-    let pathname: string | undefined = parse(request.url as string).pathname;
-    if (!pathname) { console.error("[ERROR]: parsing pathname"); return; }
-    let result: PathResolverResult | undefined = resolvePath(pathname.split("/"), root);
+    let pathname = parse(data.request.url as string).pathname;
+    if(!pathname) return client.close(400);
+    let result = data.resolvePath();
     if (!result) return client.close(404);
     let statPath = await statWalkPath(result);
     //if this is a datafolder, we hand the client and request off directly to it
     //otherwise we stick it in its own section
     if (statPath.itemtype === "datafolder") {
+      if (!data.allow.datafolder) return client.close(403);
       //trigger the datafolder to load in case it isn't
       const request = new DataFolderRequest(
         result,
@@ -301,9 +302,9 @@ class TiddlyServerAuthentication {
     //make sure nothing can access the state object!
     this.authenticateRequest = (request, response, state) => {
       let tsstate = retrieve(request.tsstate);
-      if (!tsstate.authAccountsKey && state.allowAnon) {
+      if (!tsstate.authAccountKey && state.allowAnon) {
         return true;
-      } else if (tsstate.authAccountsKey) {
+      } else if (tsstate.authAccountKey) {
         state.authenticatedUsername = tsstate.username;
         return true;
       } else {

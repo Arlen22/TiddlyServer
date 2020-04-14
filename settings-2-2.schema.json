@@ -1,5 +1,5 @@
 {
-  "$id": "settings-2-1.schema.json",
+  "$id": "settings-2-2.schema.json",
   "$ref": "#/definitions/ServerConfigSchema",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
@@ -209,7 +209,7 @@
           "type": "object"
         },
         "tree": {
-          "$ref": "settings-2-1-tree.schema.json"
+          "$ref": "settings-2-2-tree.schema.json"
         }
       },
       "required": [
@@ -229,6 +229,10 @@
         "writeErrors": true
       },
       "properties": {
+        "datafolder": {
+          "description": "Whether clients may access data folders (which gives \nthem full access to the system by modifying data folders)",
+          "type": "boolean"
+        },
         "loginlink": {
           "description": "link to the login page when returning auth errors",
           "type": "boolean"
@@ -270,7 +274,8 @@
         "websockets",
         "registerNotice",
         "loginlink",
-        "transfer"
+        "transfer",
+        "datafolder"
       ],
       "type": "object"
     },

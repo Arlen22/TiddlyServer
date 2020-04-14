@@ -417,6 +417,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
     putsaver: checkBoolean,
     loginlink: checkBoolean,
     transfer: checkBoolean,
+    datafolder: checkBoolean
   });
   const putsaverOptional = as<OptionalCheckermap<ServerConfig_PutSaver, never>>({
     backupFolder: checkString,

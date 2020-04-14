@@ -110,11 +110,10 @@ export function normalizeTree(
   }
   if (typeof item === "string" || item.$element === "folder") {
     if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
-    if (!item.path)
-      throw format(
-        "  Error loading settings: path must be specified for folder item under '%s'",
-        keypath.join(", ")
-      );
+    if (!item.path) throw format(
+      "  Error loading settings: path must be specified for folder item under '%s'",
+      keypath.join(", ")
+    );
     item.path = pathResolveWithUser(settingsDir, item.path);
     key = key || path.basename(item.path);
     let $options = item.$options || [];
@@ -233,19 +232,21 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
         putsaver: true,
         loginlink: true,
         transfer: false,
+        datafolder: true
       }),
       ...set.bindInfo.localAddressPermissions["localhost"]({} as any),
     },
     "*": {
       ...as<ServerConfig_AccessOptions>({
-        writeErrors: true,
+        writeErrors: false,
         mkdir: false,
         upload: false,
         websockets: true,
-        registerNotice: false,
+        registerNotice: true,
         putsaver: true,
         loginlink: true,
         transfer: false,
+        datafolder: true
       }),
       ...set.bindInfo.localAddressPermissions["*"]({} as any),
     },
@@ -355,11 +356,11 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
   if (newset.putsaver && newset.putsaver.etag === "disabled" && !newset.putsaver.backupFolder) {
     console.log(
       "Etag checking is disabled, but a backup folder is not set. " +
-        "Changes made in multiple tabs/windows/browsers/computers can overwrite each " +
-        "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED " +
-        "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can " +
-        "also set the etagWindow setting to allow files to be modified if not newer than " +
-        "so many seconds from the copy being saved."
+      "Changes made in multiple tabs/windows/browsers/computers can overwrite each " +
+      "other with stale information. SAVED WORK MAY BE LOST IF ANOTHER WINDOW WAS OPENED " +
+      "BEFORE THE WORK WAS SAVED. Instead of disabling Etag checking completely, you can " +
+      "also set the etagWindow setting to allow files to be modified if not newer than " +
+      "so many seconds from the copy being saved."
     );
   }
   return newset;
@@ -557,6 +558,11 @@ export interface ServerConfig_AccessOptions {
   loginlink: boolean;
   /** Allows two clients to communicate through the server */
   transfer: boolean;
+  /** 
+   * Whether clients may access data folders (which gives 
+   * them full access to the system by modifying data folders) 
+   */
+  datafolder: boolean;
 }
 export interface ServerConfig_BindInfo {
   /**
@@ -696,7 +702,7 @@ export interface ServerConfig_PutSaver {
 //  */
 // export type NewTreeItemSchema = NewTreeGroupSchema | NewTreePathSchema | string;
 // export type NewTreeItem = NewTreeGroup | NewTreePath | NewTreeOptions;
-export interface NewTreeMountArgs {}
+export interface NewTreeMountArgs { }
 type PartialExcept<T extends {}, REQUIRED extends keyof T> = {
   [KEY in Extract<keyof T, REQUIRED>]-?: T[KEY];
 } &
@@ -828,7 +834,7 @@ export namespace Schema {
     title: string;
     description: string;
   }
-  function define(name: string, val: any) {}
+  function define(name: string, val: any) { }
   function defstring(enumArr?: string[]) {
     return {
       type: "string",
@@ -890,6 +896,11 @@ export namespace Schema {
      * index.html file, and adding an index option to this element.
      */
     noTrailingSlash?: boolean;
+    /** 
+     * Do not recognize datafolders within this path. Files within data folders will
+     * be accessible directly from the web, including the tiddlywiki.info file, instead 
+     * of treating it as a data folder.
+     */
     noDataFolder?: boolean;
     $options?: OptionElements[];
   }
@@ -993,7 +1004,7 @@ export interface NewTreePathOptions_Backup {
   etagAge: number;
 }
 
-export interface ServerConfigBase {}
+export interface ServerConfigBase { }
 
 export interface OldServerConfigBase {
   _disableLocalHost: boolean;
