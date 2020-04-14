@@ -1,0 +1,513 @@
+import * as JSON5 from 'json5'
+import * as path from 'path'
+import * as http from 'http'
+import * as fs from 'fs'
+import { Stats } from 'fs'
+import { format, promisify } from 'util'
+import { networkInterfaces, NetworkInterfaceInfo } from 'os'
+
+import * as ipcalc from '../ipcalc'
+import {
+  PathResolverResult,
+  DirectoryIndexOptions,
+  DirectoryIndexData,
+  JsonError,
+  StatPathResult,
+  TreePathResult,
+} from '../server-types'
+import { generateDirectoryListing } from '../generate-directory-listing'
+import { Config, OptionsConfig } from '../server-config'
+import { StateObject } from '../state-object'
+import { ERRORS, hostIPv4reg } from '../constants'
+
+export const getHumanSize = (size: number) => {
+  const TAGS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+  let power = 0
+  while (size >= 1024) {
+    size /= 1024
+    power++
+  }
+  return size.toFixed(1) + TAGS[power]
+}
+
+/**
+ * Calls the onerror handler if there is a JSON error. Returns whatever the error handler
+ * returns. If there is no error handler, undefined is returned.
+ * The string "undefined" is not a valid JSON document.
+ */
+export const tryParseJSON = <T = any>(
+  str: string,
+  onerror?: (e: JsonError) => T | never | void
+): T | undefined => {
+  function findJSONError(message: string, json: string) {
+    console.log(message)
+    const res: string[] = []
+    const match = /at (\d+):(\d+)/gi.exec(message)
+    if (!match) return ''
+    const position = [+match[1], +match[2]]
+    const lines = json.split('\n')
+    res.push(...lines.slice(0, position[0]))
+    res.push(new Array(position[1]).join('-') + '^  ' + message)
+    res.push(...lines.slice(position[0]))
+    return res.join('\n')
+  }
+  str = str.replace(/\t/gi, '    ').replace(/\r\n/gi, '\n')
+  try {
+    return JSON5.parse(str)
+  } catch (e) {
+    let err = new JsonError(findJSONError(e.message, str), e)
+    if (onerror) onerror(err)
+  }
+}
+
+export const keys = <T>(o: T): (keyof T)[] => {
+  return Object.keys(o) as (keyof T)[]
+}
+
+export const padLeft = (str: any, pad: number | string, padStr?: string): string => {
+  var item = str.toString()
+  if (typeof padStr === 'undefined') padStr = ' '
+  if (typeof pad === 'number') {
+    pad = new Array(pad + 1).join(padStr)
+  }
+  //pad: 000000 val: 6543210 => 654321
+  return pad.substr(0, Math.max(pad.length - item.length, 0)) + item
+}
+
+export const sortBySelector = <T extends { [k: string]: string }>(key: (e: T) => any) => {
+  return function(a: T, b: T) {
+    var va = key(a)
+    var vb = key(b)
+
+    if (va > vb) return 1
+    else if (va < vb) return -1
+    else return 0
+  }
+}
+
+export const sortByKey = (key: string) => {
+  return sortBySelector(e => e[key])
+}
+
+export const isError = (obj: any): obj is Error => {
+  return !!obj && obj.constructor === Error
+}
+
+export const isErrnoException = (obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException => {
+  return isError(obj)
+}
+
+export const sanitizeJSON = (key: string, value: any) => {
+  // returning undefined omits the key from being serialized
+  if (!key) {
+    return value
+  } //This is the entire value to be serialized
+  else if (key.substring(0, 1) === '$') return
+  //Remove angular tags
+  else if (key.substring(0, 1) === '_') return
+  //Remove NoSQL tags
+  else return value
+}
+
+export const canAcceptGzip = (header: string | { headers: http.IncomingHttpHeaders }) => {
+  if (((a): a is { headers: http.IncomingHttpHeaders } => typeof a === 'object')(header)) {
+    header = header.headers['accept-encoding'] as string
+  }
+  var gzip = header
+    .split(',')
+    .map(e => e.split(';'))
+    .filter(e => e[0] === 'gzip')[0]
+  var can = !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0
+  return can
+}
+
+export const as = <T>(obj: T) => {
+  return obj
+}
+
+/**
+ * Returns the keys and paths from the PathResolverResult directory. If there
+ * is an error it will be sent directly to the client and nothing will be emitted.
+ *
+ * @param {PathResolverResult} result
+ * @returns
+ */
+export const getTreePathFiles = async (
+  result: PathResolverResult,
+  state: StateObject
+): Promise<DirectoryIndexData> => {
+  let dirpath = [result.treepathPortion.join('/'), result.filepathPortion.join('/')]
+    .filter(e => e)
+    .join('/')
+  const type = Config.isGroup(result.item) ? 'group' : 'folder'
+  if (Config.isGroup(result.item)) {
+    let $c = result.item.$children
+    const keys = $c.map(e => e.key)
+    // const keys = Object.keys(result.item);
+    const paths = $c.map(e => (Config.isPath(e) ? e.path : true))
+    return Promise.resolve({
+      keys,
+      paths,
+      dirpath,
+      type: type as 'group' | 'folder',
+    })
+  } else {
+    return promisify(fs.readdir)(result.fullfilepath)
+      .then(keys => {
+        const paths = keys.map(k => path.join(result.fullfilepath, k))
+        return { keys, paths, dirpath, type: type as 'group' | 'folder' }
+      })
+      .catch(err => {
+        if (!err) return Promise.reject(err)
+        state.log(2, 'Error calling readdir on folder "%s": %s', result.fullfilepath, err.message)
+        state.throw(500)
+        return Promise.reject(false)
+      })
+  }
+}
+
+export const getTreeOptions = (state: StateObject) => {
+  // Nonsense we have to write because putsaver could be false
+  // type putsaverT = Required<typeof state.settings.putsaver>;
+  let putsaver = as<typeof state.settings.putsaver>({
+    enabled: true,
+    gzipBackups: true,
+    backupFolder: '',
+    etag: 'optional',
+    etagAge: 3,
+    ...(state.settings.putsaver || {}),
+  })
+  let options: OptionsConfig = {
+    auth: { $element: 'auth', authError: 403, authList: null },
+    putsaver: { $element: 'putsaver', ...putsaver },
+    index: {
+      $element: 'index',
+      defaultType: state.settings.directoryIndex.defaultType,
+      indexFile: [],
+      indexExts: [],
+    },
+  }
+  state.ancestry.forEach(e => {
+    e.$options &&
+      e.$options.forEach(f => {
+        if (f.$element === 'auth' || f.$element === 'putsaver' || f.$element === 'index') {
+          Object.keys(f).forEach(k => {
+            if (f[k] === undefined) return
+            options[f.$element][k] = f[k]
+          })
+        }
+      })
+  })
+  return options
+}
+
+export const sendDirectoryIndex = async ([_r, options]: [
+  DirectoryIndexData,
+  DirectoryIndexOptions
+]) => {
+  let { keys, paths, dirpath, type } = _r
+  let entries = await Promise.all(
+    keys.map(async (key, i) => {
+      let statpath = paths[i]
+      let stat = statpath === true ? undefined : await statPath(statpath)
+      return {
+        name: key,
+        path: key + (!stat || stat.itemtype === 'folder' ? '/' : ''),
+        type: !stat
+          ? 'group'
+          : stat.itemtype === 'file'
+          ? options.extTypes[key.split('.').pop() as string] || 'other'
+          : (stat.itemtype as string),
+        size: stat && stat.stat ? getHumanSize(stat.stat.size) : '',
+      }
+    })
+  )
+  if (options.format === 'json') {
+    return JSON.stringify({ path: dirpath, entries, type, options }, null, 2)
+  } else {
+    let def = { path: dirpath, entries, type }
+    return generateDirectoryListing(def, options)
+  }
+}
+
+/**
+ * If the path
+ */
+export const statWalkPath = async (test: PathResolverResult) => {
+  if (!Config.isPath(test.item)) {
+    console.log(test.item)
+    throw 'property item must be a TreePath'
+  }
+  let n = { statpath: '', index: -1, endStat: false }
+  let stats = [test.item.path, ...test.filepathPortion].map(e => {
+    return (n = {
+      statpath: path.join(n.statpath, e),
+      index: n.index + 1,
+      endStat: false,
+    })
+  })
+  while (true) {
+    let s = stats.shift()
+    /* should never be undefined because we always do at least
+     * 1 loop and then exit if stats.length is 0 */
+    if (!s) throw new Error('PROGRAMMER ERROR')
+    let res = await statPath(s)
+    if (res.endStat || stats.length === 0) return res
+  }
+}
+
+export const statsafe = async (p: string) => {
+  return promisify(fs.stat)(p).catch(_x => undefined)
+}
+
+/**
+ * returns the info about the specified path. endstat is true if the statpath is not
+ * found or if it is a directory and contains a tiddlywiki.info file, or if it is a file.
+ *
+ * @param {({ statpath: string, index: number, endStat: boolean } | string)} s
+ * @returns
+ */
+export const statPath = async (s: { statpath: string; index: number } | string) => {
+  if (typeof s === 'string') s = { statpath: s, index: 0 }
+  const { statpath, index } = s
+  let stat = await statsafe(statpath)
+  let endStat = !stat || !stat.isDirectory()
+  let infostat: fs.Stats | undefined = undefined
+  if (!endStat) {
+    infostat = await statsafe(path.join(statpath, 'tiddlywiki.info'))
+    endStat = !!infostat && infostat.isFile()
+  }
+
+  return {
+    stat,
+    statpath,
+    index,
+    endStat,
+    itemtype: getItemType(stat, infostat),
+    infostat: infostat && infostat.isFile() ? infostat : undefined,
+  } as StatPathResult
+}
+
+function getItemType(stat: Stats | undefined, infostat: Stats | undefined) {
+  let itemtype: string = ''
+  if (!stat) itemtype = 'error'
+  else if (stat.isDirectory()) itemtype = !!infostat ? 'datafolder' : 'folder'
+  else if (stat.isFile() || stat.isSymbolicLink()) itemtype = 'file'
+  else itemtype = 'error'
+
+  return itemtype
+}
+
+export const treeWalker = (tree: Config.GroupElement | Config.PathElement, reqpath: any) => {
+  var item = tree
+  var ancestry: Config.MountElement[] = []
+  var folderPathFound = Config.isPath(item)
+  for (var end = 0; end < reqpath.length; end++) {
+    if (Config.isPath(item)) {
+      folderPathFound = true
+      break
+    }
+    let t = item.$children.find(
+      (e): e is Config.GroupElement | Config.PathElement =>
+        (Config.isGroup(e) || Config.isPath(e)) && e.key === reqpath[end]
+    )
+    if (t) {
+      ancestry.push(item)
+      item = t
+    } else {
+      break
+    }
+  }
+  return { item, end, folderPathFound, ancestry } as TreePathResult
+}
+
+export const resolvePath = (
+  state: StateObject | string[],
+  tree: Config.MountElement
+): PathResolverResult | undefined => {
+  let reqpath: any
+  if (Array.isArray(state)) {
+    reqpath = state
+  } else {
+    reqpath = state.path
+  }
+
+  reqpath = decodeURI(
+    reqpath
+      .slice()
+      .filter((a: any) => a)
+      .join('/')
+  )
+    .split('/')
+    .filter(a => a)
+
+  if (!reqpath.every((a: any) => a !== '..' && a !== '.')) return
+
+  var result = treeWalker(tree, reqpath)
+
+  if (reqpath.length > result.end && !result.folderPathFound) return
+
+  //get the remainder of the path
+  let filepathPortion = reqpath.slice(result.end).map((a: any) => a.trim())
+
+  const fullfilepath = result.folderPathFound
+    ? path.join(result.item.path, ...filepathPortion)
+    : Config.isPath(result.item)
+    ? result.item.path
+    : ''
+
+  return {
+    item: result.item,
+    ancestry: result.ancestry,
+    treepathPortion: reqpath.slice(0, result.end),
+    filepathPortion,
+    reqpath,
+    fullfilepath,
+  }
+}
+
+export const fs_move = (oldPath: string, newPath: string, callback: (_arg?: any) => any) => {
+  fs.rename(oldPath, newPath, function(err) {
+    if (err) {
+      if (err.code === 'EXDEV') {
+        copy()
+      } else {
+        callback(err)
+      }
+      return
+    }
+    callback()
+  })
+
+  function copy() {
+    var readStream = fs.createReadStream(oldPath)
+    var writeStream = fs.createWriteStream(newPath)
+
+    readStream.on('error', callback)
+    writeStream.on('error', callback)
+
+    readStream.on('close', function() {
+      fs.unlink(oldPath, callback)
+    })
+
+    readStream.pipe(writeStream)
+  }
+}
+
+/** to be used with concatMap, mergeMap, etc. */
+export const recieveBody = (
+  state: StateObject,
+  parseJSON: boolean,
+  sendError?: true | ((e: JsonError) => void)
+) => {
+  //get the data from the request
+  return state.recieveBody(parseJSON, sendError)
+}
+
+export const createHashmapString = <T>(keys: string[], values: T[]): { [id: string]: T } => {
+  if (keys.length !== values.length) throw 'keys and values must be the same length'
+  var obj: { [id: string]: T } = {}
+  keys.forEach((e, i) => {
+    obj[e] = values[i]
+  })
+  return obj
+}
+
+export const createHashmapNumber = <T>(keys: number[], values: T[]): { [id: number]: T } => {
+  if (keys.length !== values.length) throw 'keys and values must be the same length'
+  var obj: { [id: number]: T } = {}
+  keys.forEach((e, i) => {
+    obj[e] = values[i]
+  })
+  return obj
+}
+
+export const obsTruthy = <T>(a: T | undefined | null | false | '' | 0 | void): a is T => {
+  return !!a
+}
+
+export function getError(code: 'PRIMARY_KEYS_REQUIRED'): any
+export function getError(code: 'OLD_REVISION'): any
+export function getError(code: 'KEYS_REQUIRED', keyList: string): any
+export function getError(code: 'ROW_NOT_FOUND', table: string, id: string): any
+export function getError(code: 'PROGRAMMER_EXCEPTION', message: string): any
+export function getError(code: string, ...args: string[]): any {
+  // let code = args.shift() as keyof typeof ERRORS;
+  if (ERRORS[code]) args.unshift(ERRORS[code])
+  //else args.unshift(code);
+  return { code: code, message: format(code, ...args) }
+}
+
+/**
+ *
+ *
+ * @param {string} ip x.x.x.x
+ * @param {string} range x.x.x.x
+ * @param {number} netmask 0-32
+ */
+export const testAddress = (ip: string, range: string, netmask: number) => {
+  let netmaskBinStr = ipcalc.IPv4_bitsNM_to_binstrNM(netmask)
+  let addressBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(ip))
+  let netaddrBinStr = ipcalc.IPv4_intA_to_binstrA(ipcalc.IPv4_dotquadA_to_intA(range))
+  let netaddrBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(netaddrBinStr, netmaskBinStr)
+  let addressBinStrMasked = ipcalc.IPv4_Calc_netaddrBinStr(addressBinStr, netmaskBinStr)
+  return netaddrBinStrMasked === addressBinStrMasked
+}
+
+export const parseHostList = (hosts: string[]) => {
+  let hostTests = hosts.map(e => hostIPv4reg.exec(e) || e)
+  return (addr: string) => {
+    let usable = false
+    let lastMatch = -1
+    hostTests.forEach((test, i) => {
+      if (Array.isArray(test)) {
+        let allow = !test[1]
+        let ip = test[2]
+        let netmask = +test[3]
+        if (netmask < 0 || netmask > 32) console.log('Host %s has an invalid netmask', test[0])
+        if (testAddress(addr, ip, netmask)) {
+          usable = allow
+          lastMatch = i
+        }
+      } else {
+        let ip = test.startsWith('-') ? test.slice(1) : test
+        let deny = test.startsWith('-')
+        if (ip === addr) {
+          usable = !deny
+          lastMatch = i
+        }
+      }
+    })
+    return { usable, lastMatch }
+  }
+}
+
+export const getUsableAddresses = (hosts: string[]) => {
+  let reg = /^(\-?)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/i
+  let hostTests = hosts.map(e => reg.exec(e) || e)
+  var ifaces = networkInterfaces()
+  let addresses = Object.keys(ifaces).reduce(
+    (n, k) => n.concat(ifaces[k].filter(e => e.family === 'IPv4')),
+    [] as NetworkInterfaceInfo[]
+  )
+  let usableArray = addresses.filter(addr => {
+    let usable = false
+    hostTests.forEach(test => {
+      if (Array.isArray(test)) {
+        //we can't match IPv6 interface addresses so just go to the next one
+        if (addr.family === 'IPv6') return
+        let allow = !test[1]
+        let ip = test[2]
+        let netmask = +test[3]
+        if (netmask < 0 || netmask > 32) console.log('Host %s has an invalid netmask', test[0])
+        if (testAddress(addr.address, ip, netmask)) usable = allow
+      } else {
+        let ip = test.startsWith('-') ? test.slice(1) : test
+        let deny = test.startsWith('-')
+        if (ip === addr.address) usable = !deny
+      }
+    })
+    return usable
+  })
+  return usableArray
+}

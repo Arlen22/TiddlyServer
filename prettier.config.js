@@ -1,10 +1,13 @@
 /** @type {import("prettier").Options} */
 const options = {
-  trailingComma: "es5",
+  jsxSingleQuote: true,
+  printWidth: 100,
+  quoteProps: "consistent",
+  semi: false,
+  singleQuote: true,
   tabWidth: 2,
-  semi: true,
-  singleQuote: false,
-  printWidth: 100
+  trailingComma: "es5",
+  bracketSpacing: true,
 };
 
 module.exports = options;

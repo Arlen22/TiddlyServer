@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events'
+import { promisify } from 'util'
+import { gzip, createGzip } from 'zlib'
 import * as http from 'http'
 import { IncomingMessage, ServerResponse } from 'http'
 import * as https from 'https'
@@ -7,26 +9,25 @@ import * as path from 'path'
 import { inspect } from 'util'
 import * as send from 'send'
 import * as libsodium from 'libsodium-wrappers'
+import * as fs from 'fs'
 import * as WebSocket from 'ws'
-import { handler as morgan } from './logger'
-import { handleAuthRoute, initAuthRoute } from './auth-route'
-import { checkServerConfig } from './interface-checker'
-import { RequestEvent } from './request-event'
-import {
-  init as initServerTypes,
-  keys,
-  loadSettings,
-  parseHostList,
-  serveFile,
-  serveFolder,
-  ServerConfig,
-  ServerEventEmitter,
-} from './server-types'
-import { StateObject } from './state-object'
-import { handleTiddlyServerRoute, init as initTiddlyServer } from './tiddlyserver'
+import { handler as morgan } from '../logger'
+import { initAuthRoute } from '../auth-route'
+import { checkServerConfig } from '../interface-checker'
+import { RequestEvent } from '../request-event'
+import { parseHostList, ServerConfig, ServerEventEmitter } from '../server-types'
+import { tryParseJSON, keys, canAcceptGzip } from './utils'
+import { colors } from '../constants'
+import { ServerConfigSchema, normalizeSettings } from '../server-config'
+import { StateObject } from '../state-object'
+import { handleTiddlyServerRoute, init as initTiddlyServer } from '../tiddlyserver'
+import { handleAdminRoute, handleAssetsRoute } from './route-handlers'
 
-export { checkServerConfig, loadSettings, routes, libsReady }
+export { checkServerConfig, routes, libsReady }
 const { Server: WebSocketServer } = WebSocket
+const assets = path.resolve(__dirname, '../assets')
+const favicon = path.resolve(__dirname, '../assets/favicon.ico')
+const stylesheet = path.resolve(__dirname, '../assets/directory.css')
 
 // global settings
 Error.stackTraceLimit = Infinity
@@ -35,7 +36,11 @@ console.debug = function() {} //noop console debug;
 // this is the internal communicator
 export const eventer = new EventEmitter() as ServerEventEmitter
 
-initServerTypes(eventer)
+export const init = (eventer: ServerEventEmitter) => {
+  eventer.on('settings', function(_set: ServerConfig) {})
+}
+
+init(eventer)
 initTiddlyServer(eventer)
 initAuthRoute(eventer)
 
@@ -50,38 +55,10 @@ const routes: Record<string, (state: StateObject) => void> = {
   'directory.css': state => serveFile(state, 'directory.css', state.settings.__assetsDir),
 }
 
-function handleAssetsRoute(state: StateObject) {
-  switch (state.path[2]) {
-    case 'static':
-      serveFolder(state, '/assets/static', path.join(state.settings.__assetsDir, 'static'))
-      break
-    case 'icons':
-      serveFolder(state, '/assets/icons', path.join(state.settings.__assetsDir, 'icons'))
-      break
-    case 'tiddlywiki':
-      serveFolder(state, '/assets/tiddlywiki', state.settings.__targetTW)
-      break
-    default:
-      state.throw(404)
-  }
-}
-
-function handleAdminRoute(state: StateObject) {
-  switch (state.path[2]) {
-    case 'authenticate':
-      handleAuthRoute(state)
-      break
-    default:
-      state.throw(404)
-  }
-}
-
 const libsReady = Promise.all([libsodium.ready])
 
 declare function preflighterFunc<T extends RequestEvent>(ev: T): Promise<T>
-// declare function preflighterFunc(ev: RequestEventHTTP): Promise<RequestEventHTTP>;
 
-// const debug = console.log;
 /**
  *  4 - Errors that require the process to exit for restart
  *  3 - Major errors that are handled and do not require a server restart
@@ -200,7 +177,6 @@ export async function initServer({
   )
 
   if (success === false) return eventer
-  // .then(() => {
   eventer.emit('serverOpen', servers, hosts, !!settingshttps, dryRun)
   let ifaces = networkInterfaces()
   console.log('Open your browser and type in one of the following:')
@@ -221,14 +197,10 @@ export async function initServer({
   )
 
   if (dryRun) console.log('DRY RUN: No further processing is likely to happen')
-  // }, (x) => {
-  // console.log("Error thrown while starting server");
-  // console.log(x);
-  // });
-
   return eventer
 }
-function setupHosts(
+
+const setupHosts = async (
   hosts: string[],
   settingshttps: undefined | ((host: string) => https.ServerOptions),
   preflighter: <T extends RequestEvent>(ev: T) => Promise<T>,
@@ -242,7 +214,7 @@ function setupHosts(
   dryRun: boolean,
   port: number,
   debug: any
-) {
+) => {
   return Promise.all<void>(
     hosts.map(host => {
       let server: any
@@ -314,14 +286,12 @@ export function addRequestHandlers(
   log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
   debug: DebugLogger
 ) {
-  // const addListeners = () => {
   let closing = false
 
   server.on('request', (req, res) => {
     requestHandler(req, res, iface, preflighter, log, settings).catch(err => {
       //catches any errors that happen inside the then statements
       debug(3, 'Uncaught error in the request handler: ' + (err.message || err.toString()))
-      //if we have a stack, then print it
       if (err.stack) debug(3, err.stack)
     })
   })
@@ -378,7 +348,6 @@ async function requestHandler(
   preflighter: undefined | typeof preflighterFunc,
   log: { (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> },
   settings: ServerConfig
-  // debug: DebugLogger
 ) {
   await log(request, response)
 
@@ -386,7 +355,6 @@ async function requestHandler(
 
   //send it to the preflighter
   let ev2 = await ev1.requestHandlerHostLevelChecks(preflighter)
-  // }).then(ev => {
   // check if the preflighter handled it
   if (ev2.handled) return
   //create the state object
@@ -398,13 +366,164 @@ async function requestHandler(
   //otherwise forward to TiddlyServer
   else handleTiddlyServerRoute(state)
 }
-// const errLog = DebugLogger('STA-ERR');
+
 eventer.on('stateError', state => {
   if (state.doneMessage.length > 0)
     StateObject.DebugLogger('STA-ERR').call(state, 2, state.doneMessage.join('\n'))
   debugger
 })
+
 eventer.on('stateDebug', state => {
   if (state.doneMessage.length > 0)
     StateObject.DebugLogger('STA-DBG').call(state, -2, state.doneMessage.join('\n'))
 })
+
+export const loadSettings = (settingsFile: string, routeKeys: string[]) => {
+  console.log('Settings file: %s', settingsFile)
+
+  const settingsString = fs
+    .readFileSync(settingsFile, 'utf8')
+    .replace(/\t/gi, '    ')
+    .replace(/\r\n/gi, '\n')
+
+  let settingsObjSource: ServerConfigSchema = tryParseJSON<ServerConfigSchema>(
+    settingsString,
+    e => {
+      console.error(
+        colors.FgRed + 'The settings file could not be parsed: %s' + colors.Reset,
+        e.originalError.message
+      )
+      console.error(e.errorPosition)
+      throw 'The settings file could not be parsed: Invalid JSON'
+    }
+  )
+
+  if (!settingsObjSource.$schema)
+    throw 'The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new'
+
+  if (!settingsObjSource.tree) throw 'tree is not specified in the settings file'
+  let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https
+  let settingsObj = normalizeSettings(settingsObjSource, settingsFile)
+
+  settingsObj.__assetsDir = assets
+  try {
+    settingsObj.__targetTW = settingsObj._datafoldertarget
+      ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
+      : path.join(require.resolve('tiddlywiki-production/boot/boot.js'), '../..')
+  } catch (e) {
+    console.log(e)
+    throw 'Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder'
+  }
+
+  if (typeof settingsObj.tree === 'object') {
+    let keys: string[] = []
+    let conflict = keys.filter(k => routeKeys.indexOf(k) > -1)
+    if (conflict.length)
+      console.log(
+        'The following tree items are reserved for use by TiddlyServer: %s',
+        conflict.map(e => `"${e}"`).join(', ')
+      )
+  }
+  //remove the https settings and return them separately
+  return { settings: settingsObj, settingshttps }
+}
+
+export const serveFile = (state: StateObject, file: string, root: string | undefined) => {
+  promisify(fs.stat)(root ? path.join(root, file) : file).then(
+    (): any => {
+      state.send({
+        root,
+        filepath: file,
+        error: err => {
+          state.log(2, '%s %s', err.status, err.message).throw(500)
+        },
+      })
+    },
+    _err => {
+      state.throw<StateObject>(404)
+    }
+  )
+}
+
+export const serveFolder = (
+  state: StateObject,
+  mount: string,
+  root: string,
+  serveIndex?: Function
+) => {
+  const pathname = state.url.pathname
+  if (state.url.pathname.slice(0, mount.length) !== mount) {
+    state.log(2, 'URL is different than the mount point %s', mount).throw(500)
+  } else {
+    state.send({
+      root,
+      filepath: pathname.slice(mount.length),
+      error: err => {
+        state.log(-1, '%s %s', err.status, err.message).throw(404)
+      },
+      directory: filepath => {
+        if (serveIndex) {
+          serveIndex(state, filepath)
+        } else {
+          state.throw(403)
+        }
+      },
+    })
+  }
+}
+export const serveFolderIndex = (options: { type: string }) => {
+  async function readFolder(folder: string) {
+    let files = await promisify(fs.readdir)(folder)
+    let res = { directory: [], file: [] }
+    await Promise.all(
+      files.map(file =>
+        promisify(fs.stat)(path.join(folder, file)).then(
+          stat => {
+            let itemtype = stat.isDirectory() ? 'directory' : stat.isFile() ? 'file' : 'other'
+            res[itemtype].push(file)
+          },
+          x => undefined
+        )
+      )
+    )
+    return res
+  }
+  if (options.type === 'json') {
+    return function(state: StateObject, folder: string) {
+      readFolder(folder).then(item => {
+        sendResponse(state, JSON.stringify(item), {
+          contentType: 'application/json',
+          doGzip: canAcceptGzip(state.req),
+        })
+      })
+    }
+  }
+}
+
+export const sendResponse = (
+  state: StateObject,
+  body: Buffer | string,
+  options: {
+    doGzip?: boolean
+    contentType?: string
+  } = {}
+) => {
+  body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body
+  if (options.doGzip)
+    gzip(body, (err, gzBody) => {
+      if (err) _send(body, false)
+      else _send(gzBody, true)
+    })
+  else _send(body, false)
+
+  function _send(body, isGzip) {
+    state.setHeaders({
+      'Content-Length': Buffer.isBuffer(body)
+        ? body.length.toString()
+        : Buffer.byteLength(body, 'utf8').toString(),
+      'Content-Type': options.contentType || 'text/plain; charset=utf-8',
+    })
+    if (isGzip) state.setHeaders({ 'Content-Encoding': 'gzip' })
+    state.respond(200).buffer(body)
+  }
+}
