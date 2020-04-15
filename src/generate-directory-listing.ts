@@ -1,4 +1,4 @@
-const { sortBySelector } = require('./server-types')
+const { sortBySelector } = require('./server')
 const fixPutSaver = `javascript:((saver) => {
 if (typeof saver !== 'number' || saver < 0) return;
 $tw.saverHandler.savers[saver].__proto__.uri = function () { return decodeURI(encodeURI(document.location.toString().split('#')[0])); };
