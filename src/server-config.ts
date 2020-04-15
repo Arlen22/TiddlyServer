@@ -216,44 +216,46 @@ function isObject(a): a is OptionalAny {
 function spread(a: any): {} {
   return typeof a === "object" ? a : {};
 }
+export const defaultPermissions = {
+  writeErrors: false,
+  mkdir: false,
+  upload: false,
+  websockets: false,
+  registerNotice: true,
+  putsaver: true,
+  loginlink: true,
+  transfer: false,
+  datafolder: true
+};
 export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
   const settingsDir = path.dirname(settingsFile);
   let set = oc(_set);
   // proxset.bindInfo
   if (!set.tree) throw "tree is required in ServerConfig";
   let lap = {
-    localhost: {
-      ...as<ServerConfig_AccessOptions>({
-        writeErrors: true,
-        mkdir: true,
-        upload: true,
-        websockets: true,
-        registerNotice: true,
-        putsaver: true,
-        loginlink: true,
-        transfer: false,
-        datafolder: true
-      }),
-      ...set.bindInfo.localAddressPermissions["localhost"]({} as any),
-    },
+    // localhost: {
+    //   ...as<ServerConfig_AccessOptions>({
+    //     writeErrors: true,
+    //     mkdir: true,
+    //     upload: true,
+    //     websockets: true,
+    //     registerNotice: true,
+    //     putsaver: true,
+    //     loginlink: true,
+    //     transfer: false,
+    //     datafolder: true
+    //   }),
+    //   ...set.bindInfo.localAddressPermissions["localhost"]({} as any),
+    // },
+    // get defaultPermissions() { throw "This property should not be accessed"; return defaultPermissions; },
     "*": {
-      ...as<ServerConfig_AccessOptions>({
-        writeErrors: false,
-        mkdir: false,
-        upload: false,
-        websockets: true,
-        registerNotice: true,
-        putsaver: true,
-        loginlink: true,
-        transfer: false,
-        datafolder: true
-      }),
+      ...as<ServerConfig_AccessOptions>(defaultPermissions),
       ...set.bindInfo.localAddressPermissions["*"]({} as any),
     },
   };
 
-  Object.keys(set.bindInfo.localAddressPermissions({})).forEach(k => {
-    if (k === "localhost" || k === "*") return;
+  Object.keys(set.bindInfo.localAddressPermissions({ defaultPermissions })).forEach(k => {
+    if (k === "*" || k === "defaultPermissions") return;
     lap[k] = set.bindInfo.localAddressPermissions[k](lap["*"]);
     Object.keys(lap["*"]).forEach(k2 => {
       if (lap[k][k2] === undefined) lap[k][k2] = lap["*"][k2];
@@ -388,16 +390,27 @@ export interface ServerConfigSchema {
    */
   tree: any;
   /** bind address and port info */
-  bindInfo?: Partial<
-    ServerConfig_BindInfo & {
+  bindInfo?: Partial<ServerConfig_BindInfo> & {
+    /**
+     * https-only options: a string to a JavaScript file which exports a function of type
+     * `(iface:string) => https.ServerOptions`. Note that the initServer function will
+     * change this to a boolean value indicating whether https is in use once inside TiddlyServer.
+     */
+    https?: string;
+    /**
+     * Permissions based on local address: "localhost", "*" (all others), "192.168.0.0/16", etc.
+     * This checks the IP address each client connects to (socket.localAddress),
+     * not the bind address of the server instance that accepted the request.
+     */
+    localAddressPermissions?: {
       /**
-       * https-only options: a string to a JavaScript file which exports a function of type
-       * `(iface:string) => https.ServerOptions`. Note that the initServer function will
-       * change this to a boolean value indicating whether https is in use once inside TiddlyServer.
+       * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":false,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
        */
-      https?: string;
+      defaultPermissions?: ServerConfig_AccessOptions;
+      [host: string]: ServerConfig_AccessOptions | undefined;
     }
-  >;
+
+  };
   /** logging  */
   logging?: Partial<ServerConfig_Logging>;
   /** directory index options */
@@ -454,6 +467,7 @@ export interface ServerConfig {
   tree: Config.HostElement[];
   /** bind address and port */
   bindInfo: ServerConfig_BindInfo & {
+    localAddressPermissions: { [host: string]: ServerConfig_AccessOptions; }
     https: boolean;
   };
   /** logging  */
@@ -526,12 +540,12 @@ export interface ServerConfig_AuthAccountsValue {
   /**
    * override hostLevelPermissions for users with this account
    *
-   * @default {"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true,"loginlink":true}
+   * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":false,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
    */
   permissions: ServerConfig_AccessOptions;
 }
 /**
- * @default {"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true}
+ * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":false,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
  */
 export interface ServerConfig_AccessOptions {
   /** allow the putsaver to be used */
@@ -598,18 +612,6 @@ export interface ServerConfig_BindInfo {
   enableIPv6: boolean;
   /** port to listen on, default is 8080 for http and 8443 for https */
   port: number;
-
-  /**
-   * Permissions based on local address: "localhost", "*" (all others), "192.168.0.0/16", etc.
-   * This checks the IP address each client connects to (socket.localAddress),
-   * not the bind address of the server instance that accepted the request.
-   * @default {"localhost":{"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true}}
-   */
-  localAddressPermissions: {
-    /**
-     */
-    [host: string]: ServerConfig_AccessOptions;
-  };
   /** always bind a separate server instance to 127.0.0.1 regardless of any other settings */
   _bindLocalhost: boolean;
 }
@@ -1088,6 +1090,7 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
       bindWildcard: set.host === "0.0.0.0" || set.host === "::",
       localAddressPermissions: {
         localhost: set.allowLocalhost,
+        // get defaultPermissions() { throw "This property should not be accessed"; return defaultPermissions; },
         "*": set.allowNetwork,
       },
       https: undefined,

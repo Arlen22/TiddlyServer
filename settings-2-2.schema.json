@@ -66,19 +66,33 @@
             },
             "localAddressPermissions": {
               "additionalProperties": {
-                "$ref": "#/definitions/ServerConfig_AccessOptions"
-              },
-              "default": {
-                "localhost": {
-                  "mkdir": true,
-                  "putsaver": true,
-                  "registerNotice": true,
-                  "upload": true,
-                  "websockets": true,
-                  "writeErrors": true
-                }
+                "anyOf": [
+                  {
+                    "$ref": "#/definitions/ServerConfig_AccessOptions"
+                  },
+                  {
+                    "not": {
+                    }
+                  }
+                ]
               },
               "description": "Permissions based on local address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\", etc.\nThis checks the IP address each client connects to (socket.localAddress),\nnot the bind address of the server instance that accepted the request.",
+              "properties": {
+                "defaultPermissions": {
+                  "$ref": "#/definitions/ServerConfig_AccessOptions",
+                  "default": {
+                    "datafolder": true,
+                    "loginlink": true,
+                    "mkdir": false,
+                    "putsaver": true,
+                    "registerNotice": true,
+                    "transfer": false,
+                    "upload": false,
+                    "websockets": false,
+                    "writeErrors": false
+                  }
+                }
+              },
               "type": "object"
             },
             "port": {
@@ -221,12 +235,15 @@
     "ServerConfig_AccessOptions": {
       "additionalProperties": false,
       "default": {
-        "mkdir": true,
+        "datafolder": true,
+        "loginlink": true,
+        "mkdir": false,
         "putsaver": true,
         "registerNotice": true,
-        "upload": true,
-        "websockets": true,
-        "writeErrors": true
+        "transfer": false,
+        "upload": false,
+        "websockets": false,
+        "writeErrors": false
       },
       "properties": {
         "datafolder": {
@@ -313,13 +330,15 @@
         "permissions": {
           "$ref": "#/definitions/ServerConfig_AccessOptions",
           "default": {
+            "datafolder": true,
             "loginlink": true,
-            "mkdir": true,
+            "mkdir": false,
             "putsaver": true,
             "registerNotice": true,
-            "upload": true,
-            "websockets": true,
-            "writeErrors": true
+            "transfer": false,
+            "upload": false,
+            "websockets": false,
+            "writeErrors": false
           },
           "description": "override hostLevelPermissions for users with this account"
         }
