@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
     "outDir": "./build",
-    "baseUrl": ".",
-    "rootDirs": ["src", "test"],
+    "baseUrl": "./src/",
+    "rootDirs": ["./src/", "./test/"],
     "module": "commonjs",
     "target": "es2017",
     "lib": [
@@ -15,10 +15,10 @@
     "inlineSourceMap": true,
     "resolveJsonModule": true,
     "noErrorTruncation": true,
-    "declaration": true
+    "declaration": false
   },
   "files": ["./server.ts"],
-  "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/*", "test/*"],
+  "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/", "test/*"],
   "exclude": [
     "**/*/node_modules",
     "node_modules",

@@ -1,40 +1,37 @@
-const path = require("path");
-const webpack = module.parent.require("webpack");
-const CopyPlugin = require("copy-webpack-plugin");
+const path = require('path')
+const webpack = module.parent.require('webpack')
+const CopyPlugin = require('copy-webpack-plugin')
 
 /**
  * @type {import("webpack").Configuration}
  */
 const options = {
   watch: false,
-  entry: path.resolve(__dirname, "./build/server.js"),
+  entry: path.resolve(__dirname, './build/server.js'),
   output: {
-    filename: "server-bin.js",
-    path: path.resolve(__dirname, "./build/"),
-    libraryTarget: "commonjs2"
+    filename: 'server-bin.js',
+    path: path.resolve(__dirname, './build/'),
+    libraryTarget: 'commonjs2',
   },
   plugins: [
     new webpack.DefinePlugin({
       GENTLY: false,
-      global: { GENTLY: false }
+      global: { GENTLY: false },
     }),
-    new CopyPlugin([
-      // { from: "./"}
-    ])
   ],
-  mode: false ? "development" : "production",
-  target: "node",
+  mode: false ? 'development' : 'production',
+  target: 'node',
   node: {
     global: true,
     __dirname: false,
-    __filename: false
+    __filename: false,
   },
   externals: {
-    "utf-8-validate": "commonjs utf-8-validate",
-    bufferutil: "commonjs bufferutil"
-  }
-};
+    'utf-8-validate': 'commonjs utf-8-validate',
+    'bufferutil': 'commonjs bufferutil',
+  },
+}
 
-module.exports = options;
+module.exports = options
 
-throw "Webpack is not setup for TiddlyServer yet";
+throw 'Webpack is not setup for TiddlyServer yet'

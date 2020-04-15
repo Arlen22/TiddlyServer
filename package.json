@@ -54,7 +54,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node build/server",
-    "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/assets",
+    "assets": "mkdir -p ./build/src/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/src/assets",
     "build": "tsc && node build-schema.js && npm run assets",
     "build:clean": "rm -rf build && npm run build",
     "dev:run": "tsc && node build/server",

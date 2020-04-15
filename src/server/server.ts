@@ -430,7 +430,7 @@ export const loadSettings = (settingsFile: string, routeKeys: string[]) => {
   return { settings: settingsObj, settingshttps }
 }
 
-export const serveFile = (state: StateObject, file: string, root: string | undefined) => {
+export const serveFile = async (state: StateObject, file: string, root: string | undefined) => {
   promisify(fs.stat)(root ? path.join(root, file) : file).then(
     (): any => {
       state.send({
