@@ -6,7 +6,7 @@ import {
   crypto_generichash_BYTES,
 } from 'libsodium-wrappers'
 import * as http from 'http'
-import { ServerConfig } from './server-config'
+import { ServerConfig } from './server'
 
 const TIDDLY_SERVER_AUTH_COOKIE: string = 'TiddlyServerAuth'
 const isoDateRegex = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/

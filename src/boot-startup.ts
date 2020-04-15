@@ -1,22 +1,12 @@
 import * as fs from 'fs'
 import * as path from 'path'
-import { tryParseJSON, JsonError, JsonErrorContainer, Hashmap } from './server-types'
+import { tryParseJSON, Hashmap } from './server'
 import { promisify } from 'util'
-// import { Observable } from '../lib/rx';
-// const MULTILEVEL = false;
-//load the boot tiddlers
-// $tw.utils.each($tw.loadTiddlersFromPath($tw.boot.bootPath), function (tiddlerFile) {
-// 	$tw.wiki.addTiddlers(tiddlerFile.tiddlers);
-// });
-// Load the core tiddlers
-// $tw.wiki.addTiddler($tw.loadPluginFolder($tw.boot.corePath));
-//load the wiki tiddlers
-import { FileInfo, WikiInfo, PluginInfo } from './boot-startup-types'
-export function loadWikiInfo(wikipath) {
+import { FileInfo, WikiInfo } from './boot-startup-types'
+
+const loadWikiInfo = async (wikipath: string) => {
   let filePath = path.join(wikipath, 'tiddlywiki.info')
   return promisify(fs.readFile)(filePath, 'utf8').then(data => {
-    // if (err) throw err;
-    let isError = false
     let wikiInfo: WikiInfo = tryParseJSON(data, error => {
       error.filePath = filePath
       throw error
@@ -24,7 +14,8 @@ export function loadWikiInfo(wikipath) {
     return wikiInfo
   })
 }
-export function loadWikiFolder(wikipath, wikiInfo) {
+
+export const loadWikiFolder = (wikipath: string, wikiInfo: WikiInfo) => {
   if (!wikiInfo.type || wikiInfo.type === 'tiddlywiki') {
     return TiddlyWiki.loadWiki(wikipath)
   } else if (wikiInfo.type === 'tiddlyserver') {
@@ -33,17 +24,18 @@ export function loadWikiFolder(wikipath, wikiInfo) {
     throw new Error('Invalid wikiInfo type ' + wikiInfo.type)
   }
 }
+
 /**
  *
  * @param filepath Tiddler file to load
  * @param options hasMetaFile (skips reading meta file if false)
  */
-export async function loadTiddlersFromFile(
+export const loadTiddlersFromFile = async (
   filepath: string,
   options: {
     hasMetaFile?: boolean
   } = {}
-) {
+) => {
   var ext = path.extname(filepath),
     extensionInfo = global_tw.utils.getFileExtensionInfo(ext),
     type = extensionInfo ? extensionInfo.type : null,
@@ -55,7 +47,6 @@ export async function loadTiddlersFromFile(
     promisify(fs.readFile)(filepath, encoding).catch((x: NodeJS.ErrnoException) => x),
     getMetaFile ? promisify(fs.readFile)(filepath + '.meta', 'utf8') : Promise.resolve(undefined),
   ])
-  //.then(([data1, data2]) => {
   let tiddlers = typeof data1 === 'string' ? global_tw.wiki.deserializeTiddlers(ext, data1, {}) : []
   let metadata = data2 ? global_tw.utils.parseFields(data2) : false
   if (metadata && tiddlers.length === 1)
@@ -67,31 +58,17 @@ export async function loadTiddlersFromFile(
     error: typeof data1 === 'string' ? undefined : data1,
     type,
   }
-  // });
 }
 
-// export function getFileName(dirPath: string, title: string, multiLevel: boolean = false) {
-// 	return obs_readdir()(dirPath).map(([err, files]) => {
-// 		let filename = title;
-// 		if (!multiLevel) {
-// 			filename = filename.replace(/\//g, "_");
-// 		} else if (filename.startsWith('$:/')) {
-// 			filename = "$system" + filename.slice(3).replace(/\//g, "_");
-// 		}
-// 		filename = filename.replace(/<|>|\:|\"|\||\?|\*|\^/g, "_").replace(/\//g, "_");
-// 		if (files.indexOf(filename))
-// 			return filename;
-// 	})
-// }
 export namespace TiddlyWiki {
-  export function loadWiki(wikiPath) {
+  export const loadWiki = (wikiPath: string) => {
     const $tw = loadCore()
     $tw.boot.wikiPath = wikiPath
     const wikiInfo = loadWikiTiddlers($tw, wikiPath)
     return { $tw, wikiInfo }
   }
 
-  export function loadCore(options?) {
+  export const loadCore = () => {
     const $tw = require('../tiddlywiki/boot/boot.js').TiddlyWiki(
       require('../tiddlywiki/boot/bootprefix.js').bootprefix({
         packageInfo: JSON.parse(
@@ -99,19 +76,10 @@ export namespace TiddlyWiki {
         ),
       })
     )
-    // createWiki($tw);
-    options = options || {}
     $tw.locationHash = '#'
     if ($tw.browser && !$tw.node) {
       throw 'browser-only not implemented'
-      // if (location.hash === "#:safe") {
-      // 	$tw.safeMode = true;
-      // }
-      // else {
-      // 	$tw.locationHash = $tw.utils.getLocationHash();
-      // }
     }
-    // Initialise some more $tw properties
     $tw.utils.deepDefaults($tw, {
       modules: {
         titles: Object.create(null),
@@ -220,8 +188,11 @@ export namespace TiddlyWiki {
   }
 
   //copied from 5.1.15
-  export function loadWikiTiddlers($tw, wikiPath, options?) {
-    options = options || {}
+  export const loadWikiTiddlers = (
+    $tw,
+    wikiPath: string,
+    options: { parentPaths: any[]; readOnly: boolean } = { parentPaths: [], readOnly: false }
+  ) => {
     var parentPaths = options.parentPaths || [],
       wikiInfoPath = path.resolve(wikiPath, $tw.config.wikiInfo),
       wikiInfo,
@@ -236,7 +207,7 @@ export namespace TiddlyWiki {
     if (wikiInfo.includeWikis) {
       parentPaths = parentPaths.slice(0)
       parentPaths.push(wikiPath)
-      $tw.utils.each(wikiInfo.includeWikis, function(info) {
+      $tw.utils.each(wikiInfo.includeWikis, info => {
         if (typeof info === 'string') {
           info = { path: info }
         }
@@ -259,9 +230,9 @@ export namespace TiddlyWiki {
     // $tw.loadPlugins(wikiInfo.languages, $tw.config.languagesPath, $tw.config.languagesEnvVar);
     // Load the wiki files, registering them as writable
     var resolvedWikiPath = path.resolve(wikiPath, $tw.config.wikiTiddlersSubDir)
-    $tw.utils.each($tw.loadTiddlersFromPath(resolvedWikiPath), function(tiddlerFile) {
+    $tw.utils.each($tw.loadTiddlersFromPath(resolvedWikiPath), tiddlerFile => {
       if (!options.readOnly && tiddlerFile.filepath) {
-        $tw.utils.each(tiddlerFile.tiddlers, function(tiddler) {
+        $tw.utils.each(tiddlerFile.tiddlers, tiddler => {
           $tw.boot.files[tiddler.title] = {
             filepath: tiddlerFile.filepath,
             type: tiddlerFile.type,
@@ -332,7 +303,13 @@ export namespace TiddlyServer {
     public files: any[] = []
     public tiddlers: Hashmap<any> = {}
   }
-  export async function loadWiki(wikiPath: string, wikiInfo: WikiInfo, fallback: boolean) {
+
+  export const loadWiki = async (
+    wikiPath: string,
+    wikiInfo: WikiInfo | undefined,
+    fallback: boolean
+  ) => {
+    if (!wikiInfo) return
     if (wikiInfo.type !== 'tiddlyserver') {
       if (fallback) {
         loadWikiFolder(wikiPath, wikiInfo)
@@ -340,6 +317,7 @@ export namespace TiddlyServer {
       } else throw new Error('Invalid wiki type ' + wikiInfo.type)
     }
 
+    // @ts-ignore WHYYYYYY
     const includes: Promise<{
       $ts: Wiki
       $tw?: any
@@ -351,9 +329,10 @@ export namespace TiddlyServer {
         return loadWiki(wikiPath, wikiInfo, true)
       })
     })
+
     let wiki = (await Promise.all(includes)).reduce((wiki: Wiki, item) => {
       const { $ts, $tw, wikiInfo } = item
-      if (!wikiInfo.type || wikiInfo.type === 'tiddlywiki') {
+      if (!wikiInfo?.type || wikiInfo.type === 'tiddlywiki') {
         if (!$tw) return wiki
         const tiddlers: Hashmap<any>[] = []
         const skipFields: string[] = []
@@ -384,7 +363,8 @@ export namespace TiddlyServer {
     })
   }
 }
-export function loadWikiTiddlers(wikipath: string, wikiInfo: WikiInfo) {
+
+export const loadWikiTiddlers = async (wikipath: string, wikiInfo: WikiInfo) => {
   let tiddlerFolder = path.join(wikipath, global_tw.config.wikiTiddlersSubDir)
   return promisify(fs.readdir)(tiddlerFolder)
     .catch(x => undefined)
@@ -411,7 +391,7 @@ export function loadWikiTiddlers(wikipath: string, wikiInfo: WikiInfo) {
     })
 }
 
-export function getFileType(tiddlerType?: string) {
+export const getFileType = (tiddlerType?: string) => {
   if (!tiddlerType) tiddlerType = 'text/vnd.tiddlywiki'
   var contentTypeInfo = global_tw.config.contentTypeInfo[tiddlerType] || {}
   var extension = contentTypeInfo.extension || '.tid'
@@ -422,12 +402,13 @@ export function getFileType(tiddlerType?: string) {
   ).type
   return { type, extension }
 }
-export function getTiddlerFileInfo(
+
+export const getTiddlerFileInfo = (
   fields: Hashmap<any>,
   options: {
     fileInfo?: FileInfo
   } = {}
-) {
+) => {
   let { type, extension } = getFileType(fields.type)
 
   var hasMetaFile = type !== 'application/x-tiddler' && type !== 'application/json'

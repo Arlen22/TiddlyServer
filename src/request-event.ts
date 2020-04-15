@@ -3,8 +3,7 @@ import { IncomingMessage, ServerResponse } from 'http'
 import { Writable } from 'stream'
 import { format } from 'util'
 import * as WebSocket from 'ws'
-import { ServerConfig } from './server-config'
-import { parseHostList, testAddress } from './server-types'
+import { ServerConfig, parseHostList, testAddress } from './server'
 import { checkCookieAuth } from './cookies'
 export class RequestEvent {
   handled: boolean = false
@@ -21,7 +20,6 @@ export class RequestEvent {
     settings: ServerConfig,
     request: IncomingMessage,
     iface: string,
-    // network: { iface: string; host: string | undefined; addr: string },
     type: 'client',
     response: WebSocket
   )

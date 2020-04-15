@@ -1,4 +1,4 @@
-import { ServerEventEmitter, serveFile } from './server-types'
+import { serveFile, ServerEventEmitter } from './server'
 import { getSetCookie, validateCookie, parseAuthCookie } from './cookies'
 import { crypto_generichash, randombytes_buf, ready, to_hex } from 'libsodium-wrappers'
 import * as path from 'path'
@@ -29,7 +29,7 @@ export const handleAuthRoute = (state: StateObject) => {
 }
 
 export function initAuthRoute(eventer: ServerEventEmitter) {
-  eventer.on('settings', serverSettings => {
+  eventer.on('settings', _serverSettings => {
     // setAuth(serverSettings);
   })
 }
@@ -50,7 +50,7 @@ const removePendingPinTimeout = (pin: string) => {
   }, 10 * 60 * 1000)
 }
 
-const handleTransfer = (state: StateObject) => {
+export const handleTransfer = (state: StateObject) => {
   if (!state.allow.transfer) return state.throwReason(403, 'Access Denied')
   let pin = state.path[4]
   if (!state.path[4] || !pko[pin] || (state.path[5] !== 'sender' && state.path[5] !== 'reciever'))
@@ -85,7 +85,7 @@ const expect = function<T>(a: any, keys: (string | number | symbol)[]): a is T {
   )
 }
 
-const handleHEADorGETFileServe = (state: StateObject) => {
+export const handleHEADorGETFileServe = (state: StateObject) => {
   const pathLength = state.path.length
   if (pathLength === 4 && state.path[3] === 'login.html') {
     serveFile(state, 'login.html', path.join(state.settings.__assetsDir, 'authenticate'))
@@ -97,7 +97,7 @@ const handleHEADorGETFileServe = (state: StateObject) => {
   return
 }
 
-const handleLogin = async (state: StateObject) => {
+export const handleLogin = async (state: StateObject) => {
   await state.recieveBody(true, true)
   if (state.body.length && !state.json) return //recieve body sent a response already
   if (!state.body.length) {
@@ -154,7 +154,7 @@ const getRandomPin = async (): Promise<string> => {
   return pin
 }
 
-const handleInitPin = (state: StateObject) => {
+export const handleInitPin = (state: StateObject) => {
   if (!state.allow.transfer) {
     state.throwReason(403, 'Access Denied')
   } else if (Object.keys(pko).length > state.settings.maxTransferRequests) {
@@ -172,7 +172,7 @@ const setSharedKey = async (key: string) => {
   return sharedKeyList[key]
 }
 
-const handleInitShared = (state: StateObject) => {
+export const handleInitShared = (state: StateObject) => {
   if (!state.allow.transfer) {
     state.throwReason(403, 'Access Denied')
   } else if (Object.keys(pko).length > 1000) {
@@ -183,7 +183,7 @@ const handleInitShared = (state: StateObject) => {
   return
 }
 
-const handleLogout = (state: StateObject) => {
+export const handleLogout = (state: StateObject) => {
   state.setHeader('Set-Cookie', getSetCookie(TIDDLY_SERVER_AUTH_COOKIE, '', false, 0))
   state.respond(200).empty()
   return

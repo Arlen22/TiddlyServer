@@ -15,10 +15,10 @@ import { handler as morgan } from '../logger'
 import { initAuthRoute } from '../auth-route'
 import { checkServerConfig } from '../interface-checker'
 import { RequestEvent } from '../request-event'
-import { parseHostList, ServerConfig, ServerEventEmitter } from '../server-types'
-import { tryParseJSON, keys, canAcceptGzip } from './utils'
+import { ServerEventEmitter } from './types'
+import { parseHostList, tryParseJSON, keys, canAcceptGzip } from './utils'
 import { colors } from '../constants'
-import { ServerConfigSchema, normalizeSettings } from '../server-config'
+import { ServerConfigSchema, normalizeSettings, ServerConfig } from './config'
 import { StateObject } from '../state-object'
 import { handleTiddlyServerRoute, init as initTiddlyServer } from '../tiddlyserver'
 import { handleAdminRoute, handleAssetsRoute } from './route-handlers'
@@ -386,7 +386,7 @@ export const loadSettings = (settingsFile: string, routeKeys: string[]) => {
     .replace(/\t/gi, '    ')
     .replace(/\r\n/gi, '\n')
 
-  let settingsObjSource: ServerConfigSchema = tryParseJSON<ServerConfigSchema>(
+  let settingsObjSource: ServerConfigSchema | undefined = tryParseJSON<ServerConfigSchema>(
     settingsString,
     e => {
       console.error(
@@ -397,6 +397,8 @@ export const loadSettings = (settingsFile: string, routeKeys: string[]) => {
       throw 'The settings file could not be parsed: Invalid JSON'
     }
   )
+
+  if (!settingsObjSource) throw 'Settings file not found'
 
   if (!settingsObjSource.$schema)
     throw 'The settings file needs to be upgraded to v2.1, please run > node upgrade-settings.js old new'

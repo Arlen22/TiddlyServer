@@ -3,8 +3,8 @@ import {
   ServerConfig_AccessOptions,
   ServerConfig_PutSaver,
   Config,
-} from './server-config'
-import { as } from './server-types'
+  as,
+} from './server'
 
 abstract class TypeCheck<T> {
   static currentKeyArray: (string | number)[] = []

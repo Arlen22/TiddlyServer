@@ -4,12 +4,9 @@ import { Stats } from 'fs'
 import * as path from 'path'
 import { promisify } from 'util'
 import * as zlib from 'zlib'
-
 import * as formidable from 'formidable'
 import { handleDataFolderRequest, init as initDatafolder } from './data-folder'
-import { OptionsConfig } from './server-config'
 import {
-  as,
   Config,
   ER,
   getTreeOptions,
@@ -22,15 +19,15 @@ import {
   ServerEventEmitter,
   StatPathResult,
   statWalkPath,
-} from './server-types'
+} from './server'
 import { StateObject } from './state-object'
 
-export function init(eventer: ServerEventEmitter) {
-  eventer.on('settings', function(set: ServerConfig) {})
+export const init = (eventer: ServerEventEmitter) => {
+  eventer.on('settings', function(_set: ServerConfig) {})
   initDatafolder(eventer)
 }
 
-export async function handleTiddlyServerRoute(state: StateObject): Promise<void> {
+export const handleTiddlyServerRoute = async (state: StateObject): Promise<void> => {
   function catchPromiseError(err) {
     if (err) {
       state.log(2, 'Error caught ' + err.toString())
@@ -63,7 +60,7 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
     return state.statPath.itemtype === itemtype
   }
 
-  state.statPath = await statWalkPath(result) //.then((statPath) => {
+  state.statPath = await statWalkPath(result)
   if (Config.isPath(result.item)) {
     state.pathOptions = {
       noDataFolder: result.item.noDataFolder,
@@ -97,13 +94,10 @@ export async function handleTiddlyServerRoute(state: StateObject): Promise<void>
   }
 }
 
-function handleGETfile(
-  state: StateObject<
-    import('./server-types').IStatPathResult<'file', fs.Stats, undefined, true>,
-    any
-  >,
+const handleGETfile = (
+  state: StateObject<import('./server').IStatPathResult<'file', Stats, undefined, true>, any>,
   result: PathResolverResult
-) {
+) => {
   state.send({
     root: (result.item as Config.PathElement).path,
     filepath: result.filepathPortion.join('/'),
@@ -120,11 +114,11 @@ function handleGETfile(
   })
 }
 
-function authAccessDenied(
+const authAccessDenied = (
   authError: number,
   loginlink: boolean,
   authAccountsKeySet: boolean
-): string {
+): string => {
   return `
 <html><body>
 <h2>Error ${authError}</h2>
@@ -142,22 +136,21 @@ ${
 `
 }
 
-function handleFileError(debugTag: string, state: StateObject, err: NodeJS.ErrnoException) {
+const handleFileError = (debugTag: string, state: StateObject, err: NodeJS.ErrnoException) => {
   StateObject.DebugLogger(debugTag).call(state, 2, '%s %s\n%s', err.code, err.message, err.path)
 }
-function debugState(debugTag: string, state: StateObject) {
+
+const debugState = (debugTag: string, state: StateObject) => {
   return StateObject.DebugLogger(debugTag).bind(state)
 }
-async function serveDirectoryIndex(result: PathResolverResult, state: StateObject) {
-  // const { state } = result;
+
+const serveDirectoryIndex = async (result: PathResolverResult, state: StateObject) => {
   const allow = state.allow
 
-  // console.log(state.url);
   if (!state.url.pathname.endsWith('/')) return state.redirect(state.url.pathname + '/')
 
   if (state.req.method === 'GET') {
     const isFolder = result.item.$element === 'folder'
-    // Promise.resolve().then(async () => {
     let { indexFile, indexExts, defaultType } = state.treeOptions.index
 
     // check for user-specified index files
@@ -245,18 +238,17 @@ async function serveDirectoryIndex(result: PathResolverResult, state: StateObjec
   }
 }
 
-function uploadPostRequest(
+const uploadPostRequest = (
   form: any,
   state: StateObject<StatPathResult, any>,
   result: PathResolverResult
-) {
+) => {
   form.parse(state.req, function(err: Error, fields, files) {
     if (err) {
       debugState('SER-DIR', state)(2, 'upload %s', err.toString())
       state.throwError(500, new ER('Error recieving request', err.toString()))
       return
     }
-    // console.log(fields, files);
     var oldpath = files.filetoupload.path
     //get the filename to use
     let newname = fields.filename || files.filetoupload.name
@@ -270,11 +262,11 @@ function uploadPostRequest(
   })
 }
 
-function mkdirPostRequest(
+const mkdirPostRequest = (
   form: any,
   state: StateObject<StatPathResult, any>,
   result: PathResolverResult
-) {
+) => {
   form.parse(state.req, async function(err: Error, fields, files) {
     if (err) {
       debugState('SER-DIR', state)(2, 'mkdir %s', err.toString())
@@ -326,7 +318,7 @@ function mkdirPostRequest(
 
 /// file handler section =============================================
 
-async function handlePUTfile(state: StateObject<Extract<StatPathResult, { itemtype: 'file' }>>) {
+const handlePUTfile = async (state: StateObject<Extract<StatPathResult, { itemtype: 'file' }>>) => {
   if (!state.settings.putsaver.enabled || !state.allow.putsaver) {
     let message = 'PUT saver is disabled'
     state.log(-2, message)
@@ -401,7 +393,8 @@ async function handlePUTfile(state: StateObject<Extract<StatPathResult, { itemty
     } else {
       resolve()
     }
-  }) //.then(() => {
+  })
+
   await new Promise((resolve, reject) => {
     const write = state.req.pipe(fs.createWriteStream(fullpath))
     write.on('finish', () => {
@@ -415,6 +408,7 @@ async function handlePUTfile(state: StateObject<Extract<StatPathResult, { itemty
       reject()
     })
   })
+
   let statNew = await promisify(fs.stat)(fullpath).catch(err => {
     state.log(2, 'statNew target does not exist')
     state.throw(500)

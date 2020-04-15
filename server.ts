@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 require("source-map-support/register");
-import fs = require("fs");
-import path = require("path");
+import * as fs from 'fs'
+import * as path from 'path'
 import { inspect } from "util";
-import server = require("./src/server");
-import yargs = require("yargs");
+import * as server from "./src/server"
+import * as yargs from "yargs"
 
 const SETTINGS_FILE = "settings.json";
 const argv = yargs

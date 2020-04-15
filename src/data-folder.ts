@@ -7,7 +7,7 @@ import {
   // StateObject,
   statWalkPath,
   tryParseJSON,
-} from './server-types'
+} from './server'
 import { StateObject } from './state-object'
 import * as path from 'path'
 import * as http from 'http'
@@ -25,19 +25,16 @@ interface Records<T> {
 }
 
 const loadedFolders: Records<FolderData> = {}
-const otherSocketPaths: Records<WebSocket[]> = {}
 const clientsList: Records<WebSocket[]> = {}
-let eventer: ServerEventEmitter
 
-export function init(e: ServerEventEmitter) {
-  eventer = e
-  eventer.on('settings', function(set: ServerConfig) {})
-  eventer.on('settingsChanged', keys => {})
+export function init(eventer: ServerEventEmitter) {
+  eventer.on('settings', function(_set: ServerConfig) {})
+  eventer.on('settingsChanged', _keys => {})
   eventer.on('websocket-connection', async function(data: RequestEvent) {
     const { request, client, settings, treeHostIndex, debugOutput } = data
     const debug = StateObject.DebugLogger('WEBSOCK').bind({ settings, debugOutput })
     const root = settings.tree[treeHostIndex].$mount
-    let pathname: string | undefined = parse(request.url as string).pathname // new URL(request.url as string);
+    let pathname: string | null = parse(request.url as string).pathname // new URL(request.url as string);
     if (!pathname) {
       console.error('[ERROR]: parsing pathname')
       return
@@ -182,8 +179,6 @@ function loadDataFolderTrigger(
       handler: [],
     }
     loadDataFolderType(mount, folder, reload, target, vars)
-    // loadTiddlyServerAdapter(prefixURI, folder, state.url.query.reload);
-    // loadTiddlyWiki(prefixURI, folder);
   }
 
   return { mount, folder }
@@ -200,7 +195,7 @@ function loadDataFolderType(
     const wikiInfo = tryParseJSON<WikiInfo>(data, e => {
       throw e
     })
-    if (!wikiInfo.type || wikiInfo.type === 'tiddlywiki') {
+    if (!wikiInfo?.type || wikiInfo.type === 'tiddlywiki') {
       loadDataFolderTiddlyWiki(mount, folder, reload, target, vars)
     } else if (wikiInfo.type === 'tiddlyserver') {
       // loadTiddlyServerAdapter(mount, folder, reload)
@@ -219,8 +214,6 @@ function loadDataFolderTiddlyWiki(
   vars: {}
 ) {
   console.time('twboot-' + folder)
-  let _wiki = undefined
-
   const tw = nodeRequire(target + '/boot/boot.js').TiddlyWiki(
     nodeRequire(target + '/boot/bootprefix.js').bootprefix({
       packageInfo: nodeRequire(target + '/package.json'),
@@ -261,12 +254,9 @@ function loadDataFolderTiddlyWiki(
         'path-prefix': mount,
         'root-tiddler': '$:/core/save/all',
         'gzip': 'yes',
-        // "root-tiddler": "$:/core/save/all-external-js"
         ...vars,
       },
     })
-    // server.TS_StateObject_Queue = [];
-    // server.TS_Request_Queue = [];
     let queue: Record<symbol, StateObject> = {}
     let auth = new TiddlyServerAuthentication(server, (sym: symbol) => {
       let res = queue[sym]
@@ -369,18 +359,4 @@ class TiddlyServerAuthentication {
     response: http.ServerResponse,
     state
   ) => boolean
-  //  {
-  // 	// let index = this.server.TS_Request_Queue.indexOf(request);
-  // 	let tsstate = request.tsstate;
-  // 	if (!tsstate.authAccountsKey && state.allowAnon) {
-  // 		return true;
-  // 	} else if (tsstate.authAccountsKey) {
-  // 		state.authenticatedUsername = tsstate.username;
-  // 		return true;
-  // 	} else {
-  // 		//The wiki itself may specify that anonymous users cannot access it
-  // 		tsstate.throwReason(403, "Unauthenticated users cannot access this wiki");
-  // 		return false;
-  // 	}
-  // }
 }

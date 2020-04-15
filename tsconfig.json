@@ -15,11 +15,12 @@
     "inlineSourceMap": true,
     "resolveJsonModule": true,
     "noErrorTruncation": true,
-    "declaration": true,
+    "declaration": true
   },
   "files": ["./server.ts"],
-  // "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/*", "test/*"],
+  "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/*", "test/*"],
   "exclude": [
+    "**/*/node_modules",
     "node_modules",
     "new-server",
     "archive",

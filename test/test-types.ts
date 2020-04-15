@@ -1,23 +1,18 @@
-import {
-  Config,
-  Schema,
-  ServerConfig,
-  ServerConfigSchema
-} from "../src/server-config";
+import { ServerConfigSchema } from '../src/server'
 
 const config: ServerConfigSchema = {
   tree: [],
-  $schema: "",
+  $schema: '',
   // @ts-ignore
   bindInfo: {
     port: 8080,
-    bindAddress: ["127.0.0.1" /* "0.0.0.0" */ /* "192.168.0.0/16" */],
+    bindAddress: ['127.0.0.1' /* "0.0.0.0" */ /* "192.168.0.0/16" */],
     bindWildcard: false,
     enableIPv6: false,
     filterBindAddress: false,
-    https: "./https.js",
+    https: './https.js',
     localAddressPermissions: {
-      "*": {
+      '*': {
         loginlink: false,
         mkdir: false,
         putsaver: false,
@@ -25,9 +20,9 @@ const config: ServerConfigSchema = {
         upload: false,
         websockets: false,
         writeErrors: false,
-        transfer: false
-      }
+        transfer: false,
+      },
     },
-    _bindLocalhost: false
-  }
-};
+    _bindLocalhost: false,
+  },
+}

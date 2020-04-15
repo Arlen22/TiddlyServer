@@ -1,7 +1,8 @@
 import * as fs from 'fs'
-import { RequestEvent } from './request-event'
+import { StateObject } from '../state-object'
+import { RequestEvent } from '../request-event'
 import { EventEmitter } from 'events'
-import { ServerConfig, Config } from './server-config'
+import { ServerConfig, Config } from './config'
 
 interface ServerEventsListener<THIS> {
   (event: 'websocket-connection', listener: (data: RequestEvent) => void): THIS
@@ -233,8 +234,6 @@ export interface StandardResponseHeaders {
   'dav'?: string
   'etag'?: string
 }
-
-import { StateObject } from './state-object'
 
 export class ER extends Error {
   constructor(public reason: string, message: string) {

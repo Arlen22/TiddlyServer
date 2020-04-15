@@ -14,9 +14,9 @@ import {
   JsonError,
   StatPathResult,
   TreePathResult,
-} from '../server-types'
+} from './types'
 import { generateDirectoryListing } from '../generate-directory-listing'
-import { Config, OptionsConfig } from '../server-config'
+import { Config, OptionsConfig } from './config'
 import { StateObject } from '../state-object'
 import { ERRORS, hostIPv4reg } from '../constants'
 
@@ -35,10 +35,10 @@ export const getHumanSize = (size: number) => {
  * returns. If there is no error handler, undefined is returned.
  * The string "undefined" is not a valid JSON document.
  */
-export const tryParseJSON = <T = any>(
+export const tryParseJSON = <T extends unknown>(
   str: string,
   onerror?: (e: JsonError) => T | never | void
-): T | undefined => {
+): T => {
   function findJSONError(message: string, json: string) {
     console.log(message)
     const res: string[] = []
@@ -51,13 +51,15 @@ export const tryParseJSON = <T = any>(
     res.push(...lines.slice(position[0]))
     return res.join('\n')
   }
-  str = str.replace(/\t/gi, '    ').replace(/\r\n/gi, '\n')
+  str = str.replace(/\t/gi, '    ').replace(/\r\n/gi, '\n') || ''
+  let parsed: any = {}
   try {
-    return JSON5.parse(str)
+    parsed = JSON5.parse(str)
   } catch (e) {
     let err = new JsonError(findJSONError(e.message, str), e)
     if (onerror) onerror(err)
   }
+  return parsed
 }
 
 export const keys = <T>(o: T): (keyof T)[] => {

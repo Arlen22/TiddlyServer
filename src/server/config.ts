@@ -2,32 +2,7 @@ import path = require('path')
 declare const __non_webpack_require__: NodeRequire | undefined
 const nodeRequire =
   typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : require
-import { oc } from './optional-chaining'
-// type AlwaysDefined<T> = {
-// 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
-// };
-// function oc<T extends {}>(data: T): AlwaysDefined<T> & (() => T) {
-
-// 	return new Proxy((() => data) as any,
-// 		{
-// 			get: (target, key) => {
-// 				return typeof target[key] === "undefined" ? oc(oc.empty)
-// 					: typeof target[key] === "object" ? oc(target[key])
-// 						: target[key];
-// 			},
-// 		},
-// 	);
-// 	// return new Proxy(data as any,
-// 	// 	{
-// 	// 		get: (target, key) => {
-// 	// 			return typeof target[key] === "undefined" ? oc(oc.empty)
-// 	// 				: typeof target[key] === "object" ? oc(target[key])
-// 	// 					: target[key];
-// 	// 		},
-// 	// 	},
-// 	// );
-// }
-// oc.empty = Object.create(null);
+import { oc } from '../optional-chaining'
 
 function format(str: string, ...args: any[]) {
   while (args.length && str.indexOf('%s') !== -1) str = str.replace('%s', args.shift())
@@ -1045,7 +1020,6 @@ export function OldDefaultSettings(set: OldServerConfig) {
   if (!set.etagWindow) set.etagWindow = 0
   if (!set.useTW5path) set.useTW5path = false
   if (typeof set.debugLevel !== 'number') set.debugLevel = -1
-
   ;['allowNetwork', 'allowLocalhost'].forEach((key: string) => {
     if (!set[key]) set[key] = {} as any
     if (!set[key].mkdir) set[key].mkdir = false
