@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events'
 import { promisify } from 'util'
-import { gzip, createGzip } from 'zlib'
+import { gzip } from 'zlib'
 import * as http from 'http'
 import { IncomingMessage, ServerResponse } from 'http'
 import * as https from 'https'
@@ -14,7 +14,13 @@ import * as WebSocket from 'ws'
 import { handler as morgan } from '../logger'
 import { checkServerConfig } from '../interface-checker'
 import { RequestEvent } from '../request-event'
-import { ServerEventEmitter } from './types'
+import {
+  DebugLogger,
+  RequestEventFn,
+  ServerEventEmitter,
+  ServerRouteHandlers,
+  ServerOptionsByHost,
+} from './types'
 import { parseHostList, tryParseJSON, keys, canAcceptGzip } from './utils'
 import { colors } from '../constants'
 import { ServerConfigSchema, normalizeSettings, ServerConfig } from './config'
@@ -22,66 +28,42 @@ import { StateObject } from '../state-object'
 import { handleTiddlyServerRoute, init as initTiddlyServer } from '../tiddlyserver'
 import { handleAdminRoute, handleAssetsRoute } from './route-handlers'
 
-export { checkServerConfig, routes, libsReady }
+export { checkServerConfig }
 const { Server: WebSocketServer } = WebSocket
 const assets = path.resolve(__dirname, '../assets')
-const favicon = path.resolve(__dirname, '../assets/favicon.ico')
-const stylesheet = path.resolve(__dirname, '../assets/directory.css')
 
-// global settings
+/*
+ * Global settings
+ */
 Error.stackTraceLimit = Infinity
 console.debug = function() {} //noop console debug;
-
-// this is the internal communicator
 export const eventer = new EventEmitter() as ServerEventEmitter
+/* end Global settings */
 
-export const init = (eventer: ServerEventEmitter) => {
-  eventer.on('settings', function(_set: ServerConfig) {})
-}
-
-init(eventer)
 initTiddlyServer(eventer)
 
 eventer.on('settings', set => {
   if (checkServerConfig(set)[0] !== true) throw 'ServerConfig did not pass validator'
 })
 
-const routes: Record<string, (state: StateObject) => void> = {
+export const routes: ServerRouteHandlers = {
   'admin': state => handleAdminRoute(state),
   'assets': state => handleAssetsRoute(state),
   'favicon.ico': state => serveFile(state, 'favicon.ico', state.settings.__assetsDir),
   'directory.css': state => serveFile(state, 'directory.css', state.settings.__assetsDir),
 }
 
-const libsReady = Promise.all([libsodium.ready])
-
-declare function preflighterFunc<T extends RequestEvent>(ev: T): Promise<T>
+export const libsReady = Promise.all([libsodium.ready])
 
 /**
- *  4 - Errors that require the process to exit for restart
- *  3 - Major errors that are handled and do not require a server restart
- *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
- *  1 - Info - Most startup messages
- *  0 - Normal debug messages and all software and request-side error messages
- * -1 - Detailed debug messages from high level apis
- * -2 - Response status messages and error response data
- * -3 - Request and response data for all messages (verbose)
- * -4 - Protocol details and full data dump (such as encryption steps and keys)
- */
-type DebugLogger = (level: number, format: string, ...args: string[]) => void
-/**
- * All this function does is create the servers and start listening. The settings object is emitted
- * on the eventer and addListeners is called to add the listeners to each server before
- * it is started. If another project wanted to provide its own server instances, it should
- * first emit the settings event with a valid settings object as the only argument, then call
- * addListeners with each server instance, then call listen on each instance.
+ * Creates the server(s) and starts listening. The settings object is emitted
+ * on the eventer and addListeners is called to add the listeners to each
+ * server before it is started.
  *
  * @export
- * @param {<T extends RequestEvent>(ev: T) => Promise<T>} preflighter
- * @param {(SecureServerOptions | ((host: string) => https.ServerOptions)) | undefined} settingshttps
- * @param {boolean} dryRun Creates the servers and sets everything up but does not start listening
- * Either an object containing the settings.server.https from settings.json or a function that
- * takes the host string and returns an https.createServer options object. Undefined if not using https.
+ * @param {RequestEventFn} preflighter
+ * @param {SecureServerOptions | ServerOptionsByHost | undefined} settingshttps
+ * @param {boolean} dryRun initializes the server(s) w/o listening
  * @returns
  */
 export async function initServer({
@@ -91,8 +73,8 @@ export async function initServer({
   dryRun,
 }: {
   settings: ServerConfig
-  preflighter: <T extends RequestEvent>(ev: T) => Promise<T>
-  settingshttps: ((host: string) => https.ServerOptions) | undefined
+  preflighter: RequestEventFn
+  settingshttps: ServerOptionsByHost | undefined
   dryRun: boolean
 }) {
   const debug = StateObject.DebugLogger('STARTER').bind({
@@ -100,7 +82,6 @@ export async function initServer({
     settings,
   })
 
-  // if (!settings) throw "The settings object must be emitted on eventer before starting the server";
   const hosts: string[] = []
   const {
     bindWildcard,
@@ -128,7 +109,7 @@ export async function initServer({
     })
     log = (req, res) => new Promise(resolve => logger(req, res, resolve))
   } else {
-    log = (req, res) => Promise.resolve()
+    log = (_req, _res) => Promise.resolve()
   }
 
   if (bindWildcard) {
@@ -149,7 +130,7 @@ export async function initServer({
   }
   if (_bindLocalhost) hosts.push('localhost')
 
-  if (hosts.length === 0) {
+  if (!hosts.length) {
     console.log(
       EmptyHostsWarning(bindWildcard, filterBindAddress, _bindLocalhost, enableIPv6, bindAddress)
     )
@@ -174,7 +155,8 @@ export async function initServer({
     debug
   )
 
-  if (success === false) return eventer
+  if (!success) return eventer
+
   eventer.emit('serverOpen', servers, hosts, !!settingshttps, dryRun)
   let ifaces = networkInterfaces()
   console.log('Open your browser and type in one of the following:')
@@ -251,13 +233,13 @@ const setupHosts = async (
   })
 }
 
-function EmptyHostsWarning(
+const EmptyHostsWarning = (
   bindWildcard: boolean,
   filterBindAddress: boolean,
   _bindLocalhost: boolean,
   enableIPv6: boolean,
   bindAddress: string[]
-): any {
+): any => {
   return `"No IP addresses will be listened on. This is probably a mistake.
 bindWildcard is ${bindWildcard ? 'true' : 'false'}
 filterBindAddress is ${filterBindAddress ? 'true' : 'false'}
@@ -266,6 +248,7 @@ enableIPv6 is ${enableIPv6 ? 'true' : 'false'}
 bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 `
 }
+
 /**
  * Adds all the listeners required for tiddlyserver to operate.
  *
@@ -276,14 +259,14 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
  * @param {*} preflighter A preflighter function which may modify data about the request before
  * it is handed off to the router for processing.
  */
-export function addRequestHandlers(
+export const addRequestHandlers = (
   server: https.Server | http.Server,
   iface: string,
-  preflighter: typeof preflighterFunc,
+  preflighter: RequestEventFn,
   settings: ServerConfig,
   log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>,
   debug: DebugLogger
-) {
+) => {
   let closing = false
 
   server.on('request', (req, res) => {
@@ -320,13 +303,13 @@ export function addRequestHandlers(
   })
 }
 
-async function websocketHandler(
+const websocketHandler = async (
   client: WebSocket,
   request: http.IncomingMessage,
   iface: string,
   settings: ServerConfig,
   preflighter: (ev: RequestEvent) => Promise<RequestEvent>
-) {
+) => {
   //check host level permissions and the preflighter
   let ev = new RequestEvent(settings, request, iface, 'client', client)
 
@@ -339,14 +322,15 @@ async function websocketHandler(
     client.close()
   else eventer.emit('websocket-connection', ev)
 }
-async function requestHandler(
+
+const requestHandler = async (
   request: IncomingMessage,
   response: ServerResponse,
   iface: string,
-  preflighter: undefined | typeof preflighterFunc,
+  preflighter: undefined | RequestEventFn,
   log: { (req: http.IncomingMessage, res: http.ServerResponse): Promise<void> },
   settings: ServerConfig
-) {
+) => {
   await log(request, response)
 
   let ev1 = new RequestEvent(settings, request, iface, 'response', response)
@@ -471,6 +455,7 @@ export const serveFolder = (
     })
   }
 }
+
 export const serveFolderIndex = (options: { type: string }) => {
   async function readFolder(folder: string) {
     let files = await promisify(fs.readdir)(folder)
@@ -482,14 +467,15 @@ export const serveFolderIndex = (options: { type: string }) => {
             let itemtype = stat.isDirectory() ? 'directory' : stat.isFile() ? 'file' : 'other'
             res[itemtype].push(file)
           },
-          x => undefined
+          _x => undefined
         )
       )
     )
     return res
   }
+
   if (options.type === 'json') {
-    return function(state: StateObject, folder: string) {
+    return (state: StateObject, folder: string) => {
       readFolder(folder).then(item => {
         sendResponse(state, JSON.stringify(item), {
           contentType: 'application/json',
@@ -508,15 +494,7 @@ export const sendResponse = (
     contentType?: string
   } = {}
 ) => {
-  body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body
-  if (options.doGzip)
-    gzip(body, (err, gzBody) => {
-      if (err) _send(body, false)
-      else _send(gzBody, true)
-    })
-  else _send(body, false)
-
-  function _send(body, isGzip) {
+  function _send(body: Buffer, isGzip: boolean) {
     state.setHeaders({
       'Content-Length': Buffer.isBuffer(body)
         ? body.length.toString()
@@ -526,4 +504,13 @@ export const sendResponse = (
     if (isGzip) state.setHeaders({ 'Content-Encoding': 'gzip' })
     state.respond(200).buffer(body)
   }
+
+  body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body
+  if (options.doGzip) {
+    gzip(body, (err, gzBody) => {
+      // @ts-ignore
+      if (err) _send(body, false)
+      else _send(gzBody, true)
+    })
+  } else _send(body, false)
 }

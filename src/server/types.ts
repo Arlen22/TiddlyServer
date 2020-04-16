@@ -1,8 +1,31 @@
 import * as fs from 'fs'
+import * as https from 'https'
 import { StateObject } from '../state-object'
 import { RequestEvent } from '../request-event'
 import { EventEmitter } from 'events'
 import { ServerConfig, Config } from './config'
+
+export type RequestEventFn = <T extends RequestEvent>(ev: T) => Promise<T>
+
+export type ServerOptionsByHost = (host: string) => https.ServerOptions
+
+type ServerRoutes = 'admin' | 'assets' | 'favicon.ico' | 'directory.css'
+export type ServerRouteHandlers = {
+  [key in ServerRoutes]: (state: StateObject) => void
+}
+
+/**
+ *  4 - Errors that require the process to exit for restart
+ *  3 - Major errors that are handled and do not require a server restart
+ *  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+ *  1 - Info - Most startup messages
+ *  0 - Normal debug messages and all software and request-side error messages
+ * -1 - Detailed debug messages from high level apis
+ * -2 - Response status messages and error response data
+ * -3 - Request and response data for all messages (verbose)
+ * -4 - Protocol details and full data dump (such as encryption steps and keys)
+ */
+export type DebugLogger = (level: number, format: string, ...args: string[]) => void
 
 interface ServerEventsListener<THIS> {
   (event: 'websocket-connection', listener: (data: RequestEvent) => void): THIS

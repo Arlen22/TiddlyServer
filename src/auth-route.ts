@@ -1,4 +1,4 @@
-import { serveFile, ServerEventEmitter } from './server'
+import { serveFile } from './server'
 import { getSetCookie, validateCookie, parseAuthCookie } from './cookies'
 import { crypto_generichash, randombytes_buf, ready, to_hex } from 'libsodium-wrappers'
 import * as path from 'path'
@@ -109,6 +109,7 @@ export const handleLogin = async (state: StateObject) => {
   let { registerNotice } = state.settings.bindInfo.localAddressPermissions[
     state.hostLevelPermissionsKey
   ]
+  if (!state?.json) return state.throwReason(400, 'Improper request body')
   let valid = validateCookie(
     cookieData,
     registerNotice &&

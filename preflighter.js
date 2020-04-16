@@ -1,9 +1,3 @@
-/**
- * This file is copied from the root of the repository
- * (beside /server.ts) if it does not exist in build.
- * It is recommended to make any changes there rather
- * than in the build directory.
- */
 const USERNAME = ''
 const PASSWORD = ''
 const ALLOW_UNSECURED_WEBSOCKETS = false
@@ -19,18 +13,19 @@ exports.preflighter = async function(ev) {
   ev.username = USERNAME
   return ev
 }
+
 /**
- * @param {import("./src/server").RequestEvent["request"]} request
- * @param {import("./src/server").RequestEventHTTP["response"]} response
+ * Check authentication and do sanity/security checks
+ * For more details see:
+ * https://github.com/hueniverse/iron
+ *
+ * @param {IncomingMessage} request
+ * @param {ServerResponse} response
  * @returns {boolean} Returns whether the client is authorized
  */
 function handleBasicAuth(request, response) {
-  const state = false
-  //check authentication and do sanity/security checks
-  //https://github.com/hueniverse/iron
-  //auth headers =====================
   if (!USERNAME && !PASSWORD) return true
-  const first = header => (Array.isArray(header) ? header[0] : header)
+  const getHeader = header => (Array.isArray(header) ? header[0] : header)
   if (!request.headers['authorization']) {
     response.writeHead(401, '', {
       'WWW-Authenticate': 'Basic realm="TiddlyServer"',
@@ -39,12 +34,10 @@ function handleBasicAuth(request, response) {
     response.end()
     return false
   }
-  var header = first(request.headers['authorization']) || '', // get the header
-    token = header.split(/\s+/).pop() || '', // and the encoded auth token
-    auth = new Buffer(token, 'base64').toString(), // convert from base64
-    parts = auth.split(/:/), // split on colon
-    username = parts[0],
-    password = parts[1]
+  const header = getHeader(request.headers['authorization']) || ''
+  const token = header.split(/\s+/).pop() || '' // get the encoded auth token
+  const auth = new Buffer(token, 'base64').toString()
+  const [username, password] = auth.split(/:/)
   if (username !== USERNAME || password !== PASSWORD) {
     console.log('authorization invalid - UN:%s - PW:%s', username, password)
     response.writeHead(401, 'Invalid username or password')
