@@ -28,12 +28,6 @@ export const handleAuthRoute = (state: StateObject) => {
   }
 }
 
-export function initAuthRoute(eventer: ServerEventEmitter) {
-  eventer.on('settings', _serverSettings => {
-    // setAuth(serverSettings);
-  })
-}
-
 const pko: Record<
   string,
   {

@@ -12,7 +12,6 @@ import * as libsodium from 'libsodium-wrappers'
 import * as fs from 'fs'
 import * as WebSocket from 'ws'
 import { handler as morgan } from '../logger'
-import { initAuthRoute } from '../auth-route'
 import { checkServerConfig } from '../interface-checker'
 import { RequestEvent } from '../request-event'
 import { ServerEventEmitter } from './types'
@@ -42,7 +41,6 @@ export const init = (eventer: ServerEventEmitter) => {
 
 init(eventer)
 initTiddlyServer(eventer)
-initAuthRoute(eventer)
 
 eventer.on('settings', set => {
   if (checkServerConfig(set)[0] !== true) throw 'ServerConfig did not pass validator'
