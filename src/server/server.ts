@@ -67,7 +67,7 @@ export const libsReady = Promise.all([libsodium.ready])
  * @param {boolean} dryRun initializes the server(s) w/o listening
  * @returns
  */
-export async function initServer({
+export const initServer = async ({
   settings,
   preflighter,
   settingshttps,
@@ -77,7 +77,7 @@ export async function initServer({
   preflighter: RequestEventFn
   settingshttps: ServerOptionsByHost | undefined
   dryRun: boolean
-}) {
+}) => {
   const debug = StateObject.DebugLogger('STARTER').bind({
     debugOutput: RequestEvent.MakeDebugOutput(settings),
     settings,
@@ -454,36 +454,6 @@ export const serveFolder = (
         }
       },
     })
-  }
-}
-
-export const serveFolderIndex = (options: { type: string }) => {
-  async function readFolder(folder: string) {
-    let files = await promisify(fs.readdir)(folder)
-    let res = { directory: [], file: [] }
-    await Promise.all(
-      files.map(file =>
-        promisify(fs.stat)(path.join(folder, file)).then(
-          stat => {
-            let itemtype = stat.isDirectory() ? 'directory' : stat.isFile() ? 'file' : 'other'
-            res[itemtype].push(file)
-          },
-          _x => undefined
-        )
-      )
-    )
-    return res
-  }
-
-  if (options.type === 'json') {
-    return (state: StateObject, folder: string) => {
-      readFolder(folder).then(item => {
-        sendResponse(state, JSON.stringify(item), {
-          contentType: 'application/json',
-          doGzip: canAcceptGzip(state.req),
-        })
-      })
-    }
   }
 }
 
