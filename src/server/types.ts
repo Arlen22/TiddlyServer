@@ -72,8 +72,6 @@ export interface ServerEventEmitter extends EventEmitter {
 
 export type Hashmap<T> = { [K: string]: T }
 
-export type FolderEntryType = 'folder' | 'datafolder' | 'htmlfile' | 'other' | 'error'
-
 export interface DirectoryEntry {
   name: string
   type: string
@@ -87,9 +85,6 @@ export interface Directory {
   type: string
 }
 
-export interface JsonErrorContainer {
-  error?: JsonError
-}
 export class JsonError {
   public filePath: string = ''
   constructor(
@@ -98,12 +93,6 @@ export class JsonError {
     /** The original error return by JSON.parse */
     public originalError: Error
   ) {}
-}
-
-export interface ServeStaticResult {
-  status: number
-  headers: {}
-  message: string
 }
 
 export type DirectoryIndexData = {
@@ -122,14 +111,6 @@ export type DirectoryIndexOptions = {
   extTypes: { [ext: string]: string }
 }
 
-export class StateError extends Error {
-  state: StateObject
-  constructor(state: StateObject, message: string) {
-    super(message)
-    this.state = state
-  }
-}
-
 export interface IStatPathResult<IT, ST, IFST, END> {
   stat: ST
   infostat: IFST
@@ -145,10 +126,6 @@ export type StatPathResult =
   | IStatPathResult<'datafolder', fs.Stats, fs.Stats, true>
   | IStatPathResult<'file', fs.Stats, undefined, true>
 
-export class URLSearchParams {
-  constructor(_str: string) {}
-}
-
 export interface StateObjectUrl {
   path: string
   pathname: string
@@ -156,7 +133,7 @@ export interface StateObjectUrl {
   search: string
   href: string
 }
-type StandardResponseHeaderValue = number | string | string[] | undefined
+
 export interface StandardResponseHeaders {
   /** Specifying which web sites can participate in cross-origin resource sharing */
   'Access-Control-Allow-Origin'?: string

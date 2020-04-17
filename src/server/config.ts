@@ -4,7 +4,6 @@ import {
   ServerConfig_AccessOptions,
   ServerConfig,
   ServerConfig_PutSaver,
-  OldServerConfig,
   ServerConfigSchema,
   OptionsSchema,
   NormalizeTreeItem,
@@ -132,27 +131,13 @@ export const normalizeTree = (
     return item
   }
 }
-export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement) {
-  if (host.$element !== 'host') throw 'Tree array must not mix host elements with other elements'
-  return {
-    ...host,
-    $mount: normalizeTree(settingsDir, host.$mount as any, '$mount', []),
-  }
-}
-export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema['tree']) {
+
+export const normalizeSettingsTree = (settingsDir: string, tree: ServerConfigSchema['tree']) => {
   let defaultHost = (tree2: any): Config.HostElement => ({
     $element: 'host',
-    // patterns: {
-    // 	"ipv4": ["0.0.0.0/0"],
-    // 	"domain": ["*"]
-    // },
-    // includeSubdomains: true,
     $mount: normalizeTree(settingsDir, tree2, '$mount', []),
   })
-  if (typeof tree === 'string' && tree.endsWith('.xml')) {
-    //read the xml file and parse it as the tree structure
-  } else if (typeof tree === 'string' && (tree.endsWith('.js') || tree.endsWith('.json'))) {
-    //require the json or js file and use it directly
+  if (typeof tree === 'string' && (tree.endsWith('.js') || tree.endsWith('.json'))) {
     let filepath = pathResolveWithUser(settingsDir, tree)
     tree = nodeRequire(filepath).tree
   }
@@ -163,14 +148,8 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
   //host array.
   return [defaultHost(tree)]
 }
-export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema['authAccounts']) {
-  if (!auth) return {}
-  let newAuth: ServerConfig['authAccounts'] = {}
 
-  return newAuth
-}
-
-export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
+export const normalizeSettings = (_set: ServerConfigSchema, settingsFile) => {
   const settingsDir = path.dirname(settingsFile)
   const set = oc(_set)
   if (!set?.tree) throw 'tree is required in ServerConfig'
@@ -217,6 +196,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       if (lap[k][k2] === undefined) lap[k][k2] = lap['*'][k2]
     })
   })
+
   let newset: ServerConfig = {
     __dirname: '',
     __filename: '',
@@ -396,72 +376,5 @@ export namespace Config {
     noDataFolder: boolean
     // $children: never;
     $options: OptionElements[]
-  }
-}
-export function OldDefaultSettings(set: OldServerConfig) {
-  if (!set.port) set.port = 8080
-  if (!set.host) set.host = '127.0.0.1'
-  if (!set.types)
-    set.types = {
-      htmlfile: ['htm', 'html'],
-    }
-  if (!set.etag) set.etag = ''
-  if (!set.etagWindow) set.etagWindow = 0
-  if (!set.useTW5path) set.useTW5path = false
-  if (typeof set.debugLevel !== 'number') set.debugLevel = -1
-  ;['allowNetwork', 'allowLocalhost'].forEach((key: string) => {
-    if (!set[key]) set[key] = {} as any
-    if (!set[key].mkdir) set[key].mkdir = false
-    if (!set[key].upload) set[key].upload = false
-    if (!set[key].settings) set[key].settings = false
-    if (!set[key].WARNING_all_settings_WARNING) set[key].WARNING_all_settings_WARNING = false
-  })
-
-  if (!set.logColorsToFile) set.logColorsToFile = false
-  if (!set.logToConsoleAlso) set.logToConsoleAlso = false
-
-  if (!set.maxAge) set.maxAge = {} as any
-  if (typeof set.maxAge.tw_plugins !== 'number') set.maxAge.tw_plugins = 60 * 60 * 24 * 365 * 1000 //1 year of milliseconds
-}
-
-export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
-  return {
-    _devmode: set._devmode,
-    _datafoldertarget: undefined,
-    tree: set.tree,
-    bindInfo: {
-      bindAddress: set.host === '0.0.0.0' || set.host === '::' ? undefined : [set.host],
-      filterBindAddress: undefined,
-      enableIPv6: set.host === '::',
-      port: set.port,
-      bindWildcard: set.host === '0.0.0.0' || set.host === '::',
-      localAddressPermissions: {
-        'localhost': set.allowLocalhost,
-        '*': set.allowNetwork,
-      },
-      https: undefined,
-      _bindLocalhost: set._disableLocalHost === false,
-    },
-    logging: {
-      logAccess: set.logAccess,
-      logError: set.logError,
-      logColorsToFile: set.logColorsToFile,
-      logToConsoleAlso: set.logToConsoleAlso,
-      debugLevel: set.debugLevel,
-    },
-    putsaver: {
-      etag: set.etag || 'optional',
-      etagAge: set.etagWindow,
-      backupFolder: '',
-    },
-    datafolder: {},
-    authAccounts: {},
-    directoryIndex: {
-      defaultType: 'html',
-      icons: set.types,
-      mixFolders: set.mixFolders,
-    },
-    authCookieAge: 2592000,
-    $schema: './settings-2-1.schema.json',
   }
 }
