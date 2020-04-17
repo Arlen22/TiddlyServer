@@ -89,40 +89,44 @@ export const checkString = new CheckSimple(
   'expected a string value',
   (a): a is string => typeof a === 'string'
 )
+
 export const checkStringEnum = <T extends string>(...val: T[]) =>
   new CheckSimple(
     'expected one string of ' + JSON.stringify(val),
     (a): a is T => typeof a === 'string' && (val as string[]).indexOf(a) !== -1
   )
+
 export const checkStringNotEmpty = new CheckSimple(
   'expected a string with non-zero length',
   (a): a is string => typeof a === 'string' && a.length > 0
 )
+
 export const checkNumber = new CheckSimple(
   'expected a number value',
   (a): a is number => typeof a === 'number'
 )
+
 export const checkNumberEnum = <T extends number>(...val: T[]) =>
   new CheckSimple(
     'expected one number of ' + JSON.stringify(val),
     (a): a is T => typeof a === 'number' && (val as number[]).indexOf(a) !== -1
   )
+
 export const checkBoolean = new CheckSimple(
   'expected a boolean value',
   (a): a is boolean => typeof a === 'boolean'
 )
-export const checkBooleanTrue = new CheckSimple(
-  'expected a boolean true',
-  (a): a is true => typeof a === 'boolean' && a === true
-)
+
 export const checkBooleanFalse = new CheckSimple(
   'expected a boolean false',
   (a): a is false => typeof a === 'boolean' && a === false
 )
+
 export const checkNull = new CheckSimple(
   'expected a null value',
   (a): a is null => typeof a === 'object' && a === null
 )
+
 export const checkAny = new CheckSimple('expected any value', (a): a is any => true)
 
 export class CheckMultiple<T extends {}> extends TypeCheck<T> {
@@ -148,7 +152,6 @@ export class CheckMultiple<T extends {}> extends TypeCheck<T> {
   }
 }
 
-type ArrayType<T> = T extends Array<infer X> ? X : never
 export const checkArray = <V>(checker: TypeCheck<V>) =>
   new CheckMultiple(
     'expected an array that ' + checker.expectedMessage,
@@ -227,18 +230,6 @@ class CheckUnion<T> extends TypeCheck<T> {
     return is
   }
 }
-// function getErrObj(is: boolean, checker: TypeCheck<any>, value: any) {
-//   let errHash = (checker instanceof CheckObject)
-//     ? checker.lastResult || checker.error
-//     : checker.error;
-
-//   if (is) return undefined;
-//   if (typeof errHash === "symbol")
-//     return TypeCheck.errorMessage(errHash)(checker, value);
-//   else
-//     return errHash;
-
-// }
 
 function flattenWrapper(c: TypeCheck<any>): TypeCheck<any>[] {
   if (c instanceof CheckUnionWrapper)
@@ -356,11 +347,10 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
 type RequiredCheckermap<T extends {}, REQUIRED extends keyof T> = {
   [KEY in REQUIRED]-?: TypeCheck<T[KEY]>
 }
-// type RequiredCheckermap<T extends { [K: string]: unknown }, REQUIRED extends string> = { [KEY in REQUIRED]-?: TypeCheck<T[KEY]> };
+
 type OptionalCheckermap<T extends {}, REQUIRED extends keyof T> = {
   [KEY in Exclude<keyof T, REQUIRED>]-?: TypeCheck<T[KEY]>
 }
-// type OptionalCheckermap<T extends { [K: string]: unknown }, REQUIRED extends string> = { [KEY in Exclude<keyof T, REQUIRED>]-?: TypeCheck<T[KEY]> };
 
 export function checkResult(e: TypeCheck<any>, a: any) {
   let union = new CheckUnion([e])
@@ -377,7 +367,6 @@ export function checkObject<T, REQUIRED extends keyof T = keyof T>(
 }
 
 class CheckRepeat<T> extends TypeCheck<T> {
-  // public expectedMessage: string = "";
   public error: string | Record<string | number, any> | undefined = {}
   public currentKey: string | number | symbol | undefined
   protected _check(a: any): a is T {
@@ -398,14 +387,7 @@ class CheckRepeat<T> extends TypeCheck<T> {
 export const checkRepeat = <T>(cb: () => TypeCheck<T>, expected: string) =>
   new CheckRepeat(cb, expected)
 
-// export function checkServerConfig(obj, checker: boolean): true | {};
-// export function checkServerConfig(obj, checker: TypeCheck<ServerConfig>): true | {};
 export function checkServerConfig(obj): readonly [boolean, string | {}] {
-  // if(checker === undefined) checker = new CheckInterface(false);
-  // else if (typeof checker === "boolean") checker = new CheckInterface(checker);
-
-  // let checker = new CheckInterface(showUnionNulls);
-  // let { checkBoolean, checkString, checkStringEnum, checkNumber, checkNumberEnum, checkBooleanFalse, checkNull } = checker;
   const checkAccessPerms = checkObject<ServerConfig_AccessOptions>({
     mkdir: checkBoolean,
     upload: checkBoolean,
