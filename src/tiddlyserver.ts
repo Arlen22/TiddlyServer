@@ -1,4 +1,3 @@
-// import { Observable, Subject, Scheduler, Operator, Subscriber, Subscription } from "../lib/rx";
 import * as fs from 'fs'
 import { Stats } from 'fs'
 import * as path from 'path'
@@ -316,8 +315,6 @@ const mkdirPostRequest = (
   })
 }
 
-/// file handler section =============================================
-
 const handlePUTfile = async (state: StateObject<Extract<StatPathResult, { itemtype: 'file' }>>) => {
   if (!state.settings.putsaver.enabled || !state.allow.putsaver) {
     let message = 'PUT saver is disabled'
@@ -325,14 +322,14 @@ const handlePUTfile = async (state: StateObject<Extract<StatPathResult, { itemty
     state.respond(405, message).string(message)
     return
   }
-  // const hash = createHash('sha256').update(fullpath).digest('base64');
+
   const first = (header?: string | string[]) => (Array.isArray(header) ? header[0] : header)
-  const t = state.statPath
   const fullpath = state.statPath.statpath
   const statItem = state.statPath.stat
   const mtime = Date.parse(state.statPath.stat.mtime as any)
   const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join('-'))
   const ifmatchStr: string = first(state.req.headers['if-match']) || ''
+
   if (
     state.settings.putsaver.etag !== 'disabled' &&
     (ifmatchStr || state.settings.putsaver.etag === 'required') &&
@@ -348,7 +345,7 @@ const handlePUTfile = async (state: StateObject<Extract<StatPathResult, { itemty
     })
     let headTime = +ifmatch[2]
     let diskTime = mtime
-    // console.log(settings.etagWindow, diskTime, headTime);
+
     if (
       !state.settings.putsaver.etagAge ||
       diskTime - state.settings.putsaver.etagAge * 1000 > headTime
@@ -356,6 +353,7 @@ const handlePUTfile = async (state: StateObject<Extract<StatPathResult, { itemty
       return state.throw(412)
     console.log('412 prevented by etagWindow of %s seconds', state.settings.putsaver.etagAge)
   }
+
   await new Promise((resolve, reject) => {
     if (state.treeOptions.putsaver.backupFolder) {
       const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, '_')
@@ -414,6 +412,7 @@ const handlePUTfile = async (state: StateObject<Extract<StatPathResult, { itemty
     state.throw(500)
     return Promise.reject()
   })
+
   const mtimeNew = Date.parse(statNew.mtime as any)
   const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join('-'))
   state.respond(200, '', { 'x-api-access-type': 'file', 'etag': etagNew }).empty()
