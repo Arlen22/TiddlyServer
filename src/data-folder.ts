@@ -1,10 +1,8 @@
 import {
   PathResolverResult,
-  // RequestEventWS,
   resolvePath,
   ServerConfig,
   ServerEventEmitter,
-  // StateObject,
   statWalkPath,
   tryParseJSON,
 } from './server'
@@ -104,14 +102,10 @@ type FolderData = {
   events: EventEmitter
 }
 
-function quickArrayCheck(obj: any): obj is Array<any> {
-  return typeof obj.length === 'number'
-}
-
 export function handleDataFolderRequest(result: PathResolverResult, state: StateObject) {
   const target = state.settings.__targetTW
 
-  const { mount, folder } = loadDataFolderTrigger(
+  const { mount } = loadDataFolderTrigger(
     result,
     state.statPath,
     state.url.pathname,
@@ -145,14 +139,15 @@ export function handleDataFolderRequest(result: PathResolverResult, state: State
     load.handler(state)
   }
 }
-function loadDataFolderTrigger(
+
+const loadDataFolderTrigger = (
   result,
   statPath,
   pathname: string,
   reload: 'true' | 'force' | '',
   target: string,
   vars: {}
-) {
+) => {
   let filepathPrefix = result.filepathPortion.slice(0, statPath.index).join('/')
   //get the tree path, and add the file path (none if the tree path is a datafolder)
   let fullPrefix = ['', result.treepathPortion.join('/')]
@@ -184,13 +179,13 @@ function loadDataFolderTrigger(
   return { mount, folder }
 }
 
-function loadDataFolderType(
+const loadDataFolderType = (
   mount: string,
   folder: string,
   reload: string,
   target: string,
   vars: {}
-) {
+) => {
   promisify(fs.readFile)(path.join(folder, 'tiddlywiki.info'), 'utf8').then(data => {
     const wikiInfo = tryParseJSON<WikiInfo>(data, e => {
       throw e
@@ -202,17 +197,18 @@ function loadDataFolderType(
     }
   })
 }
+
 declare const __non_webpack_require__: NodeRequire | undefined
 const nodeRequire =
   typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : require
 
-function loadDataFolderTiddlyWiki(
+const loadDataFolderTiddlyWiki = (
   mount: string,
   folder: string,
   reload: string,
   target: string,
   vars: {}
-) {
+) => {
   console.time('twboot-' + folder)
   const tw = nodeRequire(target + '/boot/boot.js').TiddlyWiki(
     nodeRequire(target + '/boot/bootprefix.js').bootprefix({
@@ -293,32 +289,13 @@ function loadDataFolderTiddlyWiki(
   }
 }
 
-function doError(debug, mount, folder, err) {
-  debug(3, 'error starting %s at %s: %s', mount, folder, err.stack)
-  const requests = loadedFolders[mount].handler as any[]
-  loadedFolders[mount] = {
-    handler: function(state: StateObject) {
-      state
-        .respond(500, 'TW5 data folder failed')
-        .string(
-          'The Tiddlywiki data folder failed to load. The error has been logged to the ' +
-            'terminal with priority level 2. ' +
-            'To try again, use ?reload=true after making any necessary corrections.'
-        )
-    },
-  } as any
-  requests.forEach(([req, res]) => {
-    ;(loadedFolders[mount] as { handler: any }).handler(req, res)
-  })
-}
 declare class TiddlyWikiServer {
-  // TS_StateObject_Queue: StateObject[];
-  // TS_Request_Queue: http.IncomingMessage[];
   addAuthenticator: any
   authenticators: TiddlyServerAuthentication[]
   requestHandler: (request: http.IncomingMessage, response: http.ServerResponse) => void
   constructor(...args: any[])
 }
+
 class TiddlyServerAuthentication {
   /**
    *
