@@ -76,7 +76,7 @@
                   }
                 ]
               },
-              "description": "Permissions based on local address: \"localhost\", \"*\" (all others), \"192.168.0.0/16\", etc.\nThis checks the IP address each client connects to (socket.localAddress),\nnot the bind address of the server instance that accepted the request.",
+              "description": "Permissions based on local interface address. \nEnter the IP Address and NetMask (`127.0.0.1/8`) as the property key.\nThe keyword \"localhost\" (if specified) matches 127.0.0.0/8 instead of any other specified key. \nKeyword \"*\" matches everything that doesn't match another IP address. \nThis checks the IP address each client connects to (socket.localAddress),\nnot the bind address of the server instance that accepted the request.\n\nThe keyword defaultPermission does nothing, but auto-complete should give you the default object. \nYou can then rename it to whatever you need it to be.",
               "properties": {
                 "defaultPermissions": {
                   "$ref": "#/definitions/ServerConfig_AccessOptions",
