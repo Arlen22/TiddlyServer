@@ -1,0 +1,183 @@
+{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "$id": "settings-2-1-tree.schema.json",
+  "definitions": {
+    "GroupChildrenHashmap": {
+      "type": "object",
+      "description": "An object with any type of mount item, using the key as the mount point. The key property of an item will be ignored.",
+      "patternProperties": {
+        "^[^$]+$": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GroupRecordItem"
+            },
+            {
+              "$ref": "#/definitions/FolderRecordItem"
+            },
+            {
+              "$ref": "#/definitions/FolderPathShorthand"
+            },
+            {
+              "$ref": "#/definitions/GroupChildrenHashmap"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "GroupChildrenArray": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "$ref": "#/definitions/GroupArrayItem"
+          },
+          {
+            "$ref": "#/definitions/FolderArrayItem"
+          },
+          {
+            "$ref": "#/definitions/FolderPathShorthand"
+          }
+        ]
+      },
+      "description": "An array of children, which must specify the key property. If folder is specified as a string, the key will be the folder name"
+    },
+    "GroupRecordItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^key$": {
+          "type": "string"
+        }
+      },
+      "properties": {
+        "$element": {
+          "description": "This is a group",
+          "enum": [
+            "group"
+          ]
+        },
+        "indexPath": {
+          "type": "string"
+        },
+        "$children": {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/GroupChildrenArray"
+            },
+            {
+              "$ref": "#/definitions/GroupChildrenHashmap"
+            }
+          ]
+        },
+        "$options": {
+          "$ref": "#/definitions/OptionsArray"
+        }
+      },
+      "required": [
+        "$children",
+        "$element"
+      ],
+      "description": "A group creates a virtual mount folder to group folders together. The $children property may be an array or object."
+    },
+    "FolderRecordItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^key$": {
+          "type": "string"
+        }
+      },
+      "properties": {
+        "$element": {
+          "description": "This is a folder",
+          "enum": [
+            "folder"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "The folder path to mount"
+        },
+        "noDataFolder": {
+          "type": "boolean",
+          "description": "Set to true to prevent data folders inside this folder from being mounted. Useful for your downloads folder, for instance."
+        },
+        "noTrailingSlash": {
+          "type": "boolean",
+          "description": "Mount data folders inside this folder without a trailing slash, so that relative links start at the folder instead of the data folder. This is usually not preferred, because the folder can be referred to with two dots `../` but it can be helpful when converting single file wikis to data folders and there are a lot of interwiki links involved."
+        },
+        "$options": {
+          "$ref": "#/definitions/OptionsArray"
+        }
+      },
+      "required": [
+        "$element",
+        "path"
+      ],
+      "description": "The folder element mounts a folder"
+    },
+    "GroupArrayItem": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/GenericArrayItem"
+        },
+        {
+          "$ref": "#/definitions/GroupRecordItem"
+        }
+      ]
+    },
+    "FolderArrayItem": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/GenericArrayItem"
+        },
+        {
+          "$ref": "#/definitions/FolderRecordItem"
+        }
+      ]
+    },
+    "GenericArrayItem": {
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The mount name that will show in the URL"
+        }
+      },
+      "required": [
+        "key"
+      ]
+    },
+    "FolderPathShorthand": {
+      "type": "string",
+      "description": "The path of a folder to mount without any extra options. The folder name will be used for the url name."
+    },
+    "OptionsArray": {
+      "$ref": "settings-2-1-tree-options.schema.json"
+    }
+  },
+  "allOf": [
+    {
+      "description": "The tree property accepts one of 3 formats. \n\n- A string ending in `.xml`, `.js`, or `.json`. The tree will be loaded from the specified path. JS and JSON files must export a `tree` property and XML files must specify a `tree` element as root.\n- A path element (or a string specifying the path) to mount a path as root (a single file is possible but pointless)\n- A group element or the children of a group element (which is either an array, or an object with no $element property)"
+    },
+    {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/GroupChildrenHashmap"
+        },
+        {
+          "$ref": "#/definitions/GroupChildrenArray"
+        },
+        {
+          "$ref": "#/definitions/GroupRecordItem"
+        },
+        {
+          "$ref": "#/definitions/FolderRecordItem"
+        },
+        {
+          "$ref": "#/definitions/FolderPathShorthand"
+        }
+      ]
+    }
+  ]
+}
