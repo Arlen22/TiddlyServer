@@ -1,6 +1,5 @@
 import { EventEmitter } from 'events'
 import { promisify } from 'util'
-import { gzip } from 'zlib'
 import * as http from 'http'
 import { IncomingMessage, ServerResponse } from 'http'
 import * as https from 'https'
@@ -455,33 +454,4 @@ export const serveFolder = (
       },
     })
   }
-}
-
-export const sendResponse = (
-  state: StateObject,
-  body: Buffer | string,
-  options: {
-    doGzip?: boolean
-    contentType?: string
-  } = {}
-) => {
-  function _send(body: Buffer, isGzip: boolean) {
-    state.setHeaders({
-      'Content-Length': Buffer.isBuffer(body)
-        ? body.length.toString()
-        : Buffer.byteLength(body, 'utf8').toString(),
-      'Content-Type': options.contentType || 'text/plain; charset=utf-8',
-    })
-    if (isGzip) state.setHeaders({ 'Content-Encoding': 'gzip' })
-    state.respond(200).buffer(body)
-  }
-
-  body = !Buffer.isBuffer(body) ? Buffer.from(body, 'utf8') : body
-  if (options.doGzip) {
-    gzip(body, (err, gzBody) => {
-      // @ts-ignore
-      if (err) _send(body, false)
-      else _send(gzBody, true)
-    })
-  } else _send(body, false)
 }
