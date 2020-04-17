@@ -2,7 +2,7 @@
   "compilerOptions": {
     "outDir": "./build",
     "baseUrl": "./src/",
-    "rootDirs": ["./src/", "./test/"],
+    "rootDirs": ["./src/"],
     "module": "commonjs",
     "target": "es2017",
     "lib": [
@@ -18,7 +18,7 @@
     "declaration": false
   },
   "files": ["./server.ts"],
-  "include": ["./assets/**/*", "./server.ts", "src/", "test/*"],
+  "include": ["./assets/**/*", "./server.ts", "src/"],
   "exclude": [
     "**/*/node_modules",
     "node_modules",
