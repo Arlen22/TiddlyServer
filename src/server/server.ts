@@ -21,7 +21,7 @@ import {
   ServerRouteHandlers,
   ServerOptionsByHost,
 } from './types'
-import { parseHostList, tryParseJSON, keys, canAcceptGzip } from './utils'
+import { parseHostList, tryParseJSON, keys } from './utils'
 import { colors } from '../constants'
 import { normalizeSettings } from './config'
 import { ServerConfig, ServerConfigSchema } from './types'

@@ -1,11 +1,8 @@
 import * as JSON5 from 'json5'
 import * as path from 'path'
-import * as http from 'http'
 import * as fs from 'fs'
 import { Stats } from 'fs'
-import { format, promisify } from 'util'
-import { networkInterfaces, NetworkInterfaceInfo } from 'os'
-
+import { promisify } from 'util'
 import * as ipcalc from '../ipcalc'
 import {
   PathResolverResult,
@@ -19,7 +16,7 @@ import { generateDirectoryListing } from '../generate-directory-listing'
 import { Config } from './config'
 import { OptionsConfig } from './types'
 import { StateObject } from '../state-object'
-import { ERRORS, hostIPv4reg } from '../constants'
+import { hostIPv4reg } from '../constants'
 
 export const getHumanSize = (size: number) => {
   const TAGS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
@@ -88,40 +85,8 @@ export const sortBySelector = <T extends { [k: string]: string }>(key: (e: T) =>
   }
 }
 
-export const sortByKey = (key: string) => {
-  return sortBySelector(e => e[key])
-}
-
 export const isError = (obj: any): obj is Error => {
   return !!obj && obj.constructor === Error
-}
-
-export const isErrnoException = (obj: NodeJS.ErrnoException): obj is NodeJS.ErrnoException => {
-  return isError(obj)
-}
-
-export const sanitizeJSON = (key: string, value: any) => {
-  // returning undefined omits the key from being serialized
-  if (!key) {
-    return value
-  } //This is the entire value to be serialized
-  else if (key.substring(0, 1) === '$') return
-  //Remove angular tags
-  else if (key.substring(0, 1) === '_') return
-  //Remove NoSQL tags
-  else return value
-}
-
-export const canAcceptGzip = (header: string | { headers: http.IncomingHttpHeaders }) => {
-  if (((a): a is { headers: http.IncomingHttpHeaders } => typeof a === 'object')(header)) {
-    header = header.headers['accept-encoding'] as string
-  }
-  var gzip = header
-    .split(',')
-    .map(e => e.split(';'))
-    .filter(e => e[0] === 'gzip')[0]
-  var can = !!gzip && !!gzip[1] && parseFloat(gzip[1].split('=')[1]) > 0
-  return can
 }
 
 export const as = <T>(obj: T) => {
@@ -369,35 +334,8 @@ export const resolvePath = (
   }
 }
 
-export const fs_move = (oldPath: string, newPath: string, callback: (_arg?: any) => any) => {
-  fs.rename(oldPath, newPath, function(err) {
-    if (err) {
-      if (err.code === 'EXDEV') {
-        copy()
-      } else {
-        callback(err)
-      }
-      return
-    }
-    callback()
-  })
-
-  function copy() {
-    var readStream = fs.createReadStream(oldPath)
-    var writeStream = fs.createWriteStream(newPath)
-
-    readStream.on('error', callback)
-    writeStream.on('error', callback)
-
-    readStream.on('close', function() {
-      fs.unlink(oldPath, callback)
-    })
-
-    readStream.pipe(writeStream)
-  }
-}
-
 /** to be used with concatMap, mergeMap, etc. */
+// TODO: fix spelling error
 export const recieveBody = (
   state: StateObject,
   parseJSON: boolean,
@@ -405,40 +343,6 @@ export const recieveBody = (
 ) => {
   //get the data from the request
   return state.recieveBody(parseJSON, sendError)
-}
-
-export const createHashmapString = <T>(keys: string[], values: T[]): { [id: string]: T } => {
-  if (keys.length !== values.length) throw 'keys and values must be the same length'
-  var obj: { [id: string]: T } = {}
-  keys.forEach((e, i) => {
-    obj[e] = values[i]
-  })
-  return obj
-}
-
-export const createHashmapNumber = <T>(keys: number[], values: T[]): { [id: number]: T } => {
-  if (keys.length !== values.length) throw 'keys and values must be the same length'
-  var obj: { [id: number]: T } = {}
-  keys.forEach((e, i) => {
-    obj[e] = values[i]
-  })
-  return obj
-}
-
-export const obsTruthy = <T>(a: T | undefined | null | false | '' | 0 | void): a is T => {
-  return !!a
-}
-
-export function getError(code: 'PRIMARY_KEYS_REQUIRED'): any
-export function getError(code: 'OLD_REVISION'): any
-export function getError(code: 'KEYS_REQUIRED', keyList: string): any
-export function getError(code: 'ROW_NOT_FOUND', table: string, id: string): any
-export function getError(code: 'PROGRAMMER_EXCEPTION', message: string): any
-export function getError(code: string, ...args: string[]): any {
-  // let code = args.shift() as keyof typeof ERRORS;
-  if (ERRORS[code]) args.unshift(ERRORS[code])
-  //else args.unshift(code);
-  return { code: code, message: format(code, ...args) }
 }
 
 /**
@@ -483,34 +387,4 @@ export const parseHostList = (hosts: string[]) => {
     })
     return { usable, lastMatch }
   }
-}
-
-export const getUsableAddresses = (hosts: string[]) => {
-  let reg = /^(\-?)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/i
-  let hostTests = hosts.map(e => reg.exec(e) || e)
-  var ifaces = networkInterfaces()
-  let addresses = Object.keys(ifaces).reduce(
-    (n, k) => n.concat(ifaces[k].filter(e => e.family === 'IPv4')),
-    [] as NetworkInterfaceInfo[]
-  )
-  let usableArray = addresses.filter(addr => {
-    let usable = false
-    hostTests.forEach(test => {
-      if (Array.isArray(test)) {
-        //we can't match IPv6 interface addresses so just go to the next one
-        if (addr.family === 'IPv6') return
-        let allow = !test[1]
-        let ip = test[2]
-        let netmask = +test[3]
-        if (netmask < 0 || netmask > 32) console.log('Host %s has an invalid netmask', test[0])
-        if (testAddress(addr.address, ip, netmask)) usable = allow
-      } else {
-        let ip = test.startsWith('-') ? test.slice(1) : test
-        let deny = test.startsWith('-')
-        if (ip === addr.address) usable = !deny
-      }
-    })
-    return usable
-  })
-  return usableArray
 }

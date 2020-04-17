@@ -27,7 +27,3 @@ export namespace colors {
 }
 
 export const hostIPv4reg = /^(\-?)(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/i
-
-export const ERRORS = {
-  PROGRAMMER_EXCEPTION: 'A programmer exception occurred: %s',
-}
