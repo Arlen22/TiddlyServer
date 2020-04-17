@@ -6,7 +6,7 @@ import { promisify } from "util";
 import * as zlib from "zlib";
 
 import * as formidable from "formidable";
-import { handleDataFolderRequest, init as initDatafolder } from "./data-folder";
+import { handleDataFolderRequest, handleWebsocketConnection } from "./data-folder";
 import { OptionsConfig } from "./server-config";
 import {
   as,
@@ -30,10 +30,6 @@ import { StateObject } from "./state-object";
 import { RequestEvent } from "./request-event";
 import { parse } from "url";
 
-export function init(eventer: ServerEventEmitter) {
-  eventer.on("settings", function (set: ServerConfig) { });
-  initDatafolder(eventer);
-}
 
 // it isn't pretty but I can't find a way to improve it - 2020/04/10
 // it still isn't pretty, but it finally uses classes - 2020/04/14
@@ -50,18 +46,19 @@ export async function handleTiddlyServerRoute(event: RequestEvent, eventer: Serv
 
   let { authList, authError } = treeOptions.auth;
 
-
   if (Array.isArray(authList) && authList.indexOf(event.authAccountKey) === -1)
-    return new StateObject(eventer, event).respond(403).string(
-      authAccessDenied(authError, event.allow.loginlink, !!event.authAccountKey)
-    );
+    return event.close(403, authAccessDenied(authError, event.allow.loginlink, !!event.authAccountKey));
 
   if (Config.isGroup(result.item)) {
+    if (event.type === "client") return event.close(404);
     const state = new TreeStateObject(eventer, event, result, null as never);
     return state.serveDirectoryIndex().catch(state.catchPromiseError);
   }
 
   let statPath = await statWalkPath(result);
+
+  if (event.type === "client")
+    return handleWebsocketConnection(event, result, treeOptions, statPath);
 
   const state = new TreeStateObject(eventer, event, result, statPath, treeOptions);
 
@@ -78,7 +75,7 @@ export async function handleTiddlyServerRoute(event: RequestEvent, eventer: Serv
       state.handlePUTfile();
     } else if (["OPTIONS"].indexOf(state.req.method as string) > -1) {
       state
-        .respond(200, "", { "x-api-access-type": "file", dav: "tw5/put", })
+        .respond(200, "", { "x-api-access-type": "file", ...(state.putsaverEnabled ? { dav: "tw5/put" } : {}) })
         .string("GET,HEAD,PUT,OPTIONS");
     } else {
       state.throw(405);
@@ -294,26 +291,28 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
       })(state.statPath),
     });
   }
-
-  async handlePUTfile() {
-    let state: TreeStateObject<Extract<StatPathResult, { itemtype: "file" }>> = this as any;
-    if (!state.settings.putsaver.enabled || !state.allow.putsaver) {
+  get putsaverEnabled() {
+    return this.treeOptions.putsaver.enabled && this.allow.putsaver;
+  }
+  async handlePUTfile(this: TreeStateObject<getStatPathResult<"file">>) {
+    let state = this;
+    if (!state.putsaverEnabled) {
       let message = "PUT saver is disabled";
       state.log(-2, message);
       state.respond(405, message).string(message);
       return;
     }
-    // const hash = createHash('sha256').update(fullpath).digest('base64');
     const first = (header?: string | string[]) => (Array.isArray(header) ? header[0] : header);
-    const t = state.statPath;
     const fullpath = state.statPath.statpath;
     const statItem = state.statPath.stat;
     const mtime = Date.parse(state.statPath.stat.mtime as any);
     const etag = JSON.stringify([statItem.ino, statItem.size, mtime].join("-"));
     const ifmatchStr: string = first(state.req.headers["if-match"]) || "";
     if (
-      state.settings.putsaver.etag !== "disabled" &&
-      (ifmatchStr || state.settings.putsaver.etag === "required") &&
+      state.settings.putsaver.etag !== "disabled"
+      &&
+      (ifmatchStr || state.settings.putsaver.etag === "required")
+      &&
       ifmatchStr !== etag
     ) {
       const ifmatch = JSON.parse(ifmatchStr).split("-");

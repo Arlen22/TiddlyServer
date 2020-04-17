@@ -129,12 +129,13 @@ export class RequestEvent {
   get hostRoot() {
     return this.settings.tree[this.treeHostIndex];
   }
-  close(code: number) {
+  close(code: number, message?: string) {
     if (this.type === "response") {
       this.response.writeHead(code);
+      if(message) this.response.write(message);
       this.response.end();
     } else if (this.type === "client") {
-      this.client.close(code);
+      this.client.close(code, message);
     }
   }
   getTreeOptions(result: PathResolverResult) {

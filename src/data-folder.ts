@@ -23,13 +23,14 @@ import { inspect, promisify } from "util";
 import { WikiInfo } from "./boot-startup-types";
 import * as WebSocket from "ws";
 import { RequestEvent } from "./request-event";
+import { OptionsConfig } from "./server-config";
 
 interface Records<T> { [k: string]: T; }
 
 const loadedFolders: Records<DataFolder> = {};
 const otherSocketPaths: Records<WebSocket[]> = {};
 const clientsList: Records<WebSocket[]> = {};
-let eventer: ServerEventEmitter;
+// let eventer: ServerEventEmitter;
 
 type DataFolderEvents = {
   "ws-client-connect": readonly [WebSocket, DataFolderRequest, string]
@@ -113,71 +114,67 @@ class DataFolderRequest {
   }
 }
 
-export function init(e: ServerEventEmitter) {
-  eventer = e;
-  eventer.on("settings", function (set: ServerConfig) { });
-  eventer.on("settingsChanged", keys => { });
-  eventer.on("websocket-connection", async function (data: RequestEvent) {
-    const { client, settings, debugOutput } = data;
-    const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
-    let pathname = parse(data.request.url as string).pathname;
-    if (!pathname) return client.close(400);
-    let result = data.resolvePath();
-    if (!result) return client.close(404);
-    let statPath = await statWalkPath(result);
-    //if this is a datafolder, we hand the client and request off directly to it
-    //otherwise we stick it in its own section
-    if (statPath.itemtype === "datafolder") {
-      if (!data.allow.datafolder) return client.close(403);
-      //trigger the datafolder to load in case it isn't
-      const request = new DataFolderRequest(
-        result,
-        statPath,
-        pathname,
-        settings.__targetTW,
-        settings.datafolder
-      );
-      const { mount, folder } = request;
-      const subpath = pathname.slice(mount.length);
-      //event to give the client to the data folder
-      const loadClient = () => {
-        debug(-1, "ws-client-connect %s", mount);
-        loadedFolders[mount].events.emit("ws-client-connect", client, request, subpath);
-      };
-      //if the data folder is still loading, we wait, otherwise give immediately
-      if (Array.isArray(loadedFolders[mount].handler)) {
-        loadedFolders[mount].events.once("ws-client-preload", loadClient);
-      } else {
-        loadClient();
-      }
+export async function handleWebsocketConnection(
+  data: RequestEvent,
+  result: PathResolverResult,
+  treeOptions: OptionsConfig,
+  statPath: StatPathResult
+) {
+  const { client, settings, debugOutput } = data;
+  const debug = StateObject.DebugLogger("WEBSOCK").bind({ settings, debugOutput });
+  let pathname = parse(data.request.url as string).pathname;
+  if (!pathname) return client.close(400);
+
+  if (statPath.itemtype === "datafolder") {
+    if (!data.allow.datafolder) return client.close(403);
+    //trigger the datafolder to load in case it isn't
+    const request = new DataFolderRequest(
+      result,
+      statPath,
+      pathname,
+      settings.__targetTW,
+      settings.datafolder
+    );
+    const { mount, folder } = request;
+    const subpath = pathname.slice(mount.length);
+    //event to give the client to the data folder
+    const loadClient = () => {
+      debug(-1, "ws-client-connect %s", mount);
+      loadedFolders[mount].events.emit("ws-client-connect", client, request, subpath);
+    };
+    //if the data folder is still loading, we wait, otherwise give immediately
+    if (Array.isArray(loadedFolders[mount].handler)) {
+      loadedFolders[mount].events.once("ws-client-preload", loadClient);
     } else {
-      console.log("add client", pathname);
-
-      client.addEventListener("message", event => {
-        // console.log("message", event.data);
-        debug(-3, "WS-MESSAGE %s", inspect(event.data));
-        clientsList[pathname as string].forEach(e => {
-          if (e !== client) e.send(event.data);
-        });
-      });
-
-      client.addEventListener("error", event => {
-        debug(-2, "WS-ERROR %s %s", pathname, event.type);
-        let index = clientsList[pathname as string].indexOf(client);
-        if (index > -1) clientsList[pathname as string].splice(index, 1);
-        client.close();
-      });
-
-      client.addEventListener("close", event => {
-        debug(-2, "WS-CLOSE %s %s %s", pathname, event.code, event.reason);
-        let index = clientsList[pathname as string].indexOf(client);
-        if (index > -1) clientsList[pathname as string].splice(index, 1);
-      });
-
-      if (!clientsList[pathname]) clientsList[pathname] = [];
-      clientsList[pathname].push(client);
+      loadClient();
     }
-  });
+  } else {
+    console.log("add client", pathname);
+
+    client.addEventListener("message", event => {
+      // console.log("message", event.data);
+      debug(-3, "WS-MESSAGE %s", inspect(event.data));
+      clientsList[pathname as string].forEach(e => {
+        if (e !== client) e.send(event.data);
+      });
+    });
+
+    client.addEventListener("error", event => {
+      debug(-2, "WS-ERROR %s %s", pathname, event.type);
+      let index = clientsList[pathname as string].indexOf(client);
+      if (index > -1) clientsList[pathname as string].splice(index, 1);
+      client.close();
+    });
+
+    client.addEventListener("close", event => {
+      debug(-2, "WS-CLOSE %s %s %s", pathname, event.code, event.reason);
+      let index = clientsList[pathname as string].indexOf(client);
+      if (index > -1) clientsList[pathname as string].splice(index, 1);
+    });
+
+    if (!clientsList[pathname]) clientsList[pathname] = [];
+    clientsList[pathname].push(client);
+  }
 }
 
 declare const __non_webpack_require__: NodeRequire | undefined;

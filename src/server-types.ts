@@ -45,9 +45,7 @@ export {
   ConvertSettings,
 };
 
-export function init(eventer: ServerEventEmitter) {
-  eventer.on("settings", (set: ServerConfig) => { });
-}
+
 
 type PromiseType<T> = T extends Promise<infer R> ? R : any;
 type PromiseReturnType<T extends (...args: any) => any> = ReturnType<T> extends Promise<infer R>

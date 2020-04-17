@@ -11,14 +11,13 @@ import * as send from "send";
 import * as libsodium from "libsodium-wrappers";
 import * as WebSocket from "ws";
 import { handler as morgan } from "./logger";
-import { handleAuthRoute, initAuthRoute } from "./auth-route";
+import { handleAuthRoute } from "./auth-route";
 import { checkCookieAuth } from "./cookies";
 import { checkServerConfig } from "./interface-checker";
 import { RequestEvent } from "./request-event";
 import { Observable, Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
 import {
-  init as initServerTypes,
   keys,
   loadSettings,
   parseHostList,
@@ -29,7 +28,7 @@ import {
   testAddress,
 } from "./server-types";
 import { StateObject } from "./state-object";
-import { handleTiddlyServerRoute, init as initTiddlyServer } from "./tiddlyserver";
+import { handleTiddlyServerRoute } from "./tiddlyserver";
 import { EventEmitter } from "./event-emitter-types";
 import { Socket } from "net";
 export { checkServerConfig, loadSettings, libsReady };
@@ -188,9 +187,6 @@ export class MainServer {
     public settings: ServerConfig,
     public dryRun: boolean
   ) {
-    initServerTypes(this.eventer);
-    initTiddlyServer(this.eventer);
-    initAuthRoute(this.eventer);
     this.eventer.emit("settings", settings);
     this.debugOutput = RequestEvent.MakeDebugOutput(settings);
     this.debug = StateObject.DebugLogger("STARTER").bind(this);
@@ -439,7 +435,7 @@ export class Listener {
     public events: Subject<ListenerEvents>,
     public command: Observable<ControllerEvents>,
     public iface: string,
-    public server: https.Server & { kill: (cb?: () => void) => void } | http.Server & { kill: (cb?: () => void) => void }
+    public server: https.Server | http.Server
   ) {
     this.debug = (level: number, str: string | NodeJS.ErrnoException, ...args: any[]) => {
       StateObject.DebugLoggerInner(level, "STARTER", str, args, this.debugOutput);
@@ -448,8 +444,8 @@ export class Listener {
     this.addRequestHandlers();
     this.command.subscribe(({ close }) => {
       if (close) {
-        if (close.force) this.server.kill();
-        else this.server.close();
+        if (close.force) this.kill();
+        else this.close();
       }
     });
 

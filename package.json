@@ -7,13 +7,13 @@
   },
   "main": "./lib/compiled-lib.js",
   "dependencies": {
+    "tiddlywiki-production": "5.1.22"
+  },
+  "devDependencies": {
     "rxjs": "^6.5.5",
     "send": "^0.17.1",
     "source-map-support": "^0.5.16",
-    "tiddlywiki-production": "^5.1.21",
-    "yargs": "^15.1.0"
-  },
-  "devDependencies": {
+    "yargs": "^15.1.0",
     "@fidm/x509": "^1.2.0",
     "@material/textfield": "^0.44.0",
     "@types/angular": "^1.6.57",
