@@ -57,11 +57,11 @@ export interface ServerEventEmitter extends EventEmitter {
   ): boolean
   emit(event: 'serverClose', iface: string): boolean
   addListener: ServerEventsListener<this>
-  on: ServerEventsListener<this> //(event: keyof ServerEvents, listener: Function): this;
-  once: ServerEventsListener<this> //(event: keyof ServerEvents, listener: Function): this;
-  prependListener: ServerEventsListener<this> //(event: keyof ServerEvents, listener: Function): this;
-  prependOnceListener: ServerEventsListener<this> //(event: keyof ServerEvents, listener: Function): this;
-  removeListener: ServerEventsListener<this> //(event: keyof ServerEvents, listener: Function): this;
+  on: ServerEventsListener<this>
+  once: ServerEventsListener<this>
+  prependListener: ServerEventsListener<this>
+  prependOnceListener: ServerEventsListener<this>
+  removeListener: ServerEventsListener<this>
   removeAllListeners(event?: ServerEvents): this
   setMaxListeners(n: number): this
   getMaxListeners(): number
