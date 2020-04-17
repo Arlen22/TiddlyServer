@@ -1,5 +1,5 @@
 {
-  "$id": "settings-2-1-tree-options.schema.json",
+  "$id": "./schemas/settings-2-1-tree-options.schema.json",
   "$ref": "#/definitions/OptionsArraySchema",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
