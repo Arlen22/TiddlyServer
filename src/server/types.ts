@@ -235,29 +235,11 @@ export interface StandardResponseHeaders {
   'etag'?: string
 }
 
+// TODO: rename this
 export class ER extends Error {
   constructor(public reason: string, message: string) {
     super(message)
   }
-}
-export interface ThrowFunc {
-  throw: (statusCode: number, reason?: string, str?: string, ...args: any[]) => never
-}
-
-export interface AccessPathResult<T> {
-  isFullpath: boolean
-  type: string | NodeJS.ErrnoException
-  tag: T
-  end: number
-  statItem: fs.Stats
-  statTW?: fs.Stats
-}
-
-export interface AccessPathTag {
-  state: StateObject
-  item: string | {}
-  treepath: string
-  filepath: string
 }
 
 export interface PathResolverResult {
@@ -275,8 +257,6 @@ export interface PathResolverResult {
   fullfilepath: string
   // state: StateObject;
 }
-
-export type TreeObject = { [K: string]: string | TreeObject }
 
 export type TreePathResultObject<T, U, V> = {
   item: T
@@ -299,26 +279,14 @@ export type NormalizeTreeItem =
   | string
 
 export namespace Schema {
-  interface SchemaObjectDefinition {
-    type: 'object'
-    additionalProperties: boolean
-    properties: {}
-    required: string[]
-    title: string
-    description: string
-  }
   function define(name: string, val: any) {}
-  function defstring(enumArr?: string[]) {
-    return {
-      type: 'string',
-      enum: ['group'],
-    }
-  }
+
   export type GroupChildElements =
     | Record<string, GroupElement | PathElement | string>
     | (ArrayGroupElement | ArrayPathElement | string)[]
+
   export type OptionElements = Config.OptionElements
-  export type TreeElement = HostElement[] | GroupChildElements | string
+
   /** Host elements may only be specified in arrays */
   export interface HostElement {
     $element: 'host'
@@ -352,6 +320,7 @@ export namespace Schema {
   export interface ArrayGroupElement extends GroupElement {
     key: string
   }
+
   export interface PathElement {
     $element: 'folder'
     /** Path relative to this file or any absolute path NodeJS can stat */
@@ -372,6 +341,7 @@ export namespace Schema {
     noDataFolder?: boolean
     $options?: OptionElements[]
   }
+
   export interface ArrayPathElement extends PathElement {
     key: string
   }
@@ -379,7 +349,8 @@ export namespace Schema {
 
 type ExcludedPartial<T, NK> = {
   [P in keyof T]?: (P extends NK ? never : T[P]) | undefined
-} //Partial<ServerConfig_DirectoryIndex>
+}
+
 export interface ServerConfigSchema {
   /** enables certain expensive per-request checks */
   _devmode?: boolean
@@ -427,7 +398,6 @@ export interface ServerConfigSchema {
    */
   authAccounts?: { [K: string]: ServerConfig_AuthAccountsValue }
   // /** client-side data folder loader which loads datafolders directly into the browser */
-  // EXPERIMENTAL_clientside_datafolders?: Partial<ServerConfig_ClientsideDatafolders>,
   /**
    * Age to set for the auth cookie (default is 30 days)
    * - 24 hours: `86400`
@@ -482,7 +452,6 @@ export interface ServerConfig {
    */
   authAccounts: { [K: string]: ServerConfig_AuthAccountsValue }
   // /** client-side data folder loader which loads datafolders directly into the browser */
-  // EXPERIMENTAL_clientside_datafolders: ServerConfig_ClientsideDatafolders,
   /**
    * Age in seconds to set for the auth cookie (default is 30 days)
    * - 24 hours: `86400`
@@ -505,14 +474,6 @@ export interface ServerConfig {
   __targetTW: string
 }
 
-export interface ServerConfig_ClientsideDatafolders {
-  /** temporarily disable clientside datafolders (does NOT disable the `tiddlywiki` folder) */
-  enabled: boolean
-  /** how long to cache tw_plugins on the server side */
-  maxAge_tw_plugins: number
-  /** refresh cache whenever ?refresh=true is called */
-  alwaysRefreshCache: boolean
-}
 export interface ServerConfig_AuthAccountsValue {
   /**
    * @default {"username":{"publicKey":"","cookieSalt":""}}
@@ -541,6 +502,7 @@ export interface ServerConfig_AuthAccountsValue {
    */
   permissions: ServerConfig_AccessOptions
 }
+
 /**
  * @default {"mkdir":true,"upload":true,"registerNotice":true,"websockets":true,"writeErrors":true,"putsaver":true}
  */
@@ -570,6 +532,7 @@ export interface ServerConfig_AccessOptions {
   /** Allows two clients to communicate through the server */
   transfer: boolean
 }
+
 export interface ServerConfig_BindInfo {
   /**
    * An array of IP addresses to accept requests on. Can be any IP address
@@ -619,6 +582,7 @@ export interface ServerConfig_BindInfo {
   /** always bind a separate server instance to 127.0.0.1 regardless of any other settings */
   _bindLocalhost: boolean
 }
+
 export interface ServerConfig_Logging {
   /** access log file */
   logAccess: string | false
@@ -641,6 +605,7 @@ export interface ServerConfig_Logging {
    */
   debugLevel: number
 }
+
 export interface ServerConfig_DirectoryIndex {
   /** sort folder and files together rather than separated */
   mixFolders: boolean
@@ -655,6 +620,7 @@ export interface ServerConfig_DirectoryIndex {
   /** additional extensions to apply to mime types ["mime/type"]: ["htm", "html"] */
   mimetypes: { [type: string]: string[] }
 }
+
 export interface ServerConfig_PutSaver {
   /** If false, disables the put saver globally */
   enabled: boolean
@@ -680,163 +646,18 @@ export interface ServerConfig_PutSaver {
   etag: 'required' | 'disabled' | 'optional'
 }
 
-export interface NewTreeMountArgs {}
-type PartialExcept<T extends {}, REQUIRED extends keyof T> = {
-  [KEY in Extract<keyof T, REQUIRED>]-?: T[KEY]
-} &
-  {
-    [KEY in Exclude<keyof T, REQUIRED>]?: T[KEY]
-  }
 export interface OptionsSchema {
   auth: Config.Options_Auth
   backups: Config.Options_Backups
   index: Config.Options_Index
 }
+
 /** Used by the StateObject to compile the final Options object for the request */
 export interface OptionsConfig {
   auth: Required<Config.Options_Auth>
   putsaver: Required<Config.Options_Backups>
   index: Required<Config.Options_Index>
 }
+
 /** The options array schema is in `settings-2-1-tree-options.schema.json` */
 export type OptionsArraySchema = OptionsSchema[keyof OptionsSchema][]
-
-export interface OldServerConfigSchema extends OldServerConfigBase {
-  tree: any
-}
-export interface OldServerConfig extends OldServerConfigBase {
-  tree: any
-  __dirname: string
-  __filename: string
-  __assetsDir: string
-}
-
-export interface OldServerConfigBase {
-  _disableLocalHost: boolean
-  _devmode: boolean
-  // tree: any,
-  types: {
-    htmlfile: string[]
-    [K: string]: string[]
-  }
-  username?: string
-  password?: string
-  host: string
-  port: number | 8080
-  backupDirectory?: string
-  etag: 'required' | 'disabled' | '' //otherwise if present
-  etagWindow: number
-  useTW5path: boolean
-  debugLevel: number
-  allowNetwork: ServerConfig_AccessOptions
-  allowLocalhost: ServerConfig_AccessOptions
-  logAccess: string | false
-  logError: string
-  logColorsToFile: boolean
-  logToConsoleAlso: boolean
-  /** cache max age in milliseconds for different types of data */
-  maxAge: { tw_plugins: number }
-  tsa: { alwaysRefreshCache: boolean }
-  mixFolders: boolean
-  /** Schema generated by marcoq.vscode-typescript-to-json-schema VS code plugin */
-  $schema: string
-}
-
-export interface NewTreePathOptions_Auth {
-  /**
-   * Only allow requests using these authAccounts. Option elements affect the group
-   * they belong to and all children under that. Each property in an auth element
-   * replaces the key from parent auth elements.
-   *
-   * Anonymous requests are ALWAYS denied if an auth element applies to the requested path.
-   *
-   * Note that this does not change server authentication procedures.
-   * Data folders are always given the authenticated username
-   * regardless of whether there are auth elements in the tree.
-   */
-  $element: 'auth'
-  /** list of keys from authAccounts object that can access this resource */
-  authList: string[] | null
-  /**
-   * Which error code to return for unauthorized (or anonymous) requests
-   * - 403 Access Denied: Client is not granted permission to access this resouce.
-   * - 404 Not Found: Client is told that the resource does not exist.
-   */
-  authError: 403 | 404
-}
-export interface NewTreePathOptions_Backup {
-  /** Options related to backups for single-file wikis. Option elements affect the group
-   * they belong to and all children under that. Each property in a backups element
-   * replaces the key from parent backups elements. */
-  $element: 'backups'
-  /**
-   * Backup folder to store backups in. Multiple folder paths
-   * can backup to the same folder if desired.
-   */
-  backupFolder: string
-  /**
-   * GZip backup file to save disk space. Good for larger wikis. Turn this off
-   * for experimental wikis that you often need to restore from a backup because
-   * of a bad line of code (I speak from experience).
-   */
-  gzip: boolean
-  /**
-   * Save a backup only if the disk copy is older than this many seconds.
-   * If the file on disk is only a few minutes old it can be assumed that
-   * very little has changed since the last save. So if this is set to 10 minutes,
-   * and your wiki gets saved every 9 minutes, only the first save will trigger a backup.
-   * This is a useful option for large wikis that see a lot of daily work but not
-   * useful for experimental wikis which might crash at any time and need to be
-   * reloaded from the last backup.
-   */
-  etagAge: number
-}
-
-export interface ServerConfigBase {}
-
-namespace Test {
-  type Test<A, T extends { [K in keyof A]-?: any }> = T
-  //make sure that all keys in the schema are included in the config
-  type Host = Test<Schema.HostElement, Config.HostElement>
-  type Group = Test<Schema.ArrayGroupElement, Config.GroupElement>
-  type Path = Test<Schema.ArrayPathElement, Config.PathElement>
-  type Root1 = Test<ServerConfigSchema, ServerConfig>
-}
-
-/** @default { "$element": "" } */
-export type NewTreeOptions = Config.OptionElements
-
-export type NewTreeOptionsObject = OptionsSchema
-
-export interface NewTreePathOptions_Index {
-  /**
-   * Options related to the directory index (request paths that resolve to a folder
-   * which is not a data folder). Option elements affect the group
-   * they belong to and all children under that. Each property in an option element
-   * replaces the key from parent option elements.
-   */
-  $element: 'index'
-  /**
-   * The format of the index generated if no index file is found, or "403" to
-   * return a 403 Access Denied, or 404 to return a 404 Not Found. 403 is the
-   * error code used by Apache and Nginx.
-   */
-  defaultType: 'html' | 'json' | 403 | 404
-  /**
-   * Look for index files named exactly this or with one of the defaultExts added.
-   * For example, a defaultFile of ["index"] and a defaultExts of ["htm","",html"] would
-   * look for ["index.htm","index","index.html"] in that order.
-   *
-   * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
-   * To use a .hidden file, put the full filename here, and set indexExts to `[""]`.
-   */
-  indexFile: string[]
-  /**
-   * Extensions to add when looking for an index file. A blank string will set the order
-   * to search for the exact indexFile name. The extensions are searched in the order specified.
-   *
-   * Only applies to folder elements, but may be set on a group element. An empty array disables this feature.
-   * The default is `[""]`, which will search for an exact indexFile.
-   */
-  indexExts: string[]
-}
