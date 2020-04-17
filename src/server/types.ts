@@ -302,6 +302,7 @@ export namespace Schema {
     $children: GroupChildElements
     $options?: OptionElements[]
   }
+
   export interface ArrayGroupElement extends GroupElement {
     key: string
   }
