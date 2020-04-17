@@ -1,12 +1,9 @@
-import fs = require('fs')
-import morgan = require('morgan')
-import stream = require('stream')
+import * as fs from 'fs'
+import * as morgan from 'morgan'
+import * as stream from 'stream'
 import { Writable } from 'stream'
 import { IncomingMessage, ServerResponse } from 'http'
-
-// const { Writable } = require('stream');
-// console.log(morgan);
-
+import { colors } from './constants'
 ;(function() {
   var pad = 60
   morgan.token('padurl', function getUrlToken(req) {
@@ -28,40 +25,15 @@ import { IncomingMessage, ServerResponse } from 'http'
   })
 })()
 
-namespace colors {
-  export const Reset = '\x1b[0m'
-  export const Bright = '\x1b[1m'
-  export const Dim = '\x1b[2m'
-  export const Underscore = '\x1b[4m'
-  export const Blink = '\x1b[5m'
-  export const Reverse = '\x1b[7m'
-  export const Hidden = '\x1b[8m'
-  export const FgBlack = '\x1b[30m'
-  export const FgRed = '\x1b[31m'
-  export const FgGreen = '\x1b[32m'
-  export const FgYellow = '\x1b[33m'
-  export const FgBlue = '\x1b[34m'
-  export const FgMagenta = '\x1b[35m'
-  export const FgCyan = '\x1b[36m'
-  export const FgWhite = '\x1b[37m'
-  export const BgBlack = '\x1b[40m'
-  export const BgRed = '\x1b[41m'
-  export const BgGreen = '\x1b[42m'
-  export const BgYellow = '\x1b[43m'
-  export const BgBlue = '\x1b[44m'
-  export const BgMagenta = '\x1b[45m'
-  export const BgCyan = '\x1b[46m'
-  export const BgWhite = '\x1b[47m'
-}
-
 var clfmonth = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
 function pad2(num) {
   var str = String(num)
 
   return (str.length === 1 ? '0' : '') + str
 }
 
-function getLocalDate(format, date, tzo, colorDivider) {
+export const getLocalDate = (format, date, tzo, colorDivider) => {
   const color = colors.FgYellow
 
   switch (format || 'web') {
@@ -106,8 +78,6 @@ function getLocalDate(format, date, tzo, colorDivider) {
       return date.toUTCString()
   }
 }
-
-exports.getLocalDate = getLocalDate
 
 morgan.token('localdate', function getDateToken(req, res, format) {
   var dt = new Date()
