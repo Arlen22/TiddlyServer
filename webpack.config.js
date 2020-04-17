@@ -2,9 +2,6 @@ const path = require('path')
 const webpack = module.parent.require('webpack')
 const CopyPlugin = require('copy-webpack-plugin')
 
-/**
- * @type {import("webpack").Configuration}
- */
 const options = {
   watch: false,
   entry: path.resolve(__dirname, './build/server.js'),
@@ -33,5 +30,3 @@ const options = {
 }
 
 module.exports = options
-
-throw 'Webpack is not setup for TiddlyServer yet'
