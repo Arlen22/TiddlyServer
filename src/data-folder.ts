@@ -32,7 +32,7 @@ export function init(eventer: ServerEventEmitter) {
     const { request, client, settings, treeHostIndex, debugOutput } = data
     const debug = StateObject.DebugLogger('WEBSOCK').bind({ settings, debugOutput })
     const root = settings.tree[treeHostIndex].$mount
-    let pathname: string | null = parse(request.url as string).pathname // new URL(request.url as string);
+    let pathname: string | undefined = parse(request.url as string).pathname // new URL(request.url as string);
     if (!pathname) {
       console.error('[ERROR]: parsing pathname')
       return
