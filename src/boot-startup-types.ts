@@ -1,7 +1,3 @@
-export interface PluginInfo {
-  [K: string]: string
-}
-
 export interface WikiInfo {
   includeWikis: (string | { path: string; info: { 'read-only': boolean } })[]
   build: string[][]

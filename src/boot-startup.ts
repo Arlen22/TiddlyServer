@@ -298,6 +298,7 @@ export namespace TiddlyWiki {
     return wikiInfo
   }
 }
+
 export namespace TiddlyServer {
   export class Wiki {
     public files: any[] = []
