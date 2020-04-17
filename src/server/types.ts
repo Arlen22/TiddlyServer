@@ -72,19 +72,6 @@ export interface ServerEventEmitter extends EventEmitter {
 
 export type Hashmap<T> = { [K: string]: T }
 
-export interface DirectoryEntry {
-  name: string
-  type: string
-  path: string
-  size: string
-}
-
-export interface Directory {
-  path: string
-  entries: DirectoryEntry[]
-  type: string
-}
-
 export class JsonError {
   public filePath: string = ''
   constructor(
@@ -279,8 +266,6 @@ export type NormalizeTreeItem =
   | string
 
 export namespace Schema {
-  function define(name: string, val: any) {}
-
   export type GroupChildElements =
     | Record<string, GroupElement | PathElement | string>
     | (ArrayGroupElement | ArrayPathElement | string)[]
