@@ -5,6 +5,7 @@ import { format } from 'util'
 import * as WebSocket from 'ws'
 import { ServerConfig, parseHostList, testAddress } from './server'
 import { checkCookieAuth } from './cookies'
+
 export class RequestEvent {
   handled: boolean = false
   username: string = ''

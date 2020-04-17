@@ -36,7 +36,7 @@ export const handleTiddlyServerRoute = async (state: StateObject): Promise<void>
   }
 
   let result: PathResolverResult = resolvePath(state, state.hostRoot) || (null as never)
-  if (!result) return state.throw<never>(404)
+  if (!result) return state.throw(404)
   state.ancestry = [...result.ancestry, result.item]
   state.treeOptions = getTreeOptions(state)
 

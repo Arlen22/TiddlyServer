@@ -424,7 +424,7 @@ export const serveFile = async (state: StateObject, file: string, root: string |
       })
     },
     _err => {
-      state.throw<StateObject>(404)
+      state.throw(404)
     }
   )
 }

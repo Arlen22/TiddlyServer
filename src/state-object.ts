@@ -38,6 +38,7 @@ declare function DebugLog(
   str: string | NodeJS.ErrnoException,
   ...args: any[]
 )
+
 export class StateObject<STATPATH = StatPathResult, T = any> {
   static parseURL(str: string): StateObjectUrl {
     let item = url.parse(str, true)
@@ -49,16 +50,6 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       search: search || '',
       href: href || '',
     }
-  }
-  static errorRoute(status: number, reason?: string) {
-    // return (obs: Observable<any>): any => {
-    // 	return obs.mergeMap((state: StateObject) => {
-    // 		if (reason)
-    // 			return state.throwReason(status, reason);
-    // 		else
-    // 			return state.throw(status);
-    // 	})
-    // }
   }
 
   get allow(): ServerConfig_AccessOptions {
@@ -73,14 +64,10 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     return this.settings.tree[this.treeHostIndex].$mount
   }
 
-  // req: http.IncomingMessage;
-  // res: http.ServerResponse;
   startTime: [number, number]
   timestamp: string
-
   body: string = ''
   json: any | undefined
-
   /** The StatPathResult if this request resolves to a path */
   //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
   statPath: STATPATH
@@ -90,20 +77,11 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   /** The tree ancestors options as they apply to this request */
   //@ts-ignore Property has no initializer and is not definitely assigned in the constructor.
   treeOptions: OptionsConfig
-
   url: StateObjectUrl
-
   path: string[]
-
-  // maxid: number;
-
   // where: string;
   query: any
-  // errorThrown: Error;
-
   restrict: any
-
-  // expressNext: ((err?: any) => void) | false;
 
   pathOptions: {
     noTrailingSlash: boolean
@@ -153,23 +131,18 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       padLeft(t.getMinutes(), '00'),
       padLeft(t.getSeconds(), '00')
     )
+
     const interval = setInterval(() => {
       this.log(-2, 'LONG RUNNING RESPONSE')
       this.log(-2, '%s %s ', this.req.method, this.req.url)
     }, 60000)
+
     this._res.on('finish', () => {
       clearInterval(interval)
       if (this.hasCriticalLogs) this.eventer.emit('stateError', this)
       else this.eventer.emit('stateDebug', this)
     })
   }
-  // debug(str: string, ...args: any[]) {
-  //     this.debugLog('[' +
-  //         this.req.socket.remoteFamily + '-' + colors.FgMagenta +
-  //         this.req.socket.remoteAddress + colors.Reset + '] ' +
-  //         format.apply(null, arguments)
-  //     );
-  // }
 
   loglevel: number = DEBUGLEVEL
   doneMessage: string[] = []
@@ -194,11 +167,6 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     this.doneMessage.push(format(template, ...args))
     return this
   }
-  // error() {
-  //     this.errorThrown = new Error(this.doneMessage.join('\n'));
-  //     this.errorThrown.name = "StateObjectError";
-  //     return this;
-  // }
   /**
    * if the client is allowed to recieve error info, sends `message`, otherwise sends `reason`.
    * `reason` is always sent as the status header.
@@ -206,6 +174,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
   throwError<T = StateObject>(statusCode: number, error: ER, headers?: StandardResponseHeaders) {
     return this.throwReason(statusCode, this.allow.writeErrors ? error : error.reason, headers)
   }
+
   throwReason<T = StateObject>(
     statusCode: number,
     reason: string | ER,
@@ -220,18 +189,19 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         if (statusCode !== 204) res.string(reason.message)
       }
     }
-    // return Observable.empty<T>();
   }
-  throw<T = never>(statusCode: number, headers?: StandardResponseHeaders) {
+
+  throw(statusCode: number, headers?: StandardResponseHeaders) {
     if (!this.responseSent) {
       if (headers) this.setHeaders(headers)
       this.respond(statusCode).empty()
     }
-    // return Observable.empty<T>();
   }
+
   setHeader(key: keyof StandardResponseHeaders, val: string) {
     this.setHeaders({ [key]: val } as any)
   }
+
   setHeaders(headers: StandardResponseHeaders) {
     Object.assign(
       this.responseHeaders,
@@ -245,16 +215,19 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         : {}
     )
   }
+
   respond(code: number, message?: string, headers?: StandardResponseHeaders) {
     if (headers) this.setHeaders(headers)
     if (!message) message = http.STATUS_CODES[code]
+
     if (this.settings._devmode) {
       let stack = new Error().stack
       setTimeout(() => {
         if (!this.responseSent) this.debugOutput.write('Response not sent syncly\n ' + stack)
       }, 0)
     }
-    var subthis = {
+
+    const subthis = {
       json: (data: any) => {
         this.setHeader('Content-Type', 'application/json')
         subthis.string(JSON.stringify(data))
@@ -288,6 +261,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       Location: redirect,
     }).empty()
   }
+
   send(options: {
     root: string | undefined
     filepath: string
@@ -352,8 +326,8 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       })
     })
   }
+
   static DebugLogger(prefix: string, ignoreLevel?: boolean): typeof DebugLog {
-    //if(prefix.startsWith("V:")) return function(){};
     return function(
       this: { debugOutput: Writable; settings: ServerConfig },
       msgLevel: number,
@@ -401,5 +375,4 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
       )
     }
   }
-  // private debugLog: typeof DebugLog = StateObject.DebugLogger("STATE  ");
 }
