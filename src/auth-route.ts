@@ -6,28 +6,6 @@ import { StateObject } from './state-object'
 
 const TIDDLY_SERVER_AUTH_COOKIE: string = 'TiddlyServerAuth'
 
-/** Handles the /admin/authenticate route */
-export const handleAuthRoute = (state: StateObject) => {
-  if (state.req.method === 'GET' || state.req.method === 'HEAD') {
-    return handleHEADorGETFileServe(state)
-  }
-  if (state.req.method !== 'POST') return state.throw(405)
-  switch (state.path[3]) {
-    case 'transfer':
-      return handleTransfer(state)
-    case 'initpin':
-      return handleInitPin(state)
-    case 'initshared':
-      return handleInitShared(state)
-    case 'login':
-      return handleLogin(state)
-    case 'logout':
-      return handleLogout(state)
-    default:
-      console.log('Case not handled for authRoute')
-  }
-}
-
 const pko: Record<
   string,
   {
