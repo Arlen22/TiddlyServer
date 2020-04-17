@@ -1,4 +1,4 @@
-import { EventEmitter } from "events";
+// import { EventEmitter } from "events";
 import * as fs from "fs";
 import * as http from "http";
 import { IncomingMessage, ServerResponse } from "http";
@@ -15,6 +15,8 @@ import { handleAuthRoute, initAuthRoute } from "./auth-route";
 import { checkCookieAuth } from "./cookies";
 import { checkServerConfig } from "./interface-checker";
 import { RequestEvent } from "./request-event";
+import { Observable, Subject, Subscription } from "rxjs";
+import { filter } from "rxjs/operators";
 import {
   init as initServerTypes,
   keys,
@@ -28,8 +30,9 @@ import {
 } from "./server-types";
 import { StateObject } from "./state-object";
 import { handleTiddlyServerRoute, init as initTiddlyServer } from "./tiddlyserver";
-
-export { checkServerConfig, loadSettings, routes, libsReady };
+import { EventEmitter } from "./event-emitter-types";
+import { Socket } from "net";
+export { checkServerConfig, loadSettings, libsReady };
 const { Server: WebSocketServer } = WebSocket;
 
 // global settings
@@ -37,45 +40,60 @@ Error.stackTraceLimit = Infinity;
 console.debug = function () { }; //noop console debug;
 
 // this is the internal communicator
-export const eventer = new EventEmitter() as ServerEventEmitter;
+// export const eventer = new EventEmitter() as ServerEventEmitter;
 
 // external flags combine here
 namespace ENV {
   export let disableLocalHost: boolean = false;
 }
 
-initServerTypes(eventer);
-initTiddlyServer(eventer);
-initAuthRoute(eventer);
 
-eventer.on("settings", set => {
-  if (checkServerConfig(set)[0] !== true) throw "ServerConfig did not pass validator";
-});
 
-const routes: Record<string, (state: StateObject) => void> = {
-  admin: state => handleAdminRoute(state),
-  assets: state => handleAssetsRoute(state),
-  "favicon.ico": state => serveFile(state, "favicon.ico", state.settings.__assetsDir),
-  "directory.css": state => serveFile(state, "directory.css", state.settings.__assetsDir),
-};
+// eventer.on("settings", set => {
+//   if (checkServerConfig(set)[0] !== true) throw "ServerConfig did not pass validator";
+// });
 
-function handleAssetsRoute(state: StateObject) {
-  switch (state.path[2]) {
-    case "static": serveFolder(state, "/assets/static", path.join(state.settings.__assetsDir, "static")); break;
-    case "icons": serveFolder(state, "/assets/icons", path.join(state.settings.__assetsDir, "icons")); break;
-    case "tiddlywiki": serveFolder(state, "/assets/tiddlywiki", state.settings.__targetTW); break;
-    default: state.throw(404);
-  }
+// const routes: Record<string, (state: StateObject) => void> = {
+//   admin: state => handleAdminRoute(state),
+//   assets: state => handleAssetsRoute(state),
+//   "favicon.ico": state => serveFile(state, "favicon.ico", state.settings.__assetsDir),
+//   "directory.css": state => serveFile(state, "directory.css", state.settings.__assetsDir),
+// };
+
+// function handleAssetsRoute(state: StateObject) {
+//   switch (state.path[2]) {
+//     case "static": serveFolder(state, "/assets/static", path.join(state.settings.__assetsDir, "static")); break;
+//     case "icons": serveFolder(state, "/assets/icons", path.join(state.settings.__assetsDir, "icons")); break;
+//     case "tiddlywiki": serveFolder(state, "/assets/tiddlywiki", state.settings.__targetTW); break;
+//     default: state.throw(404);
+//   }
+// }
+
+// function handleAdminRoute(state: StateObject) {
+//   switch (state.path[2]) {
+//     case "authenticate":
+//       handleAuthRoute(state);
+//       break;
+//     default:
+//       state.throw(404);
+//   }
+// }
+
+interface ListenerEvents {
+  listening?: ReturnType<http.Server["address"]>,
+  request?: { request: IncomingMessage, response: ServerResponse },
+  socket?: { client: WebSocket, request: IncomingMessage },
+  error?:
+  | { type: "server", error: NodeJS.ErrnoException }
+  | { type: "wsServer", error: Error }
+  | { type: "connection", error: Error, socket: Socket }
+  | { type: "websocket", error: Error, client: WebSocket }
+  close?: true,
+  sender: Listener
 }
 
-function handleAdminRoute(state: StateObject) {
-  switch (state.path[2]) {
-    case "authenticate":
-      handleAuthRoute(state);
-      break;
-    default:
-      state.throw(404);
-  }
+interface ControllerEvents {
+  close?: { force: boolean }
 }
 
 const libsReady = Promise.all([libsodium.ready]);
@@ -122,9 +140,15 @@ export async function initServer({
   settingshttps: ((host: string) => https.ServerOptions) | undefined;
   dryRun: boolean;
 }) {
+
+
+
+  if (checkServerConfig(settings)[0] !== true)
+    throw "ServerConfig did not pass validator";
+
   await libsodium.ready;
 
-  let startup = new Startup(
+  let startup = new MainServer(
     settingshttps,
     preflighter,
     settings,
@@ -132,18 +156,18 @@ export async function initServer({
   );
 
   let success = await startup.setupHosts();
-  if (success === false) return eventer;
+  if (success === false) return [false, startup] as const;
 
-  eventer.emit("serverOpen", startup.servers, startup.hosts, !!settingshttps, dryRun);
-
+  startup.eventer.emit("serverOpen", startup.servers, startup.hosts, !!settingshttps, dryRun);
   startup.printWelcomeMessage();
-
   if (dryRun) console.log("DRY RUN: No further processing is likely to happen");
 
-  return eventer;
+  return [true, startup] as const;
 }
-class Startup {
-  public servers: (http.Server | https.Server)[]
+
+export class MainServer {
+
+  public servers: Listener[]
   public bindWildcard: boolean
   public filterBindAddress: boolean
   public enableIPv6: boolean
@@ -154,33 +178,32 @@ class Startup {
   debug: (level: number, str: string | NodeJS.ErrnoException, ...args: any[]) => any;
   public hosts: string[]
   public isHttps: boolean
+  public events = new Subject<ListenerEvents>();
+  public command = new Subject<ControllerEvents>();
+  public disposer = new Subscription();
+  debugOutput: Writable;
   constructor(
     public settingshttps: undefined | ((host: string) => https.ServerOptions),
     public preflighter: <T extends RequestEvent>(ev: T) => Promise<T>,
     public settings: ServerConfig,
     public dryRun: boolean
   ) {
-    this.debug = StateObject.DebugLogger("STARTER").bind({
-      debugOutput: RequestEvent.MakeDebugOutput(settings),
-      settings,
-    });
+    initServerTypes(this.eventer);
+    initTiddlyServer(this.eventer);
+    initAuthRoute(this.eventer);
+    this.eventer.emit("settings", settings);
+    this.debugOutput = RequestEvent.MakeDebugOutput(settings);
+    this.debug = StateObject.DebugLogger("STARTER").bind(this);
+
     this.tester = parseHostList([...settings.bindInfo.bindAddress, "-127.0.0.0/8"]);
     this.localhostTester = parseHostList(["127.0.0.0/8"]);
 
-    const {
-      bindWildcard,
-      enableIPv6,
-      filterBindAddress,
-      bindAddress,
-      _bindLocalhost,
-      port,
-      https: isHttps,
-    } = settings.bindInfo;
-    this.isHttps = isHttps;
-    this.port = port;
-    this.bindWildcard = bindWildcard;
-    this.filterBindAddress = filterBindAddress;
-    this.enableIPv6 = enableIPv6;
+    this.isHttps = settings.bindInfo.https;
+    this.port = settings.bindInfo.port;
+    this.bindWildcard = settings.bindInfo.bindWildcard;
+    this.filterBindAddress = settings.bindInfo.filterBindAddress;
+    this.enableIPv6 = settings.bindInfo.enableIPv6;
+
     if (settings.logging.logAccess !== false) {
       const logger = morgan({
         logFile: settings.logging.logAccess || undefined,
@@ -191,20 +214,30 @@ class Startup {
     } else {
       this.log = (req, res) => Promise.resolve();
     }
+    this.eventer.on("stateError", this.stateError);
+    this.eventer.on("stateDebug", this.stateDebug);
+
+    this.disposer.add(() => {
+      this.eventer.removeListener("stateError", this.stateError);
+      this.eventer.removeListener("stateDebug", this.stateDebug);
+    });
+
+    this.subscribeEventsHandler();
+
     this.hosts = [];
 
-    if (bindWildcard) {
+    if (settings.bindInfo.bindWildcard) {
       //bind to everything and filter elsewhere if needed
       this.hosts.push("0.0.0.0");
-      if (enableIPv6) this.hosts.push("::");
-    } else if (filterBindAddress) {
+      if (settings.bindInfo.enableIPv6) this.hosts.push("::");
+    } else if (settings.bindInfo.filterBindAddress) {
       //bind to all interfaces that match the specified addresses
       this.hosts.push(...this.getValidAddresses());
     } else {
       //bind to all specified addresses as specified
-      this.hosts.push(...bindAddress);
+      this.hosts.push(...settings.bindInfo.bindAddress);
     }
-    if (_bindLocalhost) this.hosts.push("localhost");
+    if (settings.bindInfo._bindLocalhost) this.hosts.push("localhost");
 
     if (this.hosts.length === 0) { console.log(this.EmptyHostsWarning()); }
     this.servers = [];
@@ -213,13 +246,7 @@ class Startup {
       console.log("Remember that any login credentials are being sent in the clear");
 
   }
-  EmptyHostsWarning(
-    // bindWildcard: boolean,
-    // filterBindAddress: boolean,
-    // _bindLocalhost: boolean,
-    // enableIPv6: boolean,
-    // bindAddress: string[]
-  ): any {
+  EmptyHostsWarning(): string {
     let { _bindLocalhost, bindAddress } = this.settings.bindInfo;
     return `"No IP addresses will be listened on. This is probably a mistake.
   bindWildcard is ${this.bindWildcard ? "true" : "false"}
@@ -229,6 +256,15 @@ class Startup {
   bindAddress is ${JSON.stringify(bindAddress, null, 2)}
   `;
   }
+  stateError = state => {
+    if (state.doneMessage.length > 0)
+      StateObject.DebugLogger("STA-ERR").call(state, 2, state.doneMessage.join("\n"));
+    debugger;
+  };
+  stateDebug = state => {
+    if (state.doneMessage.length > 0)
+      StateObject.DebugLogger("STA-DBG").call(state, -2, state.doneMessage.join("\n"));
+  };
   getValidAddresses() {
     let ifaces = networkInterfaces();
     return keys(networkInterfaces())
@@ -252,41 +288,38 @@ class Startup {
     send.mime.define(this.settings.directoryIndex.mimetypes);
 
     return Promise.all<void>(
-      this.hosts.map(host => {
-        let server: any;
+      this.hosts.map(async (host) => {
+        let server: http.Server | https.Server;
         if (typeof this.settingshttps === "function") {
           try {
             server = https.createServer(this.settingshttps(host));
           } catch (e) {
             console.log("settingshttps function threw for host " + host);
             console.log(e);
-            throw e;
+            return Promise.reject<void>(e);
           }
         } else {
           server = http.createServer();
         }
-        this.addRequestHandlers(server, host);
+        let listener = new Listener(this.debugOutput, this.events, this.command.asObservable(), host, server as any);
         //this one we add here because it is related to the host property rather than just listening
         if (this.bindWildcard && this.filterBindAddress) {
           server.on("connection", socket => {
-            if (!this.tester(socket.localAddress).usable && !this.localhostTester(socket.localAddress).usable)
-              socket.end();
+            if (!this.tester(socket.localAddress).usable && !this.localhostTester(socket.localAddress).usable) socket.destroy();
           });
         }
-        this.servers.push(server);
-        return new Promise(resolve => {
-          this.dryRun
-            ? resolve()
-            : server.listen(this.port, host, undefined, () => {
-              resolve();
-            });
-        });
+        this.servers.push(listener);
+
+        !this.dryRun && await listener.listen(this.port, host);
       })
-    ).catch(x => {
+    ).then(() => true).catch(x => {
       console.log("Error thrown while starting server");
       console.log(x);
       return false;
     });
+  }
+  close(force: boolean) {
+    this.command.next({ close: { force } });
   }
   /**
    * Adds all the listeners required for tiddlyserver to operate.
@@ -298,63 +331,55 @@ class Startup {
    * @param {*} preflighter A preflighter function which may modify data about the request before
    * it is handed off to the router for processing.
    */
-  addRequestHandlers(
-    server: https.Server | http.Server,
-    iface: string
-  ) {
-    // const addListeners = () => {
-    let closing = false;
+  subscribeEventsHandler() {
+    let subs = this.events.asObservable().subscribe(async e => {
 
-    server.on("request", (req, res) => {
-      this.requestHandler(req, res, iface).catch(err => {
-        //catches any errors that happen inside the then statements
-        this.debug(3, "Uncaught error in the request handler: " + (err.message || err.toString()));
-        //if we have a stack, then print it
-        if (err.stack) this.debug(3, err.stack);
-      });
-    });
+      let { iface } = e.sender;
+      if (e.close) {
+        this.debug(4, "server %s closed", iface);
+      } else if (e.listening) {
+        this.debug(1, "server %s listening", iface);
+      } else if (e.request) {
+        let { request, response } = e.request;
+        this.requestHandler(request, response, iface).catch(err => {
+          //catches any errors that happen inside the then statements
+          this.debug(3, "Uncaught error in the request handler: " + (err.message || err.toString()));
+          //if we have a stack, then print it
+          if (err.stack) this.debug(3, err.stack);
+        });
+      } else if (e.socket) {
+        let { client, request } = e.socket;
+        this.websocketHandler(client, request, iface);
+      } else if (e.error) {
+        if (e.error.type === "server") {
+          let err = e.error.error;
+          this.debug(4, "server %s error: %s", iface, err.message);
+          this.debug(4, "server %s stack: %s", iface, err.stack);
+          this.command.next({ close: { force: false } });
+          this.eventer.emit("serverClose", iface);
+        } else if (e.error.type === "wsServer") {
+          this.debug(-2, "WS-ERROR %s", inspect(e.error.error));
+        }
+      } else {
 
-    server.on("listening", () => {
-      this.debug(1, "server %s listening", iface);
+      }
     });
-
-    server.on("error", err => {
-      this.debug(4, "server %s error: %s", iface, err.message);
-      this.debug(4, "server %s stack: %s", iface, err.stack);
-      server.close();
-      eventer.emit("serverClose", iface);
-    });
-
-    server.on("close", () => {
-      if (!closing) eventer.emit("serverClose", iface);
-      this.debug(4, "server %s closed", iface);
-      closing = true;
-    });
-
-    const wss = new WebSocketServer({ server });
-    wss.on("connection", (client, request) =>
-      this.websocketHandler(client, request, iface, this.settings, this.preflighter)
-    );
-    wss.on("error", error => {
-      this.debug(-2, "WS-ERROR %s", inspect(error));
-    });
+    this.disposer.add(subs);
   }
   async websocketHandler(
     client: WebSocket,
     request: http.IncomingMessage,
     iface: string,
-    settings: ServerConfig,
-    preflighter: (ev: RequestEvent) => Promise<RequestEvent>
   ) {
     //check host level permissions and the preflighter
-    let ev = new RequestEvent(settings, request, iface, "client", client);
+    let ev = new RequestEvent(this.settings, request, iface, "client", client);
 
-    let ev2 = await ev.requestHandlerHostLevelChecks(preflighter);
+    let ev2 = await ev.requestHandlerHostLevelChecks(this.preflighter);
 
     if (ev2.handled) return;
 
     if (!ev2.allow.websockets) client.close(403);
-    else eventer.emit("websocket-connection", ev);
+    else this.eventer.emit("websocket-connection", ev);
   }
   async requestHandler(
     request: IncomingMessage,
@@ -372,12 +397,123 @@ class Startup {
 
     const key = ev2.url.split('/')[1];
     //check for static routes
-    if (routes[key]) routes[key](new StateObject(eventer, ev2));
+    if (MainServer.routes[key]) MainServer.routes[key](new StateObject(this.eventer, ev2));
     //otherwise forward to TiddlyServer
-    else handleTiddlyServerRoute(ev2, eventer);
+    else handleTiddlyServerRoute(ev2, this.eventer);
+  }
+  eventer = new EventEmitter() as ServerEventEmitter;
+  static routes: Record<string, (state: StateObject) => void> = {
+    admin: state => MainServer.handleAdminRoute(state),
+    assets: state => MainServer.handleAssetsRoute(state),
+    "favicon.ico": state => serveFile(state, "favicon.ico", state.settings.__assetsDir),
+    "directory.css": state => serveFile(state, "directory.css", state.settings.__assetsDir),
+  };
+
+  static handleAssetsRoute(state: StateObject) {
+    switch (state.path[2]) {
+      case "static": serveFolder(state, "/assets/static", path.join(state.settings.__assetsDir, "static")); break;
+      case "icons": serveFolder(state, "/assets/icons", path.join(state.settings.__assetsDir, "icons")); break;
+      case "tiddlywiki": serveFolder(state, "/assets/tiddlywiki", state.settings.__targetTW); break;
+      default: state.throw(404);
+    }
+  }
+
+  static handleAdminRoute(state: StateObject) {
+    switch (state.path[2]) {
+      case "authenticate":
+        handleAuthRoute(state);
+        break;
+      default:
+        state.throw(404);
+    }
+  }
+
+}
+export class Listener {
+  closed = false;
+  closing = false;
+  debug: (level: number, str: string | NodeJS.ErrnoException, ...args: any[]) => any;
+  wss: WebSocket.Server
+  constructor(
+    public debugOutput: Writable,
+    public events: Subject<ListenerEvents>,
+    public command: Observable<ControllerEvents>,
+    public iface: string,
+    public server: https.Server & { kill: (cb?: () => void) => void } | http.Server & { kill: (cb?: () => void) => void }
+  ) {
+    this.debug = (level: number, str: string | NodeJS.ErrnoException, ...args: any[]) => {
+      StateObject.DebugLoggerInner(level, "STARTER", str, args, this.debugOutput);
+    }
+    this.wss = new WebSocketServer({ server: this.server });
+    this.addRequestHandlers();
+    this.command.subscribe(({ close }) => {
+      if (close) {
+        if (close.force) this.server.kill();
+        else this.server.close();
+      }
+    });
+
+  }
+  addRequestHandlers() {
+    this.server.on('connection', (socket) => {
+      // in case the address watcher catches it
+      if (socket.destroyed) return;
+      this.sockets.push(socket);
+      socket.once('close', () => {
+        let index = this.sockets.indexOf(socket);
+        if (index !== -1) this.sockets.splice(index, 1);
+      });
+    });
+    this.server.on("request", (request, response) => {
+      this.events.next({ sender: this, request: { request, response } });
+    });
+
+    this.server.on("listening", () => {
+      this.events.next({ sender: this, listening: this.server.address() })
+    });
+
+    this.server.on("error", error => {
+      this.events.next({ sender: this, error: { error, type: "server" } });
+    });
+
+    false && this.server.on("clientError", (error, socket) => {
+      this.events.next({ sender: this, error: { error, socket, type: "connection" } });
+    })
+
+    this.server.on("close", () => {
+      this.closing = true;
+      this.closed = true;
+      this.events.next({ sender: this, close: true });
+      if (this.sockets.length > 0)
+        console.log("BUG: Listener#sockets.length > 0 -- please report");
+    });
+    this.wss.on("connection", (client, request) => {
+      false && client.on("error", (error) => {
+        this.events.next({ sender: this, error: { error, type: "websocket", client } });
+      });
+      this.events.next({ sender: this, socket: { client, request } });
+    });
+    this.wss.on("error", (error) => {
+      this.events.next({ sender: this, error: { error, type: "wsServer" } });
+    });
+  }
+  listen(port: number, host: string) {
+    return new Promise<void>(resolve => { this.server.listen(port, host, undefined, () => { resolve(); }); });
+  }
+  close() {
+    this.closing = true;
+    this.server.close();
+  }
+  sockets: Socket[] = [];
+  /** same as close but also destroys all open sockets */
+  kill() {
+    // copied from npm "killable" package
+    this.closing = true;
+    this.server.close();
+    this.sockets.forEach((socket) => { socket.destroy(); });
+    this.sockets = [];
   }
 }
-
 
 function EmptyHostsWarning(
   bindWildcard: boolean,
@@ -395,15 +531,6 @@ bindAddress is ${JSON.stringify(bindAddress, null, 2)}
 `;
 }
 
-eventer.on("stateError", state => {
-  if (state.doneMessage.length > 0)
-    StateObject.DebugLogger("STA-ERR").call(state, 2, state.doneMessage.join("\n"));
-  debugger;
-});
-eventer.on("stateDebug", state => {
-  if (state.doneMessage.length > 0)
-    StateObject.DebugLogger("STA-DBG").call(state, -2, state.doneMessage.join("\n"));
-});
 
 function handleBasicAuth(
   state: StateObject,

@@ -35,7 +35,9 @@ export function init(eventer: ServerEventEmitter) {
   initDatafolder(eventer);
 }
 
-// it isn't pretty but I can't find a way to improve it - Arlen 2020/04/10
+// it isn't pretty but I can't find a way to improve it - 2020/04/10
+// it still isn't pretty, but it finally uses classes - 2020/04/14
+
 export async function handleTiddlyServerRoute(event: RequestEvent, eventer: ServerEventEmitter): Promise<void> {
 
   let pathname = parse(event.url).pathname;
@@ -47,10 +49,12 @@ export async function handleTiddlyServerRoute(event: RequestEvent, eventer: Serv
   let treeOptions = event.getTreeOptions(result);
 
   let { authList, authError } = treeOptions.auth;
-  let authed = Array.isArray(authList) && authList.indexOf(event.authAccountKey) === -1;
-  if (!authed) return new StateObject(eventer, event).respond(403).string(
-    authAccessDenied(authError, event.allow.loginlink, !!event.authAccountKey)
-  );
+
+
+  if (Array.isArray(authList) && authList.indexOf(event.authAccountKey) === -1)
+    return new StateObject(eventer, event).respond(403).string(
+      authAccessDenied(authError, event.allow.loginlink, !!event.authAccountKey)
+    );
 
   if (Config.isGroup(result.item)) {
     const state = new TreeStateObject(eventer, event, result, null as never);
@@ -122,7 +126,7 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
   ): this is TreeStateObject<getStatPathResult<T>> {
     return this.statPath.itemtype === itemtype;
   }
-  
+
   ancestry: Config.MountElement[];
   treeOptions: OptionsConfig;
   pathOptions: {

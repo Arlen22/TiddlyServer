@@ -61,42 +61,41 @@ export class RequestEvent {
   async requestHandlerHostLevelChecks<T extends RequestEvent>(
     preflighter?: (ev: RequestEvent) => Promise<RequestEvent>
   ): Promise<RequestEvent> {
-    let ev = this;
+    // let this = this;
     //connections to the wrong IP address are already filtered out by the connection event listener on the server.
     //determine localAddressPermissions to be applied
     {
-      let localAddress = ev.request.socket.localAddress;
-      let keys = Object.keys(ev.settings.bindInfo.localAddressPermissions);
+      let localAddress = this.request.socket.localAddress;
+      let keys = Object.keys(this.settings.bindInfo.localAddressPermissions);
       let isLocalhost = testAddress(localAddress, "127.0.0.1", 8);
       let matches = parseHostList(keys)(localAddress);
-      if (isLocalhost) {
-        ev.localAddressPermissionsKey = "localhost";
-      } else if (matches.lastMatch > -1) {
-        ev.localAddressPermissionsKey = keys[matches.lastMatch];
+      if (isLocalhost && keys.indexOf("localhost") !== -1) {
+        this.localAddressPermissionsKey = "localhost";
+      } else if (matches.lastMatch !== -1) {
+        this.localAddressPermissionsKey = keys[matches.lastMatch];
       } else {
-        ev.localAddressPermissionsKey = "*";
+        this.localAddressPermissionsKey = "*";
       }
     }
     // host header is currently not implemented, but could be implemented by the preflighter
-    ev.treeHostIndex = 0;
-    // console.log(settings.bindInfo);
-    let { registerNotice } = ev.settings.bindInfo.localAddressPermissions[
-      ev.localAddressPermissionsKey
+    this.treeHostIndex = 0;
+    let { registerNotice } = this.settings.bindInfo.localAddressPermissions[
+      this.localAddressPermissionsKey
     ];
-    let auth = checkCookieAuth(ev.request, ev.settings);
+    let auth = checkCookieAuth(this.request, this.settings);
     if (auth) {
-      ev.authAccountKey = auth[0];
-      ev.username = auth[1];
+      this.authAccountKey = auth[0];
+      this.username = auth[1];
     }
 
     //send the data to the preflighter
-    let ev2 = await (preflighter ? preflighter(ev) : Promise.resolve(ev));
+    let ev2 = await (preflighter ? preflighter(this) : Promise.resolve(this));
 
     if (ev2.handled) return ev2 as any; //cancel early if it is handled
     //sanity checks after the preflighter
     // "always check all variables and sometimes check some constants too"
     //@ts-ignore
-    if (!ev.response !== !ev2.response || !ev.client !== !ev2.client)
+    if (!this.response !== !ev2.response || !this.client !== !ev2.client)
       throw new Error("DEV: Request Event types got mixed up");
     if (ev2.treeHostIndex > ev2.settings.tree.length - 1)
       throw format(

@@ -398,9 +398,15 @@ export interface ServerConfigSchema {
      */
     https?: string;
     /**
-     * Permissions based on local address: "localhost", "*" (all others), "192.168.0.0/16", etc.
+     * Permissions based on local interface address. 
+     * Enter the IP Address and NetMask (`127.0.0.1/8`) as the property key.
+     * The keyword "localhost" (if specified) matches 127.0.0.0/8 instead of any other specified key. 
+     * Keyword "*" matches everything that doesn't match another IP address. 
      * This checks the IP address each client connects to (socket.localAddress),
      * not the bind address of the server instance that accepted the request.
+     * 
+     * The keyword defaultPermission does nothing, but auto-complete should give you the default object. 
+     * You can then rename it to whatever you need it to be. 
      */
     localAddressPermissions?: {
       /**

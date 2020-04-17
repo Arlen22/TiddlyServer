@@ -343,49 +343,59 @@ export class StateObject {
     return function (
       this: { debugOutput: Writable; settings: ServerConfig },
       msgLevel: number,
-      tempString: any,
+      str: any,
       ...args: any[]
     ) {
       if (!ignoreLevel && this.settings.logging.debugLevel > msgLevel) return;
-      if (isError(args[0])) {
-        let err = args[0];
-        args = [];
-        if (err.stack) args.push(err.stack);
-        else args.push("Error %s: %s", err.name, err.message);
-      }
-      let t = new Date();
-      let date = format(
-        "%s-%s-%s %s:%s:%s",
-        t.getFullYear(),
-        padLeft(t.getMonth() + 1, "00"),
-        padLeft(t.getDate(), "00"),
-        padLeft(t.getHours(), "00"),
-        padLeft(t.getMinutes(), "00"),
-        padLeft(t.getSeconds(), "00")
-      );
-      this.debugOutput.write(
-        " " +
-        (msgLevel >= 3 ? colors.BgRed + colors.FgWhite : colors.FgRed) +
-        prefix +
-        " " +
-        colors.FgCyan +
-        date +
-        colors.Reset +
-        " " +
-        format
-          .apply(null, [tempString, ...args])
-          .split("\n")
-          .map((e, i) => {
-            if (i > 0) {
-              return new Array(23 + prefix.length).join(" ") + e;
-            } else {
-              return e;
-            }
-          })
-          .join("\n"),
-        "utf8"
-      );
+      StateObject.DebugLoggerInner(msgLevel, prefix, str, args, this.debugOutput);
     };
+  }
+  static DebugLoggerInner = (
+    msgLevel: number,
+    prefix: string,
+    tempString: any,
+    args: any[],
+    debugOutput: Writable
+  ) => {
+
+    if (isError(args[0])) {
+      let err = args[0];
+      args = [];
+      if (err.stack) args.push(err.stack);
+      else args.push("Error %s: %s", err.name, err.message);
+    }
+    let t = new Date();
+    let date = format(
+      "%s-%s-%s %s:%s:%s",
+      t.getFullYear(),
+      padLeft(t.getMonth() + 1, "00"),
+      padLeft(t.getDate(), "00"),
+      padLeft(t.getHours(), "00"),
+      padLeft(t.getMinutes(), "00"),
+      padLeft(t.getSeconds(), "00")
+    );
+    debugOutput.write(
+      " " +
+      (msgLevel >= 3 ? colors.BgRed + colors.FgWhite : colors.FgRed) +
+      prefix +
+      " " +
+      colors.FgCyan +
+      date +
+      colors.Reset +
+      " " +
+      format
+        .apply(null, [tempString, ...args])
+        .split("\n")
+        .map((e, i) => {
+          if (i > 0) {
+            return new Array(23 + prefix.length).join(" ") + e;
+          } else {
+            return e;
+          }
+        })
+        .join("\n"),
+      "utf8"
+    );
   }
   // private debugLog: typeof DebugLog = StateObject.DebugLogger("STATE  ");
 }

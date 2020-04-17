@@ -38,11 +38,11 @@ const {
 const settingsFile = userSettings
   ? path.resolve(userSettings)
   : path.join(
-      __dirname,
-      //if we're in the build directory the default one level up
-      __dirname.endsWith("/build") ? ".." : "",
-      "settings.json"
-    );
+    __dirname,
+    //if we're in the build directory the default one level up
+    __dirname.endsWith("/build") ? ".." : "",
+    "settings.json"
+  );
 
 
 declare const __non_webpack_require__: NodeRequire | undefined;
@@ -52,9 +52,8 @@ const nodeRequire =
     : require;
 
 const logAndCloseServer = (err: any) => {
-  server.eventer.emit("serverClose", "all");
   //hold it open because all other listeners should close
-  if (stayOnError) setInterval(function() {}, 1000);
+  if (stayOnError) setInterval(function () { }, 1000);
   process.exitCode = 1;
   console.error("[ERROR]: caught process uncaughtException", inspect(err));
   try {
@@ -67,44 +66,47 @@ const logAndCloseServer = (err: any) => {
   }
 };
 
-// Unhandled rejections with no reasons should be ignored
-process.on("unhandledRejection", (err, _prom) => {
-  if (!err) return;
-  logAndCloseServer(err);
-});
-process.on("uncaughtException", err => {
-  logAndCloseServer(err);
-});
-process.on("beforeExit", () => {
-  if (process.exitCode) {
-    console.log("Server exited with errors " + process.exitCode);
-    return;
-  }
-});
-
 async function runServer() {
   const settingsDir = path.dirname(settingsFile);
   await server.libsReady;
 
   const { settings, settingshttps } = server.loadSettings(
     settingsFile,
-    Object.keys(server.routes)
+    Object.keys(server.MainServer.routes)
   );
-  
+
   const [check, checkErr] = server.checkServerConfig(settings);
 
   if (!check) {
     console.log(JSON.stringify(checkErr, null, 2));
     debugger;
   }
-  server.eventer.emit("settings", settings);
+  let main: server.MainServer;
+
+
+  // Unhandled rejections with no reasons should be ignored
+  process.on("unhandledRejection", (err, _prom) => {
+    if (!err) return;
+    if (main) main.close(true);
+    logAndCloseServer(err);
+  });
+  process.on("uncaughtException", err => {
+    if (main) main.close(true);
+    logAndCloseServer(err);
+  });
+  process.on("beforeExit", () => {
+    if (process.exitCode) {
+      console.log("Server exited with errors " + process.exitCode);
+      return;
+    }
+  });
 
   let httpsSettingsFile = settingshttps
     ? path.resolve(settingsDir, settingshttps)
     : false;
 
   try {
-    server.initServer({
+    let [success, _main] = await server.initServer({
       settings,
       settingshttps:
         httpsSettingsFile && nodeRequire(httpsSettingsFile).serverOptions,
@@ -113,12 +115,25 @@ async function runServer() {
         : undefined,
       dryRun,
     });
+    main = _main;
+    // auditChildren();
   } catch (e) {
     console.error("[ERROR]: Uncaught error during server startup:", e);
     process.exit(1);
   }
 }
-
+function auditChildren() {
+  const parents: NodeModule[] = [];
+  const inspectModule = (mod: NodeModule) => {
+    parents.push(mod);
+    mod.children.forEach(e => {
+      if (parents.indexOf(e) > -1) return console.log("circular", e, mod);
+      else inspectModule(e);
+    });
+    parents.pop();
+  }
+  inspectModule(module);
+}
 if (fs.existsSync(settingsFile)) {
   runServer();
 } else {

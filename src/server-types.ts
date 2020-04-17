@@ -5,7 +5,7 @@ import * as path from "path";
 
 import { format, promisify } from "util";
 // import { Observable, Subscriber } from '../lib/rx';
-import { EventEmitter } from "events";
+// import { EventEmitter } from "events";
 //import { StateObject } from "./index";
 import * as JSON5 from "json5";
 import * as send from "send";
@@ -46,7 +46,7 @@ export {
 };
 
 export function init(eventer: ServerEventEmitter) {
-  eventer.on("settings", function (set: ServerConfig) { });
+  eventer.on("settings", (set: ServerConfig) => { });
 }
 
 type PromiseType<T> = T extends Promise<infer R> ? R : any;
@@ -137,35 +137,46 @@ interface ServerEventsListener<THIS> {
   ): THIS;
   (event: "serverClose", listener: (iface: string) => void): THIS;
 }
-type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
-export interface ServerEventEmitter extends EventEmitter {
-  emit(event: "websocket-connection", data: RequestEvent): boolean;
-  emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
-  emit(event: "settings", settings: ServerConfig): boolean;
-  emit(event: "stateError", state: StateObject): boolean;
-  emit(event: "stateDebug", state: StateObject): boolean;
-  emit(
-    event: "serverOpen",
-    serverList: any[],
-    hosts: string[],
-    https: boolean,
-    dryRun: boolean
-  ): boolean;
-  emit(event: "serverClose", iface: string): boolean;
-  // emit<T>(event: T, args: Parameters<ServerEventsListener<any>>)
-  addListener: ServerEventsListener<this>;
-  on: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
-  once: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
-  prependListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
-  prependOnceListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
-  removeListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
-  removeAllListeners(event?: ServerEvents): this;
-  setMaxListeners(n: number): this;
-  getMaxListeners(): number;
-  listeners(event: ServerEvents): Function[];
-  eventNames(): ServerEvents[];
-  listenerCount(type: ServerEvents): number;
+// type ServerEvents = "websocket-connection" | "settingsChanged" | "settings";
+// export interface ServerEventEmitter extends EventEmitter {
+//   emit(event: "websocket-connection", data: RequestEvent): boolean;
+//   emit(event: "settingsChanged", keys: (keyof ServerConfig)[]): boolean;
+//   emit(event: "settings", settings: ServerConfig): boolean;
+//   emit(event: "stateError", state: StateObject): boolean;
+//   emit(event: "stateDebug", state: StateObject): boolean;
+//   emit(
+//     event: "serverOpen",
+//     serverList: any[],
+//     hosts: string[],
+//     https: boolean,
+//     dryRun: boolean
+//   ): boolean;
+//   emit(event: "serverClose", iface: string): boolean;
+//   // emit<T>(event: T, args: Parameters<ServerEventsListener<any>>)
+//   addListener: ServerEventsListener<this>;
+//   on: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+//   once: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+//   prependListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+//   prependOnceListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+//   removeListener: ServerEventsListener<this>; //(event: keyof ServerEvents, listener: Function): this;
+//   removeAllListeners(event?: ServerEvents): this;
+//   setMaxListeners(n: number): this;
+//   getMaxListeners(): number;
+//   listeners(event: ServerEvents): Function[];
+//   eventNames(): ServerEvents[];
+//   listenerCount(type: ServerEvents): number;
+// }
+
+export type ServerEvents = {
+  "websocket-connection": readonly [RequestEvent]
+  "settingsChanged": readonly [(keyof ServerConfig)[]]
+  "settings": readonly [ServerConfig]
+  "stateError": readonly [StateObject]
+  "stateDebug": readonly [StateObject]
+  "serverOpen": readonly [{ servers: import("./server").Listener[], hosts: string[], https: boolean, dryRun: boolean }]
+  "serverClose": readonly [string]
 }
+export type ServerEventEmitter = EventEmitter<ServerEvents>;
 export function getHumanSize(size: number) {
   const TAGS = ["B", "KB", "MB", "GB", "TB", "PB"];
   let power = 0;
@@ -796,6 +807,7 @@ export interface StandardResponseHeaders {
 }
 
 import { StateObject } from "./state-object";
+import { EventEmitter } from "./event-emitter-types";
 
 export class ER extends Error {
   constructor(public reason: string, message: string) {
