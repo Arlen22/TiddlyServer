@@ -16,7 +16,8 @@ import {
   TreePathResult,
 } from './types'
 import { generateDirectoryListing } from '../generate-directory-listing'
-import { Config, OptionsConfig } from './config'
+import { Config } from './config'
+import { OptionsConfig } from './types'
 import { StateObject } from '../state-object'
 import { ERRORS, hostIPv4reg } from '../constants'
 

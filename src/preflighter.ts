@@ -1,8 +1,10 @@
+import { IncomingMessage, ServerResponse } from 'http'
+
 const USERNAME = ''
 const PASSWORD = ''
 const ALLOW_UNSECURED_WEBSOCKETS = false
 
-exports.preflighter = async function(ev) {
+export default async function(ev: any) {
   if (!USERNAME && !PASSWORD) return ev
   if (ev.response) ev.handled = !handleBasicAuth(ev.request, ev.response)
   else if (!ALLOW_UNSECURED_WEBSOCKETS && ev.client) {
@@ -23,9 +25,9 @@ exports.preflighter = async function(ev) {
  * @param {ServerResponse} response
  * @returns {boolean} Returns whether the client is authorized
  */
-function handleBasicAuth(request, response) {
+const handleBasicAuth = (request: IncomingMessage, response: ServerResponse) => {
   if (!USERNAME && !PASSWORD) return true
-  const getHeader = header => (Array.isArray(header) ? header[0] : header)
+  const getHeader = (header: string[] | string) => (Array.isArray(header) ? header[0] : header)
   if (!request.headers['authorization']) {
     response.writeHead(401, '', {
       'WWW-Authenticate': 'Basic realm="TiddlyServer"',

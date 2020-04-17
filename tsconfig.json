@@ -18,7 +18,7 @@
     "declaration": false
   },
   "files": ["./server.ts"],
-  "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/", "test/*"],
+  "include": ["./assets/**/*", "./server.ts", "src/", "test/*"],
   "exclude": [
     "**/*/node_modules",
     "node_modules",

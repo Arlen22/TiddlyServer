@@ -10,6 +10,7 @@
     "send": "^0.17.1",
     "source-map-support": "^0.5.16",
     "tiddlywiki-production": "^5.1.21",
+    "ts-optchain": "^0.1.8",
     "yargs": "^15.1.0"
   },
   "devDependencies": {
@@ -54,7 +55,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node build/server",
-    "assets": "mkdir -p ./build/src/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/src/assets",
+    "assets": "mkdir -p ./build/src/assets; cp -rv ./assets/* ./build/src/assets",
     "build": "tsc && node build-schema.js && npm run assets",
     "build:clean": "rm -rf build && npm run build",
     "dev:run": "tsc && node build/server",

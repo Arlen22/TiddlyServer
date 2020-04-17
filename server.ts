@@ -6,7 +6,7 @@ import * as path from 'path'
 import { inspect } from 'util'
 import * as server from './src/server'
 import * as yargs from 'yargs'
-import preflighter from './preflighter'
+import preflighter from './src/preflighter'
 
 const SETTINGS_FILE = 'settings.json'
 const argv = yargs
