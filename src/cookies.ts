@@ -7,8 +7,8 @@ import {
 } from 'libsodium-wrappers'
 import * as http from 'http'
 import { ServerConfig } from './server'
+import { TIDDLY_SERVER_AUTH_COOKIE } from './constants'
 
-const TIDDLY_SERVER_AUTH_COOKIE: string = 'TiddlyServerAuth'
 const isoDateRegex = /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}Z$/
 
 export const checkCookieAuth = (request: http.IncomingMessage, settings: ServerConfig) => {
@@ -31,7 +31,7 @@ export const checkCookieAuth = (request: http.IncomingMessage, settings: ServerC
   return validateCookie(cookieData, false, settings)
 }
 
-export function lookupAccount(settings: ServerConfig, hash: string, username: string) {
+export const lookupAccount = (settings: ServerConfig, hash: string, username: string) => {
   return Object.keys(settings.authAccounts).find(groupID => {
     if (!settings?.authAccounts[groupID]?.clientKeys[username]?.publicKey) {
       return ''

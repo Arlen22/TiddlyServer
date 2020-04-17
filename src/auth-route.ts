@@ -3,8 +3,7 @@ import { getSetCookie, validateCookie, parseAuthCookie } from './cookies'
 import { crypto_generichash, randombytes_buf, ready, to_hex } from 'libsodium-wrappers'
 import * as path from 'path'
 import { StateObject } from './state-object'
-
-const TIDDLY_SERVER_AUTH_COOKIE: string = 'TiddlyServerAuth'
+import { TIDDLY_SERVER_AUTH_COOKIE } from './constants'
 
 const pko: Record<
   string,
