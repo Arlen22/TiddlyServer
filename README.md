@@ -40,7 +40,7 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 
 ## Installation
 
-The guide at [from the original repository](https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html) is the best place to get started.
+The guide from [the original repository](https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html) is the best place to get started.
 
 ## Short instructions
 
