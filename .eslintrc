@@ -1,0 +1,33 @@
+{
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "project": "./tsconfig.json",
+    "ecmaVersion": 6,
+    "sourceType": "module"
+  },
+  "plugins": ["@typescript-eslint", "jest", "prettier"],
+  "rules": {
+    "@typescript-eslint/class-name-casing": "error",
+    "@typescript-eslint/no-explicit-any": 0,
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ],
+    "require-await": "error",
+    "jest/no-disabled-tests": "error",
+    "jest/no-identical-title": "error",
+    "semi": [2, "never"],
+    "object-curly-spacing": [2, "always"],
+    "prettier/prettier": "error"
+  },
+  "env": {
+    "jest/globals": true
+  },
+  "extends": [
+    "prettier/@typescript-eslint",
+    "plugin:jest/recommended",
+    "prettier"
+  ],
+}
+

@@ -74,7 +74,6 @@ const expectKeys = <T extends unknown>(obj: any, keys: ExpectedKeys): obj is T =
 }
 
 export const handleHEADorGETFileServe = (state: StateObject): void => {
-  console.log('STATE PATH', state.path[3])
   const pathLength = state.path.length
   if (pathLength === 4 && state.path[3] === 'login.html') {
     serveFile(state, 'login.html', path.join(state.settings.__assetsDir, 'authenticate'))
