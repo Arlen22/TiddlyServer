@@ -20,6 +20,7 @@ import {
   statWalkPath,
 } from './server'
 import { StateObject } from './state-object'
+import { RequestMethod, StateItemType, HttpResponse } from 'types'
 
 export const init = (eventer: ServerEventEmitter) => {
   eventer.on('settings', function(_set: ServerConfig) {})
@@ -67,29 +68,32 @@ export const handleTiddlyServerRoute = async (state: StateObject): Promise<void>
     }
   }
   const { noDataFolder } = state.pathOptions
-  if (stateItemType(state, 'folder') || (stateItemType(state, 'datafolder') && noDataFolder)) {
+  if (
+    stateItemType(state, StateItemType.Folder) ||
+    (stateItemType(state, StateItemType.DataFolder) && noDataFolder)
+  ) {
     serveDirectoryIndex(result, state).catch(catchPromiseError)
-  } else if (stateItemType(state, 'datafolder')) {
+  } else if (stateItemType(state, StateItemType.DataFolder)) {
     handleDataFolderRequest(result, state)
-  } else if (stateItemType(state, 'file')) {
-    if (['HEAD', 'GET'].indexOf(state.req.method as string) > -1) {
+  } else if (stateItemType(state, StateItemType.File)) {
+    if ([RequestMethod.HEAD, RequestMethod.GET].indexOf(state.req.method as RequestMethod) > -1) {
       handleGETfile(state, result)
-    } else if (['PUT'].indexOf(state.req.method as string) > -1) {
+    } else if ([RequestMethod.PUT].indexOf(state.req.method as RequestMethod) > -1) {
       handlePUTfile(state)
-    } else if (['OPTIONS'].indexOf(state.req.method as string) > -1) {
+    } else if ([RequestMethod.OPTIONS].indexOf(state.req.method as RequestMethod) > -1) {
       state
         .respond(200, '', {
-          'x-api-access-type': 'file',
+          'x-api-access-type': StateItemType.File,
           'dav': 'tw5/put',
         })
         .string('GET,HEAD,PUT,OPTIONS')
     } else {
-      state.throw(405)
+      state.throw(HttpResponse.MethodNotAllowed)
     }
   } else if (state.statPath.itemtype === 'error') {
-    state.throw(404)
+    state.throw(HttpResponse.NotFound)
   } else {
-    state.throw(500)
+    state.throw(HttpResponse.InternalServerError)
   }
 }
 
@@ -216,7 +220,7 @@ const serveDirectoryIndex = async (result: PathResolverResult, state: StateObjec
       })
       // @ts-ignore
       .buffer(Buffer.from(res, 'utf8'))
-  } else if (state.req.method === 'POST') {
+  } else if (state.req.method === RequestMethod.POST) {
     var form = new formidable.IncomingForm()
     // console.log(state.url);
     if (state.url.query.formtype === 'upload') {

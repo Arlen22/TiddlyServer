@@ -9,6 +9,7 @@ import {
   handleLogin,
   handleHEADorGETFileServe,
 } from '../auth-route'
+import { RequestMethod } from 'types'
 
 export const handleAssetsRoute = (state: StateObject) => {
   switch (state.path[2]) {
@@ -38,10 +39,10 @@ export const handleAdminRoute = (state: StateObject) => {
 
 /** Handles the /admin/authenticate route */
 export const handleAuthRoute = (state: StateObject) => {
-  if (state.req.method === 'GET' || state.req.method === 'HEAD') {
+  if (state.req.method === RequestMethod.GET || state.req.method === RequestMethod.HEAD) {
     return handleHEADorGETFileServe(state)
   }
-  if (state.req.method !== 'POST') return state.throw(405)
+  if (state.req.method !== RequestMethod.POST) return state.throw(405)
   switch (state.path[3]) {
     case 'transfer':
       return handleTransfer(state)
