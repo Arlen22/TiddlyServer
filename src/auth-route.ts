@@ -65,8 +65,8 @@ export const handleTransfer = (state: StateObject): void => {
   pkop.sender = undefined
 }
 
-type AllowedKeys = (string | number | symbol)[]
-const expectKeys = <T extends unknown>(obj: any, keys: AllowedKeys): obj is T => {
+type ExpectedKeys = (string | number | symbol)[]
+const expectKeys = <T extends unknown>(obj: any, keys: ExpectedKeys): obj is T => {
   return (
     keys.every(key => Object.prototype.hasOwnProperty.call(obj, key)) &&
     Object.keys(obj).every(key => keys.indexOf(key) > -1)
@@ -74,6 +74,7 @@ const expectKeys = <T extends unknown>(obj: any, keys: AllowedKeys): obj is T =>
 }
 
 export const handleHEADorGETFileServe = (state: StateObject): void => {
+  console.log('STATE PATH', state.path[3])
   const pathLength = state.path.length
   if (pathLength === 4 && state.path[3] === 'login.html') {
     serveFile(state, 'login.html', path.join(state.settings.__assetsDir, 'authenticate'))
