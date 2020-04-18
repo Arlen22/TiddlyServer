@@ -1,0 +1,10 @@
+**/assets
+**/build
+**/docs
+**/examples
+**/https
+**/node_modules
+**/schemas
+**/scripts
+*.json
+*.md
