@@ -20,7 +20,7 @@ import {
   StatPathResult,
   tryParseJSON,
 } from './server'
-import { HttpResponse } from 'types'
+import { HttpResponse, Header } from './types'
 let DEBUGLEVEL = -1
 /**
  *  4 - Errors that require the process to exit for restart
@@ -207,10 +207,10 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
     Object.assign(
       this.responseHeaders,
       headers,
-      headers['Set-Cookie']
+      headers[Header.SetCookie]
         ? {
-            'Set-Cookie': (this.responseHeaders['Set-Cookie'] || []).concat(
-              headers['Set-Cookie'] || []
+            'Set-Cookie': (this.responseHeaders[Header.SetCookie] || []).concat(
+              headers[Header.SetCookie] || []
             ),
           }
         : {}
@@ -230,7 +230,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
 
     const subthis = {
       json: (data: any) => {
-        this.setHeader('Content-Type', 'application/json')
+        this.setHeader(Header.ContentType, 'application/json')
         subthis.string(JSON.stringify(data))
       },
       string: (data: string) => {
@@ -242,7 +242,7 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
         this.responseSent = true
       },
       buffer: (data: Buffer) => {
-        this.setHeader('Content-Length', data.byteLength.toString())
+        this.setHeader(Header.ContentLength, data.byteLength.toString())
         this._res.writeHead(code, message, this.responseHeaders as any)
         this._res.write(data)
         this._res.end()

@@ -1,10 +1,15 @@
 import { serveFile } from './server'
 import { getSetCookie, validateCookie, parseAuthCookie } from './cookies'
-import { crypto_generichash, randombytes_buf, ready, to_hex } from 'libsodium-wrappers'
+import {
+  crypto_generichash as cryptoGenericHash,
+  randombytes_buf as randomBytesBuffer,
+  ready as libSodiumReady,
+  to_hex as toHex,
+} from 'libsodium-wrappers'
 import * as path from 'path'
 import { StateObject } from './state-object'
 import { TIDDLY_SERVER_AUTH_COOKIE } from './constants'
-import { HttpResponse } from 'types'
+import { HttpResponse, LoginRequestBody, Header } from './types'
 
 interface PkoVals {
   step: number
@@ -14,50 +19,61 @@ interface PkoVals {
 }
 
 const pko: Record<string, PkoVals> = {}
-const SixHundredSeconds: number = 10 * 60 * 1000
+const TenMinutes: number = 10 * 60 * 1000
 
-const removePendingPinTimeout = (pin: string) => {
+const removePendingPinTimeout = (pin: string): NodeJS.Timeout => {
   return setTimeout(() => {
     delete pko[pin]
-  }, SixHundredSeconds)
+  }, TenMinutes)
 }
 
-export const handleTransfer = (state: StateObject) => {
+export const handleTransfer = (state: StateObject): void => {
   if (!state.allow.transfer) return state.throwReason(HttpResponse.Forbidden, 'Access Denied')
-  let pin = state.path[4]
-  if (!state.path[4] || !pko[pin] || (state.path[5] !== 'sender' && state.path[5] !== 'receiver'))
+
+  let [, , , , pin, senderOrReceiver] = state.path
+
+  if (!pin || !pko[pin] || (senderOrReceiver !== 'sender' && senderOrReceiver !== 'receiver')) {
     return state.throwReason(HttpResponse.BadRequest, 'Invalid request parameters')
-  let direction: 'sender' | 'receiver' = state.path[5] as any
+  }
+
+  let direction: 'sender' | 'receiver' = senderOrReceiver
   let pkop = pko[pin]
   pkop[direction] = state
+
   if (!pkop.sender || !pkop.receiver) return
+
   clearTimeout(pkop.cancelTimeout)
+
   pkop.step += 1
   pkop.sender.res.writeHead(HttpResponse.Ok, undefined, {
     'x-tiddlyserver-transfer-count': pkop.step,
     'content-type': pkop.receiver.req.headers['content-type'],
     'content-length': pkop.receiver.req.headers['content-length'],
   })
+
   pkop.receiver.req.pipe(pkop.sender.res)
+
   pkop.receiver.res.writeHead(HttpResponse.Ok, undefined, {
     'x-tiddlyserver-transfer-count': pkop.step,
     'content-type': pkop.sender.req.headers['content-type'],
     'content-length': pkop.sender.req.headers['content-length'],
   })
+
   pkop.sender.req.pipe(pkop.receiver.res)
   pkop.cancelTimeout = removePendingPinTimeout(pin)
   pkop.receiver = undefined
   pkop.sender = undefined
 }
 
-const expect = function<T>(a: any, keys: (string | number | symbol)[]): a is T {
+type AllowedKeys = (string | number | symbol)[]
+const expectKeys = <T extends unknown>(obj: any, keys: AllowedKeys): obj is T => {
   return (
-    keys.every(k => Object.prototype.hasOwnProperty.call(a, k)) &&
-    Object.keys(a).every(k => keys.indexOf(k) !== -1)
+    keys.every(key => Object.prototype.hasOwnProperty.call(obj, key)) &&
+    Object.keys(obj).every(key => keys.indexOf(key) > -1)
   )
 }
 
-export const handleHEADorGETFileServe = (state: StateObject) => {
+export const handleHEADorGETFileServe = (state: StateObject): void => {
   const pathLength = state.path.length
   if (pathLength === 4 && state.path[3] === 'login.html') {
     serveFile(state, 'login.html', path.join(state.settings.__assetsDir, 'authenticate'))
@@ -69,70 +85,67 @@ export const handleHEADorGETFileServe = (state: StateObject) => {
   return
 }
 
-export const handleLogin = async (state: StateObject) => {
+export const handleLogin = async (state: StateObject): Promise<void> => {
   await state.recieveBody(true, true)
-  if (state.body.length && !state.json) return // receive body sent a response already
-  if (!state.body.length) {
+  const { body, json, settings, hostLevelPermissionsKey } = state
+
+  if (body.length && !json) return // receive body sent a response already
+
+  if (!body.length) {
     return state.throwReason(HttpResponse.BadRequest, 'Empty request body')
   }
-  if (!expect<{ setCookie: string; publicKey: string }>(state.json, ['setCookie', 'publicKey'])) {
+
+  if (!expectKeys<LoginRequestBody>(json, ['setCookie', 'publicKey']) || !json) {
     return state.throwReason(HttpResponse.BadRequest, 'Improper request body')
   }
-  let cookieData = parseAuthCookie(state.json.setCookie, false)
+
+  const cookieData = parseAuthCookie(json.setCookie, false)
   if (!cookieData) return state.throwReason(HttpResponse.BadRequest, 'Bad cookie format')
 
   const [userName, , timestamp, , , salt] = cookieData
-
-  if (!cookieData || !salt) {
+  if (!cookieData || salt) {
     return state.throwReason(HttpResponse.BadRequest, 'Bad cookie format')
   }
-  let { registerNotice } = state.settings.bindInfo.localAddressPermissions[
-    state.hostLevelPermissionsKey
-  ]
-  if (!state?.json) return state.throwReason(HttpResponse.BadRequest, 'Improper request body')
-  let valid = validateCookie(
-    cookieData,
+
+  const { registerNotice } = settings.bindInfo.localAddressPermissions[hostLevelPermissionsKey]
+  const logString =
     registerNotice &&
-      [
-        '    login attempted with unknown public key',
-        '    ' + state.json.publicKey,
-        '    username: ' + userName,
-        '    timestamp: ' + timestamp,
-      ].join('\n'),
-    state.settings
-  )
-  if (valid) {
-    state.setHeader(
-      'Set-Cookie',
-      getSetCookie(
-        TIDDLY_SERVER_AUTH_COOKIE,
-        state.json.setCookie + '|' + valid[2],
-        false,
-        state.settings.authCookieAge
-      )
+    `login attempted with unknown public key
+    ${json.publicKey}
+    username: ${userName}
+    timestamp: ${timestamp}`
+
+  const valid = validateCookie(cookieData, logString, settings)
+  if (!valid) return state.throwReason(HttpResponse.BadRequest, 'INVALID_CREDENTIALS')
+
+  state.setHeader(
+    Header.SetCookie,
+    getSetCookie(
+      TIDDLY_SERVER_AUTH_COOKIE,
+      `${json.setCookie}|${valid[2]}`,
+      false,
+      settings.authCookieAge
     )
-    state.respond(HttpResponse.Ok).empty()
-  } else {
-    state.throwReason(HttpResponse.BadRequest, 'INVALID_CREDENTIALS')
-  }
+  )
+  state.respond(HttpResponse.Ok).empty()
 }
 
 const getRandomPin = async (): Promise<string> => {
-  // Wait for libsodium.ready
-  await ready
-  let randomPin = randombytes_buf(8)
+  await libSodiumReady
+  let randomPin = randomBytesBuffer(8)
   let pin = ''
   while (!pin || pko[pin]) {
-    pin = to_hex((randomPin = crypto_generichash(8, randomPin, undefined, 'uint8array')))
+    pin = toHex((randomPin = cryptoGenericHash(8, randomPin, undefined, 'uint8array')))
   }
   pko[pin] = { step: 1, cancelTimeout: removePendingPinTimeout(pin) }
   return pin
 }
 
-export const handleInitPin = (state: StateObject) => {
-  if (!state.allow.transfer) {
+export const handleInitPin = (state: StateObject): void => {
+  const { allow, settings } = state
+  if (!allow.transfer) {
     state.throwReason(HttpResponse.Forbidden, 'Access Denied')
-  } else if (Object.keys(pko).length > state.settings.maxTransferRequests) {
+  } else if (Object.keys(pko).length > settings.maxTransferRequests) {
     state.throwReason(HttpResponse.TooManyRequests, 'Too many transfer requests in progress')
   } else {
     state.respond(HttpResponse.Ok).json({ initPin: getRandomPin() })
@@ -140,26 +153,27 @@ export const handleInitPin = (state: StateObject) => {
   return
 }
 
-let sharedKeyList: Record<string, string> = {}
-const setSharedKey = async (key: string) => {
+const sharedKeyList: Record<string, string> = {}
+const setSharedKey = async (key: string): Promise<string> => {
   const pin = await getRandomPin()
   if (!sharedKeyList[key]) sharedKeyList[key] = pin
   return sharedKeyList[key]
 }
 
-export const handleInitShared = (state: StateObject) => {
-  if (!state.allow.transfer) {
+export const handleInitShared = (state: StateObject): void => {
+  const { allow, path } = state
+  if (!allow.transfer) {
     state.throwReason(HttpResponse.Forbidden, 'Access Denied')
   } else if (Object.keys(pko).length > 1000) {
     state.throwReason(HttpResponse.TooManyRequests, 'Too many transfer requests in progress')
   } else {
-    state.respond(HttpResponse.Ok).json({ initPin: setSharedKey(state.path[4]) })
+    state.respond(HttpResponse.Ok).json({ initPin: setSharedKey(path[4]) })
   }
   return
 }
 
-export const handleLogout = (state: StateObject) => {
-  state.setHeader('Set-Cookie', getSetCookie(TIDDLY_SERVER_AUTH_COOKIE, '', false, 0))
+export const handleLogout = (state: StateObject): void => {
+  state.setHeader(Header.SetCookie, getSetCookie(TIDDLY_SERVER_AUTH_COOKIE, '', false, 0))
   state.respond(HttpResponse.Ok).empty()
   return
 }

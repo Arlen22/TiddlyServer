@@ -9,7 +9,7 @@ import {
   handleLogin,
   handleHEADorGETFileServe,
 } from '../auth-route'
-import { RequestMethod } from 'types'
+import { RequestMethod } from '../types'
 
 export const handleAssetsRoute = (state: StateObject) => {
   switch (state.path[2]) {

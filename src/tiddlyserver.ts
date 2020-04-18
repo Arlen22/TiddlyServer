@@ -20,7 +20,7 @@ import {
   statWalkPath,
 } from './server'
 import { StateObject } from './state-object'
-import { RequestMethod, StateItemType, HttpResponse } from 'types'
+import { RequestMethod, StateItemType, HttpResponse } from './types'
 
 export const init = (eventer: ServerEventEmitter) => {
   eventer.on('settings', function(_set: ServerConfig) {})

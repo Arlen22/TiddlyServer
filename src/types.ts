@@ -32,3 +32,14 @@ export enum HttpResponse {
   TooManyRequests = 429,
   NoContent = 204,
 }
+
+export enum Header {
+  SetCookie = 'Set-Cookie',
+  ContentType = 'Content-Type',
+  ContentLength = 'Content-Length',
+}
+
+export interface LoginRequestBody {
+  setCookie: string
+  publicKey: string
+}
