@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/someguynamedmatt/TiddlyServer.svg?branch=master)](https://travis-ci.org/someguynamedmatt/TiddlyServer)
 
-# TiddlyServer 2.2
+# TiddlyServer
 
 > Forked from [Arlen22](https://github.com/Arlen22/TiddlyServer)
 
@@ -17,6 +17,7 @@ I want to take this project in a different direction both architecturally and er
 - Remove unnecessary dependencies
 - Complete restructure of directories
 - Code cleanup
+- Update non-TW5 pages (e.g. `/admin/authenticate/login.html`) to React
 
 TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a static file server. This means you can load and serve any TiddlyWiki data folder in the same way you can serve a single file TiddlyWiki.
 
@@ -39,7 +40,7 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 
 ## Installation
 
-The guide at https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html is the best place to get started.
+The guide at [from the original repository](https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html) is the best place to get started.
 
 ## Short instructions
 
@@ -53,18 +54,8 @@ The guide at https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html is 
 
 Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0.x to 2.1.x, just use the `example-settings.json` file as your starting point and copy the tree over from your old settings file.
 
-## FAQ
-
-If these do not answer your question, feel free to open an issue or ask on the TiddlyWiki Google Group.
-
-### TiddlyServer throws a Syntax Error on start up
-
-The minimum Node version required is
-
-TiddlyServer 2.0: Node v6
-TiddlyServer 2.1: Node v8
-
 ## Questions or Comments?
 
 - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.
+
 - If you see a bug, please open an issue describing what is going on and I will try to answer it. Including the console output from the server is very useful to me. The browser console or network request log may contain clues as well.
