@@ -30,4 +30,5 @@ export enum HttpResponse {
   NotFound = 404,
   Ok = 200,
   TooManyRequests = 429,
+  NoContent = 204,
 }

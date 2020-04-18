@@ -7,7 +7,7 @@ import * as formidable from 'formidable'
 import { handleDataFolderRequest, init as initDatafolder } from './data-folder'
 import {
   Config,
-  ER,
+  ErrorResponse,
   getTreeOptions,
   getTreePathFiles,
   PathResolverResult,
@@ -82,7 +82,7 @@ export const handleTiddlyServerRoute = async (state: StateObject): Promise<void>
       handlePUTfile(state)
     } else if ([RequestMethod.OPTIONS].indexOf(state.req.method as RequestMethod) > -1) {
       state
-        .respond(200, '', {
+        .respond(HttpResponse.Ok, '', {
           'x-api-access-type': StateItemType.File,
           'dav': 'tw5/put',
         })
@@ -180,7 +180,7 @@ const serveDirectoryIndex = async (result: PathResolverResult, state: StateObjec
         root: undefined,
         filepath: indexPath,
         error: err => {
-          let error = new ER('error sending index', err.toString())
+          let error = new ErrorResponse('error sending index', err.toString())
           state.log(2, error.message).throwError(500, error)
         },
       })
@@ -249,7 +249,7 @@ const uploadPostRequest = (
   form.parse(state.req, function(err: Error, fields, files) {
     if (err) {
       debugState('SER-DIR', state)(2, 'upload %s', err.toString())
-      state.throwError(500, new ER('Error recieving request', err.toString()))
+      state.throwError(500, new ErrorResponse('Error recieving request', err.toString()))
       return
     }
     var oldpath = files.filetoupload.path
@@ -273,7 +273,7 @@ const mkdirPostRequest = (
   form.parse(state.req, async function(err: Error, fields, files) {
     if (err) {
       debugState('SER-DIR', state)(2, 'mkdir %s', err.toString())
-      state.throwError(500, new ER('Error recieving request', err.toString()))
+      state.throwError(500, new ErrorResponse('Error recieving request', err.toString()))
       return
     }
     const newdir = fields.dirname
@@ -283,7 +283,7 @@ const mkdirPostRequest = (
       debugState('SER-DIR', state)(2, 'mkdir normalized path %s didnt match %s', normdir, newdir)
       state.throwError(
         400,
-        new ER('Error parsing request - invalid name', 'invalid path given in dirname')
+        new ErrorResponse('Error parsing request - invalid name', 'invalid path given in dirname')
       )
       return
     }

@@ -10,7 +10,7 @@ import {
   OptionsConfig,
   ServerConfig,
   ServerConfig_AccessOptions,
-  ER,
+  ErrorResponse,
   isError,
   JsonError,
   padLeft,
@@ -20,6 +20,7 @@ import {
   StatPathResult,
   tryParseJSON,
 } from './server'
+import { HttpResponse } from 'types'
 let DEBUGLEVEL = -1
 /**
  *  4 - Errors that require the process to exit for restart
@@ -171,22 +172,22 @@ export class StateObject<STATPATH = StatPathResult, T = any> {
    * if the client is allowed to recieve error info, sends `message`, otherwise sends `reason`.
    * `reason` is always sent as the status header.
    */
-  throwError<T = StateObject>(statusCode: number, error: ER, headers?: StandardResponseHeaders) {
+  throwError(statusCode: number, error: ErrorResponse, headers?: StandardResponseHeaders) {
     return this.throwReason(statusCode, this.allow.writeErrors ? error : error.reason, headers)
   }
 
-  throwReason<T = StateObject>(
+  throwReason(
     statusCode: number,
-    reason: string | ER,
+    reason: string | ErrorResponse,
     headers?: StandardResponseHeaders
   ) {
     if (!this.responseSent) {
       if (typeof reason === 'string') {
         let res = this.respond(statusCode, reason, headers)
-        if (statusCode !== 204) res.string(reason)
+        if (statusCode !== HttpResponse.NoContent) res.string(reason)
       } else {
         let res = this.respond(statusCode, reason.reason, headers)
-        if (statusCode !== 204) res.string(reason.message)
+        if (statusCode !== HttpResponse.NoContent) res.string(reason.message)
       }
     }
   }

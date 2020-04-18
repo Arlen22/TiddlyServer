@@ -6,47 +6,47 @@ import { StateObject } from './state-object'
 import { TIDDLY_SERVER_AUTH_COOKIE } from './constants'
 import { HttpResponse } from 'types'
 
-const pko: Record<
-  string,
-  {
-    step: number
-    cancelTimeout: NodeJS.Timer
-    sender?: StateObject
-    reciever?: StateObject
-  }
-> = {}
+interface PkoVals {
+  step: number
+  cancelTimeout: NodeJS.Timer
+  sender?: StateObject
+  receiver?: StateObject
+}
+
+const pko: Record<string, PkoVals> = {}
+const SixHundredSeconds: number = 10 * 60 * 1000
 
 const removePendingPinTimeout = (pin: string) => {
   return setTimeout(() => {
     delete pko[pin]
-  }, 10 * 60 * 1000)
+  }, SixHundredSeconds)
 }
 
 export const handleTransfer = (state: StateObject) => {
   if (!state.allow.transfer) return state.throwReason(HttpResponse.Forbidden, 'Access Denied')
   let pin = state.path[4]
-  if (!state.path[4] || !pko[pin] || (state.path[5] !== 'sender' && state.path[5] !== 'reciever'))
+  if (!state.path[4] || !pko[pin] || (state.path[5] !== 'sender' && state.path[5] !== 'receiver'))
     return state.throwReason(HttpResponse.BadRequest, 'Invalid request parameters')
-  let direction: 'sender' | 'reciever' = state.path[5] as any
+  let direction: 'sender' | 'receiver' = state.path[5] as any
   let pkop = pko[pin]
   pkop[direction] = state
-  if (!pkop.sender || !pkop.reciever) return
+  if (!pkop.sender || !pkop.receiver) return
   clearTimeout(pkop.cancelTimeout)
   pkop.step += 1
   pkop.sender.res.writeHead(HttpResponse.Ok, undefined, {
     'x-tiddlyserver-transfer-count': pkop.step,
-    'content-type': pkop.reciever.req.headers['content-type'],
-    'content-length': pkop.reciever.req.headers['content-length'],
+    'content-type': pkop.receiver.req.headers['content-type'],
+    'content-length': pkop.receiver.req.headers['content-length'],
   })
-  pkop.reciever.req.pipe(pkop.sender.res)
-  pkop.reciever.res.writeHead(HttpResponse.Ok, undefined, {
+  pkop.receiver.req.pipe(pkop.sender.res)
+  pkop.receiver.res.writeHead(HttpResponse.Ok, undefined, {
     'x-tiddlyserver-transfer-count': pkop.step,
     'content-type': pkop.sender.req.headers['content-type'],
     'content-length': pkop.sender.req.headers['content-length'],
   })
-  pkop.sender.req.pipe(pkop.reciever.res)
+  pkop.sender.req.pipe(pkop.receiver.res)
   pkop.cancelTimeout = removePendingPinTimeout(pin)
-  pkop.reciever = undefined
+  pkop.receiver = undefined
   pkop.sender = undefined
 }
 
@@ -71,17 +71,19 @@ export const handleHEADorGETFileServe = (state: StateObject) => {
 
 export const handleLogin = async (state: StateObject) => {
   await state.recieveBody(true, true)
-  if (state.body.length && !state.json) return //recieve body sent a response already
+  if (state.body.length && !state.json) return // receive body sent a response already
   if (!state.body.length) {
     return state.throwReason(HttpResponse.BadRequest, 'Empty request body')
   }
   if (!expect<{ setCookie: string; publicKey: string }>(state.json, ['setCookie', 'publicKey'])) {
     return state.throwReason(HttpResponse.BadRequest, 'Improper request body')
   }
-  /** [username, type, timestamp, hash, sig] */
   let cookieData = parseAuthCookie(state.json.setCookie, false)
+  if (!cookieData) return state.throwReason(HttpResponse.BadRequest, 'Bad cookie format')
 
-  if (!cookieData || typeof cookieData[5] !== 'undefined') {
+  const [userName, , timestamp, , , salt] = cookieData
+
+  if (!cookieData || !salt) {
     return state.throwReason(HttpResponse.BadRequest, 'Bad cookie format')
   }
   let { registerNotice } = state.settings.bindInfo.localAddressPermissions[
@@ -94,8 +96,8 @@ export const handleLogin = async (state: StateObject) => {
       [
         '    login attempted with unknown public key',
         '    ' + state.json.publicKey,
-        '    username: ' + cookieData[0],
-        '    timestamp: ' + cookieData[2],
+        '    username: ' + userName,
+        '    timestamp: ' + timestamp,
       ].join('\n'),
     state.settings
   )

@@ -223,7 +223,7 @@ export interface StandardResponseHeaders {
 }
 
 // TODO: rename this
-export class ER extends Error {
+export class ErrorResponse extends Error {
   constructor(public reason: string, message: string) {
     super(message)
   }
