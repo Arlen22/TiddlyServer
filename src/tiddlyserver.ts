@@ -297,7 +297,7 @@ const mkdirPostRequest = (
       return
 
     if (fields.dirtype === 'datafolder') {
-      let read = fs.createReadStream(path.join(__dirname, '../datafolder-template.json'))
+      let read = fs.createReadStream(path.join(__dirname, '../schemas/datafolder-template.json'))
       let write = fs.createWriteStream(path.join(result.fullfilepath, normdir, 'tiddlywiki.info'))
       let error
       const errorHandler = err => {
