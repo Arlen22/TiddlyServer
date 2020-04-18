@@ -57,7 +57,7 @@
     "build": "tsc && node build-schema.js && npm run assets",
     "build:clean": "rm -rf build && npm run build",
     "dev:run": "tsc && node build/server",
-    "prettier": "prettier --write src/*.ts"
+    "lint": "prettier src/**/*.ts --write"
   },
   "author": "Arlen Beiler",
   "license": "MIT"
