@@ -297,15 +297,14 @@ export class MainServer {
         } else {
           server = http.createServer();
         }
-        let listener = new Listener(this.debugOutput, this.events, this.command.asObservable(), host, server as any);
-        //this one we add here because it is related to the host property rather than just listening
         if (this.bindWildcard && this.filterBindAddress) {
+          //this one we add here because it is related to the host property rather than just listening
           server.on("connection", socket => {
             if (!this.tester(socket.localAddress).usable && !this.localhostTester(socket.localAddress).usable) socket.destroy();
           });
         }
+        let listener = new Listener(this.debugOutput, this.events, this.command.asObservable(), host, server as any);
         this.servers.push(listener);
-
         !this.dryRun && await listener.listen(this.port, host);
       })
     ).then(() => true).catch(x => {
@@ -349,10 +348,15 @@ export class MainServer {
       } else if (e.error) {
         if (e.error.type === "server") {
           let err = e.error.error;
-          this.debug(4, "server %s error: %s", iface, err.message);
-          this.debug(4, "server %s stack: %s", iface, err.stack);
-          this.command.next({ close: { force: false } });
-          this.eventer.emit("serverClose", iface);
+          if(err.code === "EADDRNOTAVAIL"){
+            this.debug(4, "server %s error: %s", iface, err.message);
+            this.debug(4, "server %s could not be started. Continuing with the others", iface);
+          } else {
+            this.debug(4, "server %s error: %s", iface, err.message);
+            this.debug(4, "server %s stack: %s", iface, err.stack);
+            this.command.next({ close: { force: false } });
+            this.eventer.emit("serverClose", iface);
+          }
         } else if (e.error.type === "wsServer") {
           this.debug(-2, "WS-ERROR %s", inspect(e.error.error));
         }
@@ -369,11 +373,8 @@ export class MainServer {
   ) {
     //check host level permissions and the preflighter
     let ev = new RequestEvent(this.settings, request, iface, "client", client);
-
     let ev2 = await ev.requestHandlerHostLevelChecks(this.preflighter);
-
     if (ev2.handled) return;
-
     if (!ev2.allow.websockets) client.close(403);
     else this.eventer.emit("websocket-connection", ev);
   }

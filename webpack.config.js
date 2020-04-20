@@ -1,11 +1,47 @@
 const path = require("path");
 const webpack = module.parent.require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
-
-/**
- * @type {import("webpack").Configuration}
- */
+let dev = false;
+/** @type {import("webpack").Configuration} */
 const options = {
+  entry: { index: "./build/server.js" },
+  target: "node",
+  mode: dev ? "none" : "production",
+  devtool: false ? 'source-map' : "",
+  watch: false,
+  plugins: [
+    new webpack.DefinePlugin({
+      GENTLY: false,
+      global: { GENTLY: false },
+      "typeof __non_webpack_require__": JSON.stringify("function")
+    })
+  ],
+  node: {
+    global: true,
+    __dirname: false,
+    __filename: false
+  },
+  output: {
+    filename: '[name].js',
+    path: path.resolve(__dirname, "build"),
+    libraryTarget: 'commonjs'
+  },
+  externals: [
+    "tiddlywiki-production",
+    "bufferutil",
+    "utf-8-validate",
+    "tiddlywiki-production/boot/boot.js"
+  ],
+  stats: {
+    // Ignore warnings due to yarg's dynamic module loading
+    warningsFilter: [/node_modules\/yargs/]
+  },
+};
+
+module.exports = options;
+
+
+const old = {
   watch: false,
   entry: path.resolve(__dirname, "./build/server.js"),
   output: {
@@ -34,7 +70,3 @@ const options = {
     bufferutil: "commonjs bufferutil"
   }
 };
-
-module.exports = options;
-
-throw "Webpack is not setup for TiddlyServer yet";

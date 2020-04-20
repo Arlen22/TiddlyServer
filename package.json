@@ -7,13 +7,9 @@
   },
   "main": "./lib/compiled-lib.js",
   "dependencies": {
-    "tiddlywiki-production": "5.1.22"
+    "tiddlywiki-production": "5.1.21"
   },
   "devDependencies": {
-    "rxjs": "^6.5.5",
-    "send": "^0.17.1",
-    "source-map-support": "^0.5.16",
-    "yargs": "^15.1.0",
     "@fidm/x509": "^1.2.0",
     "@material/textfield": "^0.44.0",
     "@types/angular": "^1.6.57",
@@ -38,25 +34,31 @@
     "node-fetch": "^2.6.0",
     "path": "^0.12.7",
     "prettier": "1.19.1",
+    "rxjs": "^6.5.5",
+    "send": "^0.17.1",
     "serve-static": "*",
+    "source-map-support": "^0.5.16",
     "ts-json-schema-generator": "^0.61.1",
+    "ts-loader": "^7.0.1",
     "typescript": "^3.8.3",
     "webpack": "^4.41.6",
     "webpack-cli": "^3.3.11",
     "ws": "^7.2.1",
-    "xml-js": "*"
+    "xml-js": "*",
+    "yargs": "^15.1.0"
   },
   "engines": {
     "node": ">=^6.11.4"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node build/server",
+    "start": "node build/index",
     "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/assets",
-    "build": "tsc && node build-schema.js && npm run assets",
+    "build": "tsc && webpack && node build-schema.js && npm run assets",
     "build:clean": "rm -rf build && npm run build",
-    "dev:run": "tsc && node build/server",
-    "prettier": "prettier --write src/*.ts"
+    "dev:run": "tsc && webpack && node build/index",
+    "prettier": "prettier --write src/*.ts",
+    "build:final": "rm -rf build/package.d.ts build/server.js build/server.d.ts build/src"
   },
   "author": "Arlen Beiler",
   "license": "MIT"

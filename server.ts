@@ -1,12 +1,18 @@
-#!/usr/bin/env node
+// #!/usr/bin/env node
 
 require("source-map-support/register");
-import fs = require("fs");
-import path = require("path");
-import { inspect } from "util";
-import server = require("./src/server");
-import yargs = require("yargs");
+import * as fs from "fs";
+import * as path from "path";
+import * as server from "./src/server";
+import * as yargs from "yargs";
 
+// import fs = require("fs");
+// import path = require("path");
+import { inspect } from "util";
+// import server = require("./src/server");
+// import yargs = require("yargs");
+
+console.log(process.pid);
 const SETTINGS_FILE = "settings.json";
 const argv = yargs
   .usage("./$0 - TiddlyServer")
@@ -44,6 +50,7 @@ const settingsFile = userSettings
     "settings.json"
   );
 
+const assetsFolder = path.join(__dirname, "assets");
 
 declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
@@ -72,6 +79,7 @@ async function runServer() {
 
   const { settings, settingshttps } = server.loadSettings(
     settingsFile,
+    assetsFolder,
     Object.keys(server.MainServer.routes)
   );
 

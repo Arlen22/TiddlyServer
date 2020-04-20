@@ -44,7 +44,11 @@ export {
   normalizeSettings,
   ConvertSettings,
 };
-
+declare const __non_webpack_require__: NodeRequire;
+const nodeRequire =
+  typeof __non_webpack_require__ !== "undefined"
+    ? __non_webpack_require__
+    : require;
 
 
 type PromiseType<T> = T extends Promise<infer R> ? R : any;
@@ -60,11 +64,7 @@ export function as<T>(obj: T) {
   return obj;
 }
 
-const assets = path.resolve(__dirname, "../assets");
-const favicon = path.resolve(__dirname, "../assets/favicon.ico");
-const stylesheet = path.resolve(__dirname, "../assets/directory.css");
-
-export function loadSettings(settingsFile: string, routeKeys: string[]) {
+export function loadSettings(settingsFile: string, assetsFolder: string, routeKeys: string[]) {
   console.log("Settings file: %s", settingsFile);
 
   const settingsString = fs
@@ -99,11 +99,11 @@ export function loadSettings(settingsFile: string, routeKeys: string[]) {
   let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;
   let settingsObj = normalizeSettings(settingsObjSource, settingsFile);
 
-  settingsObj.__assetsDir = assets;
+  settingsObj.__assetsDir = assetsFolder;
   try {
     settingsObj.__targetTW = settingsObj._datafoldertarget
       ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
-      : path.join(require.resolve("tiddlywiki-production/boot/boot.js"), "../..");
+      : path.join(nodeRequire.resolve("tiddlywiki-production/boot/boot.js"), "../..");
   } catch (e) {
     console.log(e);
     throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";

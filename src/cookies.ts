@@ -33,7 +33,9 @@ export const checkCookieAuth = (request: http.IncomingMessage, settings: ServerC
 
 export function lookupAccount(settings: ServerConfig, hash: string, username: string) {
   return Object.keys(settings.authAccounts).find(groupID => {
-    let _key = from_base64(settings.authAccounts[groupID].clientKeys[username].publicKey);
+    let _user = settings.authAccounts[groupID].clientKeys[username];
+    if (!_user) return false;
+    let _key = from_base64(_user.publicKey);
     let _hash = crypto_generichash(crypto_generichash_BYTES, _key, undefined, "base64");
     return hash === _hash;
   });

@@ -1,13 +1,14 @@
-import fs = require("fs");
-import morgan = require("morgan");
-import stream = require("stream");
+import * as fs from "fs";
+import * as morgan from "morgan";
+import * as stream from "stream";
+
 import { Writable } from "stream";
 import { IncomingMessage, ServerResponse } from "http";
 
 // const { Writable } = require('stream');
 // console.log(morgan);
 
-(function() {
+(function () {
   var pad = 60;
   morgan.token("padurl", function getUrlToken(req) {
     var url = req.originalUrl || req.url;
@@ -17,7 +18,7 @@ import { IncomingMessage, ServerResponse } from "http";
     return url;
   });
 })();
-(function() {
+(function () {
   var pad = 8;
   morgan.token("padmethod", function getUrlToken(req) {
     var method = req.method;
@@ -133,12 +134,12 @@ morgan.format("mydevcolor", function developmentFormatLine(tokens, req, res) {
     status >= 500
       ? 31 // red
       : status >= 400
-      ? 33 // yellow
-      : status >= 300
-      ? 36 // cyan
-      : status >= 200
-      ? 32 // green
-      : 0; // no color
+        ? 33 // yellow
+        : status >= 300
+          ? 36 // cyan
+          : status >= 200
+            ? 32 // green
+            : 0; // no color
 
   path = page ? 2 : col ? 1 : 0;
   var colorkey = [path, color].join("-");
@@ -154,12 +155,12 @@ morgan.format("mydevcolor", function developmentFormatLine(tokens, req, res) {
     // compile
     fn = developmentFormatLine[colorkey] = morgan.compile(
       "[:localdate[iso]]" +
-        colorzero +
-        " :padmethod :local-addr " +
-        colorcode +
-        ":status \x1b[35m:remote-addr " +
-        colorzero +
-        ":padurl :response-time ms - :res[content-length]\x1b[0m"
+      colorzero +
+      " :padmethod :local-addr " +
+      colorcode +
+      ":status \x1b[35m:remote-addr " +
+      colorzero +
+      ":padurl :response-time ms - :res[content-length]\x1b[0m"
     );
   }
 
@@ -180,7 +181,7 @@ export function handler(options: {
   const { logFile, logToConsole, logColorsToFile } = options;
   const colorsRegex = /\x1b\[[0-9]+m/gi;
   const myWritable = new stream.Writable({
-    write: function(chunk, encoding, callback) {
+    write: function (chunk, encoding, callback) {
       // if we're given a buffer, convert it to a string
       if (Buffer.isBuffer(chunk)) chunk = chunk.toString("utf8");
       // remove ending linebreaks for consistency
@@ -205,7 +206,7 @@ export function handler(options: {
     console.log(err);
   });
   return morgan("mydevcolor", {
-    skip: function(req, res) {
+    skip: function (req, res) {
       return !!req.skipLog;
     },
     stream: options.stream || myWritable,

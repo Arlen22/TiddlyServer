@@ -1,4 +1,4 @@
-import path = require("path");
+import * as path from "path";
 declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
   typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
