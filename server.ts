@@ -43,12 +43,7 @@ const {
 
 const settingsFile = userSettings
   ? path.resolve(userSettings)
-  : path.join(
-    __dirname,
-    //if we're in the build directory the default one level up
-    __dirname.endsWith("/build") ? ".." : "",
-    "settings.json"
-  );
+  : path.join(__dirname, "settings.json");
 
 const assetsFolder = path.join(__dirname, "assets");
 

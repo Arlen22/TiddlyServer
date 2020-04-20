@@ -53,12 +53,12 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node build/index",
-    "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js ./build/; cp -rv ./assets/* ./build/assets",
-    "build": "tsc && webpack && node build-schema.js && npm run assets",
+    "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js settings.json ./build/; cp -rv ./assets/* ./build/assets",
+    "build": "tsc && webpack && node build-schema.js && npm run assets && npm run build:final",
+    "build:dev": "tsc && webpack", 
     "build:clean": "rm -rf build && npm run build",
-    "dev:run": "tsc && webpack && node build/index",
-    "prettier": "prettier --write src/*.ts",
-    "build:final": "rm -rf build/package.d.ts build/server.js build/server.d.ts build/src"
+    "build:final": "rm -rf build/package.d.ts build/server.js build/server.d.ts build/src",
+    "prettier": "prettier --write src/*.ts"
   },
   "author": "Arlen Beiler",
   "license": "MIT"
