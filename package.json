@@ -47,19 +47,16 @@
     "xml-js": "*",
     "yargs": "^15.1.0"
   },
-  "engines": {
-    "node": ">=^6.11.4"
-  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "cp -v settings.json ./build/; node build/index",
-    "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js settings.json ./build/; cp -rv ./assets/* ./build/assets",
+    "assets": "cp -rv ./assets ./preflighter.js ./node_modules/tiddlywiki-production ./build",
     "build": "tsc && webpack && node build-schema.js && npm run assets && npm run build:final",
     "build:dev": "tsc && webpack",
     "build:clean": "rm -rf build && npm run build",
     "build:final": "rm -rf build/package.d.ts build/server.js build/server.d.ts build/src",
     "prettier": "prettier --write src/*.ts"
   },
-  "author": "Arlen Beiler",
+  "author": "Arlen22@GitHub.com",
   "license": "MIT"
 }
