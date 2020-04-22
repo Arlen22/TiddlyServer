@@ -19,11 +19,12 @@ import * as fs from "fs";
 
 import { EventEmitter } from "./event-emitter-types";
 import { parse } from "url";
-import { inspect, promisify } from "util";
+import { inspect, promisify, debuglog } from "util";
 import { WikiInfo } from "./boot-startup-types";
 import * as WebSocket from "ws";
 import { RequestEvent } from "./request-event";
 import { OptionsConfig } from "./server-config";
+import { Writable } from "stream";
 
 interface Records<T> { [k: string]: T; }
 
@@ -48,6 +49,7 @@ export function handleDataFolderRequest(
     state.url.pathname,
     state.settings.__targetTW,
     state.settings.datafolder,
+    state.debugOutput
   );
   DataFolder.trigger(request, reload);
   const { mount } = request;
@@ -75,10 +77,22 @@ class DataFolder {
       promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(data => {
         const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
         if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-          loadDataFolderTiddlyWiki(mount, folder, target, vars);
+          loadDataFolderTiddlyWiki(request.debugOutput, mount, folder, target, vars);
         }
       });
     }
+  }
+  static doError(debugOutput: Writable, mount, folder, err) {
+    const requests = loadedFolders[mount].pending;
+    StateObject.DebugLoggerInner(3, "DATA", "error starting %s at %s: %s", [mount, folder, err.stack], debugOutput)
+    loadedFolders[mount].handler = function (state: StateObject) {
+      state.respond(500, "TW5 data folder failed").string(
+        "The Tiddlywiki data folder failed to load. The error has been " +
+        "logged to the terminal with priority level 2. To try again, " +
+        "use ?reload=true after making any necessary corrections."
+      );
+    }
+    requests.forEach(e => loadedFolders[mount].handler(e));
   }
   pending: StateObject[] = [];
   events = new EventEmitter<DataFolderEvents>();
@@ -99,7 +113,8 @@ class DataFolderRequest {
     public statPath: getStatPathResult<"datafolder">,
     public pathname: string,
     public target: string,
-    public vars: {}
+    public vars: {},
+    public debugOutput: Writable
   ) {
     let filepathPrefix = this.result.filepathPortion.slice(0, this.statPath.index).join("/");
     //get the tree path, and add the file path (none if the tree path is a datafolder)
@@ -133,7 +148,8 @@ export async function handleWebsocketConnection(
       statPath,
       pathname,
       settings.__targetTW,
-      settings.datafolder
+      settings.datafolder,
+      data.debugOutput
     );
     const { mount, folder } = request;
     const subpath = pathname.slice(mount.length);
@@ -182,6 +198,7 @@ const nodeRequire =
   typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 
 function loadDataFolderTiddlyWiki(
+  debugOutput: Writable,
   mount: string,
   folder: string,
   target: string,
@@ -213,7 +230,7 @@ function loadDataFolderTiddlyWiki(
   function complete(err, $tw) {
     console.timeEnd("twboot-" + folder);
     if (err) {
-      return console.log(mount, folder, err);
+      return DataFolder.doError(debugOutput, mount, folder, err);
     }
 
     //we use $tw.modules.execute so that the module has its respective $tw variable.
@@ -245,14 +262,7 @@ function loadDataFolderTiddlyWiki(
     auth.init();
     server.authenticators.unshift(auth);
     //invoke the server start hook so plugins can extend the server or attach to the event handler
-    $tw.hooks.invokeHook(
-      "th-server-command-post-start",
-      server,
-      loadedFolders[mount].events,
-      "tiddlyserver"
-    );
-    // //add the event emitter to the $tw variable
-    // $tw.wss = loadedFolders[mount].events;
+    $tw.hooks.invokeHook("th-server-command-post-start", server, loadedFolders[mount].events, "tiddlyserver");
     //set the request handler, indicating we are now ready to recieve requests
     const requests = loadedFolders[mount].pending;
     loadedFolders[mount].handler = (state: StateObject) => {
@@ -273,20 +283,7 @@ function loadDataFolderTiddlyWiki(
   }
 }
 
-function doError(debug, mount, folder, err) {
-  debug(3, "error starting %s at %s: %s", mount, folder, err.stack);
-  const requests = loadedFolders[mount].pending;
-  loadedFolders[mount] = {
-    handler: function (state: StateObject) {
-      state.respond(500, "TW5 data folder failed").string(
-        "The Tiddlywiki data folder failed to load. The error has been " +
-        "logged to the terminal with priority level 2. To try again, " +
-        "use ?reload=true after making any necessary corrections."
-      );
-    },
-  } as any;
-  requests.forEach(e => loadedFolders[mount].handler(e));
-}
+
 
 declare class TiddlyWikiServer {
   addAuthenticator: any;

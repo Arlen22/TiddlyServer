@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-06/schema#",
-  "$id": "settings-2-1-tree.schema.json",
+  "$id": "settings-2-2-tree.schema.json",
   "definitions": {
     "GroupChildrenHashmap": {
       "type": "object",
@@ -153,7 +153,7 @@
       "description": "The path of a folder to mount without any extra options. The folder name will be used for the url name."
     },
     "OptionsArray": {
-      "$ref": "settings-2-1-tree-options.schema.json"
+      "$ref": "settings-2-2-tree-options.schema.json"
     }
   },
   "allOf": [

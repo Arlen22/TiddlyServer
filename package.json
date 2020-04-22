@@ -7,7 +7,7 @@
   },
   "main": "./lib/compiled-lib.js",
   "dependencies": {
-    "tiddlywiki-production": "5.1.21"
+    "tiddlywiki-production": "5.1.22"
   },
   "devDependencies": {
     "@fidm/x509": "^1.2.0",
@@ -52,10 +52,10 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node build/index",
+    "start": "cp -v settings.json ./build/; node build/index",
     "assets": "mkdir -p ./build/assets; cp -nv ./preflighter.js settings.json ./build/; cp -rv ./assets/* ./build/assets",
     "build": "tsc && webpack && node build-schema.js && npm run assets && npm run build:final",
-    "build:dev": "tsc && webpack", 
+    "build:dev": "tsc && webpack",
     "build:clean": "rm -rf build && npm run build",
     "build:final": "rm -rf build/package.d.ts build/server.js build/server.d.ts build/src",
     "prettier": "prettier --write src/*.ts"

@@ -28,7 +28,7 @@ import {
   testAddress,
 } from "./server-types";
 import { StateObject } from "./state-object";
-import { handleTiddlyServerRoute } from "./tiddlyserver";
+import { handleTreeRoute } from "./tiddlyserver";
 import { EventEmitter } from "./event-emitter-types";
 import { Socket } from "net";
 export { checkServerConfig, loadSettings, libsReady };
@@ -45,38 +45,6 @@ console.debug = function () { }; //noop console debug;
 namespace ENV {
   export let disableLocalHost: boolean = false;
 }
-
-
-
-// eventer.on("settings", set => {
-//   if (checkServerConfig(set)[0] !== true) throw "ServerConfig did not pass validator";
-// });
-
-// const routes: Record<string, (state: StateObject) => void> = {
-//   admin: state => handleAdminRoute(state),
-//   assets: state => handleAssetsRoute(state),
-//   "favicon.ico": state => serveFile(state, "favicon.ico", state.settings.__assetsDir),
-//   "directory.css": state => serveFile(state, "directory.css", state.settings.__assetsDir),
-// };
-
-// function handleAssetsRoute(state: StateObject) {
-//   switch (state.path[2]) {
-//     case "static": serveFolder(state, "/assets/static", path.join(state.settings.__assetsDir, "static")); break;
-//     case "icons": serveFolder(state, "/assets/icons", path.join(state.settings.__assetsDir, "icons")); break;
-//     case "tiddlywiki": serveFolder(state, "/assets/tiddlywiki", state.settings.__targetTW); break;
-//     default: state.throw(404);
-//   }
-// }
-
-// function handleAdminRoute(state: StateObject) {
-//   switch (state.path[2]) {
-//     case "authenticate":
-//       handleAuthRoute(state);
-//       break;
-//     default:
-//       state.throw(404);
-//   }
-// }
 
 interface ListenerEvents {
   listening?: ReturnType<http.Server["address"]>,
@@ -98,9 +66,7 @@ interface ControllerEvents {
 const libsReady = Promise.all([libsodium.ready]);
 
 declare function preflighterFunc<T extends RequestEvent>(ev: T): Promise<T>;
-// declare function preflighterFunc(ev: RequestEventHTTP): Promise<RequestEventHTTP>;
 
-// const debug = console.log;
 /**
  *  4 - Errors that require the process to exit for restart
  *  3 - Major errors that are handled and do not require a server restart
@@ -140,25 +106,19 @@ export async function initServer({
   dryRun: boolean;
 }) {
 
-
-
   if (checkServerConfig(settings)[0] !== true)
     throw "ServerConfig did not pass validator";
 
   await libsodium.ready;
 
-  let startup = new MainServer(
-    settingshttps,
-    preflighter,
-    settings,
-    dryRun
-  );
+  let startup = new MainServer(settingshttps, preflighter, settings, dryRun);
 
   let success = await startup.setupHosts();
   if (success === false) return [false, startup] as const;
 
   startup.eventer.emit("serverOpen", startup.servers, startup.hosts, !!settingshttps, dryRun);
   startup.printWelcomeMessage();
+
   if (dryRun) console.log("DRY RUN: No further processing is likely to happen");
 
   return [true, startup] as const;
@@ -166,21 +126,22 @@ export async function initServer({
 
 export class MainServer {
 
-  public servers: Listener[]
-  public bindWildcard: boolean
-  public filterBindAddress: boolean
-  public enableIPv6: boolean
-  public port: number
-  public log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
-  public tester: (addr: string) => { usable: boolean; lastMatch: number }
-  public localhostTester: (addr: string) => { usable: boolean; lastMatch: number }
+  servers: Listener[]
+  bindWildcard: boolean
+  filterBindAddress: boolean
+  enableIPv6: boolean
+  port: number
+  log: (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>
+  tester: (addr: string) => { usable: boolean; lastMatch: number }
+  localhostTester: (addr: string) => { usable: boolean; lastMatch: number }
   debug: (level: number, str: string | NodeJS.ErrnoException, ...args: any[]) => any;
-  public hosts: string[]
-  public isHttps: boolean
-  public events = new Subject<ListenerEvents>();
-  public command = new Subject<ControllerEvents>();
-  public disposer = new Subscription();
+  hosts: string[]
+  isHttps: boolean
+  events = new Subject<ListenerEvents>();
+  command = new Subject<ControllerEvents>();
+  disposer = new Subscription();
   debugOutput: Writable;
+
   constructor(
     public settingshttps: undefined | ((host: string) => https.ServerOptions),
     public preflighter: <T extends RequestEvent>(ev: T) => Promise<T>,
@@ -348,7 +309,7 @@ export class MainServer {
       } else if (e.error) {
         if (e.error.type === "server") {
           let err = e.error.error;
-          if(err.code === "EADDRNOTAVAIL"){
+          if (err.code === "EADDRNOTAVAIL") {
             this.debug(4, "server %s error: %s", iface, err.message);
             this.debug(4, "server %s could not be started. Continuing with the others", iface);
           } else {
@@ -396,7 +357,7 @@ export class MainServer {
     //check for static routes
     if (MainServer.routes[key]) MainServer.routes[key](new StateObject(this.eventer, ev2));
     //otherwise forward to TiddlyServer
-    else handleTiddlyServerRoute(ev2, this.eventer);
+    else handleTreeRoute(ev2, this.eventer);
   }
   eventer = new EventEmitter() as ServerEventEmitter;
   static routes: Record<string, (state: StateObject) => void> = {
@@ -510,62 +471,4 @@ export class Listener {
     this.sockets.forEach((socket) => { socket.destroy(); });
     this.sockets = [];
   }
-}
-
-function EmptyHostsWarning(
-  bindWildcard: boolean,
-  filterBindAddress: boolean,
-  _bindLocalhost: boolean,
-  enableIPv6: boolean,
-  bindAddress: string[]
-): any {
-  return `"No IP addresses will be listened on. This is probably a mistake.
-bindWildcard is ${bindWildcard ? "true" : "false"}
-filterBindAddress is ${filterBindAddress ? "true" : "false"}
-_bindLocalhost is ${_bindLocalhost ? "true" : "false"}
-enableIPv6 is ${enableIPv6 ? "true" : "false"}
-bindAddress is ${JSON.stringify(bindAddress, null, 2)}
-`;
-}
-
-
-function handleBasicAuth(
-  state: StateObject,
-  settings: { username: string; password: string }
-): boolean {
-  //check authentication and do sanity/security checks
-  //https://github.com/hueniverse/iron
-  //auth headers =====================
-  if (!settings.username && !settings.password) return true;
-  const first = (header?: string | string[]) => (Array.isArray(header) ? header[0] : header);
-  if (!state.req.headers["authorization"]) {
-    StateObject.DebugLogger("AUTH   ").call(state, -2, "authorization required");
-    state
-      .respond(401, "", {
-        "WWW-Authenticate": 'Basic realm="TiddlyServer"',
-        "Content-Type": "text/plain",
-      })
-      .empty();
-    return false;
-  }
-  StateObject.DebugLogger("AUTH   ").call(state, -3, "authorization requested");
-  var header = first(state.req.headers["authorization"]) || "", // get the header
-    token = header.split(/\s+/).pop() || "", // and the encoded auth token
-    auth = new Buffer(token, "base64").toString(), // convert from base64
-    parts = auth.split(/:/), // split on colon
-    username = parts[0],
-    password = parts[1];
-  if (username !== settings.username || password !== settings.password) {
-    StateObject.DebugLogger("AUTH   ").call(
-      state,
-      -2,
-      "authorization invalid - UN:%s - PW:%s",
-      username,
-      password
-    );
-    state.throwReason(401, "Invalid username or password");
-    return false;
-  }
-  StateObject.DebugLogger("AUTH   ").call(state, -3, "authorization successful");
-  return true;
 }

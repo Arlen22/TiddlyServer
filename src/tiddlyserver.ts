@@ -34,7 +34,7 @@ import { parse } from "url";
 // it isn't pretty but I can't find a way to improve it - 2020/04/10
 // it still isn't pretty, but it finally uses classes - 2020/04/14
 
-export async function handleTiddlyServerRoute(event: RequestEvent, eventer: ServerEventEmitter): Promise<void> {
+export async function handleTreeRoute(event: RequestEvent, eventer: ServerEventEmitter): Promise<void> {
 
   let pathname = parse(event.url).pathname;
   if (!pathname) return event.close(400);
