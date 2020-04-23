@@ -1,10 +1,10 @@
 {
   "name": "tiddlyserver",
-  "version": "2.2.0-master",
-  "description": "",
-  "bin": {
-    "tiddlyserver": "./build/server.js"
-  },
+  "version": "2.2.0-alpha-2",
+  "description": "Many TiddlyWiki, One Port",
+  "homepage": "https://arlen22.github.io/tiddlyserver/",
+  "repository": "github:Arlen22/TiddlyServer",
+  "bin": "./build/server.js",
   "main": "./lib/compiled-lib.js",
   "dependencies": {
     "tiddlywiki-production": "5.1.22"

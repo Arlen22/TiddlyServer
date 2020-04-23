@@ -12,7 +12,7 @@ import { inspect } from "util";
 // import server = require("./src/server");
 // import yargs = require("yargs");
 
-console.log(process.pid);
+// console.log(process.pid);
 const SETTINGS_FILE = "settings.json";
 const argv = yargs
   .usage("./$0 - TiddlyServer")
@@ -41,9 +41,10 @@ const {
   "stay-on-error": stayOnError,
 } = argv;
 
-const settingsFile = userSettings
-  ? path.resolve(userSettings)
-  : path.join(__dirname, "settings.json");
+const settingsFile =
+  userSettings
+    ? path.resolve(userSettings)
+    : path.join(__dirname, "settings.json");
 
 const assetsFolder = path.join(__dirname, "assets");
 
@@ -53,10 +54,13 @@ const nodeRequire =
     ? __non_webpack_require__
     : require;
 
-const logAndCloseServer = (err: any) => {
+const logAndCloseServer = (err?: any) => {
   //hold it open because all other listeners should close
   if (stayOnError) setInterval(function () { }, 1000);
   process.exitCode = 1;
+  if(err) log(err);
+};
+const log = (err: any) => {
   console.error("[ERROR]: caught process uncaughtException", inspect(err));
   try {
     fs.appendFileSync(
@@ -66,8 +70,7 @@ const logAndCloseServer = (err: any) => {
   } catch (e) {
     console.log("Could not write to uncaughtException.log");
   }
-};
-
+}
 async function runServer() {
   const settingsDir = path.dirname(settingsFile);
   await server.libsReady;
@@ -140,7 +143,7 @@ function auditChildren() {
 if (fs.existsSync(settingsFile)) {
   runServer();
 } else {
-  logAndCloseServer(
-    "[ERROR]: server config file could not be found.\nConsider passing its location via --config\n"
-  );
+  let msg = "[ERROR]: server config file could not be found.\nConsider passing its location via --config\n";
+  console.log(msg);
+  logAndCloseServer();
 }

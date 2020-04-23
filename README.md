@@ -26,12 +26,14 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 
 The guide at https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html is the best place to get started. 
 
+New in version 2.2: You can also run `npm install -g tiddlyserver` and everything will be installed. 
+
 ## Short instructions
 
- - Install or download NodeJS v8+. Only the Node binary is required, nothing else. 
+ - Install or download NodeJS v10+. Version 8.x may work, but I aim to support LTS versions. Only the Node executable is required.
  - Download TiddlyServer and unzip it to an empty directory so you don't merge with an existing directory.
- - Create your [settings.json](https://arlen22.github.io/tiddlyserver/docs/settingsjson) file and put it in the TiddlyServer folder or specify it as the first argument to `server.js`. 
- - Run `node server.js [--config /path/to/settings.json] [--stay-on-error] [--dry-run]`
+ - Create your [settings.json](https://arlen22.github.io/tiddlyserver/docs/settingsjson) file and put it in the TiddlyServer folder.
+ - Run `node server.js`. Additional options are `[--config /path/to/settings.json] [--stay-on-error] [--dry-run]`.
  - The working directory is not used by TiddlyServer except for locating the config file if specified. Otherwise it expects to find it in the TiddlyServer folder with the server.js file. All other paths are relative to the settings file. This does not apply inside the TiddlyWiki data folder environment, but TiddyWiki does not normally use it either because it uses the data folder path and the boot.js path as its reference paths. 
 
 ## How to upgrade
@@ -48,6 +50,7 @@ The minimum Node version required is
 
 TiddlyServer 2.0: Node v6
 TiddlyServer 2.1: Node v8
+TiddlyServer 2.2: Node v10
 
 ## Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.

@@ -14,7 +14,8 @@ const options = {
       GENTLY: false,
       global: { GENTLY: false },
       "typeof __non_webpack_require__": JSON.stringify("function")
-    })
+    }),
+    new webpack.BannerPlugin({ banner: "#!/usr/bin/env node", raw: true }),
   ],
   node: {
     global: true,
