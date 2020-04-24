@@ -20,6 +20,7 @@
     "resolveJsonModule": true,
     "noErrorTruncation": true,
     "declaration": true,
+    "importHelpers": true
   },
   "files": [
     "./server.ts"
