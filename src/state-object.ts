@@ -82,7 +82,7 @@ export class StateObject {
   startTime: [number, number];
   timestamp: string;
 
-  body: string = "";
+  body: Buffer[] = [];
   json: any | undefined;
 
 
@@ -311,13 +311,13 @@ export class StateObject {
       let chunks: Buffer[] = [];
       this._req.on("data", chunk => {
         if (typeof chunk === "string") {
-          chunks.push(Buffer.from(chunk));
+          if (chunk.length) chunks.push(Buffer.from(chunk));
         } else {
-          chunks.push(chunk);
+          if (chunk.byteLength) chunks.push(chunk);
         }
       });
       this._req.on("end", () => {
-        this.body = Buffer.concat(chunks).toString("utf8");
+        this.body = chunks; // Buffer.concat(chunks).toString("utf8");
 
         if (this.body.length === 0 || !parseJSON) return resolve();
 
@@ -332,8 +332,8 @@ export class StateObject {
             : errorCB;
 
         this.json = catchHandler
-          ? tryParseJSON<any>(this.body, catchHandler)
-          : tryParseJSON(this.body);
+          ? tryParseJSON<any>(Buffer.concat(this.body).toString("utf8"), catchHandler)
+          : tryParseJSON(Buffer.concat(this.body).toString("utf8"));
         resolve();
       });
     });
@@ -397,7 +397,6 @@ export class StateObject {
       "utf8"
     );
   }
-  // private debugLog: typeof DebugLog = StateObject.DebugLogger("STATE  ");
 }
 
 
@@ -423,13 +422,10 @@ function getTreeOptions(event: RequestEvent, result: PathResolverResult) {
       indexExts: [],
     },
   };
-  // console.log(state.ancestry);
   ancestry.forEach(e => {
-    // console.log(e);
     e.$options &&
       e.$options.forEach(f => {
         if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
-          // console.log(f);
           Object.keys(f).forEach(k => {
             if (f[k] === undefined) return;
             options[f.$element][k] = f[k];

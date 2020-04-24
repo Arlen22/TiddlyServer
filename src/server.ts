@@ -13,7 +13,7 @@ import * as WebSocket from "ws";
 import { handler as morgan } from "./logger";
 import { handleAuthRoute } from "./auth-route";
 import { checkCookieAuth } from "./cookies";
-import { checkServerConfig } from "./interface-checker";
+import { checkServerConfig, checkController } from "./interface-checker";
 import { RequestEvent } from "./request-event";
 import { Observable, Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
@@ -26,11 +26,14 @@ import {
   ServerConfig,
   ServerEventEmitter,
   testAddress,
+  ServerConfigSchema,
+  ServerConfig_AccessOptions,
 } from "./server-types";
 import { StateObject } from "./state-object";
 import { handleTreeRoute } from "./tiddlyserver";
 import { EventEmitter } from "./event-emitter-types";
 import { Socket } from "net";
+import { ServerConfig_Controller } from "./server-config";
 export { checkServerConfig, loadSettings, libsReady };
 const { Server: WebSocketServer } = WebSocket;
 
@@ -59,7 +62,7 @@ interface ListenerEvents {
   sender: Listener
 }
 
-interface ControllerEvents {
+interface MainServerEvents {
   close?: { force: boolean }
 }
 
@@ -106,6 +109,8 @@ export async function initServer({
   dryRun: boolean;
 }) {
 
+  Controller.handleSettings(settings);
+
   if (checkServerConfig(settings)[0] !== true)
     throw "ServerConfig did not pass validator";
 
@@ -118,6 +123,10 @@ export async function initServer({
 
   startup.eventer.emit("serverOpen", startup.servers, startup.hosts, !!settingshttps, dryRun);
   startup.printWelcomeMessage();
+  startup.disposer.add(() => {
+
+  });
+  Controller.handleServer(startup);
 
   if (dryRun) console.log("DRY RUN: No further processing is likely to happen");
 
@@ -138,7 +147,7 @@ export class MainServer {
   hosts: string[]
   isHttps: boolean
   events = new Subject<ListenerEvents>();
-  command = new Subject<ControllerEvents>();
+  command = new Subject<MainServerEvents>();
   disposer = new Subscription();
   debugOutput: Writable;
 
@@ -293,6 +302,8 @@ export class MainServer {
       let { iface } = e.sender;
       if (e.close) {
         this.debug(4, "server %s closed", iface);
+        if (this.servers.every(e => e.closed))
+          this.disposer.unsubscribe();
       } else if (e.listening) {
         this.debug(1, "server %s listening", iface);
       } else if (e.request) {
@@ -378,6 +389,9 @@ export class MainServer {
 
   static handleAdminRoute(state: StateObject) {
     switch (state.path[2]) {
+      case "controller":
+        Controller.handleController(state);
+        break;
       case "authenticate":
         handleAuthRoute(state);
         break;
@@ -395,7 +409,7 @@ export class Listener {
   constructor(
     public debugOutput: Writable,
     public events: Subject<ListenerEvents>,
-    public command: Observable<ControllerEvents>,
+    public command: Observable<MainServerEvents>,
     public iface: string,
     public server: https.Server | http.Server
   ) {
@@ -436,14 +450,14 @@ export class Listener {
 
     false && this.server.on("clientError", (error, socket) => {
       this.events.next({ sender: this, error: { error, socket, type: "connection" } });
-    })
+    });
 
     this.server.on("close", () => {
       this.closing = true;
-      this.closed = true;
-      this.events.next({ sender: this, close: true });
-      if (this.sockets.length > 0)
-        console.log("BUG: Listener#sockets.length > 0 -- please report");
+      process.nextTick(() => {
+        this.closed = true;
+        this.events.next({ sender: this, close: true });
+      });
     });
     this.wss.on("connection", (client, request) => {
       false && client.on("error", (error) => {
@@ -461,6 +475,8 @@ export class Listener {
   close() {
     this.closing = true;
     this.server.close();
+    //this is a hack which should release the listener address
+    this.server.emit("close");
   }
   sockets: Socket[] = [];
   /** same as close but also destroys all open sockets */
@@ -472,3 +488,63 @@ export class Listener {
     this.sockets = [];
   }
 }
+let instance: Controller;
+let timestamp: number = 0;
+let expectedControllers: string = "";
+interface ControllerEvents {
+  restart: boolean;
+  getSettings: boolean;
+  putSettings: ServerConfigSchema;
+  timestamp: number;
+  signature: string;
+  publicKeyHash: string;
+}
+export class Controller {
+  static timestamp: number;
+  static handleSettings(settings: ServerConfig) {
+    let safeJSON = (key, val) => {
+      if (key === "__proto__" || key === "constructor") return undefined;
+      else return val;
+    }
+    if (!checkController.check(JSON.parse(JSON.stringify(settings.controllers, safeJSON), safeJSON))) {
+      Controller.handleServer = (startup) => { };
+      Controller.handleController = (state) => { state.throw(500); return Promise.resolve(); }
+      return false;
+    } else {
+      expectedControllers = JSON.stringify(settings.controllers, safeJSON);
+      return true;
+    }
+  }
+  static handleServer(startup: MainServer) {
+
+  }
+  static async handleController(state: StateObject) {
+    if (state.req.method !== "POST" || state.url.pathname !== "/")
+      return state.throw(400);
+
+    await state.recieveBody(false, () => { });
+
+    let cont: ServerConfig_Controller = {} as any;
+    let json: ControllerEvents = {} as any;
+
+    if (json.timestamp <= timestamp) return state.throw(403);
+
+    timestamp = json.timestamp
+
+    let restart = !!json.restart;
+    let settings = !!json.putSettings;
+
+    let allowed = (!restart || cont.allowRestart) && (!settings || cont.allowSave);
+
+    if (!allowed) return state.throw(403);
+
+
+  }
+  constructor(public main: MainServer) {
+
+  }
+}
+// This isn't ready yet
+Controller.handleSettings = () => true;
+Controller.handleServer = () => { };
+Controller.handleController = async (state) => { state.throw(500); };

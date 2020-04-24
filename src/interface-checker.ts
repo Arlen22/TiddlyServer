@@ -3,6 +3,7 @@ import {
   ServerConfig_AccessOptions,
   ServerConfig_PutSaver,
   Config,
+  ServerConfig_Controller,
 } from "./server-config";
 import { as } from "./server-types";
 
@@ -400,25 +401,32 @@ class CheckRepeat<T> extends TypeCheck<T> {
 export const checkRepeat = <T>(cb: () => TypeCheck<T>, expected: string) =>
   new CheckRepeat(cb, expected);
 
-// export function checkServerConfig(obj, checker: boolean): true | {};
-// export function checkServerConfig(obj, checker: TypeCheck<ServerConfig>): true | {};
+
+const checkAccessPerms = checkObject<ServerConfig_AccessOptions>({
+  mkdir: checkBoolean,
+  upload: checkBoolean,
+  websockets: checkBoolean,
+  writeErrors: checkBoolean,
+  registerNotice: checkBoolean,
+  putsaver: checkBoolean,
+  loginlink: checkBoolean,
+  transfer: checkBoolean,
+  datafolder: checkBoolean
+});
+
+export const checkController = checkArray(checkObject<ServerConfig_Controller>({
+  publicKey: checkString,
+  permissions: checkUnion(checkBooleanFalse, checkAccessPerms),
+  allowRestart: checkBoolean,
+  allowSave: checkBoolean
+}));
 export function checkServerConfig(obj): readonly [boolean, string | {}] {
   // if(checker === undefined) checker = new CheckInterface(false);
   // else if (typeof checker === "boolean") checker = new CheckInterface(checker);
 
   // let checker = new CheckInterface(showUnionNulls);
   // let { checkBoolean, checkString, checkStringEnum, checkNumber, checkNumberEnum, checkBooleanFalse, checkNull } = checker;
-  const checkAccessPerms = checkObject<ServerConfig_AccessOptions>({
-    mkdir: checkBoolean,
-    upload: checkBoolean,
-    websockets: checkBoolean,
-    writeErrors: checkBoolean,
-    registerNotice: checkBoolean,
-    putsaver: checkBoolean,
-    loginlink: checkBoolean,
-    transfer: checkBoolean,
-    datafolder: checkBoolean
-  });
+
   const putsaverOptional = as<OptionalCheckermap<ServerConfig_PutSaver, never>>({
     backupFolder: checkString,
     etag: checkStringEnum("optional", "required", "disabled"),
@@ -526,6 +534,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       localAddressPermissions: checkRecord(checkString, checkAccessPerms),
       port: checkNumber,
     }),
+    controllers: checkController,
     directoryIndex: checkObject<ServerConfig["directoryIndex"]>({
       defaultType: checkStringEnum("html", "json"),
       icons: checkRecord(checkString, checkArray(checkString)),
@@ -549,4 +558,5 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
   //not conform to ServerConfig and the server is about to exit. The error data is in `res`.
   // console.log("Check server config result: " + JSON.stringify(res, null, 2));
   return [res, errHash] as const;
+
 }

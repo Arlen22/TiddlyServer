@@ -304,6 +304,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
       gzipBackups: set.putsaver.gzipBackups(true),
     },
     datafolder: set.datafolder({}),
+    controllers: set.controllers([]),
     directoryIndex: {
       // ...{
       defaultType: set.directoryIndex.defaultType("html"),
@@ -434,6 +435,7 @@ export interface ServerConfigSchema {
    * which exports the object
    */
   authAccounts?: { [K: string]: ServerConfig_AuthAccountsValue };
+  controllers?: ServerConfig_Controller[];
   // /** client-side data folder loader which loads datafolders directly into the browser */
   // EXPERIMENTAL_clientside_datafolders?: Partial<ServerConfig_ClientsideDatafolders>,
   /**
@@ -490,6 +492,8 @@ export interface ServerConfig {
    * which exports the object
    */
   authAccounts: { [K: string]: ServerConfig_AuthAccountsValue };
+  /** An array of controllers which can control TiddlyServer */
+  controllers: ServerConfig_Controller[];
   // /** client-side data folder loader which loads datafolders directly into the browser */
   // EXPERIMENTAL_clientside_datafolders: ServerConfig_ClientsideDatafolders,
   /**
@@ -620,6 +624,19 @@ export interface ServerConfig_BindInfo {
   port: number;
   /** always bind a separate server instance to 127.0.0.1 regardless of any other settings */
   _bindLocalhost: boolean;
+}
+export interface ServerConfig_Controller {
+  /** The public key of this controller. */
+  publicKey: string
+  /** Allow the browser to order restarts of the server listeners and data folders with new settings applied */
+  allowRestart: boolean
+  /** Allow changed settings to be saved back to the loaded settings.json file */
+  allowSave: boolean
+  /** 
+   * Connections from this browser will use these permissions instead of the permissions from the local address. 
+   * Permissions only apply if not logged in. Tree authList is unaffected. Set to false to not use this.
+   */
+  permissions: ServerConfig_AccessOptions | false
 }
 export interface ServerConfig_Logging {
   /** access log file */
