@@ -5,20 +5,16 @@ import * as fs from "fs";
 import * as path from "path";
 import * as server from "./src/server";
 import * as yargs from "yargs";
-
-// import fs = require("fs");
-// import path = require("path");
 import { inspect } from "util";
-// import server = require("./src/server");
-// import yargs = require("yargs");
+import { homedir } from "os";
 
-// console.log(process.pid);
-const SETTINGS_FILE = "settings.json";
+const configInstallPath = path.join(__dirname, "settings.json");
 const argv = yargs
-  .usage("./$0 - TiddlyServer")
+  .usage("./$0 --config ~/path/to/settings.json")
+  .help()
   .option("config", {
-    describe: "Path to the server config file",
-    demandOption: false,
+    describe: "Path to the server config file. Optional if a settings.json file exists in the installation directory.",
+    demandOption: !fs.existsSync(configInstallPath),
     type: "string",
   })
   .option("stay-on-error", {
@@ -33,7 +29,8 @@ const argv = yargs
     demandOption: false,
     default: false,
     type: "boolean",
-  }).argv;
+  })
+  .argv;
 
 const {
   config: userSettings,
@@ -41,10 +38,12 @@ const {
   "stay-on-error": stayOnError,
 } = argv;
 
+
+
 const settingsFile =
   userSettings
-    ? path.resolve(userSettings)
-    : path.join(__dirname, "settings.json");
+    ? path.resolve(userSettings.startsWith("~/") ? homedir() + userSettings.slice(1) : userSettings)
+    : configInstallPath;
 
 const assetsFolder = path.join(__dirname, "assets");
 
@@ -58,7 +57,7 @@ const logAndCloseServer = (err?: any) => {
   //hold it open because all other listeners should close
   if (stayOnError) setInterval(function () { }, 1000);
   process.exitCode = 1;
-  if(err) log(err);
+  if (err) log(err);
 };
 const log = (err: any) => {
   console.error("[ERROR]: caught process uncaughtException", inspect(err));
@@ -80,6 +79,9 @@ async function runServer() {
     assetsFolder,
     Object.keys(server.MainServer.routes)
   );
+
+  console.log("Settings file: %s", settingsFile);
+  console.log("TiddlyWiki: %s", settings.__serverTW);
 
   const [check, checkErr] = server.checkServerConfig(settings);
 
@@ -133,7 +135,7 @@ function auditChildren() {
   const inspectModule = (mod: NodeModule) => {
     parents.push(mod);
     mod.children.forEach(e => {
-      if (parents.indexOf(e) > -1) return console.log("circular", e, mod);
+      if (parents.indexOf(e) > -1) return console.log("circular", e.filename, mod.filename);
       else inspectModule(e);
     });
     parents.pop();
@@ -142,6 +144,7 @@ function auditChildren() {
 }
 if (fs.existsSync(settingsFile)) {
   runServer();
+  // auditChildren();
 } else {
   let msg = "[ERROR]: server config file could not be found.\nConsider passing its location via --config\n";
   console.log(msg);

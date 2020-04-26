@@ -65,7 +65,7 @@ export function as<T>(obj: T) {
 }
 
 export function loadSettings(settingsFile: string, assetsFolder: string, routeKeys: string[]) {
-  console.log("Settings file: %s", settingsFile);
+  
 
   const settingsString = fs
     .readFileSync(settingsFile, "utf8")
@@ -101,9 +101,9 @@ export function loadSettings(settingsFile: string, assetsFolder: string, routeKe
 
   settingsObj.__assetsDir = assetsFolder;
   try {
-    settingsObj.__targetTW = settingsObj._datafoldertarget
+    settingsObj.__serverTW = settingsObj._datafoldertarget
       ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
-      : path.join(nodeRequire.resolve("tiddlywiki-production/boot/boot.js"), "../..");
+      : path.join(nodeRequire.resolve("tiddlywiki-production-server/boot/boot.js"), "../..");
   } catch (e) {
     console.log(e);
     throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";

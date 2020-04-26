@@ -1,13 +1,14 @@
 {
   "name": "tiddlyserver",
-  "version": "2.2.0-alpha-4",
+  "version": "2.2.0-alpha-5",
   "description": "Many TiddlyWiki, One Port",
   "homepage": "https://arlen22.github.io/tiddlyserver/",
   "repository": "github:Arlen22/TiddlyServer",
   "bin": "./build/server.js",
   "main": "./build/src/server.js",
   "prodDependencies": [
-    "tiddlywiki-production"
+    "tiddlywiki-production-server",
+    "tiddlywiki-production-client"
   ],
   "dependencies": {
     "@types/libsodium-wrappers": "^0.7.5",
@@ -27,7 +28,8 @@
     "rxjs": "^6.5.5",
     "send": "^0.17.1",
     "source-map-support": "^0.5.16",
-    "tiddlywiki-production": "5.1.22",
+    "tiddlywiki-production-server": "5.1.22",
+    "tiddlywiki-production-client": "5.1.22",
     "ts-json-schema-generator": "^0.61.1",
     "tslib": "^1.11.1",
     "typescript": "^3.8.3",

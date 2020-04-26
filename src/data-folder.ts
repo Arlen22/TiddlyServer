@@ -47,7 +47,7 @@ export function handleDataFolderRequest(
     result,
     state.statPath,
     state.url.pathname,
-    state.settings.__targetTW,
+    state.settings.__serverTW,
     state.settings.datafolder,
     state.debugOutput
   );
@@ -147,7 +147,7 @@ export async function handleWebsocketConnection(
       result,
       statPath,
       pathname,
-      settings.__targetTW,
+      settings.__serverTW,
       settings.datafolder,
       data.debugOutput
     );

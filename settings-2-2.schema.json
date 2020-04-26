@@ -102,6 +102,12 @@
           },
           "type": "object"
         },
+        "controllers": {
+          "items": {
+            "$ref": "#/definitions/ServerConfig_Controller"
+          },
+          "type": "array"
+        },
         "datafolder": {
           "description": "Options object whose properties will be passed to the tiddlywiki server instance using the spread operator.\nIf a property specifies an object instead of a string, the object will be shared between all instances.",
           "type": "object"
@@ -345,6 +351,44 @@
       },
       "required": [
         "clientKeys",
+        "permissions"
+      ],
+      "type": "object"
+    },
+    "ServerConfig_Controller": {
+      "additionalProperties": false,
+      "properties": {
+        "allowRestart": {
+          "description": "Allow the browser to order restarts of the server listeners and data folders with new settings applied",
+          "type": "boolean"
+        },
+        "allowSave": {
+          "description": "Allow changed settings to be saved back to the loaded settings.json file",
+          "type": "boolean"
+        },
+        "permissions": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ServerConfig_AccessOptions"
+            },
+            {
+              "enum": [
+                false
+              ],
+              "type": "boolean"
+            }
+          ],
+          "description": "Connections from this browser will use these permissions instead of the permissions from the local address. \nPermissions only apply if not logged in. Tree authList is unaffected. Set to false to not use this."
+        },
+        "publicKey": {
+          "description": "The public key of this controller.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "publicKey",
+        "allowRestart",
+        "allowSave",
         "permissions"
       ],
       "type": "object"

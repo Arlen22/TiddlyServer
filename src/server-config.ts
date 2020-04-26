@@ -227,7 +227,7 @@ export const defaultPermissions = {
   transfer: false,
   datafolder: true
 };
-export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
+export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string, assetsFolder: string) {
   const settingsDir = path.dirname(settingsFile);
   let set = oc(_set);
   // proxset.bindInfo
@@ -254,6 +254,8 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
     },
   };
 
+  // settingsObj.__assetsDir = assetsFolder;
+
   Object.keys(set.bindInfo.localAddressPermissions({ defaultPermissions })).forEach(k => {
     if (k === "*" || k === "defaultPermissions") return;
     lap[k] = set.bindInfo.localAddressPermissions[k](lap["*"]);
@@ -264,10 +266,10 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
   let newset: ServerConfig = {
     __dirname: "",
     __filename: "",
-    __assetsDir: "",
-    __targetTW: "",
+    __assetsDir: assetsFolder,
+    __serverTW: "",
+    __clientTW: "",
     _devmode: !!set._devmode(),
-    _datafoldertarget: set._datafoldertarget() || "",
     tree: normalizeSettingsTree(settingsDir, set.tree() as any),
     bindInfo: {
       // ...{
@@ -355,7 +357,19 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile) {
 
   newset.__dirname = settingsDir;
   newset.__filename = settingsFile;
-
+  try {
+    let serverTW = set._datafolderserver(set._datafoldertarget(""));
+    newset.__serverTW = serverTW
+      ? pathResolveWithUser(newset.__dirname, serverTW)
+      : path.join(nodeRequire.resolve("tiddlywiki-production-server/boot/boot.js"), "../..");
+    let clientTW = set._datafolderclient("");
+    newset.__clientTW = clientTW
+      ? pathResolveWithUser(newset.__dirname, clientTW)
+      : path.join(nodeRequire.resolve("tiddlywiki-production-client/boot/boot.js"), "../..");
+  } catch (e) {
+    console.log(e);
+    throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";
+  }
   if (newset.putsaver && newset.putsaver.etag === "disabled" && !newset.putsaver.backupFolder) {
     console.log(
       "Etag checking is disabled, but a backup folder is not set. " +
@@ -375,12 +389,12 @@ type ExcludedPartial<T, NK> = {
 export interface ServerConfigSchema {
   /** enables certain expensive per-request checks */
   _devmode?: boolean;
-  /**
-   * The tiddlywiki folder to use for data folder instances. Defaults to the
-   * tiddlywiki folder in the TiddlyServer installation regardless of the
-   * settings.json location.
-   */
+  /** Deprecated: Use _datafolderserver instead. */
   _datafoldertarget?: string;
+  /** The tiddlywiki folder to use for data folder instances. */
+  _datafolderserver?: string;
+  /** The tiddlywiki folder to serve on "/assets/tiddlywiki/" */
+  _datafolderclient?: string;
   /**
    * The tree property accepts one of 3 formats. If it is a string ending in `.xml`, `.js`, or `.json`,
    * the tree will be loaded from the specified path. JS and JSON files must export a `tree` property
@@ -470,8 +484,6 @@ export interface ServerConfigSchema {
 export interface ServerConfig {
   /** enables certain expensive per-request checks */
   _devmode: boolean;
-  /** the tiddlywiki folder to use for data folder instances */
-  _datafoldertarget: string;
   tree: Config.HostElement[];
   /** bind address and port */
   bindInfo: ServerConfig_BindInfo & {
@@ -515,7 +527,8 @@ export interface ServerConfig {
   __dirname: string;
   __filename: string;
   __assetsDir: string;
-  __targetTW: string;
+  __clientTW: string;
+  __serverTW: string;
 }
 
 export interface ServerConfig_ClientsideDatafolders {
@@ -939,7 +952,10 @@ namespace Test {
   type Host = Test<Schema.HostElement, Config.HostElement>;
   type Group = Test<Schema.ArrayGroupElement, Config.GroupElement>;
   type Path = Test<Schema.ArrayPathElement, Config.PathElement>;
-  type Root1 = Test<ServerConfigSchema, ServerConfig>;
+  type Root1 = Test<Pick<
+    ServerConfigSchema,
+    Exclude<keyof ServerConfigSchema, "_datafolderserver" | "_datafolderclient" | "_datafoldertarget">
+  >, ServerConfig>;
 }
 
 /** @default { "$element": "" } */
