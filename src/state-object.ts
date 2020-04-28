@@ -346,7 +346,7 @@ export class StateObject {
       str: any,
       ...args: any[]
     ) {
-      if (!ignoreLevel && this.settings.logging.debugLevel > msgLevel) return;
+      if (!ignoreLevel && this.settings.debugLevel > msgLevel) return;
       StateObject.DebugLoggerInner(msgLevel, prefix, str, args, this.debugOutput);
     };
   }
@@ -378,6 +378,7 @@ export class StateObject {
       " " +
       (msgLevel >= 3 ? colors.BgRed + colors.FgWhite : colors.FgRed) +
       prefix +
+      colors.Reset +
       " " +
       colors.FgCyan +
       date +
@@ -393,7 +394,7 @@ export class StateObject {
             return e;
           }
         })
-        .join("\n"),
+        .join("\n") + "\n",
       "utf8"
     );
   }

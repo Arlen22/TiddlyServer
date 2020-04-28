@@ -171,44 +171,42 @@ morgan.format(
   "mydev",
   "[:localdate[iso]] :method :status  :remote-addr :padurl :response-time ms - :res[content-length]\x1b[0m"
 );
-
-export function handler(options: {
-  logFile?: string;
-  stream?: Writable;
-  logToConsole?: boolean;
-  logColorsToFile?: boolean;
-}): (req: IncomingMessage, res: ServerResponse, next: (err?: any) => void) => void {
-  const { logFile, logToConsole, logColorsToFile } = options;
+type LogFunc = (req: IncomingMessage, res: ServerResponse, next: (err?: any) => void) => void;
+export function handler(options: { stream: Writable; }): LogFunc {
+  return morgan("mydevcolor", {
+    skip: function (req, res) { return !!req.skipLog; },
+    stream: options.stream,
+  });
+}
+export function createLogWritable(
+  logToFile: string | undefined,
+  logToConsole: boolean | undefined,
+  logColorsToFile: boolean | undefined,
+  consoleStream: Writable = process.stdout
+) {
   const colorsRegex = /\x1b\[[0-9]+m/gi;
-  const myWritable = new stream.Writable({
+  let writable = new stream.Writable({
     write: function (chunk, encoding, callback) {
       // if we're given a buffer, convert it to a string
       if (Buffer.isBuffer(chunk)) chunk = chunk.toString("utf8");
       // remove ending linebreaks for consistency
       chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
-      if (logFile) {
+      if (logToFile) {
         try {
-          fs.appendFileSync(
-            logFile,
-            (logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
-            { encoding: "utf8" }
-          );
+          fs.appendFileSync(logToFile, (logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n", { encoding: "utf8" });
         } catch (e) {
           console.error(e);
         }
       }
-      if (logToConsole) console.log(chunk);
+
+      if (logToConsole) consoleStream.write(chunk + "\r\n");
 
       callback && callback();
     },
   });
-  myWritable.on("error", err => {
+  writable.on("error", err => {
     console.log(err);
   });
-  return morgan("mydevcolor", {
-    skip: function (req, res) {
-      return !!req.skipLog;
-    },
-    stream: options.stream || myWritable,
-  });
+  return writable;
 }
+

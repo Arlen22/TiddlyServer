@@ -64,8 +64,14 @@ export function as<T>(obj: T) {
   return obj;
 }
 
-export function loadSettings(settingsFile: string, assetsFolder: string, routeKeys: string[]) {
-  
+type DebugFunc = (level: number, str: string | NodeJS.ErrnoException, ...args: any[]) => any;
+
+export function loadSettings(
+  settingsFile: string,
+  assetsFolder: string,
+  routeKeys: string[]
+) {
+  let debug: DebugFunc = (level, str, ...args) => StateObject.DebugLoggerInner(level, "startup", str, args, process.stderr);
 
   const settingsString = fs
     .readFileSync(settingsFile, "utf8")
@@ -75,13 +81,13 @@ export function loadSettings(settingsFile: string, assetsFolder: string, routeKe
   let settingsObjSource: ServerConfigSchema = tryParseJSON<ServerConfigSchema>(
     settingsString,
     e => {
-      console.error(
+      debug(4,
         /*colors.BgWhite + */ colors.FgRed +
         "The settings file could not be parsed: %s" +
         colors.Reset,
         e.originalError.message
       );
-      console.error(e.errorPosition);
+      debug(4, e.errorPosition);
       throw "The settings file could not be parsed: Invalid JSON";
     }
   );
@@ -89,7 +95,7 @@ export function loadSettings(settingsFile: string, assetsFolder: string, routeKe
   if (!settingsObjSource.$schema) throw "The settings file is v2.0 and must be upgraded.";
 
   if (settingsObjSource.$schema.startsWith("settings-2-1")) {
-    console.log(
+    debug(2,
       "The settins file needs to be upgraded from 2.1 if errors are thrown. "
       + "Please set the $schema property to settings-2-2.schema.json to get proper intellisense."
     );
@@ -97,24 +103,20 @@ export function loadSettings(settingsFile: string, assetsFolder: string, routeKe
   if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
   // let routeKeys = Object.keys(routes);
   let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;
-  let settingsObj = normalizeSettings(settingsObjSource, settingsFile);
+  let settingsObj = normalizeSettings(settingsObjSource, settingsFile, assetsFolder);
 
-  settingsObj.__assetsDir = assetsFolder;
-  try {
-    settingsObj.__serverTW = settingsObj._datafoldertarget
-      ? path.resolve(settingsObj.__dirname, settingsObj._datafoldertarget)
-      : path.join(nodeRequire.resolve("tiddlywiki-production-server/boot/boot.js"), "../..");
-  } catch (e) {
-    console.log(e);
-    throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";
+  if ((settingsObjSource as any).logging) {
+    debug(4, "Logging to file is no longer supported. Please remove the logging property from your config file. The debugLevel property is now a top level property (sibling to the tree property).");
+    throw "Logging to file is no longer supported";
   }
+
 
   if (typeof settingsObj.tree === "object") {
     let keys: string[] = [];
     settingsObj.tree;
     let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
     if (conflict.length)
-      console.log(
+      debug(2,
         "The following tree items are reserved for use by TiddlyServer: %s",
         conflict.map(e => '"' + e + '"').join(", ")
       );

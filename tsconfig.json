@@ -20,7 +20,8 @@
     "resolveJsonModule": true,
     "noErrorTruncation": true,
     "declaration": true,
-    "importHelpers": true
+    "importHelpers": true,
+    "experimentalDecorators": true
   },
   "files": [
     "./server.ts"

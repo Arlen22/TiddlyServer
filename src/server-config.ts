@@ -63,8 +63,8 @@ type normalizeTree_itemtype =
   | Schema.ArrayGroupElement
   | Schema.GroupElement
   | { $element: undefined }
-  | Schema.ArrayPathElement
-  | Schema.PathElement
+  | Schema.ArrayFolderElement
+  | Schema.FolderElement
   | string;
 export function normalizeTree(
   settingsDir: string,
@@ -74,19 +74,19 @@ export function normalizeTree(
 ): Config.GroupElement;
 export function normalizeTree(
   settingsDir: string,
-  item: Schema.ArrayPathElement | Schema.ArrayGroupElement | string,
+  item: Schema.ArrayFolderElement | Schema.ArrayGroupElement | string,
   key: undefined,
   keypath
 ): Config.PathElement | Config.GroupElement;
 export function normalizeTree(
   settingsDir: string,
-  item: Schema.PathElement | Schema.GroupElement | string,
+  item: Schema.FolderElement | Schema.GroupElement | string,
   key: string,
   keypath
 ): Config.PathElement | Config.GroupElement;
 export function normalizeTree(
   settingsDir: string,
-  item: Schema.ArrayPathElement | Schema.PathElement | string,
+  item: Schema.ArrayFolderElement | Schema.FolderElement | string,
   key: string | undefined,
   keypath
 ): Config.PathElement;
@@ -134,7 +134,7 @@ export function normalizeTree(
     let $children: (Config.PathElement | Config.GroupElement)[] = [];
     if (Array.isArray(item.$children)) {
       $children = item.$children
-        .filter((e: any): e is Schema.ArrayGroupElement | Schema.ArrayPathElement => {
+        .filter((e: any): e is Schema.ArrayGroupElement | Schema.ArrayFolderElement => {
           if (Config.isOption(e)) {
             throw "specifying options in $children is unsupported at " + keypath.join(".");
           } else {
@@ -263,6 +263,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
       if (lap[k][k2] === undefined) lap[k][k2] = lap["*"][k2];
     });
   });
+  let https = !!set.bindInfo.https("");
   let newset: ServerConfig = {
     __dirname: "",
     __filename: "",
@@ -277,25 +278,26 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
       bindWildcard: set.bindInfo.bindWildcard(false),
       enableIPv6: set.bindInfo.enableIPv6(false),
       filterBindAddress: set.bindInfo.filterBindAddress(false),
-      port: set.bindInfo.port(8080),
+      port: set.bindInfo.port(https ? 8443 : 8080),
       localAddressPermissions: lap,
       _bindLocalhost: set.bindInfo._bindLocalhost(false),
-      https: !!set.bindInfo.https(""),
+      https,
       // },
       // ...spread(set.bindInfo),
       // ...{
       // 	https: !!(set.bindInfo && set.bindInfo.https)
       // }
     },
-    logging: {
-      // ...{
-      debugLevel: set.logging.debugLevel(0),
-      logAccess: set.logging.logAccess(""),
-      logError: set.logging.logError(""),
-      logColorsToFile: set.logging.logColorsToFile(false),
-      logToConsoleAlso: set.logging.logToConsoleAlso(true),
-      // }
-    },
+    debugLevel: set.debugLevel(0),
+    // logging: {
+    //   // ...{
+    //   debugLevel: set.logging.debugLevel(0),
+    //   logAccess: set.logging.logAccess(""),
+    //   logError: set.logging.logError(""),
+    //   logColorsToFile: set.logging.logColorsToFile(false),
+    //   logToConsoleAlso: set.logging.logToConsoleAlso(true),
+    //   // }
+    // },
     authAccounts: set.authAccounts({}),
     putsaver: {
       // ...{
@@ -350,10 +352,10 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
 
   if (newset.putsaver && newset.putsaver.backupFolder)
     newset.putsaver.backupFolder = pathResolveWithUser(settingsDir, newset.putsaver.backupFolder);
-  if (newset.logging.logAccess)
-    newset.logging.logAccess = pathResolveWithUser(settingsDir, newset.logging.logAccess);
-  if (newset.logging.logError)
-    newset.logging.logError = pathResolveWithUser(settingsDir, newset.logging.logError);
+  // if (newset.logging.logAccess)
+  //   newset.logging.logAccess = pathResolveWithUser(settingsDir, newset.logging.logAccess);
+  // if (newset.logging.logError)
+  //   newset.logging.logError = pathResolveWithUser(settingsDir, newset.logging.logError);
 
   newset.__dirname = settingsDir;
   newset.__filename = settingsFile;
@@ -362,7 +364,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
     newset.__serverTW = serverTW
       ? pathResolveWithUser(newset.__dirname, serverTW)
       : path.join(nodeRequire.resolve("tiddlywiki-production-server/boot/boot.js"), "../..");
-    let clientTW = set._datafolderclient("");
+    let clientTW = set._datafolderclient(set._datafoldertarget(""));
     newset.__clientTW = clientTW
       ? pathResolveWithUser(newset.__dirname, clientTW)
       : path.join(nodeRequire.resolve("tiddlywiki-production-client/boot/boot.js"), "../..");
@@ -430,10 +432,9 @@ export interface ServerConfigSchema {
       defaultPermissions?: ServerConfig_AccessOptions;
       [host: string]: ServerConfig_AccessOptions | undefined;
     }
-
   };
-  /** logging  */
-  logging?: Partial<ServerConfig_Logging>;
+  // /** logging  */
+  // logging?: Partial<ServerConfig_Logging>;
   /** directory index options */
   directoryIndex?: ExcludedPartial<ServerConfig_DirectoryIndex, "types">;
   /** tiddlyserver specific options */
@@ -467,6 +468,18 @@ export interface ServerConfigSchema {
   /** Max concurrent transfer requests */
   maxTransferRequests?: number;
   /**
+   * -  4 - Errors that require the process to exit for restart
+   * -  3 - Major errors that are handled and do not require a server restart
+   * -  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+   * -  1 - Info - Most startup messages
+   * -  0 - Normal debug messages and all software and request-side error messages
+   * - -1 - Detailed debug messages from high level apis
+   * - -2 - Response status messages and error response data
+   * - -3 - Request and response data for all messages (verbose)
+   * - -4 - Protocol details and full data dump (such as encryption steps and keys)
+   */
+  debugLevel?: number;
+  /**
    * The JSON schema location for this document. This schema is generated
    * directly from the TypeScript interfaces
    * used in TiddlyServer. A text-editor with autocomplete, such as VS code,
@@ -490,8 +503,8 @@ export interface ServerConfig {
     localAddressPermissions: { [host: string]: ServerConfig_AccessOptions; }
     https: boolean;
   };
-  /** logging  */
-  logging: ServerConfig_Logging;
+  // /** logging  */
+  // logging: ServerConfig_Logging;
   /** directory index */
   directoryIndex: ServerConfig_DirectoryIndex;
   /** PUT saver options */
@@ -522,6 +535,18 @@ export interface ServerConfig {
   authCookieAge: number;
   /** Max concurrent transfer requests */
   maxTransferRequests: number;
+  /**
+ * -  4 - Errors that require the process to exit for restart
+ * -  3 - Major errors that are handled and do not require a server restart
+ * -  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)
+ * -  1 - Info - Most startup messages
+ * -  0 - Normal debug messages and all software and request-side error messages
+ * - -1 - Detailed debug messages from high level apis
+ * - -2 - Response status messages and error response data
+ * - -3 - Request and response data for all messages (verbose)
+ * - -4 - Protocol details and full data dump (such as encryption steps and keys)
+ */
+  debugLevel: number;
   $schema: string;
 
   __dirname: string;
@@ -750,13 +775,13 @@ type PartialExcept<T extends {}, REQUIRED extends keyof T> = {
 // type OptionElementsSchema = ;
 export interface OptionsSchema {
   auth: Config.Options_Auth;
-  backups: Config.Options_Backups;
+  backups: Config.Options_Putsaver;
   index: Config.Options_Index;
 }
 /** Used by the StateObject to compile the final Options object for the request */
 export interface OptionsConfig {
   auth: Required<Config.Options_Auth>;
-  putsaver: Required<Config.Options_Backups>;
+  putsaver: Required<Config.Options_Putsaver>;
   index: Required<Config.Options_Index>;
 }
 /** The options array schema is in `settings-2-1-tree-options.schema.json` */
@@ -815,7 +840,7 @@ export namespace Config {
      */
     authError?: 403 | 404;
   }
-  export interface Options_Backups extends ServerConfig_PutSaver {
+  export interface Options_Putsaver extends ServerConfig_PutSaver {
     /** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
     $element: "putsaver";
   }
@@ -880,8 +905,8 @@ export namespace Schema {
     };
   }
   export type GroupChildElements =
-    | Record<string, GroupElement | PathElement | string>
-    | (ArrayGroupElement | ArrayPathElement | string)[];
+    | Record<string, GroupElement | FolderElement | string>
+    | (ArrayGroupElement | ArrayFolderElement | string)[];
   export type OptionElements = Config.OptionElements;
   export type TreeElement = HostElement[] | GroupChildElements | string;
   /** Host elements may only be specified in arrays */
@@ -905,7 +930,7 @@ export namespace Schema {
     // /** Whether the pattern should match subdomains of the host name (e.g. example.com would include server2.apis.example.com) */
     // includeSubdomains: boolean,
     /** The HostElement child may be one group or folder element. A string may be used in place of a folder element. */
-    $mount: GroupElement | PathElement | string;
+    $mount: GroupElement | FolderElement | string;
   }
 
   export interface GroupElement {
@@ -917,7 +942,7 @@ export namespace Schema {
   export interface ArrayGroupElement extends GroupElement {
     key: string;
   }
-  export interface PathElement {
+  export interface FolderElement {
     $element: "folder";
     /** Path relative to this file or any absolute path NodeJS can stat */
     path: string;
@@ -942,7 +967,7 @@ export namespace Schema {
     noDataFolder?: boolean;
     $options?: OptionElements[];
   }
-  export interface ArrayPathElement extends PathElement {
+  export interface ArrayFolderElement extends FolderElement {
     key: string;
   }
 }
@@ -951,7 +976,7 @@ namespace Test {
   //make sure that all keys in the schema are included in the config
   type Host = Test<Schema.HostElement, Config.HostElement>;
   type Group = Test<Schema.ArrayGroupElement, Config.GroupElement>;
-  type Path = Test<Schema.ArrayPathElement, Config.PathElement>;
+  type Path = Test<Schema.ArrayFolderElement, Config.PathElement>;
   type Root1 = Test<Pick<
     ServerConfigSchema,
     Exclude<keyof ServerConfigSchema, "_datafolderserver" | "_datafolderclient" | "_datafoldertarget">
@@ -1135,13 +1160,14 @@ export function ConvertSettings(set: OldServerConfig): ServerConfigSchema {
       https: undefined,
       _bindLocalhost: set._disableLocalHost === false,
     },
-    logging: {
-      logAccess: set.logAccess,
-      logError: set.logError,
-      logColorsToFile: set.logColorsToFile,
-      logToConsoleAlso: set.logToConsoleAlso,
-      debugLevel: set.debugLevel,
-    },
+    // logging: {
+    //   logAccess: set.logAccess,
+    //   logError: set.logError,
+    //   logColorsToFile: set.logColorsToFile,
+    //   logToConsoleAlso: set.logToConsoleAlso,
+    //   debugLevel: set.debugLevel,
+    // },
+    debugLevel: set.debugLevel,
     putsaver: {
       etag: set.etag || "optional",
       etagAge: set.etagWindow,

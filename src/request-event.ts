@@ -7,6 +7,7 @@ import { ServerConfig, ServerConfig_AccessOptions, Config, OptionsConfig } from 
 import { parseHostList, testAddress, resolvePath, PathResolverResult, as } from "./server-types";
 import { checkCookieAuth } from "./cookies";
 import { parse } from "url";
+import { createLogWritable } from './logger';
 export class RequestEvent {
   handled: boolean = false;
   username: string = "";
@@ -132,7 +133,7 @@ export class RequestEvent {
   close(code: number, message?: string) {
     if (this.type === "response") {
       this.response.writeHead(code);
-      if(message) this.response.write(message);
+      if (message) this.response.write(message);
       this.response.end();
     } else if (this.type === "client") {
       this.client.close(code, message);
@@ -177,28 +178,13 @@ export class RequestEvent {
     return options;
   }
   static MakeDebugOutput(settings: ServerConfig) {
-    const colorsRegex = /\x1b\[[0-9]+m/gi;
-    const { logError, logColorsToFile, logToConsoleAlso } = settings.logging;
-    return new Writable({
-      write: function (chunk, encoding, callback) {
-        // if we're given a buffer, convert it to a string
-        if (Buffer.isBuffer(chunk)) chunk = chunk.toString("utf8");
-        // remove ending linebreaks for consistency
-        chunk = chunk.slice(0, chunk.length - (chunk.endsWith("\r\n") ? 2 : +chunk.endsWith("\n")));
-
-        if (logError) {
-          appendFileSync(
-            logError,
-            (logColorsToFile ? chunk : chunk.replace(colorsRegex, "")) + "\r\n",
-            { encoding: "utf8" }
-          );
-        }
-        if (!logError || logToConsoleAlso) {
-          console.log(chunk);
-        }
-        callback && callback();
-        return true;
-      },
-    });
+    return process.stderr;
+    // const { logError, logColorsToFile, logToConsoleAlso } = { logError: undefined, logColorsToFile: false, logToConsoleAlso: true };
+    // return createLogWritable(
+    //   logError,
+    //   !logError || logToConsoleAlso,
+    //   logColorsToFile,
+    //   process.stderr
+    // )
   }
 }

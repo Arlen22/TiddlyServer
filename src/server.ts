@@ -170,16 +170,9 @@ export class MainServer {
     this.filterBindAddress = settings.bindInfo.filterBindAddress;
     this.enableIPv6 = settings.bindInfo.enableIPv6;
 
-    if (settings.logging.logAccess !== false) {
-      const logger = morgan({
-        logFile: settings.logging.logAccess || undefined,
-        logToConsole: !settings.logging.logAccess || settings.logging.logToConsoleAlso,
-        logColorsToFile: settings.logging.logColorsToFile,
-      });
-      this.log = (req, res) => new Promise(resolve => logger(req, res, resolve));
-    } else {
-      this.log = (req, res) => Promise.resolve();
-    }
+    const logger = morgan({ stream: process.stdout });
+    this.log = (req, res) => new Promise(resolve => logger(req, res, resolve));
+
     this.eventer.on("stateError", this.stateError);
     this.eventer.on("stateDebug", this.stateDebug);
 
@@ -427,9 +420,11 @@ export class Listener {
 
   }
   addRequestHandlers() {
-    this.server.on('connection', (socket) => {
+    this.server.on('connection', (socket: Socket) => {
       // in case the address watcher catches it
       if (socket.destroyed) return;
+      // if the process is about to exit, don't handle anything else
+      if (process.exitCode) { socket.destroy(); return; }
       this.sockets.push(socket);
       socket.once('close', () => {
         let index = this.sockets.indexOf(socket);

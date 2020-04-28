@@ -41,7 +41,50 @@
       ],
       "type": "object"
     },
-    "Config.Options_Backups": {
+    "Config.Options_Index": {
+      "additionalProperties": false,
+      "properties": {
+        "$element": {
+          "description": "Options related to the directory index (request paths that resolve to a folder\nwhich is not a data folder). Option elements affect the group\nthey belong to and all children under that. Each property in an option element\nreplaces the key from parent option elements.",
+          "enum": [
+            "index"
+          ],
+          "type": "string"
+        },
+        "defaultType": {
+          "description": "The format of the index generated if no index file is found, or \"403\" to\nreturn a 403 Access Denied, or 404 to return a 404 Not Found. 403 is the\nerror code used by Apache and Nginx.",
+          "enum": [
+            "html",
+            "json",
+            403,
+            404
+          ],
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "indexExts": {
+          "description": "Extensions to add when looking for an index file. A blank string will set the order\nto search for the exact indexFile name. The extensions are searched in the order specified.\n\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\nThe default is `[\"\"]`, which will search for an exact indexFile.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "indexFile": {
+          "description": "Look for index files named exactly this or with one of the defaultExts added.\nFor example, a defaultFile of [\"index\"] and a defaultExts of [\"htm\",\"\",html\"] would\nlook for [\"index.htm\",\"index\",\"index.html\"] in that order.\n\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\nTo use a .hidden file, put the full filename here, and set indexExts to `[\"\"]`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "$element"
+      ],
+      "type": "object"
+    },
+    "Config.Options_Putsaver": {
       "additionalProperties": false,
       "properties": {
         "$element": {
@@ -87,49 +130,6 @@
       ],
       "type": "object"
     },
-    "Config.Options_Index": {
-      "additionalProperties": false,
-      "properties": {
-        "$element": {
-          "description": "Options related to the directory index (request paths that resolve to a folder\nwhich is not a data folder). Option elements affect the group\nthey belong to and all children under that. Each property in an option element\nreplaces the key from parent option elements.",
-          "enum": [
-            "index"
-          ],
-          "type": "string"
-        },
-        "defaultType": {
-          "description": "The format of the index generated if no index file is found, or \"403\" to\nreturn a 403 Access Denied, or 404 to return a 404 Not Found. 403 is the\nerror code used by Apache and Nginx.",
-          "enum": [
-            "html",
-            "json",
-            403,
-            404
-          ],
-          "type": [
-            "string",
-            "number"
-          ]
-        },
-        "indexExts": {
-          "description": "Extensions to add when looking for an index file. A blank string will set the order\nto search for the exact indexFile name. The extensions are searched in the order specified.\n\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\nThe default is `[\"\"]`, which will search for an exact indexFile.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "indexFile": {
-          "description": "Look for index files named exactly this or with one of the defaultExts added.\nFor example, a defaultFile of [\"index\"] and a defaultExts of [\"htm\",\"\",html\"] would\nlook for [\"index.htm\",\"index\",\"index.html\"] in that order.\n\nOnly applies to folder elements, but may be set on a group element. An empty array disables this feature.\nTo use a .hidden file, put the full filename here, and set indexExts to `[\"\"]`.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "$element"
-      ],
-      "type": "object"
-    },
     "OptionsArraySchema": {
       "description": "The options array schema is in `settings-2-1-tree-options.schema.json`",
       "items": {
@@ -138,7 +138,7 @@
             "$ref": "#/definitions/Config.Options_Auth"
           },
           {
-            "$ref": "#/definitions/Config.Options_Backups"
+            "$ref": "#/definitions/Config.Options_Putsaver"
           },
           {
             "$ref": "#/definitions/Config.Options_Index"

@@ -10,8 +10,16 @@
           "description": "The JSON schema location for this document. This schema is generated\ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with autocomplete, such as VS code,\nwill make editing this file much simpler.\nMost fields include a description like this one.\n\nAll relative paths in this file are resolved relative to this file, so\n`./settings-tree.xml` refers to an XML file in the same folder as this file.\nAll relative paths in included files (such as the XML file) are resolved\nrelative to the included file.",
           "type": "string"
         },
+        "_datafolderclient": {
+          "description": "The tiddlywiki folder to serve on \"/assets/tiddlywiki/\"",
+          "type": "string"
+        },
+        "_datafolderserver": {
+          "description": "The tiddlywiki folder to use for data folder instances.",
+          "type": "string"
+        },
         "_datafoldertarget": {
-          "description": "The tiddlywiki folder to use for data folder instances. Defaults to the\ntiddlywiki folder in the TiddlyServer installation regardless of the\nsettings.json location.",
+          "description": "Deprecated: Use _datafolderserver instead.",
           "type": "string"
         },
         "_devmode": {
@@ -112,6 +120,10 @@
           "description": "Options object whose properties will be passed to the tiddlywiki server instance using the spread operator.\nIf a property specifies an object instead of a string, the object will be shared between all instances.",
           "type": "object"
         },
+        "debugLevel": {
+          "description": "-  4 - Errors that require the process to exit for restart\n-  3 - Major errors that are handled and do not require a server restart\n-  2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\n-  1 - Info - Most startup messages\n-  0 - Normal debug messages and all software and request-side error messages\n- -1 - Detailed debug messages from high level apis\n- -2 - Response status messages and error response data\n- -3 - Request and response data for all messages (verbose)\n- -4 - Protocol details and full data dump (such as encryption steps and keys)",
+          "type": "number"
+        },
         "directoryIndex": {
           "additionalProperties": false,
           "description": "directory index options",
@@ -151,43 +163,6 @@
             "types": {
               "not": {
               }
-            }
-          },
-          "type": "object"
-        },
-        "logging": {
-          "additionalProperties": false,
-          "description": "logging",
-          "properties": {
-            "debugLevel": {
-              "description": "4 - Errors that require the process to exit for restart\n3 - Major errors that are handled and do not require a server restart\n2 - Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500)\n1 - Info - Most startup messages\n0 - Normal debug messages and all software and request-side error messages\n-1 - Detailed debug messages from high level apis\n-2 - Response status messages and error response data\n-3 - Request and response data for all messages (verbose)\n-4 - Protocol details and full data dump (such as encryption steps and keys)",
-              "type": "number"
-            },
-            "logAccess": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "enum": [
-                    false
-                  ],
-                  "type": "boolean"
-                }
-              ],
-              "description": "access log file"
-            },
-            "logColorsToFile": {
-              "description": "write the console color markers to file, useful if you read the logs by printing them to a terminal",
-              "type": "boolean"
-            },
-            "logError": {
-              "description": "error log file",
-              "type": "string"
-            },
-            "logToConsoleAlso": {
-              "description": "print access and error events to the console regardless of whether they are logged to a file",
-              "type": "boolean"
             }
           },
           "type": "object"

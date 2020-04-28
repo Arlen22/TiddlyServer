@@ -7,6 +7,7 @@ import * as server from "./src/server";
 import * as yargs from "yargs";
 import { inspect } from "util";
 import { homedir } from "os";
+import { StateObject } from './src/state-object';
 
 const configInstallPath = path.join(__dirname, "settings.json");
 const argv = yargs
@@ -60,14 +61,14 @@ const logAndCloseServer = (err?: any) => {
   if (err) log(err);
 };
 const log = (err: any) => {
-  console.error("[ERROR]: caught process uncaughtException", inspect(err));
+  StateObject.DebugLoggerInner(4, "[ERROR]", "caught process uncaughtException " + inspect(err), [], process.stderr);
   try {
     fs.appendFileSync(
       path.join(__dirname, "uncaughtException.log"),
       new Date().toISOString() + "\r\n" + inspect(err) + "\r\n\r\n"
     );
   } catch (e) {
-    console.log("Could not write to uncaughtException.log");
+    StateObject.DebugLoggerInner(4, "[ERROR]", "Could not write to uncaughtException.log", [], process.stderr);
   }
 }
 async function runServer() {
@@ -113,22 +114,18 @@ async function runServer() {
     ? path.resolve(settingsDir, settingshttps)
     : false;
 
-  try {
-    let [success, _main] = await server.initServer({
-      settings,
-      settingshttps:
-        httpsSettingsFile && nodeRequire(httpsSettingsFile).serverOptions,
-      preflighter: fs.existsSync(__dirname + "/preflighter.js")
-        ? nodeRequire("./preflighter.js").preflighter
-        : undefined,
-      dryRun,
-    });
-    main = _main;
-    // auditChildren();
-  } catch (e) {
-    console.error("[ERROR]: Uncaught error during server startup:", e);
-    process.exit(1);
-  }
+
+  let [success, _main] = await server.initServer({
+    settings,
+    settingshttps:
+      httpsSettingsFile && nodeRequire(httpsSettingsFile).serverOptions,
+    preflighter: fs.existsSync(__dirname + "/preflighter.js")
+      ? nodeRequire("./preflighter.js").preflighter
+      : undefined,
+    dryRun,
+  });
+  main = _main;
+
 }
 function auditChildren() {
   const parents: NodeModule[] = [];
@@ -143,7 +140,9 @@ function auditChildren() {
   inspectModule(module);
 }
 if (fs.existsSync(settingsFile)) {
-  runServer();
+  runServer().catch(e => {
+    if (e) logAndCloseServer(e);
+  });
   // auditChildren();
 } else {
   let msg = "[ERROR]: server config file could not be found.\nConsider passing its location via --config\n";

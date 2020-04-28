@@ -7,7 +7,7 @@ The server config is both a TypeScript interface, and a JSON file. The JSON file
 
 ```json
 {
-  "$schema": "./settings-2-1.schema.json",
+  "$schema": "./settings-2-2.schema.json",
   "tree": {},
   "authAccounts": {},
   "bindInfo": {},
@@ -18,7 +18,8 @@ The server config is both a TypeScript interface, and a JSON file. The JSON file
   "authCookieAge": 86400,
   "maxTransferRequests": 20,
   "_devmode": false,
-  "_datafoldertarget": ""
+  "_datafolderserver": "",
+  "_datafolderclient": ""
 }
 ```
 
