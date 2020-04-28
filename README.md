@@ -6,6 +6,12 @@ https://arlen22.github.io/tiddlyserver/
 
 TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a static file server. This means you can load and serve any TiddlyWiki data folder in the same way you can serve a single file TiddlyWiki. 
 
+### Notes for 2.2
+
+- You can run `npm install -g tiddlyserver` and everything will be installed properly. Installation instructions are below.
+- The terms "settings.json" and "config file" both refer to the same thing. I'm changing the terminology to keep things simple, because the config file can be specified as a command line option `tiddlyserver --config settings.json`.
+- Logging to file has been removed, as it was not completely consistent anyway. Instead you can use a process manager such as PM2 to capture stdout and stderr to file. 
+
 ### Benefits
 
 * Open single-file wikis and data folder wikis with a single click.
@@ -24,17 +30,25 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 
 ## Installation
 
-The guide at https://arlen22.github.io/tiddlyserver/docs/gettingstarted.html is the best place to get started. 
+### Global install using NPM
 
-New in version 2.2: You can also run `npm install -g tiddlyserver` and everything will be installed. 
+ - Install TiddlyServer globally using `npm install tiddlyserver -g`. 
+ - Create your [config file](https://arlen22.github.io/tiddlyserver/docs/settingsjson).
+ - Run `tiddlyserver --config ~/path/to/settings.json`. Additional options are `[--stay-on-error] [--dry-run]`.
+ - All paths in the config are relative to the config file. The working directory is not used by TiddlyServer for anything. TiddlyWiki Data Folders do not use the working directory for anything either. 
 
-## Short instructions
+### Portable install
 
- - Install or download NodeJS v10+. Version 8.x may work, but I aim to support LTS versions. Only the Node executable is required.
- - Download TiddlyServer and unzip it to an empty directory so you don't merge with an existing directory.
- - Create your [settings.json](https://arlen22.github.io/tiddlyserver/docs/settingsjson) file and put it in the TiddlyServer folder.
- - Run `node server.js`. Additional options are `[--config /path/to/settings.json] [--stay-on-error] [--dry-run]`.
- - The working directory is not used by TiddlyServer except for locating the config file if specified. Otherwise it expects to find it in the TiddlyServer folder with the server.js file. All other paths are relative to the settings file. This does not apply inside the TiddlyWiki data folder environment, but TiddyWiki does not normally use it either because it uses the data folder path and the boot.js path as its reference paths. 
+- Create a new folder and `cd` into the folder or open it in your favorite terminal. 
+- Run `npm init -y` to quickly create a package.json file. 
+- Run "`npm install tiddlyserver --save-exact`".
+  - Notice there is no `-g` option there.
+- Create your [config file](https://arlen22.github.io/tiddlyserver/docs/settingsjson).
+- Test it by running `npx tiddlyserver --config settings.json`.
+- Create your bash or batch file with the following command.
+  - "`node node_modules/tiddlyserver/index.js --config settings.json`"
+- You can also download the Node executable and put in in the directory for a truly portable install.
+  - Windows CMD will use this immediately, but bash and other shells usually require you to change the command to `./node`. 
 
 ## How to upgrade
 
