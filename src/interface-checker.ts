@@ -3,7 +3,9 @@ import {
   ServerConfig_AccessOptions,
   ServerConfig_PutSaver,
   Config,
+  Schema,
   ServerConfig_Controller,
+  ServerConfigSchema,
 } from "./server-config";
 import { as } from "./server-types";
 
@@ -435,7 +437,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
     enabled: checkBoolean,
   });
   const checkOptions: TypeCheck<
-    Config.Options_Auth | Config.Options_Backups | Config.Options_Index
+    Config.Options_Auth | Config.Options_Putsaver | Config.Options_Index
   > = checkUnion(
     checkObject<Config.Options_Auth, "$element">(
       {
@@ -448,7 +450,7 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       ["$element"]
     ),
     checkUnion.cu(
-      checkObject<Config.Options_Backups, "$element">(
+      checkObject<Config.Options_Putsaver, "$element">(
         {
           $element: checkStringEnum("putsaver"),
         },
@@ -495,17 +497,19 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       )
     );
 
+
   const _checkServerConfig = checkObject<ServerConfig>({
+
     $schema: checkString,
     __assetsDir: checkString,
     __dirname: checkString,
     __filename: checkString,
     __serverTW: checkString,
     __clientTW: checkString,
-    _datafoldertarget: checkString,
     _devmode: checkBoolean,
     authCookieAge: checkNumber,
     maxTransferRequests: checkNumber,
+    debugLevel: checkNumber,
     tree: checkArray(
       checkObject<Config.HostElement>({
         $element: checkStringEnum("host"),
@@ -543,13 +547,13 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
       mixFolders: checkBoolean,
       types: checkRecord(checkString, checkString),
     }),
-    logging: checkObject<ServerConfig["logging"]>({
-      debugLevel: checkNumber,
-      logAccess: checkUnion(checkString, checkBooleanFalse),
-      logColorsToFile: checkBoolean,
-      logError: checkString,
-      logToConsoleAlso: checkBoolean,
-    }),
+    // logging: checkObject<ServerConfig["logging"]>({
+    //   debugLevel: checkNumber,
+    //   logAccess: checkUnion(checkString, checkBooleanFalse),
+    //   logColorsToFile: checkBoolean,
+    //   logError: checkString,
+    //   logToConsoleAlso: checkBoolean,
+    // }),
     putsaver: checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional),
     datafolder: checkRecord(checkString, checkAny),
   });
@@ -561,3 +565,88 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
   return [res, errHash] as const;
 
 }
+interface Description<V> {
+  $description: string,
+  $items?: DescObj<V>,
+  $default?: NonNullable<V>,
+  $ref?: string
+}
+type Primitive = string | number | symbol | false | true | undefined;
+type DescItem<V> =
+  V extends Primitive ? string :
+  V extends Array<infer X> ? Description<NonNullable<X>> :
+  string extends keyof V ? Description<V[keyof V]> : Description<V>;
+
+type DescObj<V> = { [K in keyof V]-?: DescItem<NonNullable<V[K]>> };
+
+let descriptions: DescObj<ServerConfigSchema> = {
+  $schema: "The JSON schema location for this document. This schema is generated directly from the TypeScript interfaces used in TiddlyServer. A text-editor with autocomplete, such as VS code, will make editing this file much simpler. Most fields include a description like this one. \n\nAll relative paths in this file are resolved relative to this file, so `./settings-tree.xml` refers to an XML file in the same folder as this file. All relative paths in included files (such as the XML file) are resolved relative to the included file.",
+  authCookieAge: "Age to set for the auth cookie (default is 30 days)\n- 24 hours: 86400\n- 7 days: 604800\n- 30 days: 2592000\n- 60 days: 5184000\n- 90 days: 7776000\n- 120 days: 10368000\n- 150 days: 12950000\n- 180 days: 15552000",
+  debugLevel: "- 4: Errors that require the process to exit for restart \n- 3: Major errors that are handled and do not require a server restart \n- 2: Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500) \n- 1: Info - Most startup messages \n- 0: Normal debug messages and all software and request-side error messages \n- -1: Detailed debug messages from high level apis \n- -2: Response status messages and error response data \n- -3: Request and response data for all messages (verbose) \n- -4: Protocol details and full data dump (such as encryption steps and keys)",
+  maxTransferRequests: "",
+  tree: {
+    $description: "The tree property accepts one of 3 formats. \n\n- If it is a string ending in .xml, .js, or .json, the tree will be loaded from the specified path. JS and JSON files must export a tree property and XML files must specify a tree element as root. \n\n- A path element (or a string specifying the path) to mount a path as root (a single file is possible but pointless). \n\n- A group element or the children of a group element (which is either an array, or an object with no $element property)",
+  },
+  authAccounts: {
+    $description: "",
+    $items: {
+      clientKeys: {
+        $description: "",
+        $items: {
+          publicKey: "",
+          cookieSalt: ""
+        }
+      },
+      permissions: {
+        $description: "",
+        $ref: ""
+      }
+    },
+  },
+  bindInfo: {
+    $description: "bind address and port info",
+    $items: {
+      port: "port to listen on, default is 8080 for http and 8443 for https",
+      _bindLocalhost: "always bind a separate server instance to 127.0.0.1 regardless of any other settings",
+      bindAddress: { $description: "An array of IP addresses to accept requests on. Can be any IP address assigned to the machine. Default is \"127.0.0.1\".\n\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens on the specified IP addresses and accepts all connections from the operating system. If an IP address cannot be bound, the server skips it unless `--bindAddressRequired` is specified\n\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask, (e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-) to block requests incoming to that IP address or range." },
+      bindWildcard: "Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order. The default is `true`. In many cases this is preferred, however Android does not support this for some reason. On Android, set this to `false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses.",
+      enableIPv6: "Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requests incoming to IPv6 addresses if not explicitly denied.",
+      filterBindAddress: "IPv4 addresses may include a subnet mask, (e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) to block requests incoming to that IP address or range.",
+      https: "https-only options: a string to a JavaScript file which exports a function of type `(iface:string) => https.ServerOptions`. Note that the initServer function will change this to a boolean value indicating whether https is in use once inside TiddlyServer.",
+      localAddressPermissions: {
+        $description: "Permissions based on local interface address.  Enter the IP Address and NetMask (`127.0.0.1/8`) as the property key. The keyword \"localhost\" (if specified) matches 127.0.0.0/8 instead of any other specified key.  Keyword \"*\" matches everything that doesn't match another IP address.  This checks the IP address each client connects to (socket.localAddress), not the bind address of the server instance that accepted the request. The keyword defaultPermission does nothing, but auto-complete should give you the default object.  You can then rename it to whatever you need it to be. ",
+        $default: {
+          "writeErrors": false,
+          "mkdir": false,
+          "upload": false,
+          "websockets": false,
+          "registerNotice": true,
+          "putsaver": true,
+          "loginlink": true,
+          "transfer": false,
+          "datafolder": true
+        },
+        $items: {
+          datafolder: "Whether clients may access data folders, which gives them full access to the system as the user that owns the server process because data folders can be easily modified to execute code on the server. This returns a 403 Access Denied if a data folder is detected. It does not serve the files inside the data folder as a regular folder. For that you need to use the noDataFolder attribute on the folder in the tree.",
+          loginlink: "Whether to include a link to the login page when returning auth errors",
+          mkdir: "Whether clients may create new directories and datafolders inside existing directories served by TiddlyWiki",
+          putsaver: "Whether clients may use the put saver, allowing any file served within the tree (not assets) to be overwritten, not just TiddlyWiki files. The put saver cannot save to data folders regardless of this setting.",
+          registerNotice: "Whether login attempts for a public/private key pair which has not been registered will be logged at debug level 2 with the full public key which can be copied into an authAccounts entry. Turn this off if you get spammed with login attempts.",
+          transfer: "Allows clients to use a custom TiddlyServer feature which relays a connection between two clients. ",
+          upload: "Whether clients may upload files to directories (not data folders).",
+          websockets: "Whether clients may open websocket connections.",
+          writeErrors: "Whether to write status 500 errors to the browser, possibly including stack traces."
+        }
+      },
+    }
+  },
+  controllers: { $description: "" },
+  directoryIndex: { $description: "" },
+  putsaver: { $description: "" },
+  datafolder: { $description: "Options object whose properties will be passed to the tiddlywiki server instance using the spread operator. If a property specifies an object instead of a string, the object will be shared between all instances." },
+  _datafolderclient: "The tiddlywiki folder to serve on `/assets/tiddlywiki/`",
+  _datafolderserver: "The tiddlywiki folder to use for data folder instances.",
+  _datafoldertarget: "Deprecated: Use _datafolderserver instead.",
+  _devmode: "enables certain expensive per-request checks",
+
+};
