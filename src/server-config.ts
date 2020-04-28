@@ -427,7 +427,7 @@ export interface ServerConfigSchema {
      */
     localAddressPermissions?: {
       /**
-       * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":false,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
+       * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":true,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
        */
       defaultPermissions?: ServerConfig_AccessOptions;
       [host: string]: ServerConfig_AccessOptions | undefined;
@@ -588,12 +588,12 @@ export interface ServerConfig_AuthAccountsValue {
   /**
    * override hostLevelPermissions for users with this account
    *
-   * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":false,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
+   * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":true,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
    */
   permissions: ServerConfig_AccessOptions;
 }
 /**
- * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":false,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
+ * @default {"writeErrors":false,"mkdir":false,"upload":false,"websockets":true,"registerNotice":true,"putsaver":true,"loginlink":true,"transfer":false,"datafolder":true}
  */
 export interface ServerConfig_AccessOptions {
   /** allow the putsaver to be used */

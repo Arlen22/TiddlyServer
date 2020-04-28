@@ -11,13 +11,12 @@ The server config is both a TypeScript interface, and a JSON file. The JSON file
   "tree": {},
   "authAccounts": {},
   "bindInfo": {},
-  "logging": {},
   "directoryIndex": {},
   "datafolder": {},
   "putsaver": {},
   "authCookieAge": 86400,
   "maxTransferRequests": 20,
-  "_devmode": false,
+  "debugLevel": 0,
   "_datafolderserver": "",
   "_datafolderclient": ""
 }
@@ -25,81 +24,63 @@ The server config is both a TypeScript interface, and a JSON file. The JSON file
 
 ## Section `tree`
 
-The tree property has many expressions, but only one format. In it's simplest form, it is expressed as string values specifying folders and files to be served organized into a tree structure using objects.
+The tree property has many expressions, but only one format. In it's simple form, it is expressed as string values specifying folders and files to be served organized into a tree structure using objects.
 
 <div style="color: rgb(0, 0, 0); font-family: Menlo, Monaco, &quot;Courier New&quot;, monospace; font-size: 12px; line-height: 18px; white-space: pre; overflow: scroll hidden; "><div>{</div><div>  <span style="color: rgb(4, 81, 165);">"tree"</span>: {</div><div>    <span style="color: rgb(4, 81, 165);">"myfolder"</span>: <span style="color: rgb(163, 21, 21);">"../personal"</span>,</div><div>    <span style="color: rgb(4, 81, 165);">"workstuff"</span>: <span style="color: rgb(163, 21, 21);">"../work"</span>,</div><div>    <span style="color: rgb(4, 81, 165);">"user"</span>: <span style="color: rgb(163, 21, 21);">"~/Desktop/random"</span>,</div><div>    <span style="color: rgb(4, 81, 165);">"projects_group"</span>: {</div><div>      <span style="color: rgb(4, 81, 165);">"tiddlyserver"</span>: <span style="color: rgb(163, 21, 21);">"~/Desktop/Github/TiddlyServer"</span>,</div><div>      <span style="color: rgb(4, 81, 165);">"material-theme"</span>: <span style="color: rgb(163, 21, 21);">"~/Dropbox/Material Theme"</span></div><div>    }</div><div>  }</div><div>}</div></div>
 
-In it's most advanced form it is more like an array of Group and Folder class instances. Each Group class instance may contain its own array of Group and Folder class instances, and so on. The end result is exactly the same. In fact, this is the internal representation that TiddlyServer uses. 
+In it's advanced form it is an XML document with element names, attributes, and children. A folder element only has option elements, but a group element may contain other group and folder elements as well as the same option elements. The end result is exactly the same. In fact, this is the internal representation that TiddlyServer uses. 
 
-In the settings file, the simple and advanced formats may be mixed. In other words, an object which doesn't contain the `$element` property is converted to a Group instance. A string is converted to a Folder instance. 
+In the settings file, the simple and advanced formats may be mixed. In other words, an object which doesn't contain the `$element` property is converted into a Group element. A string is converted to a Folder element. The `$element` property is used to keep track of the element name (aka tag name in HTML). 
 
-The `$element` property is used to keep track of which instance type an object is. All instance types are written in a way that imitates XML. This means the tree can also be expressed using XML. Because of this I refer to instances as "elements". 
-
-The navigation and linking is seamless, making it easy to logically organized different folders. 
-
-Internally, the tree property has an array of Host instances at the top level, but TiddlyServer simply uses the first Host in the array, unless the [preflighter](Preflighter.md) specifies a different host index. There are no plans to expand this feature, it is simply there for advanced use-cases to implement if desired. 
-
-Group and Folder elements are collectively referred to as "mount" elements. 
-
-### Host element type
-
-- $element: `host`
-- $mount: One group or folder element, not an array. 
+> Advanced Feature: Internally, the tree property has an array of Host instances at the top level, but TiddlyServer simply uses the first Host in the array, unless the [preflighter](Preflighter.md) specifies a different host index. There are no plans to expand this feature, it is simply there for advanced use-cases.
 
 ### Group element type
 
-- $element: `group`,
-- indexPath: string,
-- key: string - not used if specified in a hashmap instead of an array
-- $children: An array or hashmap of Group and Folder elements
-- $options: An array of Option elements
+- `$element`: `group`,
+- `indexPath`: string,
+- `key`: string - not used if specified in a hashmap instead of an array
+- `$children`: An array or hashmap of Group and Folder elements
+- `$options`: An array of Option elements
 
 In XML: Group, Folder, and Option elements are all be mixed together as child elements. 
 
 ### Folder element type
 
-- $element: `folder`,
-- path: string,
-- key: string - not used if specified in a hashmap instead of an array
-- $options: An array of Option elements
+- `$element`: `folder`,
+- `path`: string,
+- `key`: string 
+  - not used if specified in a hashmap instead of an array
+- `noDataFolder`: boolean 
+  - don't recognize data folders under this path (useful for your Downloads folder)
+- `noTrailingSlash`: boolean 
+  - Mount data folders inside this folder without a trailing slash, so that relative links start at the folder instead of the data folder. This is usually not preferred, because the folder can be referred to with two dots `../` but it can be helpful when converting single file wikis to data folders and there are a lot of interwiki links involved.
+- `$options`: An array of Option elements
 
 ### Option element types
 
-The option elements can be specified on a mount element and apply to all children of that mount element, unless overriden by an option element for a mount element below it. Each element overrides the properties of the element above it, unless the property is undefined. Here is a simple xml example of this.
-
-```xml
-<group>
-  <putsaver backupFolder="~/backups" />
-  <folder path="/junkstuff">
-    <backups backupFolder="" />
-  </folder>
-  <folder path="/treasures">
-    <auth authList='["someone"]' />
-  </folder>
-</group>
-```
-
-In this case, backups will be made for all items in the group except for the `/junkstuff` folder, and users may access all resources in the group except `/treasures`, which is restricted to the auth account `someone`. 
+The option elements can be specified on a group or folder element and apply to all children of that element, unless overriden by an option element for an element below it. Each option element overrides the properties of the element above it, unless the property is undefined. Here is a simple xml example of this.
 
 #### Auth option
 
-- $element: `auth`
-- authList: Array of strings that are the keys of the authAccounts object. These auth accounts are allowed to access this resource.
-- authError: Either `403` or `404`, as desired. The default is 403.
+- `$element`: `auth`
+- `authList`: Array of strings that are the keys from the authAccounts object. These auth accounts are allowed to access this resource. To allow anyone to access a child folder set this to null on that child folder. 
+- `authError`: Either `403` or `404`, as desired. The default is 403.
 
-#### Backups option
+#### Putsaver option
 
-- $element: `backups`
-- backupFolder: The folder path to put backups in. An empty string disables backups for this element.
-- etagAge: Don't save a backup unless the previous backup is older than this.
-- gzip: Whether to gzip compress the backup file to save space (highly recommended).
+- `$element`: `backups`
+- `enabled`: Whether to allow the put saver to function on this path. The default is true.
+- `backupFolder`: The folder path to put backups in. An empty string disables backups for this element.
+- `etag`: Whether to use the etag field -- if not specified then it will check it if presented. This does not affect the backup etagAge option, as the saving mechanism will still send etags back to the browser, regardless of this option.
+- `etagAge`: Don't save a backup unless the previous backup is older than this.
+- `gzipBackups`: Whether to gzip compress the backup file to save space (highly recommended).
 
 #### Index option
 
-- $element: `index`
-- defaultType: The type of directory index to return if no index file is found. `"html"`, `"json"`, `403`, `404` 
-- indexFile: Array of index file names to check for.
-- indexExts: Array of index file extensions to use when checking for index. 
+- `$element`: `index`
+- `defaultType`: The type of directory index to return if no index file is found. `"html"`, `"json"`, `403`, `404` 
+- `indexFile`: Array of index file names to check for.
+- `indexExts`: Array of index file extensions to use when checking for index. 
 
 `indexFile` and `indexExts` must both apply to the request in order for the index file to be used, but they don't need to be specified on the same element. For instance, one may be specified on a group, and the other may be specified on the folder underneath it. 
 
@@ -170,26 +151,29 @@ Permissions based on local address: "localhost", "*" (all others), "192.168.0.0/
 This checks the server IP address each client actually connects to (socket.localAddress), 
 not the bind address of the server instance that accepted the request, so it works with bindWildcard. The localhost key will be used for all localhost requests regardless of the actual IP address.
 
-- `putsaver`: allow the putsaver to be used
-- `writeErrors`: write error messages to the browser
-- `upload`: allow uploads on the directory index page
-- `mkdir`: allow create directory on directory index page
-- `websockets`: allow websocket connections (default true);
-- `registerNotice`: login attempts for a public/private key pair which has not been registered will be logged at debug level 2 with the full public key which can be copied into an authAccounts entry. 
-- `loginlink`: 403 Access Denied error page will include a link to the login page.
+- `datafolder`: Whether clients may access data folders, which gives them full access to the system as the user that owns the server process because data folders can be easily modified to execute code on the server. This returns a 403 Access Denied if a data folder is detected. It does not serve the files inside the data folder as a regular folder. For that you need to use the noDataFolder attribute on the folder in the tree.
+- `loginlink`: Whether to include a link to the login page when returning auth errors
+- `mkdir`: Whether clients may create new directories and datafolders inside existing directories served by TiddlyWiki
+- `putsaver`: Whether clients may use the put saver, allowing any file served within the tree (not assets) to be overwritten, not just TiddlyWiki files. The put saver cannot save to data folders regardless of this setting.
+- `registerNotice`: Whether login attempts for a public/private key pair which has not been registered will be logged at debug level 2 with the full public key which can be copied into an authAccounts entry. Turn this off if you get spammed with login attempts.
+- `transfer`: Allows clients to use a custom TiddlyServer feature which relays a connection between two clients. 
+- `upload`: Whether clients may upload files to directories (not data folders).
+- `websockets`: Whether clients may open websocket connections.
+- `writeErrors`: Whether to write status 500 errors to the browser, possibly including stack traces.
 
-Here is an example of what it could look like, with everything allowed. 
+Here is a good default for the standard use case.
 
 ```json
 {
-  "*": {
-    "putsaver": true,
-    "writeErrors": true,
-    "upload": true,
-    "mkdir": true,
-    "websockets": true,
-    "registerNotice": true
-  }
+  "datafolder": true,
+  "loginlink": true,
+  "mkdir": false,
+  "putsaver": true,
+  "registerNotice": true,
+  "transfer": false,
+  "upload": false,
+  "websockets": true,
+  "writeErrors": false
 }
 ```
 
@@ -235,21 +219,25 @@ A record of strings which will be added to options.variables object of the Tiddl
 
 One security consideration is that if an object is specified instead of a string for any of the properties, then all data folders will be sharing that object. Changes to the object will be seen by all other data folder instances. 
 
-No type checking is done on the values of the datafolder object. 
+No type checking is done on the values of the datafolder object. They are passed directly to each datafolder instance. Plugins in the data folder can access these variables on the server side using the `"th-server-command-post-start"` hook. The TiddlyWiki Server class from `$:/core/modules/server/server.js` is the first argument in the hook, and the string "tiddlyserver" or "tiddlywiki" is the third argument depending on which environment the data folder is loaded in. 
 
 ## Section `putsaver`
 
-Setting this property to false disables the putsaver completely in case this feature is not desired. The properties are the same as the putsaver option element in the tree. This can be considered the top-level `putsaver` option element. 
+Setting this property to false disables the putsaver completely in case this feature is not desired. The properties are the same as the putsaver option element in the tree. This can be considered the top-level `putsaver` option element and setting . 
 
 <div style="color: rgb(0, 0, 0); font-family: Menlo, Monaco, &quot;Courier New&quot;, monospace; font-size: 12px; line-height: 18px; white-space: pre; overflow: auto;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div style="line-height: 18px;"><div>&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"putsaver"</span>:&nbsp;{</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"backupFolder"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"../backups"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"etag"</span>:&nbsp;<span style="color: rgb(163, 21, 21);">"optional"</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"etagAge"</span>:&nbsp;<span style="color: rgb(9, 136, 90);">3</span>,</div><div>&nbsp;&nbsp;&nbsp;&nbsp;<span style="color: rgb(4, 81, 165);">"gzipBackups"</span>:&nbsp;<span style="color: rgb(0, 0, 255);">true</span></div><div>&nbsp;&nbsp;},</div></div></div></div></div>
 
+### enabled: boolean
+
+Set this to false to disable the putsaver.
+
 ### backupFolder: string
 
-Backup directory to use for all single-file wikis, unless over-ridden by the tree. An empty string will disable backups for this folder.
+Backup directory to use for all single-file wikis. An empty string will disable backups.
 
 ### gzipBackups: boolean
 
-Whether to gzip compress the backup file. The `.gz` extension will be added. Default is true. 
+Whether to gzip compress the backup file. The `.gz` extension will be added. Default is true. Files can be uncompressed using `tiddlyserver --gunzip backup.gz backup.html`. 
 
 ### etag: string
 

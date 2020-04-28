@@ -10,12 +10,12 @@ import { homedir } from "os";
 import { StateObject } from './src/state-object';
 
 const configInstallPath = path.join(__dirname, "settings.json");
-const argv = yargs
+const cli = yargs
   .usage("./$0 --config ~/path/to/settings.json")
   .help()
   .option("config", {
     describe: "Path to the server config file. Optional if a settings.json file exists in the installation directory.",
-    demandOption: !fs.existsSync(configInstallPath),
+    // demandOption: !fs.existsSync(configInstallPath),
     type: "string",
   })
   .option("stay-on-error", {
@@ -31,13 +31,21 @@ const argv = yargs
     default: false,
     type: "boolean",
   })
-  .argv;
+  .option("gunzip", {
+    array: true,
+    conflicts: ["config"],
+    describe: "Unzip a backup file. Specify --gunzip input.gz output.html",
+    type: "string"
+  });
+const argv = cli.argv;
 
 const {
   config: userSettings,
   "dry-run": dryRun,
   "stay-on-error": stayOnError,
+  gunzip
 } = argv;
+
 
 
 
@@ -139,7 +147,21 @@ function auditChildren() {
   }
   inspectModule(module);
 }
-if (fs.existsSync(settingsFile)) {
+if (gunzip) {
+  const z = require("zlib");
+  const fs = require("fs");
+  if (gunzip.length !== 2) { 
+    console.log("  Please specify the input gz file and an output file that does not exist."); 
+    process.exit(1);
+  }
+  const [input, output] = gunzip;
+  if (fs.existsSync(output)) {
+    console.log("  The output file already exists");
+    process.exit(1);
+  }
+  fs.writeFileSync(output, z.gunzipSync(fs.readFileSync(input)));
+  console.log("Uncompressed file written to " + path.resolve(output));
+} else if (fs.existsSync(settingsFile)) {
   runServer().catch(e => {
     if (e) logAndCloseServer(e);
   });
