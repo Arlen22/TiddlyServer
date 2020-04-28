@@ -96,7 +96,7 @@
                     "registerNotice": true,
                     "transfer": false,
                     "upload": false,
-                    "websockets": false,
+                    "websockets": true,
                     "writeErrors": false
                   }
                 }
@@ -223,7 +223,7 @@
         "registerNotice": true,
         "transfer": false,
         "upload": false,
-        "websockets": false,
+        "websockets": true,
         "writeErrors": false
       },
       "properties": {
@@ -318,7 +318,7 @@
             "registerNotice": true,
             "transfer": false,
             "upload": false,
-            "websockets": false,
+            "websockets": true,
             "writeErrors": false
           },
           "description": "override hostLevelPermissions for users with this account"
