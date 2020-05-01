@@ -6,7 +6,7 @@
 - If a secure plugin is developed it will be considered a separate local address. 
 - WebSockets now use the same access checks as regular requests. An invalid path will return a 404 error. Not being logged in when required will return the same status code (and HTML page if the loginlink permission allows it) as specified in the tree. 
 - TiddlyServer no longer adds the wss variable to the data folder $tw variable. Plugins should instead listen for the server start hook and add it if desired.  
-- The tiddlywiki directory is now the `tiddlywiki-production` node module. The `_datafoldertarget` setting may still be used to provide a custom path. TiddlyServer will specify the exact version of `tiddlywiki-production` in package.json. 
+- The tiddlywiki directory is now the `tiddlywiki-production-server` and `tiddlywiki-production-client` node modules. The `_datafolderserver` (for loading data folders) and `_datafolderclient` (for serving `/assets/tiddlywiki`) settings may still be used to provide a custom path for both packages. TiddlyServer will specify the exact version of `tiddlywiki-production-*` in package.json.
 - Removed logging option. The debug output (aka error log) goes to stderr and the access log goes to stdout. The startup preamble is printed using `console.log`. I recommend using pm2 or another process manager if you are needing to do more than just log it to console. PM2 is nice because it separates the stdout and stderr streams allowing you to see the latest messages on both. Data folders have been untouched. They should log to wherever they usually do. That's another reason the logging wasn't a perfect option. 
 
 ### 2.1.0
