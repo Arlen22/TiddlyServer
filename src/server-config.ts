@@ -220,7 +220,7 @@ export const defaultPermissions = {
   writeErrors: false,
   mkdir: false,
   upload: false,
-  websockets: false,
+  websockets: true,
   registerNotice: true,
   putsaver: true,
   loginlink: true,
