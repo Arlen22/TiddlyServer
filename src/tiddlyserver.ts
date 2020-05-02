@@ -47,7 +47,12 @@ export async function handleTreeRoute(event: RequestEvent, eventer: ServerEventE
   let { authList, authError } = treeOptions.auth;
 
   if (Array.isArray(authList) && authList.indexOf(event.authAccountKey) === -1)
-    return event.close(403, authAccessDenied(authError, event.allow.loginlink, !!event.authAccountKey));
+    return event.close(403, authAccessDenied(
+      authError,
+      event.allow.loginlink,
+      !!event.authAccountKey,
+      event.url
+    ));
 
   if (Config.isGroup(result.item)) {
     if (event.type === "client") return event.close(404);
@@ -100,7 +105,8 @@ function debugState(debugTag: string, state: TreeStateObject) {
 function authAccessDenied(
   authError: number,
   loginlink: boolean,
-  authAccountsKeySet: boolean
+  authAccountsKeySet: boolean,
+  requestURL: string
 ): string {
   return `
 <html><body>
@@ -110,7 +116,7 @@ ${authAccountsKeySet
       ? "You do not have access to this URL"
       : "In this case you are not logged in. "}
 ${loginlink
-      ? '<br/> Try logging in using the <a href="/admin/authenticate/login.html">login page</a>.'
+      ? `<br/> Try logging in using the <a href="/admin/authenticate/login.html?redirect=${encodeURIComponent(requestURL)}">login page</a>.`
       : ""}
 </p>
 </body></html>

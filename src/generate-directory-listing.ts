@@ -44,6 +44,8 @@ export function generateDirectoryListing(directory, options) {
       .join("");
   }
   const pathArr = directory.path.split("/").filter(a => a);
+  const ourJoin = ["", pathArr.join("/"), ""].join("/");
+  const ourPath = ourJoin === "//" ? "/" : ourJoin;
   const parentJoin = ["", pathArr.slice(0, pathArr.length - 1).join("/"), ""].join("/");
   const parentPath = parentJoin === "//" ? "/" : parentJoin;
   const name = pathArr.slice(pathArr.length - 1);
@@ -67,7 +69,7 @@ function logout(){
 ${
   options.isLoggedIn
     ? `<p>Welcome ${options.isLoggedIn}, <a href="javascript:return false;" onclick="logout()">logout</a></p>`
-    : `<p><a href="/admin/authenticate/login.html">Login</a></p>`
+    : `<p><a href="/admin/authenticate/login.html?redirect=${encodeURIComponent(ourPath)}">Login</a></p>`
 }
 ${pathArr.length > 0 ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>` : ``}
 <ul>${listEntries(directory.entries)}</ul>
