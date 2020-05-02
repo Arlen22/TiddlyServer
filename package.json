@@ -40,11 +40,6 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "tsc && node build/server --config settings.json",
-    "assets": "cp -rv ./assets ./preflighter.js ./scripts ./README.md ./build",
-    "build:init": "rm -rf build",
-    "build:dev": "tsc && webpack && node build-schema.js",
-    "build:final": "rm -rf ./build/package.d.ts ./build/server.js ./build/server.d.ts ./build/src",
-    "build": "npm run build:init && npm run build:dev && node build-package-json.js && npm run build:final",
     "prettier": "prettier --write src/*.ts",
     "postinstall": "tsc && cp -rv ./assets ./build"
   },
