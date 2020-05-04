@@ -45,6 +45,8 @@
   "scripts": {
     "test": "tsc && node dist/server --config settings.json --dry-run",
     "start": "tsc && node dist/server --config settings.json",
+    "server": "node dist/server --config settings.json",
+    "index": "node dist/index --config settings.json",
     "build:schema": "node build-schema.js",
     "build:pkg": "node build-package-json.js",
     "build": "rm -rf dist && tsc && webpack && npm run build:pkg"
