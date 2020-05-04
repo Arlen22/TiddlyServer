@@ -14,9 +14,10 @@ try {
   root["$id"] = prefix + ".schema.json";
   root["definitions"]['ServerConfigSchema']['properties']['tree'] = {'$ref': prefix + '-tree.schema.json'}
   let options = createGenerator(config).createSchema("OptionsArraySchema");
-  options["$id"] = prefix + "-tree-options.schema.json";
-  writeFileSync(prefix + ".schema.json", stringify(root, {space: 2}));
-  writeFileSync(prefix + "-tree-options.schema.json", stringify(options, {space: 2}));
+  options["$id"] = "https://raw.githubusercontent.com/Arlen22/TiddlyServer/v2.2/src/schema/"
+   + prefix + "-tree-options.schema.json";
+  writeFileSync("src/schema/" + prefix + ".schema.json", stringify(root, {space: 2}));
+  writeFileSync("src/schema/" + prefix + "-tree-options.schema.json", stringify(options, {space: 2}));
 } catch (error) {
   if (error instanceof BaseError) {
     process.stderr.write(formatError(error));

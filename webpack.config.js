@@ -1,8 +1,7 @@
-import * as path from "path";
+const path = require("path");
 /** @type {import("webpack")} */
 const webpack = module.parent.require("webpack");
-import CopyPlugin from "copy-webpack-plugin";
-import { CleanWebpackPlugin } from 'clean-webpack-plugin';
+const CopyPlugin = require("copy-webpack-plugin");
 
 const dev = false;
 /** @type {import("webpack").Configuration} */
