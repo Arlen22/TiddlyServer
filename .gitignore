@@ -35,5 +35,5 @@ https.js
 settings-*.json
 !settings-*.schema.json
 lib/compiled-lib.js
-build/
+/dist/
 /backups/

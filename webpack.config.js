@@ -1,21 +1,44 @@
 const path = require("path");
 const webpack = module.parent.require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
 let dev = false;
+let watch = false;
 /** @type {import("webpack").Configuration} */
 const options = {
-  entry: { index: "./build/server.js" },
+  entry: { index: "./dist/build/server.js" },
   target: "node",
   mode: dev ? "none" : "production",
   devtool: false ? 'source-map' : "",
-  watch: false,
+  watch,
   plugins: [
     new webpack.DefinePlugin({
       GENTLY: false,
       global: { GENTLY: false },
       "typeof __non_webpack_require__": JSON.stringify("function")
     }),
-    new webpack.BannerPlugin({ banner: "#!/usr/bin/env node", raw: true }),
+    new webpack.BannerPlugin({
+      banner: "#!/usr/bin/env node", raw: true
+    }),
+    //./preflighter.js ./scripts ./README.md ./build
+    new CopyPlugin([
+      { from: 'assets', to: './assets/' },
+      { from: 'preflighter.js', to: '.' },
+      { from: 'scripts', to: './scripts/' },
+      { from: 'README.md', to: '.' },
+    ]),
+    new CleanWebpackPlugin({
+      cleanOnceBeforeBuildPatterns: [],
+      //only cleanup if we aren't watching
+      cleanAfterEveryBuildPatterns: watch ? [] : [
+        "build/"
+        // "package.d.ts",
+        // "package.json",
+        // "src/",
+        // "server.d.ts",
+        // "server.js"
+      ]
+    }),
   ],
   node: {
     global: true,
@@ -24,7 +47,7 @@ const options = {
   },
   output: {
     filename: '[name].js',
-    path: path.resolve(__dirname, "build"),
+    path: path.resolve(__dirname, "dist"),
     libraryTarget: 'commonjs'
   },
   externals: [
