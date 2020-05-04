@@ -1,16 +1,17 @@
 const path = require("path");
 const webpack = module.parent.require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
-const { CleanWebpackPlugin } = require('clean-webpack-plugin');
-let dev = false;
-let watch = false;
+const CleanWebpackPlugin = require('clean-webpack-plugin').CleanWebpackPlugin;
+
+
+const dev = false;
 /** @type {import("webpack").Configuration} */
 const options = {
   entry: { index: "./dist/build/server.js" },
   target: "node",
   mode: dev ? "none" : "production",
   devtool: false ? 'source-map' : "",
-  watch,
+  watch: false,
   plugins: [
     new webpack.DefinePlugin({
       GENTLY: false,
@@ -20,25 +21,12 @@ const options = {
     new webpack.BannerPlugin({
       banner: "#!/usr/bin/env node", raw: true
     }),
-    //./preflighter.js ./scripts ./README.md ./build
     new CopyPlugin([
       { from: 'assets', to: './assets/' },
       { from: 'preflighter.js', to: '.' },
       { from: 'scripts', to: './scripts/' },
       { from: 'README.md', to: '.' },
     ]),
-    new CleanWebpackPlugin({
-      cleanOnceBeforeBuildPatterns: [],
-      //only cleanup if we aren't watching
-      cleanAfterEveryBuildPatterns: watch ? [] : [
-        "build/"
-        // "package.d.ts",
-        // "package.json",
-        // "src/",
-        // "server.d.ts",
-        // "server.js"
-      ]
-    }),
   ],
   node: {
     global: true,
@@ -51,10 +39,11 @@ const options = {
     libraryTarget: 'commonjs'
   },
   externals: [
-    "tiddlywiki-production",
     "bufferutil",
     "utf-8-validate",
-    "tiddlywiki-production/boot/boot.js"
+    "tiddlywiki-production",
+    "tiddlywiki-production-server",
+    "tiddlywiki-production-client"
   ],
   stats: {
     // Ignore warnings due to yarg's dynamic module loading
@@ -63,34 +52,3 @@ const options = {
 };
 
 module.exports = options;
-
-
-const old = {
-  watch: false,
-  entry: path.resolve(__dirname, "./build/server.js"),
-  output: {
-    filename: "server-bin.js",
-    path: path.resolve(__dirname, "./build/"),
-    libraryTarget: "commonjs2"
-  },
-  plugins: [
-    new webpack.DefinePlugin({
-      GENTLY: false,
-      global: { GENTLY: false }
-    }),
-    new CopyPlugin([
-      // { from: "./"}
-    ])
-  ],
-  mode: false ? "development" : "production",
-  target: "node",
-  node: {
-    global: true,
-    __dirname: false,
-    __filename: false
-  },
-  externals: {
-    "utf-8-validate": "commonjs utf-8-validate",
-    bufferutil: "commonjs bufferutil"
-  }
-};

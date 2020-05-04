@@ -41,10 +41,11 @@
     "webpack-cleanup-plugin": "^0.5.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "tsc && node build/server --config settings.json",
-    "prettier": "prettier --write src/*.ts",
-    "postinstall": "tsc && cp -rv ./assets ./build"
+    "test": "tsc && node dist/build/server --config settings.json --dry-run",
+    "start": "tsc && node dist/build/server --config settings.json",
+    "build:schema": "node build-schema.js",
+    "build:pkg": "node build-package-json.js",
+    "build": "rm -rf dist && tsc && webpack && npm run build:pkg"
   },
   "author": "Arlen22@GitHub.com",
   "license": "MIT"
