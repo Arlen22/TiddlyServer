@@ -36,6 +36,7 @@
     "yargs": "^15.1.0"
   },
   "devDependencies": {
+    "@types/copy-webpack-plugin": "^5.0.0",
     "clean-webpack-plugin": "^3.0.0",
     "copy-webpack-plugin": "^5.1.1",
     "webpack-cleanup-plugin": "^0.5.1"

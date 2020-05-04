@@ -1,11 +1,9 @@
-const path = require("path");
-const webpack = module.parent.require("webpack");
-const CopyPlugin = require("copy-webpack-plugin");
-const CleanWebpackPlugin = require('clean-webpack-plugin').CleanWebpackPlugin;
-
+import * as path from "path";
+const webpack: typeof import("webpack") = module.parent.require("webpack");
+import CopyPlugin from "copy-webpack-plugin";
+import { CleanWebpackPlugin } from 'clean-webpack-plugin';
 
 const dev = false;
-/** @type {import("webpack").Configuration} */
 const options = {
   entry: { index: "./dist/build/server.js" },
   target: "node",
