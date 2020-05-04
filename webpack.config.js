@@ -2,11 +2,11 @@ const path = require("path");
 /** @type {import("webpack")} */
 const webpack = module.parent.require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
-
+const CleanWebpackPlugin = require("clean-webpack-plugin").CleanWebpackPlugin;
 const dev = false;
 /** @type {import("webpack").Configuration} */
 const options = {
-  entry: { index: "./dist/build/server.js" },
+  entry: { index: "./dist/server.js" },
   target: "node",
   mode: dev ? "none" : "production",
   devtool: false ? 'source-map' : "",
@@ -26,6 +26,15 @@ const options = {
       { from: 'scripts', to: './scripts/' },
       { from: 'README.md', to: '.' },
     ]),
+    new CleanWebpackPlugin({
+      cleanAfterEveryBuildPatterns: [
+        "server.d.ts",
+        "server.js",
+        "package.d.ts",
+        "src/"
+      ],
+      cleanOnceBeforeBuildPatterns: []
+    })
   ],
   node: {
     global: true,

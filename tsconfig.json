@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "./dist/build",
+    "outDir": "./dist",
     "baseUrl": ".",
     "rootDirs": [
       "src",
