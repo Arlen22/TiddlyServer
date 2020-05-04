@@ -8,18 +8,18 @@ import {
   ServerConfigSchema,
 } from "./server-config";
 import { as } from "./server-types";
-
+type Reffer = Record<string, () => TypeCheck<any>>;
 abstract class TypeCheck<T> {
   static currentKeyArray: (string | number)[] = [];
   static stack: TypeCheck<any>[] = [];
   public abstract expectedMessage: string;
-  public abstract error: Record<string | number, any> | string | undefined;
+  public abstract error: Record<string, any> | string | undefined;
   public abstract currentKey: string | number | symbol | undefined;
-  protected abstract _check(a: any): a is T;
+  protected abstract _check(a: any, reffer: Reffer): a is T;
 
   private errMessage = (err: any) => JSON.stringify(TypeCheck.currentKeyArray) + " " + err + "\n";
 
-  public check(a: any): a is T {
+  public check(a: any, reffer: Reffer): a is T {
     let parent: TypeCheck<any> | undefined = TypeCheck.stack[TypeCheck.stack.length - 1];
     TypeCheck.stack.push(this);
     this.currentKey = undefined;
@@ -27,7 +27,7 @@ abstract class TypeCheck<T> {
     let res: boolean = false;
 
     if (!parent) {
-      res = this._check(a);
+      res = this._check(a, reffer);
     } else if (
       parent instanceof CheckMultiple ||
       parent instanceof CheckObject ||
@@ -35,7 +35,7 @@ abstract class TypeCheck<T> {
     ) {
       let key = parent.currentKey;
 
-      res = this._check(a);
+      res = this._check(a, reffer);
 
       if (!res && typeof parent.error === "object") {
         parent.error[key] = this.error;
@@ -46,8 +46,8 @@ abstract class TypeCheck<T> {
       }
     } else if (parent instanceof CheckSimple) {
       throw new Error("CheckSimple instances may not call other checkers. ");
-    } else if (parent instanceof CheckRepeat) {
-      res = this._check(a);
+    } else if (parent instanceof CheckRef) {
+      res = this._check(a, reffer);
       if (!res) parent.error = this.error;
     } else {
       throw new Error("unhandled instance " + this.toString());
@@ -56,6 +56,8 @@ abstract class TypeCheck<T> {
     this.currentKey = undefined;
     return res;
   }
+  public abstract getSchema(reffer: Reffer): any;
+
   static errorMessage(key: symbol): (co: any, x: any) => string {
     switch (key) {
       case CheckObject.wrongUnionKey:
@@ -81,73 +83,117 @@ class CheckSimple<T> extends TypeCheck<T> {
   public error: string = "";
   public currentKey: undefined = undefined;
   protected _check: (a: any) => a is T;
-  constructor(public expectedMessage: string, check: (a: any) => a is T) {
+  constructor(
+    public expectedMessage: string,
+    check: (a: any) => a is T,
+    public schema: {
+      type: "boolean" | "number" | "string" | "null" | "any",
+      default?: any,
+      enum?: any[],
+      expectNotEmpty?: boolean
+    }
+  ) {
     super();
     this._check = check;
     this.error = this.expectedMessage;
+  }
+  getSchema() {
+    return {
+      type: this.schema.type,
+      enum: this.schema.enum,
+      default: this.schema.default
+    }
   }
 }
 
 export const checkString = new CheckSimple(
   "expected a string value",
-  (a): a is string => typeof a === "string"
+  (a): a is string => typeof a === "string",
+  { type: "string" }
 );
 export const checkStringEnum = <T extends string>(...val: T[]) =>
   new CheckSimple(
     "expected one string of " + JSON.stringify(val),
-    (a): a is T => typeof a === "string" && (val as string[]).indexOf(a) !== -1
+    (a): a is T => typeof a === "string" && (val as string[]).indexOf(a) !== -1,
+    { type: "string", enum: val }
   );
 export const checkStringNotEmpty = new CheckSimple(
   "expected a string with non-zero length",
-  (a): a is string => typeof a === "string" && a.length > 0
+  (a): a is string => typeof a === "string" && a.length > 0,
+  { type: "string", expectNotEmpty: true }
 );
 export const checkNumber = new CheckSimple(
   "expected a number value",
-  (a): a is number => typeof a === "number"
+  (a): a is number => typeof a === "number",
+  { type: "number" }
 );
 export const checkNumberEnum = <T extends number>(...val: T[]) =>
   new CheckSimple(
     "expected one number of " + JSON.stringify(val),
-    (a): a is T => typeof a === "number" && (val as number[]).indexOf(a) !== -1
+    (a): a is T => typeof a === "number" && (val as number[]).indexOf(a) !== -1,
+    { type: "number", enum: val }
   );
 export const checkBoolean = new CheckSimple(
   "expected a boolean value",
-  (a): a is boolean => typeof a === "boolean"
+  (a): a is boolean => typeof a === "boolean",
+  { type: "boolean" }
 );
 export const checkBooleanTrue = new CheckSimple(
   "expected a boolean true",
-  (a): a is true => typeof a === "boolean" && a === true
+  (a): a is true => typeof a === "boolean" && a === true,
+  { type: "boolean", enum: [true] }
 );
 export const checkBooleanFalse = new CheckSimple(
   "expected a boolean false",
-  (a): a is false => typeof a === "boolean" && a === false
+  (a): a is false => typeof a === "boolean" && a === false,
+  { type: "boolean", enum: [false] }
 );
 export const checkNull = new CheckSimple(
   "expected a null value",
-  (a): a is null => typeof a === "object" && a === null
+  (a): a is null => typeof a === "object" && a === null,
+  { type: "null" }
 );
-export const checkAny = new CheckSimple("expected any value", (a): a is any => true);
+export const checkAny = new CheckSimple(
+  "expected any value",
+  (a): a is any => true,
+  { type: "any" }
+);
 
 export class CheckMultiple<T extends {}> extends TypeCheck<T> {
-  error: Record<string | number, any> | string = {} as any;
+  error: Record<string, any> | string = {} as any;
   currentKey: any;
-  protected _check = (a: any): a is T => {
+  protected _check = (a: any, reffer): a is T => {
     this.currentKey = undefined;
     this.error = {};
-    let res = this.checkObject(a);
+    let res = this.checkObject(a, reffer);
 
     if (!res) return (this.error = this.expectedMessage), res;
     else
-      return this.checkChildren(a, k => {
+      return this.checkChildren(a, reffer, k => {
         this.currentKey = k;
       });
   };
+  // public schema = { type: "object",  }
   constructor(
     public expectedMessage: string,
-    private checkObject: (a: any) => a is T,
-    private checkChildren: (a: any, curKey: (k: any) => void) => a is T
+    private checkObject: (a: any, reffer: Reffer) => a is T,
+    private checkChildren: (a: any, reffer: Reffer, curKey: (k: any) => void) => a is T,
+    private schema: "array" | "record",
+    private childType: TypeCheck<any>
   ) {
     super();
+  }
+  getSchema(reffer) {
+    switch (this.schema) {
+      case "record": return {
+        type: "object",
+        additionalProperties: this.childType.getSchema(reffer),
+      };
+      case "array": return {
+        items: this.childType.getSchema(reffer),
+        type: "array"
+      };
+    }
   }
 }
 
@@ -155,41 +201,47 @@ type ArrayType<T> = T extends Array<infer X> ? X : never;
 export const checkArray = <V>(checker: TypeCheck<V>) =>
   new CheckMultiple(
     "expected an array that " + checker.expectedMessage,
-    (a): a is V[] => typeof a === "object" && Array.isArray(a),
-    (a, curKey): a is V[] =>
+    (a, reffer): a is V[] => typeof a === "object" && Array.isArray(a),
+    (a, reffer, curKey): a is V[] =>
       a.filter((b, i) => {
         curKey(i);
-        return checker.check(b);
-      }).length === a.length
+        return checker.check(b, reffer);
+      }).length === a.length,
+    "array",
+    checker
   );
 
-export const checkRecord = <K extends string | number, V>(
+export const checkRecord = <K extends string, V>(
   keyChecker: TypeCheck<K>,
   checker: TypeCheck<V>
 ) =>
   new CheckMultiple<{ [k in K]: V }>(
     "expected a record that " + checker.expectedMessage,
-    (a): a is { [k in K]: V } => typeof a === "object",
-    (a, curKey): a is { [k in K]: V } => {
+    (a, reffer): a is { [k in K]: V } => typeof a === "object",
+    (a, reffer, curKey): a is { [k in K]: V } => {
       let keys = Object.keys(a);
       let arr = keys.filter(k => {
         curKey(k);
-        return keyChecker.check(k) && checker.check(a[k]);
+        return keyChecker.check(k, reffer) && checker.check(a[k], reffer);
       });
       return arr.length === keys.length;
-    }
+    },
+    "record",
+    checker
   );
 
 class CheckUnionWrapper<A, B> extends TypeCheck<A | B> {
   currentKey: number | undefined = undefined;
-  error: Record<number, any> = {};
+  error: any[] = [];
   _check: (x: any) => x is A | B = (a): a is A | B => {
     throw new Error("incorrect usage of CheckUnionWrapper");
   };
   get expectedMessage(): string {
     throw new Error("incorrect usage of CheckUnionWrapper");
   }
-
+  getSchema() {
+    throw new Error("incorrect usage of CheckUnionWrapper");
+  }
   constructor(public checkerA: TypeCheck<A>, public checkerB: TypeCheck<B>) {
     super();
   }
@@ -197,11 +249,12 @@ class CheckUnionWrapper<A, B> extends TypeCheck<A | B> {
 
 class CheckUnion<T> extends TypeCheck<T> {
   currentKey: string | number | undefined = undefined;
-  error: Record<number, any> = {};
+  error: any[];
   expectedMessage: string = "";
 
   constructor(public checks: TypeCheck<any>[]) {
     super();
+    this.error = new Array(this.checks.length);
     this.expectedMessage = checks.map(e => e.expectedMessage).join(", ");
     if (this.checks.filter(e => e instanceof CheckUnion).length > 0)
       throw new Error(
@@ -209,14 +262,14 @@ class CheckUnion<T> extends TypeCheck<T> {
       );
   }
 
-  _check = (a: any): a is T => {
+  _check = (a: any, reffer: Reffer): a is T => {
     // this.lastResult = undefined;
     this.currentKey = undefined;
-    this.error = {};
+    this.error = new Array(this.checks.length);
 
     let res = this.checks.map((e, i) => {
       this.currentKey = i;
-      let res = e.check(a);
+      let res = e.check(a, reffer);
       let err = e.error;
       return [res, err] as const;
     });
@@ -229,6 +282,11 @@ class CheckUnion<T> extends TypeCheck<T> {
     // })
     return is;
   };
+  getSchema(reffer) {
+    return {
+      "anyOf": this.checks.map(e => e.getSchema(reffer))
+    }
+  }
 }
 // function getErrObj(is: boolean, checker: TypeCheck<any>, value: any) {
 //   let errHash = (checker instanceof CheckObject)
@@ -283,13 +341,27 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
           throw new Error("unionKey not found in checkermap " + k);
       });
   }
-
+  getSchema(reffer) {
+    const properties = {};
+    this.required.forEach(k => {
+      properties[k] = this.checkermap[k].getSchema(reffer);
+    });
+    this.optional.forEach(k => {
+      properties[k] = this.checkermap[k].getSchema(reffer);
+    });
+    return {
+      type: "object",
+      additionalProperties: false,
+      properties,
+      required: this.required
+    }
+  }
   public expectedMessage: string;
   public lastResult?: symbol = CheckObject.typeofNotObject;
   public lastMessage: string = "";
   // public errorLog: string[][] = [];
   public currentKey: string | number | undefined = undefined;
-  public error: Record<string | number, any> | string | undefined = {};
+  public error: Record<string, any> | string | undefined = {};
   currentKeyArray: string[] = [];
   private symbolError(symbol: symbol, value: any, missingkeys?: string[]): false {
     this.lastResult = symbol;
@@ -300,7 +372,7 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
         : TypeCheck.errorMessage(symbol)(this, value);
     return false;
   }
-  protected _check(a: any): a is T {
+  protected _check(a: any, reffer: Reffer): a is T {
     this.lastResult = undefined;
     this.currentKey = undefined;
     this.lastMessage = "";
@@ -317,7 +389,7 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
       this.unionKeys &&
       !(
         this.unionKeys.filter(k => {
-          let res = keys.indexOf(k) !== -1 && this.checkermap[k].check(a[k]);
+          let res = keys.indexOf(k) !== -1 && this.checkermap[k].check(a[k], reffer);
           return res;
         }).length === this.unionKeys.length
       );
@@ -337,10 +409,10 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
         let res: boolean = false;
         if (this.checkermap[k]) {
           this.currentKey = k;
-          res = this.checkermap[k].check(a[k]);
+          res = this.checkermap[k].check(a[k], reffer);
         } else if (this.optionalcheckermap[k]) {
           this.currentKey = k;
-          res = this.optionalcheckermap[k].check(a[k]);
+          res = this.optionalcheckermap[k].check(a[k], reffer);
         } else {
           this.currentKey = k;
           res = false;
@@ -367,9 +439,9 @@ type OptionalCheckermap<T extends {}, REQUIRED extends keyof T> = {
 };
 // type OptionalCheckermap<T extends { [K: string]: unknown }, REQUIRED extends string> = { [KEY in Exclude<keyof T, REQUIRED>]-?: TypeCheck<T[KEY]> };
 
-export function checkResult(e: TypeCheck<any>, a: any) {
+export function checkResult(e: TypeCheck<any>, a: any, reffer: Reffer) {
   let union = new CheckUnion([e]);
-  let res = union.check(a);
+  let res = union.check(a, reffer);
   return [res, union.error ? union.error[0] : undefined] as const;
 }
 
@@ -381,17 +453,24 @@ export function checkObject<T, REQUIRED extends keyof T = keyof T>(
   return new CheckObject<T>(checkermap, optionalcheckermap, unionKeys);
 }
 
-class CheckRepeat<T> extends TypeCheck<T> {
+class CheckRef<T> extends TypeCheck<T> {
   // public expectedMessage: string = "";
-  public error: string | Record<string | number, any> | undefined = {};
+  public error: string | Record<string, any> | undefined = {};
   public currentKey: string | number | symbol | undefined;
-  protected _check(a: any): a is T {
+  protected _check(a: any, reffer: Reffer): a is T {
     this.error = {};
-    return this.innerCheck().check(a);
+    return reffer[this.refKey]().check(a, reffer);
   }
 
-  constructor(private innerCheck: () => TypeCheck<T>, public expectedMessage: string) {
+  constructor(
+    private refKey: string,
+    public expectedMessage: string
+  ) {
     super();
+  }
+
+  getSchema() {
+    return { $ref: this.refKey }
   }
 }
 /**
@@ -400,9 +479,9 @@ class CheckRepeat<T> extends TypeCheck<T> {
  * be a unique instance. The callback will be called on each
  * recursion.
  */
-export const checkRepeat = <T>(cb: () => TypeCheck<T>, expected: string) =>
-  new CheckRepeat(cb, expected);
-
+export const checkRef = <REFFER extends Record<string, TypeCheck<any>>>() => <K extends keyof REFFER>(refKey: K, expected: string) => {
+  return new CheckRef<REFFER[K] extends TypeCheck<infer X> ? X : any>(refKey, expected);
+}
 
 const checkAccessPerms = checkObject<ServerConfig_AccessOptions>({
   mkdir: checkBoolean,
@@ -423,145 +502,10 @@ export const checkController = checkArray(checkObject<ServerConfig_Controller>({
   allowSave: checkBoolean
 }));
 export function checkServerConfig(obj): readonly [boolean, string | {}] {
-  // if(checker === undefined) checker = new CheckInterface(false);
-  // else if (typeof checker === "boolean") checker = new CheckInterface(checker);
 
-  // let checker = new CheckInterface(showUnionNulls);
-  // let { checkBoolean, checkString, checkStringEnum, checkNumber, checkNumberEnum, checkBooleanFalse, checkNull } = checker;
+  const _checkServerConfig = getServerConfig();
+  let [res, errHash] = checkResult(_checkServerConfig["#/definitions/ServerConfig"], obj, _checkServerConfig);
 
-  const putsaverOptional = as<OptionalCheckermap<ServerConfig_PutSaver, never>>({
-    backupFolder: checkString,
-    etag: checkStringEnum("optional", "required", "disabled"),
-    etagAge: checkNumber,
-    gzipBackups: checkBoolean,
-    enabled: checkBoolean,
-  });
-  const checkOptions: TypeCheck<
-    Config.Options_Auth | Config.Options_Putsaver | Config.Options_Index
-  > = checkUnion(
-    checkObject<Config.Options_Auth, "$element">(
-      {
-        $element: checkStringEnum("auth"),
-      },
-      {
-        authError: checkNumberEnum(403, 404),
-        authList: checkUnion(checkArray(checkString), checkNull),
-      },
-      ["$element"]
-    ),
-    checkUnion.cu(
-      checkObject<Config.Options_Putsaver, "$element">(
-        {
-          $element: checkStringEnum("putsaver"),
-        },
-        putsaverOptional,
-        ["$element"]
-      ),
-      checkObject<Config.Options_Index, "$element">(
-        {
-          $element: checkStringEnum("index"),
-        },
-        {
-          defaultType: checkUnion(checkStringEnum("html", "json"), checkNumberEnum(404, 403)),
-          indexExts: checkArray(checkString),
-          indexFile: checkArray(checkString),
-        },
-        ["$element"]
-      )
-    )
-  );
-  const GroupChild: () => TypeCheck<Config.PathElement | Config.GroupElement> = () =>
-    checkUnion(
-      checkObject<Config.PathElement>(
-        {
-          $element: checkStringEnum("folder"),
-          $options: checkArray(checkOptions),
-          key: checkString,
-          noTrailingSlash: checkBoolean,
-          noDataFolder: checkBoolean,
-          path: checkString,
-        },
-        undefined,
-        ["$element"]
-      ),
-      checkObject<Config.GroupElement>(
-        {
-          $element: checkStringEnum("group"),
-          $children: checkArray(checkRepeat(() => GroupChild(), "expected a repeat of GroupChild")),
-          $options: checkArray(checkOptions),
-          key: checkString,
-          indexPath: checkUnion(checkString, checkBooleanFalse),
-        },
-        undefined,
-        ["$element"]
-      )
-    );
-
-
-  const _checkServerConfig = checkObject<ServerConfig>({
-
-    $schema: checkString,
-    __assetsDir: checkString,
-    __dirname: checkString,
-    __filename: checkString,
-    __serverTW: checkString,
-    __clientTW: checkString,
-    _devmode: checkBoolean,
-    authCookieAge: checkNumber,
-    maxTransferRequests: checkNumber,
-    debugLevel: checkNumber,
-    tree: checkArray(
-      checkObject<Config.HostElement>({
-        $element: checkStringEnum("host"),
-        $mount: GroupChild(),
-      })
-    ),
-    authAccounts: checkRecord(
-      checkString,
-      checkObject<ServerConfig["authAccounts"][""]>({
-        clientKeys: checkRecord(
-          checkString,
-          checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
-            publicKey: checkString,
-            cookieSalt: checkStringNotEmpty,
-          })
-        ),
-        permissions: checkAccessPerms,
-      })
-    ),
-    bindInfo: checkObject<ServerConfig["bindInfo"]>({
-      _bindLocalhost: checkBoolean,
-      bindAddress: checkArray(checkString),
-      bindWildcard: checkBoolean,
-      enableIPv6: checkBoolean,
-      filterBindAddress: checkBoolean,
-      https: checkBoolean,
-      localAddressPermissions: checkRecord(checkString, checkAccessPerms),
-      port: checkNumber,
-    }),
-    controllers: checkController,
-    directoryIndex: checkObject<ServerConfig["directoryIndex"]>({
-      defaultType: checkStringEnum("html", "json"),
-      icons: checkRecord(checkString, checkArray(checkString)),
-      mimetypes: checkRecord(checkString, checkArray(checkString)),
-      mixFolders: checkBoolean,
-      types: checkRecord(checkString, checkString),
-    }),
-    // logging: checkObject<ServerConfig["logging"]>({
-    //   debugLevel: checkNumber,
-    //   logAccess: checkUnion(checkString, checkBooleanFalse),
-    //   logColorsToFile: checkBoolean,
-    //   logError: checkString,
-    //   logToConsoleAlso: checkBoolean,
-    // }),
-    putsaver: checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional),
-    datafolder: checkRecord(checkString, checkAny),
-  });
-  let [res, errHash] = checkResult(_checkServerConfig, obj);
-
-  // if (res !== true) console.log(errHash); //if you hit this breakpoint, it means the settings does
-  //not conform to ServerConfig and the server is about to exit. The error data is in `res`.
-  // console.log("Check server config result: " + JSON.stringify(res, null, 2));
   return [res, errHash] as const;
 
 }
@@ -650,3 +594,141 @@ let descriptions: DescObj<ServerConfigSchema> = {
   _devmode: "enables certain expensive per-request checks",
 
 };
+
+function getServerConfig() {
+  const putsaverOptional = () => ({
+    backupFolder: checkString,
+    etag: checkStringEnum("optional", "required", "disabled"),
+    etagAge: checkNumber,
+    gzipBackups: checkBoolean,
+    enabled: checkBoolean,
+  });
+  type refsType = {
+    "#/definitions/GroupChild": TypeCheck<Config.PathElement | Config.GroupElement>,
+    "#/definitions/TreeOptions": TypeCheck<Config.Options_Auth | Config.Options_Index | Config.Options_Putsaver>,
+    "#/definitions/ServerConfig": TypeCheck<ServerConfig>,
+    "#/definitions/AccessOptions": TypeCheck<ServerConfig_AccessOptions>,
+    "#/definitions/PutSaver": TypeCheck<ServerConfig_PutSaver>
+  }
+  const refs: Record<keyof refsType, any> = {
+    "#/definitions/GroupChild": (): TypeCheck<Config.PathElement | Config.GroupElement> =>
+      checkUnion(
+        checkObject<Config.PathElement>(
+          {
+            $element: checkStringEnum("folder"),
+            $options: checkArray(checkRef<refsType>()("#/definitions/TreeOptions", "expected one of TreeOptions")),
+            noTrailingSlash: checkBoolean,
+            noDataFolder: checkBoolean,
+            path: checkString,
+            key: checkString,
+          },
+          undefined,
+          ["$element"]
+        ),
+        checkObject<Config.GroupElement>(
+          {
+            $element: checkStringEnum("group"),
+            $children: checkArray(checkRef<refsType>()("#/definitions/GroupChild", "expected a repeat of GroupChild")),
+            $options: checkArray(checkRef<refsType>()("#/definitions/TreeOptions", "expected one of TreeOptions")),
+            indexPath: checkUnion(checkString, checkBooleanFalse),
+            key: checkString,
+          },
+          undefined,
+          ["$element"]
+        )
+      ),
+    "#/definitions/TreeOptions": () => checkUnion(
+      checkObject<Config.Options_Auth, "$element">(
+        { $element: checkStringEnum("auth") },
+        {
+          authError: checkNumberEnum(403, 404),
+          authList: checkUnion(checkArray(checkString), checkNull),
+        },
+        ["$element"]
+      ),
+      checkUnion.cu(
+        checkObject<Config.Options_Putsaver, "$element">(
+          {
+            $element: checkStringEnum("putsaver"),
+          },
+          putsaverOptional(),
+          ["$element"]
+        ),
+        checkObject<Config.Options_Index, "$element">(
+          {
+            $element: checkStringEnum("index"),
+          },
+          {
+            defaultType: checkUnion(checkStringEnum("html", "json"), checkNumberEnum(404, 403)),
+            indexExts: checkArray(checkString),
+            indexFile: checkArray(checkString),
+          },
+          ["$element"]
+        )
+      )
+    ),
+    "#/definitions/AccessOptions": checkObject<ServerConfig_AccessOptions>({
+      mkdir: checkBoolean,
+      upload: checkBoolean,
+      websockets: checkBoolean,
+      writeErrors: checkBoolean,
+      registerNotice: checkBoolean,
+      putsaver: checkBoolean,
+      loginlink: checkBoolean,
+      transfer: checkBoolean,
+      datafolder: checkBoolean
+    }),
+    "#/definitions/PutSaver": putsaverOptional(),
+    "#/definitions/ServerConfig": checkObject<ServerConfig>({
+      $schema: checkString,
+      __assetsDir: checkString,
+      __dirname: checkString,
+      __filename: checkString,
+      __serverTW: checkString,
+      __clientTW: checkString,
+      _devmode: checkBoolean,
+      authCookieAge: checkNumber,
+      maxTransferRequests: checkNumber,
+      debugLevel: checkNumber,
+      tree: checkArray(checkObject<Config.HostElement>({
+        $element: checkStringEnum("host"),
+        $mount: checkRef<refsType>()("#/definitions/GroupChild", "expected a GroupChild object"),
+      })),
+      authAccounts: checkRecord(checkString, checkObject<ServerConfig["authAccounts"][""]>({
+        clientKeys: checkRecord(checkString, checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>({
+          publicKey: checkString,
+          cookieSalt: checkStringNotEmpty,
+        })),
+        permissions: checkAccessPerms,
+      })),
+      bindInfo: checkObject<ServerConfig["bindInfo"]>({
+        _bindLocalhost: checkBoolean,
+        bindAddress: checkArray(checkString),
+        bindWildcard: checkBoolean,
+        enableIPv6: checkBoolean,
+        filterBindAddress: checkBoolean,
+        https: checkBoolean,
+        localAddressPermissions: checkRecord(checkString, checkAccessPerms),
+        port: checkNumber,
+      }),
+      controllers: checkController,
+      directoryIndex: checkObject<ServerConfig["directoryIndex"]>({
+        defaultType: checkStringEnum("html", "json"),
+        icons: checkRecord(checkString, checkArray(checkString)),
+        mimetypes: checkRecord(checkString, checkArray(checkString)),
+        mixFolders: checkBoolean,
+        types: checkRecord(checkString, checkString),
+      }),
+      // logging: checkObject<ServerConfig["logging"]>({
+      //   debugLevel: checkNumber,
+      //   logAccess: checkUnion(checkString, checkBooleanFalse),
+      //   logColorsToFile: checkBoolean,
+      //   logError: checkString,
+      //   logToConsoleAlso: checkBoolean,
+      // }),
+      putsaver: checkObject<ServerConfig["putsaver"], never>({}, putsaverOptional()),
+      datafolder: checkRecord(checkString, checkAny),
+    })
+  }
+  return refs;
+}

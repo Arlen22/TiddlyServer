@@ -15,12 +15,13 @@
     "strict": true,
     "noImplicitAny": false,
     "sourceMap": false,
-    "inlineSourceMap": false,
+    "inlineSourceMap": true,
     "resolveJsonModule": true,
     "noErrorTruncation": true,
     "declaration": true,
     "importHelpers": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+    "keyofStringsOnly": true
   },
   "files": [
     "./server.ts"

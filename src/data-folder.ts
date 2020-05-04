@@ -253,10 +253,10 @@ function loadDataFolderTiddlyWiki(
     });
     // server.TS_StateObject_Queue = [];
     // server.TS_Request_Queue = [];
-    let queue: Record<symbol, StateObject> = {};
+    let queue: Record<string, StateObject> = {};
     let auth = new TiddlyServerAuthentication(server, (sym: symbol) => {
-      let res = queue[sym];
-      delete queue[sym];
+      let res = queue[sym as any];
+      delete queue[sym as any];
       return res;
     });
     auth.init();
@@ -272,7 +272,7 @@ function loadDataFolderTiddlyWiki(
       };
       req.url += state.url.pathname === mount && !state.url.pathname.endsWith("/") ? "/" : "";
       req.tsstate = Symbol("state object pointer");
-      queue[req.tsstate] = state;
+      queue[req.tsstate as any] = state;
       server.requestHandler(req, state.res);
     };
     //send queued websocket clients to the event emitter

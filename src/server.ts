@@ -501,7 +501,7 @@ export class Controller {
       if (key === "__proto__" || key === "constructor") return undefined;
       else return val;
     }
-    if (!checkController.check(JSON.parse(JSON.stringify(settings.controllers, safeJSON), safeJSON))) {
+    if (!checkController.check(JSON.parse(JSON.stringify(settings.controllers, safeJSON), safeJSON), {})) {
       Controller.handleServer = (startup) => { };
       Controller.handleController = (state) => { state.throw(500); return Promise.resolve(); }
       return false;
