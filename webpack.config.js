@@ -21,7 +21,7 @@ const options = {
       banner: "#!/usr/bin/env node", raw: true
     }),
     new CopyPlugin([
-      { from: 'assets', to: './assets/' },
+      { from: 'src/client', to: './client/' },
       { from: 'preflighter.js', to: '.' },
       { from: 'scripts', to: './scripts/' },
       { from: 'README.md', to: '.' },
@@ -31,7 +31,7 @@ const options = {
         "server.d.ts",
         "server.js",
         "package.d.ts",
-        "src/"
+        "server/"
       ],
       cleanOnceBeforeBuildPatterns: []
     })

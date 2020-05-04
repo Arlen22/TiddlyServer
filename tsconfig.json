@@ -24,7 +24,7 @@
     "keyofStringsOnly": true
   },
   "files": [
-    "./server.ts"
+    "./src/server.ts"
   ],
   // "include": ["./preflighter.ts", "./assets/**/*", "./server.ts", "src/*", "test/*"],
   "exclude": [
