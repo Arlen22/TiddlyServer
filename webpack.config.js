@@ -41,6 +41,11 @@ const options = {
     __dirname: false,
     __filename: false
   },
+  resolve: {
+    alias: {
+      "../package.json": "../../package.json"
+    }
+  },
   output: {
     filename: '[name].js',
     path: path.resolve(__dirname, "dist"),
