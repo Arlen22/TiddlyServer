@@ -48,7 +48,7 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 - Create your bash or batch file with the following command.
   - "`node node_modules/tiddlyserver/index.js --config settings.json`"
 - You can also download the Node executable and put in in the directory for a truly portable install.
-  - Windows CMD will use this immediately, but bash and other shells usually require you to change the command to `./node`. 
+  - Windows CMD will use this immediately, but bash and other shells usually require you to change the command `node` to `./node`. 
 
 ## How to upgrade
 
