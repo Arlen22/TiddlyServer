@@ -1,9 +1,11 @@
 import * as path from "path";
-const webpack: typeof import("webpack") = module.parent.require("webpack");
+/** @type {import("webpack")} */
+const webpack = module.parent.require("webpack");
 import CopyPlugin from "copy-webpack-plugin";
 import { CleanWebpackPlugin } from 'clean-webpack-plugin';
 
 const dev = false;
+/** @type {import("webpack").Configuration} */
 const options = {
   entry: { index: "./dist/build/server.js" },
   target: "node",
@@ -34,7 +36,7 @@ const options = {
   output: {
     filename: '[name].js',
     path: path.resolve(__dirname, "dist"),
-    libraryTarget: 'commonjs'
+    libraryTarget: 'commonjs2'
   },
   externals: [
     "bufferutil",
@@ -50,3 +52,4 @@ const options = {
 };
 
 module.exports = options;
+// export default options;
