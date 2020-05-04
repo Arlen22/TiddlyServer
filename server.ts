@@ -36,14 +36,21 @@ const cli = yargs
     conflicts: ["config"],
     describe: "Unzip a backup file. Specify --gunzip input.gz output.html",
     type: "string"
-  });
+  })
+  .option("gen-schema", {
+    conflicts: ["config"],
+    describe: "Generate a JSON schema for the config file and write it to the specified file",
+    type: "string"
+  })
+  ;
 const argv = cli.argv;
 
 const {
   config: userSettings,
   "dry-run": dryRun,
   "stay-on-error": stayOnError,
-  gunzip
+  gunzip,
+  "gen-schema": genSchema
 } = argv;
 
 
@@ -161,6 +168,10 @@ if (gunzip) {
   }
   fs.writeFileSync(output, z.gunzipSync(fs.readFileSync(input)));
   console.log("Uncompressed file written to " + path.resolve(output));
+} else if(genSchema) {
+  let output = path.resolve(genSchema);
+  console.log("writing schema to %s", output);
+  fs.writeFileSync(output, JSON.stringify(server.generateSchema(path.basename(output)), null, 2));
 } else if (fs.existsSync(settingsFile)) {
   runServer().catch(e => {
     if (e) logAndCloseServer(e);

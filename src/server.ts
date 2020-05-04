@@ -13,7 +13,7 @@ import * as WebSocket from "ws";
 import { handler as morgan } from "./logger";
 import { handleAuthRoute } from "./auth-route";
 import { checkCookieAuth } from "./cookies";
-import { checkServerConfig, checkController } from "./interface-checker";
+import { checkServerConfig, generateSchema } from "./interface-checker";
 import { RequestEvent } from "./request-event";
 import { Observable, Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
@@ -34,7 +34,7 @@ import { handleTreeRoute } from "./tiddlyserver";
 import { EventEmitter } from "./event-emitter-types";
 import { Socket } from "net";
 import { ServerConfig_Controller } from "./server-config";
-export { checkServerConfig, loadSettings, libsReady };
+export { checkServerConfig, generateSchema, loadSettings, libsReady };
 const { Server: WebSocketServer } = WebSocket;
 
 // global settings
@@ -501,7 +501,7 @@ export class Controller {
       if (key === "__proto__" || key === "constructor") return undefined;
       else return val;
     }
-    if (!checkController.check(JSON.parse(JSON.stringify(settings.controllers, safeJSON), safeJSON), {})) {
+    if (true/* !checkController.check(JSON.parse(JSON.stringify(settings.controllers, safeJSON), safeJSON), {}) */) {
       Controller.handleServer = (startup) => { };
       Controller.handleController = (state) => { state.throw(500); return Promise.resolve(); }
       return false;
