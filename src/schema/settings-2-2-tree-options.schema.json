@@ -1,5 +1,5 @@
 {
-  "$id": "settings-2-2-tree-options.schema.json",
+  "$id": "https://raw.githubusercontent.com/Arlen22/TiddlyServer/v2.2/src/schema/settings-2-2-tree-options.schema.json",
   "$ref": "#/definitions/OptionsArraySchema",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {

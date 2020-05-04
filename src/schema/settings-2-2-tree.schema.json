@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-06/schema#",
-  "$id": "settings-2-2-tree.schema.json",
+  "$id": "https://raw.githubusercontent.com/Arlen22/TiddlyServer/v2.2/src/schema/settings-2-2-tree.schema.json",
   "definitions": {
     "GroupChildrenHashmap": {
       "type": "object",
