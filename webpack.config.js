@@ -34,7 +34,23 @@ const options = {
         "server/"
       ],
       cleanOnceBeforeBuildPatterns: []
-    })
+    }),
+    {
+      apply: (compiler) => {
+        compiler.hooks.afterEmit.tap('AfterEmitPlugin', (compilation) => {
+          // make the package.json file for the npm package
+          const json = JSON.parse(require("fs").readFileSync("./package.json", "utf8"));
+          // remove keys not used in the production build
+          delete json.devDependencies;
+          delete json.main;
+          delete json.scripts;
+          // set the webpack output as the bin file
+          json.bin = "./index.js";
+          // save to the output directory
+          require("fs").writeFileSync("./dist/package.json", JSON.stringify(json, null, 2), "utf8");
+        });
+      }
+    }
   ],
   node: {
     global: true,
