@@ -4,7 +4,6 @@
   "description": "Many TiddlyWiki, One Port",
   "homepage": "https://arlen22.github.io/tiddlyserver/",
   "repository": "github:Arlen22/TiddlyServer",
-  "main": "./build/src/server.js",
   "prodDependencies": [
     "tiddlywiki-production-server",
     "tiddlywiki-production-client"
