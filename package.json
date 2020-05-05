@@ -4,26 +4,9 @@
   "description": "Many TiddlyWiki, One Port",
   "homepage": "https://arlen22.github.io/tiddlyserver/",
   "repository": "github:Arlen22/TiddlyServer",
-  "prodDependencies": [
-    "tiddlywiki-production-server",
-    "tiddlywiki-production-client"
-  ],
   "dependencies": {
-    "formidable": "^1.1.1",
-    "json-stable-stringify": "^1.0.1",
-    "json5": "^2.1.0",
-    "libsodium": "^0.7.4",
-    "libsodium-wrappers": "^0.7.4",
-    "morgan": ">=1.9.1",
-    "rxjs": "^6.5.5",
-    "send": "^0.17.1",
-    "source-map-support": "^0.5.16",
     "tiddlywiki-production-client": "5.1.22",
-    "tiddlywiki-production-server": "5.1.22",
-    "ts-json-schema-generator": "^0.61.1",
-    "tslib": "^1.11.1",
-    "ws": "^7.2.1",
-    "yargs": "^15.1.0"
+    "tiddlywiki-production-server": "5.1.22"
   },
   "devDependencies": {
     "@types/copy-webpack-plugin": "^5.0.0",
@@ -33,6 +16,19 @@
     "@types/webpack": "^4.41.12",
     "@types/ws": "^6.0.1",
     "@types/yargs": "^15.0.4",
+    "formidable": "^1.1.1",
+    "json-stable-stringify": "^1.0.1",
+    "json5": "^2.1.0",
+    "libsodium": "^0.7.4",
+    "libsodium-wrappers": "^0.7.4",
+    "morgan": ">=1.9.1",
+    "rxjs": "^6.5.5",
+    "send": "^0.17.1",
+    "source-map-support": "^0.5.16",
+    "ts-json-schema-generator": "^0.61.1",
+    "tslib": "^1.11.1",
+    "ws": "^7.2.1",
+    "yargs": "^15.1.0",
     "clean-webpack-plugin": "^3.0.0",
     "copy-webpack-plugin": "^5.1.1",
     "prettier": "1.19.1",
@@ -48,7 +44,7 @@
     "index": "node dist/index --config settings.json",
     "build:schema": "node build-schema.js",
     "build:pkg": "node build-package-json.js",
-    "build": "rm -rf dist && tsc && webpack && npm run build:pkg"
+    "build": "rm -rf dist && tsc && webpack"
   },
   "author": "Arlen22@GitHub.com",
   "license": "MIT"
