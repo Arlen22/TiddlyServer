@@ -11,17 +11,12 @@
     "tiddlywiki-production-client"
   ],
   "dependencies": {
-    "@types/libsodium-wrappers": "^0.7.5",
-    "@types/send": "^0.14.4",
-    "@types/ws": "^6.0.1",
-    "@types/yargs": "^15.0.4",
     "formidable": "^1.1.1",
     "json-stable-stringify": "^1.0.1",
     "json5": "^2.1.0",
     "libsodium": "^0.7.4",
     "libsodium-wrappers": "^0.7.4",
     "morgan": ">=1.9.1",
-    "prettier": "1.19.1",
     "rxjs": "^6.5.5",
     "send": "^0.17.1",
     "source-map-support": "^0.5.16",
@@ -34,13 +29,18 @@
   },
   "devDependencies": {
     "@types/copy-webpack-plugin": "^5.0.0",
+    "@types/libsodium-wrappers": "^0.7.5",
     "@types/node": "^10.17.21",
+    "@types/send": "^0.14.4",
     "@types/webpack": "^4.41.12",
+    "@types/ws": "^6.0.1",
+    "@types/yargs": "^15.0.4",
     "clean-webpack-plugin": "^3.0.0",
     "copy-webpack-plugin": "^5.1.1",
+    "prettier": "1.19.1",
     "ts-node": "^8.10.1",
     "typescript": "^3.8.3",
-    "webpack-cleanup-plugin": "^0.5.1"
+    "webpack": "^4.43.0"
   },
   "scripts": {
     "test": "tsc && node dist/server --config settings.json --dry-run",
