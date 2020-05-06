@@ -385,9 +385,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
   return newset;
 }
 // T extends U ? never : T
-type ExcludedPartial<T, NK> = {
-  [P in keyof T]?: (P extends NK ? never : T[P]) | undefined;
-}; //Partial<ServerConfig_DirectoryIndex>
+type PartialPickNot<T, NK extends keyof T> = Partial<Pick<T, Exclude<keyof T, NK>>>; //Partial<ServerConfig_DirectoryIndex>
 export interface ServerConfigSchema {
   /** enables certain expensive per-request checks */
   _devmode?: boolean;
@@ -436,7 +434,7 @@ export interface ServerConfigSchema {
   // /** logging  */
   // logging?: Partial<ServerConfig_Logging>;
   /** directory index options */
-  directoryIndex?: ExcludedPartial<ServerConfig_DirectoryIndex, "types">;
+  directoryIndex?: PartialPickNot<ServerConfig_DirectoryIndex, "types">; // ExcludedPartial<ServerConfig_DirectoryIndex, "types">;
   /** tiddlyserver specific options */
   putsaver?: Partial<ServerConfig_PutSaver>;
   /**

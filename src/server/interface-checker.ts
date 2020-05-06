@@ -7,6 +7,7 @@ import {
   ServerConfig_Controller,
   ServerConfigSchema,
   defaultPermissions,
+  ServerConfig_AuthAccountsValue,
 } from "./server-config";
 import { as } from "./server-types";
 
@@ -113,7 +114,7 @@ abstract class TypeCheck<T> {
     return this;
   }
   /** Chainable method to set schema default */
-  public defaultData(def: T) {
+  public defaultData(def: NonNullable<T>) {
     this.defData = def;
     return this;
   }
@@ -190,9 +191,9 @@ class CheckSimple<T> extends TypeCheck<T> {
     check: (a: any) => a is T,
     public schema: {
       type: "boolean" | "number" | "string" | "null" | "object",
-      default?: any,
       enum?: readonly any[],
-      expectNotEmpty?: boolean
+      expectNotEmpty?: boolean,
+      regex?: string,
     }
   ) {
     super();
@@ -203,7 +204,7 @@ class CheckSimple<T> extends TypeCheck<T> {
     return {
       type: this.schema.type,
       enum: this.schema.enum,
-      default: this.schema.default,
+      default: this.defData,
       description: this.description || undefined
     }
   }
@@ -225,6 +226,11 @@ export const checkStringNotEmpty = () => new CheckSimple(
   (a): a is string => typeof a === "string" && a.length > 0,
   { type: "string", expectNotEmpty: true }
 );
+export const checkStringRegex = (reg: RegExp) => new CheckSimple(
+  "expected a string that matches the regex " + reg.source,
+  (a): a is string => typeof a === "string" && reg.test(a),
+  { type: "string", regex: reg.source }
+)
 export const checkNumber = () => new CheckSimple(
   "expected a number value",
   (a): a is number => typeof a === "number",
@@ -254,6 +260,11 @@ export const checkBooleanFalse = () => new CheckSimple(
 export const checkNull = () => new CheckSimple(
   "expected a null value",
   (a): a is null => typeof a === "object" && a === null,
+  { type: "null" }
+);
+export const checkUndefined = () => new CheckSimple(
+  "expected a null value",
+  (a): a is undefined => typeof a === "undefined",
   { type: "null" }
 );
 export const checkAny = () => new CheckSimple(
@@ -288,11 +299,13 @@ export class CheckMultiple<T extends {}> extends TypeCheck<T> {
       case "record": return {
         type: "object",
         additionalProperties: this.childType.getSchema(reffer),
+        default: this.defData,
         description: this.description || undefined
       };
       case "array": return {
         items: this.childType.getSchema(reffer),
         type: "array",
+        default: this.defData,
         description: this.description || undefined
       };
     }
@@ -316,7 +329,7 @@ export const checkArray = <V>(checker: TypeCheck<V>, ) =>
 export const checkRecord = <K extends string, V>(
   keyChecker: TypeCheck<K>,
   checker: TypeCheck<V>,
-  
+
 ) =>
   new CheckMultiple<{ [k in K]: V }>(
     "expected a record that " + checker.expectedMessage,
@@ -387,6 +400,7 @@ class CheckUnion<T> extends TypeCheck<T> {
   };
   getSchema(reffer) {
     return {
+      default: this.defData,
       description: this.description || undefined,
       "anyOf": this.checks.map(e => e.getSchema(reffer))
     }
@@ -459,6 +473,7 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
       additionalProperties: false,
       properties,
       required: this.required,
+      default: this.defData,
       description: this.description || undefined
     }
   }
@@ -536,9 +551,9 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
   static unexpectedProperty = Symbol("property is unexpected");
 }
 
-type RequiredCheckermap<T extends {}, REQUIRED extends keyof T> = {
-  [KEY in REQUIRED]-?: TypeCheck<T[KEY]>;
-};
+// type RequiredCheckermap<T extends {}, REQUIRED extends keyof T> = {
+//   [KEY in REQUIRED]-?: TypeCheck<T[KEY]>;
+// };
 // type RequiredCheckermap<T extends { [K: string]: unknown }, REQUIRED extends string> = { [KEY in REQUIRED]-?: TypeCheck<T[KEY]> };
 type OptionalCheckermap<T extends {}, REQUIRED extends keyof T> = {
   [KEY in Exclude<keyof T, REQUIRED>]-?: TypeCheck<T[KEY]>;
@@ -550,11 +565,20 @@ export function checkResult(e: TypeCheck<any>, a: any, reffer: Reffer) {
   let res = union.check(a, reffer);
   return [res, union.error ? union.error[0] : undefined] as const;
 }
+type Defined<T> = T extends undefined ? never : T;
 
-export function checkObject<T, REQUIRED extends keyof T = keyof T>(
+type ExcludeNever<T> = { [K in keyof T]: T[K] extends never ? never : K }
+type r = NonNullable<ServerConfigSchema["directoryIndex"]>;
+type t = ExcludeNever<NonNullable<ServerConfigSchema["directoryIndex"]>>;
+/** checkermap parameter is type never if T extends undefined */
+export function checkObject<T, REQUIRED extends keyof T = keyof ExcludeNever<T>>(
   description: string,
-  checkermap: RequiredCheckermap<T, REQUIRED>,
-  optionalcheckermap: OptionalCheckermap<T, REQUIRED> = {} as any,
+  checkermap: {
+    [KEY in REQUIRED]-?: TypeCheck<T[KEY]>;
+  },
+  optionalcheckermap: {
+    [KEY in Exclude<keyof T, REQUIRED>]-?: TypeCheck<Defined<T[KEY]>>;
+  } = {} as any,
   unionKeys: string[] = []
 ) {
   return new CheckObject<T>(description, checkermap, optionalcheckermap, unionKeys);
@@ -566,7 +590,7 @@ class CheckRef<T> extends TypeCheck<T> {
   public currentKey: string | number | symbol | undefined;
   protected _check(a: any, reffer: Reffer): a is T {
     this.error = {};
-    if(!reffer[this.refKey]) console.log(reffer, this.refKey);
+    if (!reffer[this.refKey]) console.log(reffer, this.refKey);
     return reffer[this.refKey]().check(a, reffer);
   }
 
@@ -621,31 +645,106 @@ export function generateSchema($id: string): any {
   const refs = getServerConfig();
   let definitions = {};
   Object.keys(refs).forEach((k) => {
+    if (k === "ServerConfig") return;
     definitions[k] = refs[k as keyof typeof refs]().getSchema(refs);
   });
   return {
     $id,
-    $ref: "#/definitions/ServerConfig",
+    $ref: "#/definitions/ServerConfigSchema",
     $schema: "http://json-schema.org/draft-07/schema#",
     definitions
   };
 }
+type treeType = {
 
+}
+
+type refsType = {
+  "GroupChild": () => TypeCheck<Config.PathElement | Config.GroupElement>
+  "TreeOptions": () => TypeCheck<Config.Options_Auth | Config.Options_Index | Config.Options_Putsaver>
+  "AccessOptions": () => TypeCheck<ServerConfig_AccessOptions>
+  "AuthAccountsValue": () => TypeCheck<ServerConfig_AuthAccountsValue>
+  "ServerConfig": () => TypeCheck<ServerConfig>
+  "SchemaGroupChild": () => TypeCheck<Schema.GroupChildElements | Record<string, string | object>>
+  "ServerConfigSchema": () => TypeCheck<ServerConfigSchema>
+}
+function getSchemaGroupChild() {
+  const groupElement: {
+    (array: true): TypeCheck<Schema.ArrayGroupElement>;
+    (array: false): TypeCheck<Schema.GroupElement>;
+  } = <AR extends boolean>(array: AR) => {
+    return checkObject<Schema.ArrayGroupElement, "$element" | "$children" | "key">("",
+      {
+        $element: checkStringEnum(["group"]),
+        ...(array ? { key: checkString() } : {}) as { key: TypeCheck<string> },
+        $children: checkRef<refsType>()("SchemaGroupChild", "expected a repeat of GroupChild") as any
+      },
+      {
+        $options: checkArray(checkRef<refsType>()("TreeOptions", "expected one of TreeOptions")),
+        indexPath: checkString().describe("Path of a file to serve as the directory index.")
+      },
+      ["$element"]
+    ).describe("This is a group element in an " + (array ? "array" : "object") + ". It is used for grouping folders under a mount point. " + (array ? "The key property is the mount point" : "The key is the mount point"));
+  };
+  const folderElement: {
+    (array: true): TypeCheck<Schema.ArrayFolderElement>;
+    (array: false): TypeCheck<Schema.FolderElement>;
+  } = <AR extends boolean>(array: AR) => {
+    return checkObject<Schema.ArrayFolderElement, "$element" | "path">("",
+      {
+        $element: checkStringEnum(["folder"] as const),
+        path: checkString().describe("Path relative to this file or an absolute path. If NodeJS can access it using stat, readdir, and readFile, then you can put it here")
+      },
+      {
+        $options: checkArray(checkRef<refsType>()("TreeOptions", "expected one of TreeOptions")),
+        noTrailingSlash: checkBoolean().describe("Load data folders under this path with no trailing slash. This imitates single-file wikis and allows tiddlers with relative links to be imported directly into a data folder wiki. The source point of the relative link becomes the data folder itself as though it is actually a file. However, this breaks relative links to resources served by the datafolder instance itself, such as the files directory introduced in 5.1.19 and requires the relative link to include the data folder name in the relative link. For this reason, it is better to convert single-file wikis to the datafolder format by putting each wiki inside its own folder as index.html, and a \"files\" folder beside the index.html file, and adding an index option to this element."),
+        noDataFolder: checkBoolean().describe("Do not recognize datafolders within this path. Files within data folders will be accessible directly from the web, including the tiddlywiki.info file, instead of treating it as a data folder. This is useful for folders like your downloads folder which might end up containing a tiddlywiki.info file but you do not want it to be a data folder."),
+        ...(array ? { key: checkString() } : {}) as { key: TypeCheck<string> }
+      },
+      ["$element"]
+    ).describe("This is a folder element. The path property specifies the file system path to serve. Any path may be specified, not just a folder. The key is the mount point for this item. If this is in an Array, the key property will be used or the path basename.")
+  };
+  const folderString = () => checkString().describe("A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used.");
+
+  const SchemaGroupChild = () => checkUnion(
+    checkRecord<string, string | object>(checkStringRegex(/^[^$]+$/), checkUnion(
+      checkUnion.cu(
+        folderElement(false),
+        groupElement(false),
+      ),
+      checkUnion.cu(
+        checkRef<refsType>()("SchemaGroupChild", "expected group child"),
+        folderString()
+      )
+    )),
+    checkArray<Schema.ArrayFolderElement | Schema.ArrayGroupElement | string>(
+      checkUnion(
+        checkUnion.cu(
+          folderElement(true),
+          groupElement(true),
+        ),
+        folderString(),
+      )
+    )
+  ).describe("This is the children type. It can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.");
+
+  return SchemaGroupChild;
+
+}
+const putsaverOptional = () => ({
+  backupFolder: checkString().describe("Backup folder to store backups in. Multiple folder paths can backup to the same folder if desired."),
+  etag: checkStringEnum(["optional", "required", "disabled"]).describe("Whether to use the etag field -- if not specified then it will check it if presented. This does not affect the backup etagAge option, as the saving mechanism will still send etags back to the browser, regardless of this option."),
+  etagAge: checkNumber().describe("Reject an etag with a modified time that is different than the file on disk by this many seconds. Sometimes sync or antivirus sofware will \"touch\" a file and update the modified time without changing anything. Size difference will still cause the request to be rejected."),
+  gzipBackups: checkBoolean().describe("GZip backup file to save disk space. Good for larger wikis. Turn this off for experimental wikis that you often need to restore from a backup because of a bad line of code (I speak from experience)."),
+  enabled: checkBoolean().describe("If false, disables the put saver globally"),
+});
 function getServerConfig() {
-  const putsaverOptional = () => ({
-    backupFolder: checkString(),
-    etag: checkStringEnum(["optional", "required", "disabled"]),
-    etagAge: checkNumber(),
-    gzipBackups: checkBoolean(),
-    enabled: checkBoolean(),
-  });
-  type refsType = {
-    "GroupChild": () => TypeCheck<Config.PathElement | Config.GroupElement>,
-    "TreeOptions": () => TypeCheck<Config.Options_Auth | Config.Options_Index | Config.Options_Putsaver>,
-    "ServerConfig": () => TypeCheck<ServerConfig>,
-    "AccessOptions": () => TypeCheck<ServerConfig_AccessOptions>,
-  }
+
   const AccessOptionsDescription = "Whether the user has access to different features of TiddlyServer beyond static file serving";
+  type TypeCheckItems<T, X = never> = {
+    [K in Exclude<keyof T, X>]: TypeCheck<T[K]>;
+  };
+
   const refs: { [K in keyof refsType]: refsType[K] } = {
     "GroupChild": (): TypeCheck<Config.PathElement | Config.GroupElement> =>
       checkUnion(
@@ -676,17 +775,17 @@ function getServerConfig() {
       ),
     "TreeOptions": () => checkUnion(
       checkObject<Config.Options_Auth, "$element">("",
-        { $element: checkStringEnum(["auth"]) },
+        { $element: checkStringEnum(["auth"]).describe("Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth list applies to the requested path.\n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.") },
         {
-          authError: checkNumberEnum([403, 404] as const),
-          authList: checkUnion(checkArray(checkString()), checkNull()),
+          authError: checkNumberEnum([403, 404] as const).describe("Which error code to return for unauthorized (or anonymous) requests\n\n - 403 Access Denied: Client is not granted permission to access this resouce.\n - 404 Not Found: Client is told that the resource does not exist."),
+          authList: checkUnion(checkArray(checkString()), checkNull()).describe("Array of keys from authAccounts object that can access this resource. `null` allows all requests, including anonymous."),
         },
         ["$element"]
       ),
       checkUnion.cu(
         checkObject<Config.Options_Putsaver, "$element">("",
           {
-            $element: checkStringEnum(["putsaver"] as const),
+            $element: checkStringEnum(["putsaver"] as const).describe("Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements."),
           },
           putsaverOptional(),
           ["$element"]
@@ -718,6 +817,19 @@ function getServerConfig() {
         writeErrors: checkBoolean().describe("Whether to write status 500 errors to the browser, possibly including stack traces."),
       }
     ).describe(AccessOptionsDescription),
+    AuthAccountsValue: () => checkObject<ServerConfig_AuthAccountsValue>("", {
+      clientKeys: checkRecord(
+        checkString(),
+        checkObject<ServerConfig_AuthAccountsValue["clientKeys"][""]>("", {
+          publicKey: checkString().describe("base 64 encoded public key"),
+          cookieSalt: checkStringNotEmpty().describe("String which will be added to the cookie by the server. Changing it will invalidate all current cookies for this user, which requires them to login again on each device. `node -e \"console.log(Date.now())\"` will print the current timestamp, which you can use to make sure you get one that you've never used it before."),
+        }).describe("The username the user will login with")
+      ).describe("Changing the public key or cookie suffix will require the user to log in again."),
+      permissions: checkRef<refsType>()("AccessOptions", "expected AccessOptions object")
+        .describe(AccessOptionsDescription)
+        .defaultData(defaultPermissions),
+    }).describe("The authAccount specified in the tree auth options"),
+    SchemaGroupChild: getSchemaGroupChild(),
     "ServerConfig": () => checkObject<ServerConfig>("", {
       $schema: checkString(),
       __assetsDir: checkString(),
@@ -733,15 +845,7 @@ function getServerConfig() {
         $element: checkStringEnum(["host"] as const),
         $mount: checkRef<refsType>()("GroupChild", "expected a GroupChild object"),
       })),
-      authAccounts: checkRecord(checkString(), checkObject<ServerConfig["authAccounts"][""]>("", {
-        clientKeys: checkRecord(checkString(), checkObject<ServerConfig["authAccounts"][""]["clientKeys"][""]>("", {
-          publicKey: checkString(),
-          cookieSalt: checkStringNotEmpty(),
-        })),
-        permissions: checkRef<refsType>()("AccessOptions", "expected AccessOptions object")
-          .describe(AccessOptionsDescription)
-          .defaultData(defaultPermissions),
-      })),
+      authAccounts: checkRecord(checkString(), checkRef<refsType>()("AuthAccountsValue", "expected AuthAccountsValue")),
       bindInfo: checkObject<ServerConfig["bindInfo"]>("", {
         _bindLocalhost: checkBoolean(),
         bindAddress: checkArray(checkString()),
@@ -752,8 +856,7 @@ function getServerConfig() {
         localAddressPermissions: checkRecord(
           checkString(),
           checkRef<refsType>()("AccessOptions", "expected AccessOptions object"),
-        ).describe("Permissions based on local interface address.  Enter the IP Address and NetMask (`127.0.0.1/8`) as the property key. The keyword \"localhost\" (if specified) matches 127.0.0.0/8 instead of any other specified key.  Keyword \"*\" matches everything that doesn't match another IP address.  This checks the IP address each client connects to (socket.localAddress), not the bind address of the server instance that accepted the request. The keyword defaultPermission does nothing, but auto-complete should give you the defaults (assuming they haven't changed).  You can then rename it to whatever you need it to be. ")
-          .defaultData({ defaultPermissions }),
+        ),
         port: checkNumber(),
       }),
       controllers: checkAny().describe("This is not implemented yet"),
@@ -766,7 +869,266 @@ function getServerConfig() {
       }),
       putsaver: checkObject<ServerConfig["putsaver"], never>("", {}, putsaverOptional()),
       datafolder: checkRecord(checkString(), checkAny()),
-    })
+    }),
+    ServerConfigSchema: () => checkObject<Defined<ServerConfigSchema>, "tree">("", {
+      tree: checkRef<refsType>()("SchemaGroupChild", "expected group child"),
+    }, {
+      _datafolderclient: checkString().describe("The tiddlywiki folder to serve on \"/assets/tiddlywiki/\""),
+      _datafolderserver: checkString().describe("The tiddlywiki folder to use for data folder instances."),
+      _datafoldertarget: checkString().describe("Deprecated: Use _datafolderserver instead."),
+      _devmode: checkBoolean(),
+      maxTransferRequests: checkNumber().describe("Max concurrent transfer requests"),
+      authCookieAge: checkNumber().describe("Age to set for the auth cookie (default is 30 days)\n- 24 hours: 86400\n- 7 days: 604800\n- 30 days: 2592000\n- 60 days: 5184000\n- 90 days: 7776000\n- 120 days: 10368000\n- 150 days: 12950000\n- 180 days: 15552000"),
+      debugLevel: checkNumber().describe("- 4: Errors that require the process to exit for restart \n- 3: Major errors that are handled and do not require a server restart \n- 2: Warnings or errors that do not alter the program flow but need to be marked (minimum for status 500) \n- 1: Info - Most startup messages \n- 0: Normal debug messages and all software and request-side error messages \n- -1: Detailed debug messages from high level apis \n- -2: Response status messages and error response data \n- -3: Request and response data for all messages (verbose) \n- -4: Protocol details and full data dump (such as encryption steps and keys)"),
+      $schema: checkString().describe("\nThe JSON schema location for this document. This schema is generated\ndirectly from the TypeScript interfaces\nused in TiddlyServer. A text-editor with intellisense, such as VS code,\nwill make editing this file much simpler.\nMost fields include a description like this one.\n\nAll relative paths in this file are resolved relative to this file, so\n`./settings-tree.xml` refers to an XML file in the same folder as this file.\nAll relative paths in included files (such as the XML file) are resolved\nrelative to the included file."),
+      bindInfo: checkObject<Defined<ServerConfigSchema["bindInfo"]>, never>("", {}, {
+        _bindLocalhost: checkBoolean().describe("always bind a separate server instance to 127.0.0.1 regardless of any other settings"),
+        bindAddress: checkArray(checkString()).describe("An array of IP addresses to accept requests on. Can be any IP address\nassigned to the machine. Default is \"127.0.0.1\".\n\nIf `bindWildcard` is true, each connection is checked individually. Otherwise, the server listens\non the specified IP addresses and accepts all connections from the operating system. If an IP address\ncannot be bound, the server skips it unless `--bindAddressRequired` is specified\n\nIf `filterBindAddress` is true, IPv4 addresses may include a subnet mask,\n(e.g. `/24`) which matches any interface IP address in that range. Prefix with a minus sign (-)\nto block requests incoming to that IP address or range."),
+        bindWildcard: checkBoolean().describe("Bind to the wildcard addresses `0.0.0.0` and `::` (if enabled) in that order. The default is `true`. In many cases this is preferred, however Android does not support this for some reason. On Android, set this to `false` and set host to `[\"0.0.0.0/0\"]` to bind to all IPv4 addresses."),
+        enableIPv6: checkBoolean().describe("Bind to the IPv6 wildcard as well if `bindWilcard` is true and allow requestsincoming to IPv6 addresses if not explicitly denied"),
+        filterBindAddress: checkBoolean().describe("IPv4 addresses may include a subnet mask, (e.g. `/24`) which matches any IP address in that range. Prefix with a minus sign (-) to block requests incoming to that IP address or range."),
+        https: checkString().describe("https-only options: a string to a JavaScript file which exports a function of type `(iface:string) => https.ServerOptions`. Developers: Note that the initServer function will change this to a boolean value indicating whether https is in use once inside TiddlyServer."),
+        port: checkNumber().describe("port to listen on, default is 8080 for http and 8443 for https"),
+        localAddressPermissions: checkRecord(checkString(),
+          checkRef<refsType>()("AccessOptions", "expected AccessOptions object"),
+        ).describe("Permissions based on local interface address.  Enter the IP Address and NetMask (`127.0.0.1/8`) as the property key. The keyword \"localhost\" (if specified) matches 127.0.0.0/8 instead of any other specified key.  Keyword \"*\" matches everything that doesn't match another IP address.  This checks the IP address each client connects to (socket.localAddress), not the bind address of the server instance that accepted the request. The keyword defaultPermission does nothing, but auto-complete should give you the defaults (assuming they haven't changed).  You can then rename it to whatever you need it to be. ")
+          .defaultData({ defaultPermissions }),
+      }/*  as TypeCheckItems<NonNullable<ServerConfigSchema["bindInfo"]>> */),
+      authAccounts: checkRecord(checkString(), checkRef<refsType>()("AuthAccountsValue", "expected AuthAccountsValue")),
+      putsaver: checkObject<ServerConfig["putsaver"], never>("", {}, putsaverOptional()).describe("Settings related to the put saver"),
+      directoryIndex: checkObject<Defined<ServerConfigSchema["directoryIndex"]>>("", {
+        defaultType: checkStringEnum(["html", "json"] as const)
+          .describe("default format for the directory index"),
+        icons: checkRecord(checkString(), checkArray(checkString()))
+          .describe("Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for. Icons are in the TiddlyServer/assets/icons folder."),
+        mimetypes: checkRecord(checkString(), checkArray(checkString()))
+          .describe("additional extensions to associate with mime types [\"mime/type\"]: [\"htm\", \"html\"]"),
+        mixFolders: checkBoolean()
+          .describe("Sort folder and files together rather than separated")
+      }),
+      controllers: checkAny(),
+      datafolder: checkRecord(checkString(), checkAny()).describe("Options object whose properties will be passed to the tiddlywiki server instance using the spread operator. This means that if a property specifies an object (or array) instead of a primitive, the same object will be given to all instances."),
+    }/*  as TypeCheckItems<ServerConfigSchema, "tree"> */)
   }
   return refs;
 }
+
+
+// // "ServerConfigSchema": () => checkObject<ServerConfigSchema>("", {
+//     //   tree: checkRef("")
+//     // })
+//     "SchemaFolderElement": () => checkObject<Schema.FolderElement, "$element" | "path">(
+//       "",
+//       {
+//         $element: checkStringEnum(["folder"] as const),
+//         path: checkString()
+//       }, {
+//         $options: checkArray(checkRef<refsType>()("TreeOptions", "expected one of TreeOptions")),
+//         noTrailingSlash: checkBoolean(),
+//         noDataFolder: checkBoolean(),
+//       },
+//       ["$element"]
+//     ),
+//     "SchemaGroupElement": () => checkObject<Schema.FolderElement>(
+//       "",
+//       {
+//         $element: checkStringEnum(["folder"] as const),
+//         $options: checkArray(checkRef<refsType>()("TreeOptions", "expected one of TreeOptions")),
+//         noTrailingSlash: checkBoolean(),
+//         noDataFolder: checkBoolean(),
+//         path: checkString(),
+//         // key: checkString(),
+//       },
+//       undefined,
+//       ["$element"]
+//     ),
+//     "FolderPathShorthand": () => checkString().describe("The path of a folder to mount without any extra options. The folder name will be used for the url name."),
+//     "SchemaGroupChild": (): any =>
+//       checkUnion(
+//         checkRecord()
+//         ,
+//         checkUnion.cu(
+//           checkObject<Schema.GroupElement, "$element" | "$children">("",
+//             {
+//               $element: checkStringEnum(["group"]),
+//               $children: checkRef<refsType>()("SchemaGroupChild", "expected a repeat of GroupChild")
+//             },
+//             {
+//               $options: checkArray(checkRef<refsType>()("TreeOptions", "expected one of TreeOptions")),
+//               indexPath: checkString()
+//             },
+//             ["$element"]
+//           ),
+//           checkUnion(
+
+//           )
+//           checkObject<Schema.ArrayGroupElement, "$element" | "$children">("",
+//             ,
+//             ["$element"]
+//           ),
+//         )
+//       ),
+//       "GroupChildrenHashmap": () => checkRecord(checkStringRegex(/^[^$]+$/), checkUnion(
+//         checkUnion.cu(
+//           checkRef<refsType>()("GroupRecordItem", "expected a GroupRecordItem"),
+//           checkRef<refsType>()("FolderRecordItem", "expected a FolderRecordItem"),
+//         ),
+//         checkUnion.cu(
+//           checkRef<refsType>()("FolderPathShorthand", "expected a FolderPathShorthand"),
+//           checkRef<refsType>()("GroupChildrenHashmap", "expected a GroupChildrenHashmap"),
+//         ),
+//       ))
+//       // {
+//       //   "type": "object",
+//       //   "description": "An object with any type of mount item, using the key as the mount point. The key property of an item will be ignored.",
+//       //   "patternProperties": {
+//       //     "^[^$]+$": {
+//       //       "anyOf": [
+//       //         {
+//       //           "$ref": "#/definitions/GroupRecordItem"
+//       //         },
+//       //         {
+//       //           "$ref": "#/definitions/FolderRecordItem"
+//       //         },
+//       //         {
+//       //           "$ref": "#/definitions/FolderPathShorthand"
+//       //         },
+//       //         {
+//       //           "$ref": "#/definitions/GroupChildrenHashmap"
+//       //         }
+//       //       ]
+//       //     }
+//       //   },
+//       //   "additionalProperties": false
+//       // },
+//       "GroupChildrenArray": {
+//         "type": "array",
+//         "items": {
+//           "anyOf": [
+//             {
+//               "$ref": "#/definitions/GroupArrayItem"
+//             },
+//             {
+//               "$ref": "#/definitions/FolderArrayItem"
+//             },
+//             {
+//               "$ref": "#/definitions/FolderPathShorthand"
+//             }
+//           ]
+//         },
+//         "description": "An array of children, which must specify the key property. If folder is specified as a string, the key will be the folder name"
+//       },
+//       "GroupRecordItem": {
+//         "type": "object",
+//         "additionalProperties": false,
+//         "patternProperties": {
+//           "^key$": {
+//             "type": "string"
+//           }
+//         },
+//         "properties": {
+//           "$element": {
+//             "description": "This is a group",
+//             "enum": [
+//               "group"
+//             ]
+//           },
+//           "indexPath": {
+//             "type": "string"
+//           },
+//           "$children": {
+//             "oneOf": [
+//               {
+//                 "$ref": "#/definitions/GroupChildrenArray"
+//               },
+//               {
+//                 "$ref": "#/definitions/GroupChildrenHashmap"
+//               }
+//             ]
+//           },
+//           "$options": {
+//             "$ref": "#/definitions/OptionsArray"
+//           }
+//         },
+//         "required": [
+//           "$children",
+//           "$element"
+//         ],
+//         "description": "A group creates a virtual mount folder to group folders together. The $children property may be an array or object."
+//       },
+//       "FolderRecordItem": {
+//         "type": "object",
+//         "additionalProperties": false,
+//         "patternProperties": {
+//           "^key$": {
+//             "type": "string"
+//           }
+//         },
+//         "properties": {
+//           "$element": {
+//             "description": "This is a folder",
+//             "enum": [
+//               "folder"
+//             ]
+//           },
+//           "path": {
+//             "type": "string",
+//             "description": "The folder path to mount"
+//           },
+//           "noDataFolder": {
+//             "type": "boolean",
+//             "description": "Handle data folders like regular folders. Useful for your downloads folder, for instance, in case you download a tiddlywiki.info file."
+//           },
+//           "noTrailingSlash": {
+//             "type": "boolean",
+//             "description": "Mount data folders inside this folder without a trailing slash, so that relative links start at the folder instead of the data folder. This is usually not preferred, because the folder can be referred to with two dots `../` but it can be helpful when converting single file wikis to data folders and there are a lot of interwiki links involved."
+//           },
+//           "$options": {
+//             "$ref": "#/definitions/OptionsArray"
+//           }
+//         },
+//         "required": [
+//           "$element",
+//           "path"
+//         ],
+//         "description": "The folder element mounts a folder"
+//       },
+//       "GroupArrayItem": {
+//         "allOf": [
+//           {
+//             "$ref": "#/definitions/GenericArrayItem"
+//           },
+//           {
+//             "$ref": "#/definitions/GroupRecordItem"
+//           }
+//         ]
+//       },
+//       "FolderArrayItem": {
+//         "allOf": [
+//           {
+//             "$ref": "#/definitions/GenericArrayItem"
+//           },
+//           {
+//             "$ref": "#/definitions/FolderRecordItem"
+//           }
+//         ]
+//       },
+//       "GenericArrayItem": {
+//         "properties": {
+//           "key": {
+//             "type": "string",
+//             "description": "The mount name that will show in the URL"
+//           }
+//         },
+//         "required": [
+//           "key"
+//         ]
+//       },
+//       "FolderPathShorthand": {
+//         "type": "string",
+//         "description": "The path of a folder to mount without any extra options. The folder name will be used for the url name."
+//       },
+//       "OptionsArray": {
+//         "$ref": "settings-2-2-tree-options.schema.json"
+//       }
+//     },
