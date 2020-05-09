@@ -6,7 +6,6 @@ import {
   ServerEventEmitter,
   // StateObject,
   statWalkPath,
-  tryParseJSON,
   StatPathResult,
   IStatPathResult,
   Resolved,
@@ -25,6 +24,7 @@ import * as WebSocket from "ws";
 import { RequestEvent } from "./request-event";
 import { OptionsConfig } from "./server-config";
 import { Writable } from "stream";
+import { tryParseJSON } from './utils-functions';
 
 interface Records<T> { [k: string]: T; }
 

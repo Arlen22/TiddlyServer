@@ -10,7 +10,6 @@ import {
   ServerConfig_AuthAccountsValue,
 } from "./server-config";
 import { as } from "./server-types";
-
 interface Description<V> {
   $description: string,
   $items?: DescObj<V>,
@@ -641,6 +640,11 @@ export function checkServerConfig(obj): readonly [boolean, string | {}] {
   let [res, errHash] = checkResult(_checkServerConfig["ServerConfig"](), obj, _checkServerConfig);
   return [res, errHash] as const;
 }
+export function checkServerConfigSchema(obj): readonly [boolean, string | {}] {
+  const _checkServerConfig = getServerConfig();
+  let [res, errHash] = checkResult(_checkServerConfig["ServerConfigSchema"](), obj, _checkServerConfig);
+  return [res, errHash] as const;
+}
 export function generateSchema($id: string): any {
   const refs = getServerConfig();
   let definitions = {};
@@ -665,7 +669,7 @@ type refsType = {
   "AccessOptions": () => TypeCheck<ServerConfig_AccessOptions>
   "AuthAccountsValue": () => TypeCheck<ServerConfig_AuthAccountsValue>
   "ServerConfig": () => TypeCheck<ServerConfig>
-  "SchemaGroupChild": () => TypeCheck<Schema.GroupChildElements | Record<string, string | object>>
+  "SchemaGroupChild": () => TypeCheck<Schema.GroupChildElements | Record<string, string | object> | string>
   "ServerConfigSchema": () => TypeCheck<ServerConfigSchema>
 }
 function getSchemaGroupChild() {
@@ -707,7 +711,8 @@ function getSchemaGroupChild() {
   const folderString = () => checkString().describe("A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used.");
 
   const SchemaGroupChild = () => checkUnion(
-    checkRecord<string, string | object>(checkStringRegex(/^[^$]+$/), checkUnion(
+    checkString().describe("A string ending in `xml`, `js`, or `json` will be parsed and loaded as the tree."),
+    checkUnion.cu(checkRecord<string, string | object>(checkStringRegex(/^[^$]+$/), checkUnion(
       checkUnion.cu(
         folderElement(false),
         groupElement(false),
@@ -717,16 +722,16 @@ function getSchemaGroupChild() {
         folderString()
       )
     )),
-    checkArray<Schema.ArrayFolderElement | Schema.ArrayGroupElement | string>(
-      checkUnion(
-        checkUnion.cu(
-          folderElement(true),
-          groupElement(true),
-        ),
-        folderString(),
-      )
-    )
-  ).describe("This is the children type. It can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.");
+      checkArray<Schema.ArrayFolderElement | Schema.ArrayGroupElement | string>(
+        checkUnion(
+          checkUnion.cu(
+            folderElement(true),
+            groupElement(true),
+          ),
+          folderString(),
+        )
+      ))
+  ).describe("This can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.");
 
   return SchemaGroupChild;
 
@@ -740,7 +745,7 @@ const putsaverOptional = () => ({
 });
 function getServerConfig() {
 
-  const AccessOptionsDescription = "Whether the user has access to different features of TiddlyServer beyond static file serving";
+  const AccessOptionsDescription = "Whether the user has access to different features of TiddlyServer beyond static file serving. Using auto-complete here should give you the entire object with defaults prefilled. All options are required.";
   type TypeCheckItems<T, X = never> = {
     [K in Exclude<keyof T, X>]: TypeCheck<T[K]>;
   };
@@ -772,6 +777,7 @@ function getServerConfig() {
           undefined,
           ["$element"]
         )
+
       ),
     "TreeOptions": () => checkUnion(
       checkObject<Config.Options_Auth, "$element">("",
@@ -785,19 +791,20 @@ function getServerConfig() {
       checkUnion.cu(
         checkObject<Config.Options_Putsaver, "$element">("",
           {
-            $element: checkStringEnum(["putsaver"] as const).describe("Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements."),
+            $element: checkStringEnum(["putsaver"] as const).describe("Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each attribute in a backups element replaces the key from parent backups elements."),
           },
           putsaverOptional(),
           ["$element"]
         ),
         checkObject<Config.Options_Index, "$element">("",
           {
-            $element: checkStringEnum(["index"] as const),
+            $element: checkStringEnum(["index"] as const).describe("Options related to the directory index. If you want to specify an index file for a group, use the indexPath attribute on the group element"),
           },
           {
-            defaultType: checkUnion(checkStringEnum(["html", "json"] as const), checkNumberEnum([404, 403] as const)),
-            indexExts: checkArray(checkString()),
-            indexFile: checkArray(checkString()),
+            defaultType: checkUnion(checkStringEnum(["html", "json"] as const), checkNumberEnum([404, 403] as const))
+              .describe("The format of the index generated if no index file is found, or \"403\" to return a 403 Access Denied, or 404 to return a 404 Not Found. 403 is the error code used by Apache and Nginx."),
+            indexExts: checkArray(checkString()).describe('Extensions to add when looking for an index file. A blank string will set the order to search for the exact indexFile name. The extensions are searched in the order specified. Only applies to folder elements, but may be set on a group element. An empty array disables this feature. The default is `[""]`, which will search for an exact indexFile.'),
+            indexFile: checkArray(checkString()).describe('Look for index files named exactly this or with one of the defaultExts added. For example, a defaultFile of ["index"] and a defaultExts of ["htm","",html"] would look for ["index.htm","index","index.html"] in that order. \n\nOnly applies to folder elements, but may be set on a group element to apply to all child folder elements. An empty array disables this feature. To use a .hidden file, put the full filename here, and set indexExts to [""].'),
           },
           ["$element"]
         )
@@ -816,7 +823,7 @@ function getServerConfig() {
         websockets: checkBoolean().describe("Whether clients may open websocket connections."),
         writeErrors: checkBoolean().describe("Whether to write status 500 errors to the browser, possibly including stack traces."),
       }
-    ).describe(AccessOptionsDescription),
+    ).describe(AccessOptionsDescription).defaultData(defaultPermissions),
     AuthAccountsValue: () => checkObject<ServerConfig_AuthAccountsValue>("", {
       clientKeys: checkRecord(
         checkString(),
@@ -830,6 +837,7 @@ function getServerConfig() {
         .defaultData(defaultPermissions),
     }).describe("The authAccount specified in the tree auth options"),
     SchemaGroupChild: getSchemaGroupChild(),
+
     "ServerConfig": () => checkObject<ServerConfig>("", {
       $schema: checkString(),
       __assetsDir: checkString(),
@@ -894,7 +902,7 @@ function getServerConfig() {
         ).describe("Permissions based on local interface address.  Enter the IP Address and NetMask (`127.0.0.1/8`) as the property key. The keyword \"localhost\" (if specified) matches 127.0.0.0/8 instead of any other specified key.  Keyword \"*\" matches everything that doesn't match another IP address.  This checks the IP address each client connects to (socket.localAddress), not the bind address of the server instance that accepted the request. The keyword defaultPermission does nothing, but auto-complete should give you the defaults (assuming they haven't changed).  You can then rename it to whatever you need it to be. ")
           .defaultData({ defaultPermissions }),
       }/*  as TypeCheckItems<NonNullable<ServerConfigSchema["bindInfo"]>> */),
-      authAccounts: checkRecord(checkString(), checkRef<refsType>()("AuthAccountsValue", "expected AuthAccountsValue")),
+      authAccounts: checkRecord(checkString(), checkRef<refsType>()("AuthAccountsValue", "expected AuthAccountsValue")).describe("This is the auth accounts settings related to logins. The keys of this object are the authAccount specifed in the authList under the tree"),
       putsaver: checkObject<ServerConfig["putsaver"], never>("", {}, putsaverOptional()).describe("Settings related to the put saver"),
       directoryIndex: checkObject<Defined<ServerConfigSchema["directoryIndex"]>>("", {
         defaultType: checkStringEnum(["html", "json"] as const)

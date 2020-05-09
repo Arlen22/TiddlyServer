@@ -32,6 +32,8 @@ import {
   Config,
   OptionsConfig,
 } from "./server-config";
+import { JsonError } from "./utils";
+import { checkServerConfigSchema } from "./interface-checker";
 export {
   Config,
   NewTreeOptions,
@@ -65,65 +67,6 @@ export function as<T>(obj: T) {
 }
 
 type DebugFunc = (level: number, str: string | NodeJS.ErrnoException, ...args: any[]) => any;
-
-export function loadSettings(
-  settingsFile: string,
-  assetsFolder: string,
-  routeKeys: string[]
-) {
-  let debug: DebugFunc = (level, str, ...args) => StateObject.DebugLoggerInner(level, "startup", str, args, process.stderr);
-
-  const settingsString = fs
-    .readFileSync(settingsFile, "utf8")
-    .replace(/\t/gi, "    ")
-    .replace(/\r\n/gi, "\n");
-
-  let settingsObjSource: ServerConfigSchema = tryParseJSON<ServerConfigSchema>(
-    settingsString,
-    e => {
-      debug(4,
-        /*colors.BgWhite + */ colors.FgRed +
-        "The settings file could not be parsed: %s" +
-        colors.Reset,
-        e.originalError.message
-      );
-      debug(4, e.errorPosition);
-      throw "The settings file could not be parsed: Invalid JSON";
-    }
-  );
-
-  if (!settingsObjSource.$schema) throw "The settings file is v2.0 and must be upgraded.";
-
-  if (settingsObjSource.$schema.startsWith("settings-2-1")) {
-    debug(2,
-      "The settins file needs to be upgraded from 2.1 if errors are thrown. "
-      + "Please set the $schema property to settings-2-2.schema.json to get proper intellisense."
-    );
-  }
-  if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
-  // let routeKeys = Object.keys(routes);
-  let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;
-  let settingsObj = normalizeSettings(settingsObjSource, settingsFile, assetsFolder);
-
-  if ((settingsObjSource as any).logging) {
-    debug(4, "Logging to file is no longer supported. Please remove the logging property from your config file. The debugLevel property is now a top level property (sibling to the tree property).");
-    throw "Logging to file is no longer supported";
-  }
-
-
-  if (typeof settingsObj.tree === "object") {
-    let keys: string[] = [];
-    settingsObj.tree;
-    let conflict = keys.filter(k => routeKeys.indexOf(k) > -1);
-    if (conflict.length)
-      debug(2,
-        "The following tree items are reserved for use by TiddlyServer: %s",
-        conflict.map(e => '"' + e + '"').join(", ")
-      );
-  }
-  //remove the https settings and return them separately
-  return { settings: settingsObj, settingshttps };
-}
 
 interface ServerEventsListener<THIS> {
   (event: "websocket-connection", listener: (data: RequestEvent) => void): THIS;
@@ -204,103 +147,6 @@ export interface Directory {
   type: string;
 }
 
-// export function tryParseJSON(str: string, errObj?: { error?: JsonError }): any;
-// export function tryParseJSON(str: string, errObj?: ((e: JsonError) => T | void)): T;
-/**
- * Calls the onerror handler if there is a JSON error. Returns whatever the error handler
- * returns. If there is no error handler, undefined is returned.
- * The string "undefined" is not a valid JSON document.
- */
-export function tryParseJSON<T = any>(str: string, onerror: (e: JsonError) => never): T;
-export function tryParseJSON<T = any>(str: string, onerror: (e: JsonError) => T): T;
-export function tryParseJSON<T = any>(str: string, onerror: (e: JsonError) => void): T | undefined;
-export function tryParseJSON<T = any>(str: string, onerror?: undefined): T | undefined;
-export function tryParseJSON<T = any>(str: string, onerror?: (e: JsonError) => T): T | undefined {
-  function findJSONError(message: string, json: string) {
-    console.log(message);
-    const res: string[] = [];
-    const match = /at (\d+):(\d+)/gi.exec(message);
-    if (!match) return "";
-    const position = [+match[1], +match[2]];
-    const lines = json.split("\n");
-    res.push(...lines.slice(0, position[0]));
-    res.push(new Array(position[1]).join("-") + "^  " + message);
-    res.push(...lines.slice(position[0]));
-    return res.join("\n");
-  }
-  str = str.replace(/\t/gi, "    ").replace(/\r\n/gi, "\n");
-  try {
-    return JSON5.parse(str);
-  } catch (e) {
-    let err = new JsonError(findJSONError(e.message, str), e);
-    if (onerror) return onerror(err);
-  }
-}
-export interface JsonErrorContainer {
-  error?: JsonError;
-}
-export class JsonError {
-  public filePath: string = "";
-  constructor(
-    /** The full JSON string showing the position of the error */
-    public errorPosition: string,
-    /** The original error return by JSON.parse */
-    public originalError: Error
-  ) { }
-}
-
-export function keys<T>(o: T): (keyof T)[] {
-  return Object.keys(o) as (keyof T)[];
-}
-export function padLeft(str: any, pad: number | string, padStr?: string): string {
-  var item = str.toString();
-  if (typeof padStr === "undefined") padStr = " ";
-  if (typeof pad === "number") {
-    pad = new Array(pad + 1).join(padStr);
-  }
-  //pad: 000000 val: 6543210 => 654321
-  return pad.substr(0, Math.max(pad.length - item.length, 0)) + item;
-}
-export function sortBySelector<T extends { [k: string]: string }>(key: (e: T) => any) {
-  return function (a: T, b: T) {
-    var va = key(a);
-    var vb = key(b);
-
-    if (va > vb) return 1;
-    else if (va < vb) return -1;
-    else return 0;
-  };
-}
-export function sortByKey(key: string) {
-  return sortBySelector(e => e[key]);
-}
-export namespace colors {
-  export const Reset = "\x1b[0m";
-  export const Bright = "\x1b[1m";
-  export const Dim = "\x1b[2m";
-  export const Underscore = "\x1b[4m";
-  export const Blink = "\x1b[5m";
-  export const Reverse = "\x1b[7m";
-  export const Hidden = "\x1b[8m";
-
-  export const FgBlack = "\x1b[30m";
-  export const FgRed = "\x1b[31m";
-  export const FgGreen = "\x1b[32m";
-  export const FgYellow = "\x1b[33m";
-  export const FgBlue = "\x1b[34m";
-  export const FgMagenta = "\x1b[35m";
-  export const FgCyan = "\x1b[36m";
-  export const FgWhite = "\x1b[37m";
-
-  export const BgBlack = "\x1b[40m";
-  export const BgRed = "\x1b[41m";
-  export const BgGreen = "\x1b[42m";
-  export const BgYellow = "\x1b[43m";
-  export const BgBlue = "\x1b[44m";
-  export const BgMagenta = "\x1b[45m";
-  export const BgCyan = "\x1b[46m";
-  export const BgWhite = "\x1b[47m";
-}
 
 // declare function DebugLog(str: string, ...args: any[]);
 export function isError(obj): obj is Error {

@@ -18,8 +18,6 @@ import { RequestEvent } from "./request-event";
 import { Observable, Subject, Subscription } from "rxjs";
 import { filter } from "rxjs/operators";
 import {
-  keys,
-  loadSettings,
   parseHostList,
   serveFile,
   serveFolder,
@@ -29,6 +27,8 @@ import {
   ServerConfigSchema,
   ServerConfig_AccessOptions,
 } from "./server-types";
+import {loadSettings} from "./utils-config";
+import { keys } from "./utils-functions";
 import { StateObject } from "./state-object";
 import { handleTreeRoute } from "./tiddlyserver";
 import { EventEmitter } from "./event-emitter-types";

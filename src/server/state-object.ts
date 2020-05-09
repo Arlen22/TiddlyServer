@@ -8,16 +8,18 @@ import { format, promisify } from "util";
 import { RequestEvent } from "./request-event";
 import { Config, OptionsConfig, ServerConfig, ServerConfig_AccessOptions } from "./server-config";
 import {
-  colors,
-  ER,
-  isError,
   JsonError,
   padLeft,
+  tryParseJSON,
+} from "./utils-functions";
+import { colors } from "./utils";
+import {
+  ER,
+  isError,
   ServerEventEmitter,
   StandardResponseHeaders,
   StateObjectUrl,
   StatPathResult,
-  tryParseJSON,
   PathResolverResult,
   as,
   DirectoryIndexData,

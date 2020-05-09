@@ -170,9 +170,9 @@ if (gunzip) {
   fs.writeFileSync(output, z.gunzipSync(fs.readFileSync(input)));
   console.log("Uncompressed file written to " + path.resolve(output));
 } else if(genSchema) {
-  let output = path.resolve(genSchema[0] || "settings-2-2.schema.json");
+  let output = path.resolve(genSchema[0] || "tiddlyserver-2-2.schema.json");
   console.log("writing schema to %s", output);
-  if(fs.existsSync(path.join(path.dirname(output), "settings-2-2-tree.schema.json")))
+  if(fs.existsSync(path.join(path.dirname(output), "setttings-2-2-tree.schema.json")))
     console.log("The files \"settings-2-2-tree.schema.json\" and \"settings-2-2-tree-options.schema.json\" are not required with this schema. They may be safely deleted.")
   fs.writeFileSync(output, JSON.stringify(server.generateSchema(path.basename(output)), null, 2));
 } else if (fs.existsSync(settingsFile)) {

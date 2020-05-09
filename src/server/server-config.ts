@@ -3,6 +3,10 @@ declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
   typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 import { oc } from "./optional-chaining";
+
+import { fromXML, toXML } from "./utils-xml";
+import { safeJSON } from "./utils-functions";
+import { readFileSync } from 'fs';
 // type AlwaysDefined<T> = {
 // 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
 // };
@@ -45,14 +49,40 @@ function is<T>(test: (a: typeof b) => boolean, b: any): b is T {
 function as<T>(obj: T) {
   return obj;
 }
-
+const numberReg = /^-?[0-9.]+$/
+function parsePrimitive<T>(a: T, key: keyof T);
+function parsePrimitive<T>(a: any, key: keyof T) {
+  if (a[key] === "true" || a[key] === "false") a[key] = a[key] === "true";
+  else if (numberReg.test(a[key])) a[key] = +a[key];
+}
+function parseArrayChild<T>(a: T, key: keyof T);
+function parseArrayChild<T>(a: any, key: keyof T) {
+  if (typeof a[key] === "string") a[key] = JSON.parse(a[key]);
+  if (a.$children) {
+    a.$children.forEach(e => {
+      if (e.$element === key) {
+        if (!a[key]) a[key] = [];
+        a[key].push(...e.$children);
+      }
+    });
+    delete a.$children;
+  }
+}
 function normalizeOptions(keypath: string[], a: OptionsSchema[keyof OptionsSchema]) {
   if (typeof a.$element !== "string")
     throw new Error("Missing $element property in " + keypath.join("."));
 
   if (a.$element === "auth") {
+    parsePrimitive(a, "authError");
+    parseArrayChild(a, "authList");
   } else if (a.$element === "putsaver") {
+    parsePrimitive(a, "enabled");
+    parsePrimitive(a, "etagAge");
+    parsePrimitive(a, "gzipBackups")
   } else if (a.$element === "index") {
+    parsePrimitive(a, "defaultType")
+    parseArrayChild(a, "indexExts");
+    parseArrayChild(a, "indexFile");
   } else {
     let { $element } = a;
     throw new Error("Invalid element " + $element + " found at " + keypath.join("."));
@@ -100,13 +130,8 @@ export function normalizeTree(
   if (typeof item === "object" && !item.$element) {
     //@ts-ignore
     if (Object.keys(item).findIndex(e => e.startsWith("$")) !== -1)
-      console.log(
-        "Is this a mistake? Found keys starting with the dollar sign under /" + keypath.join("/")
-      );
-    item = as<Schema.GroupElement>({
-      $element: "group",
-      $children: item as any,
-    });
+      console.log("Is this a mistake? Found keys starting with the dollar sign under /" + keypath.join("/"));
+    item = as<Schema.GroupElement>({ $element: "group", $children: item as any, });
   }
   if (typeof item === "string" || item.$element === "folder") {
     if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
@@ -136,7 +161,8 @@ export function normalizeTree(
       $children = item.$children
         .filter((e: any): e is Schema.ArrayGroupElement | Schema.ArrayFolderElement => {
           if (Config.isOption(e)) {
-            throw "specifying options in $children is unsupported at " + keypath.join(".");
+            $options.push(e);
+            return false;
           } else {
             return true;
           }
@@ -173,27 +199,23 @@ export function normalizeTree(
 }
 export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement) {
   if (host.$element !== "host") throw "Tree array must not mix host elements with other elements";
-  return {
-    ...host,
-    $mount: normalizeTree(settingsDir, host.$mount as any, "$mount", []),
-  };
+  return { ...host, $mount: normalizeTree(settingsDir, host.$mount as any, "$mount", []), };
 }
 export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
-  let defaultHost = (tree2: any): Config.HostElement => ({
-    $element: "host",
-    // patterns: {
-    // 	"ipv4": ["0.0.0.0/0"],
-    // 	"domain": ["*"]
-    // },
-    // includeSubdomains: true,
-    $mount: normalizeTree(settingsDir, tree2, "$mount", []),
-  });
+  let defaultHost = (tree2: any): Config.HostElement => {
+    let $mount = normalizeTree(settingsDir, tree2, "$mount", []);
+    return ({ $element: "host", $mount })
+  };
   if (typeof tree === "string" && tree.endsWith(".xml")) {
     //read the xml file and parse it as the tree structure
+    let docstr = readFileSync(pathResolveWithUser(settingsDir, tree), "utf8");
+    let doc: any = fromXML(docstr, "tree");
+    if (!doc) throw new Error("tree XML file did not parse correctly");
+    tree = doc.$children;
   } else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
     //require the json or js file and use it directly
     let filepath = pathResolveWithUser(settingsDir, tree);
-    tree = nodeRequire(filepath).tree;
+    tree = JSON.parse(readFileSync(filepath, "utf8"), safeJSON).tree;
   }
   //otherwise just assume we're using the value itself.
   //we are not implementing host-based routing yet. If TiddlyServer is
@@ -209,52 +231,27 @@ export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAcco
   return newAuth;
 }
 
-type OptionalAny = { [K in string]: undefined };
-function isObject(a): a is OptionalAny {
-  return typeof a === "object";
-}
-function spread(a: any): {} {
-  return typeof a === "object" ? a : {};
-}
 export const defaultPermissions = {
-  writeErrors: false,
+  datafolder: true,
+  loginlink: true,
   mkdir: false,
+  putsaver: true,
+  registerNotice: true,
+  transfer: false,
   upload: false,
   websockets: true,
-  registerNotice: true,
-  putsaver: true,
-  loginlink: true,
-  transfer: false,
-  datafolder: true
+  writeErrors: false,
 };
 export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string, assetsFolder: string) {
   const settingsDir = path.dirname(settingsFile);
   let set = oc(_set);
-  // proxset.bindInfo
   if (!set.tree) throw "tree is required in ServerConfig";
   let lap = {
-    // localhost: {
-    //   ...as<ServerConfig_AccessOptions>({
-    //     writeErrors: true,
-    //     mkdir: true,
-    //     upload: true,
-    //     websockets: true,
-    //     registerNotice: true,
-    //     putsaver: true,
-    //     loginlink: true,
-    //     transfer: false,
-    //     datafolder: true
-    //   }),
-    //   ...set.bindInfo.localAddressPermissions["localhost"]({} as any),
-    // },
-    // get defaultPermissions() { throw "This property should not be accessed"; return defaultPermissions; },
     "*": {
       ...as<ServerConfig_AccessOptions>(defaultPermissions),
       ...set.bindInfo.localAddressPermissions["*"]({} as any),
     },
   };
-
-  // settingsObj.__assetsDir = assetsFolder;
 
   Object.keys(set.bindInfo.localAddressPermissions({ defaultPermissions })).forEach(k => {
     if (k === "*" || k === "defaultPermissions") return;
@@ -273,7 +270,6 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
     _devmode: !!set._devmode(),
     tree: normalizeSettingsTree(settingsDir, set.tree() as any),
     bindInfo: {
-      // ...{
       bindAddress: set.bindInfo.bindAddress([]),
       bindWildcard: set.bindInfo.bindWildcard(false),
       enableIPv6: set.bindInfo.enableIPv6(false),
@@ -282,25 +278,10 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
       localAddressPermissions: lap,
       _bindLocalhost: set.bindInfo._bindLocalhost(false),
       https,
-      // },
-      // ...spread(set.bindInfo),
-      // ...{
-      // 	https: !!(set.bindInfo && set.bindInfo.https)
-      // }
     },
     debugLevel: set.debugLevel(0),
-    // logging: {
-    //   // ...{
-    //   debugLevel: set.logging.debugLevel(0),
-    //   logAccess: set.logging.logAccess(""),
-    //   logError: set.logging.logError(""),
-    //   logColorsToFile: set.logging.logColorsToFile(false),
-    //   logToConsoleAlso: set.logging.logToConsoleAlso(true),
-    //   // }
-    // },
     authAccounts: set.authAccounts({}),
     putsaver: {
-      // ...{
       etagAge: set.putsaver.etagAge(3),
       backupFolder: set.putsaver.backupFolder(""),
       etag: set.putsaver.etag("optional"),
@@ -310,7 +291,6 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
     datafolder: set.datafolder({}),
     controllers: set.controllers([]),
     directoryIndex: {
-      // ...{
       defaultType: set.directoryIndex.defaultType("html"),
       icons: {
         ...set.directoryIndex.icons({}),
@@ -319,17 +299,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
       types: {},
       mixFolders: set.directoryIndex.mixFolders(true),
       mimetypes: {},
-      // },
-      // ...spread(set.directoryIndex)
     },
-    // EXPERIMENTAL_clientside_datafolders: {
-    //   // ...{
-    //   enabled: set.EXPERIMENTAL_clientside_datafolders.enabled(false),
-    //   alwaysRefreshCache: set.EXPERIMENTAL_clientside_datafolders.alwaysRefreshCache(true),
-    //   maxAge_tw_plugins: set.EXPERIMENTAL_clientside_datafolders.maxAge_tw_plugins(0)
-    //   // },
-    //   // ...spread(set.EXPERIMENTAL_clientside_datafolders)
-    // },
     authCookieAge: set.authCookieAge(2592000),
     maxTransferRequests: set.maxTransferRequests(0),
     $schema: "./settings.schema.json",
@@ -352,25 +322,24 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
 
   if (newset.putsaver && newset.putsaver.backupFolder)
     newset.putsaver.backupFolder = pathResolveWithUser(settingsDir, newset.putsaver.backupFolder);
-  // if (newset.logging.logAccess)
-  //   newset.logging.logAccess = pathResolveWithUser(settingsDir, newset.logging.logAccess);
-  // if (newset.logging.logError)
-  //   newset.logging.logError = pathResolveWithUser(settingsDir, newset.logging.logError);
 
   newset.__dirname = settingsDir;
   newset.__filename = settingsFile;
   try {
+
     let serverTW = set._datafolderserver(set._datafoldertarget(""));
     newset.__serverTW = serverTW
       ? pathResolveWithUser(newset.__dirname, serverTW)
       : path.join(nodeRequire.resolve("tiddlywiki-production-server/boot/boot.js"), "../..");
+
     let clientTW = set._datafolderclient(set._datafoldertarget(""));
     newset.__clientTW = clientTW
       ? pathResolveWithUser(newset.__dirname, clientTW)
       : path.join(nodeRequire.resolve("tiddlywiki-production-client/boot/boot.js"), "../..");
+
   } catch (e) {
     console.log(e);
-    throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";
+    throw "Could not resolve a tiddlywiki installation directory. Please specify a valid _datafoldertarget or _datafoldertarget or make sure tiddlywiki is in an accessible node_modules folder";
   }
   if (newset.putsaver && newset.putsaver.etag === "disabled" && !newset.putsaver.backupFolder) {
     console.log(
