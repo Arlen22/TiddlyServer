@@ -212,17 +212,30 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
     let doc: any = fromXML(docstr, "tree");
     if (!doc) throw new Error("tree XML file did not parse correctly");
     tree = doc.$children;
-  } else if (typeof tree === "string" && (tree.endsWith(".js") || tree.endsWith(".json"))) {
+    return [defaultHost(tree)];
+  } else if (typeof tree === "string" && (tree.endsWith(".json"))) {
     //require the json or js file and use it directly
     let filepath = pathResolveWithUser(settingsDir, tree);
     tree = JSON.parse(readFileSync(filepath, "utf8"), safeJSON).tree;
+    return [defaultHost(tree)];
+  } else if (typeof tree === "string" && tree.endsWith(".js")) {
+    let filepath = pathResolveWithUser(settingsDir, tree);
+    let options = nodeRequire(filepath);
+    tree = options.tree;
+    if (options.multiple)
+      tree = tree.map(e => defaultHost(e))
+    else
+      tree = [defaultHost(tree)];
+    return tree;
+  } else {
+    return [defaultHost(tree)];
   }
   //otherwise just assume we're using the value itself.
   //we are not implementing host-based routing yet. If TiddlyServer is
   //loaded as a module, the tree may be added to after the settings file
   //has been normalized and the preflighter may specify any index in the
   //host array.
-  return [defaultHost(tree)];
+
 }
 export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
   if (!auth) return {};

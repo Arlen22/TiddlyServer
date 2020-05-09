@@ -188,3 +188,48 @@ export class RequestEvent {
     // )
   }
 }
+
+// export interface RequestEvent {
+//   // if this is true after calling the preflighter, no further processing occurs
+//   handled: boolean;
+//   // the settings object being applied to this request
+//   // changing this is not officially supported, but may work
+//   settings: ServerConfig,
+//   // the HTTP request
+//   request: IncomingMessage,
+//   // which type of request this is
+//   type: "client" | "response",
+//   // only the one specified in type will be defined
+//   client: WebSocket;
+//   response: ServerResponse;
+//   // the network info for the request
+//   network: { 
+//     // listen address passed to the HTTP Server.listen
+//     iface: string; 
+//     // host header of the request
+//     host: string | undefined; 
+//     // local interface address
+//     addr: string; 
+//   };
+//   // returns the permissions object that applies based 
+//   // on authAccountKey and localAddressPermissionsKey
+//   allow: ServerConfig_AccessOptions;
+//   //getter that returns the treeHost at treeHostIndex
+//   hostRoot: Config.HostElement;
+//   // username for this request, preset if logged in
+//   username: string;
+//   // authAccounts object key that applies to this request
+//   authAccountKey: string;
+//   // bindInfo.localAddressPermissions object key that applies to this request
+//   localAddressPermissionsKey: string;
+//   // the host index in the tree
+//   treeHostIndex: number;
+//   // the output stream of the debug logger, may be changed or used by the preflighter
+//   debugOutput: Writable;
+//   // resolves the url to determine the tree node this request applies to
+//   resolvePath(): PathResolverResult | undefined;
+//   // close the response or client with this code and message
+//   close(code: number, message?: string | undefined): void;
+//   // get the tree options (auth, index, and putsaver) that apply to this tree node
+//   getTreeOptions(result: PathResolverResult): OptionsConfig;
+// }

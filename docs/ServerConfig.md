@@ -42,7 +42,7 @@ The server config is both a TypeScript interface, and a JSON file. The JSON file
 
 ## Section `tree` (required)
 
-The tree property may be a string or an object. If it is a string end in `js` or `json`, it is loaded and parsed as JSON. If it is a string ending in `xml` it is loaded as an XML document and converted to JSON.
+The tree property may be a string or an object. If it is a string end in `json`, it is loaded and parsed as JSON. If it is a string ending in `xml` it is loaded as an XML document and converted to JSON. 
 
 The tree property has many expressions, but compiles to one final structure. In it's simple form, it is expressed as string values specifying folders and files to be served organized into a tree structure using objects.
 

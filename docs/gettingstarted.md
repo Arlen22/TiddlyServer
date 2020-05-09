@@ -3,6 +3,11 @@ id: gettingstarted
 title: The Getting Started Guide
 ---
 
+The minimum Node version required is 
+
+- TiddlyServer 2.0: Node v6
+- TiddlyServer 2.1: Node v8
+
 ## Installation
 
 TiddlyServer is published to NPM. This means that you need NodeJS and NPM installed on your computer. 
@@ -79,15 +84,19 @@ Open the terminal or command prompt and run `tiddlyserver --config path/to/setti
 
 ### Android
 
-The easy way to install it on Android is to use Dory (https://play.google.com/store/apps/details?id=io.tempage.dorynode). Open the app, tap the + button on the bottom right, then select "file". Select the TiddlyServer server.js file in your filesystem. If your settings.json file isn't next to the server.js file, paste the full path into the "argument" field (not the "Node option" field). That's basically all there is to it. Save it, then hit back to return to the list of scripts and tap start. Tap stdout to see the terminal output, including any error messages.
+The easy way to install it on Android is to use Dory (https://play.google.com/store/apps/details?id=io.tempage.dorynode). 
 
-The other option is to use Termux. If you have a keyboard attached to your Android, you can basically 
+Create a portable install as explained at the top of the page and copy it to your phones storage. 
+
+Open the app, tap the + button on the bottom right, then select "file". Select the `node_modules/tiddlyserver/index.js` file in your TiddlyServer portable install. In this case it may be easier to put your config file in the same folder as the `index.js` file referred to above. That's basically all there is to it. Save it, then hit back to return to the list of scripts and tap start. Tap stdout to see the terminal output, including any error messages.
+
+The other option is to use Termux. If you have a keyboard attached to your Android, it can help.
  - Once you enable shared storage inside Termux you can use your regular Android file manager to unzip the TiddlyServer files and then cd to the directory to access them from Termux. 
  - You can install Node on Termux using the built-in package manager. 
 
 ### iOS
 
-Sorry, we're still kind of up the creek on this one, but if you can find a way to run Node on iOS, then that's what you need. 
+Sorry, we're still kind of up the creek on this one, but if you can find a way to run Node on iOS, then that's what you need. There are a couple options out there but none that I've tested. 
 
 ### Anything else
 
