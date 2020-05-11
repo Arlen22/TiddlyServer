@@ -73,7 +73,7 @@ class DataFolder {
   static tiddlywiki: Record<string, { server: TiddlyWikiServer, $tw: any, queue: any, cache: any }> = {}
   syncadaptor: any;
   syncer: any;
-  wikiInfo: any;
+  // wikiInfo: any;
   /** Creates a DataFolder if there is none on loadedFolders[mount] then loads the datafolder asyncly */
   static async trigger(request: DataFolderRequest, reloadParam: boolean) {
     let { mount, folder, target, vars } = request;
@@ -81,13 +81,13 @@ class DataFolder {
       if (reloadParam) loadedFolders[mount].events.emit("reload", mount, folder);
       loadedFolders[mount] = new DataFolder(mount, folder);
       // make sure we've loaded this target (in case settings change mid-flight)
-      // if (!DataFolder.tiddlywiki[target]) DataFolder.tiddlywiki[target] = await loadDataFolderServer(target, vars)
+      if (!DataFolder.tiddlywiki[target]) DataFolder.tiddlywiki[target] = await loadDataFolderServer(target, vars)
       // initialize the tiddlywiki instance
       promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(data => {
         const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
         if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-          loadDataFolderTiddlyWiki(request);
-          // loadDataFolder(request);
+          // loadDataFolderTiddlyWiki(request);
+          loadDataFolder(request);
         }
       });
     }
@@ -105,8 +105,8 @@ class DataFolder {
     requests.forEach(e => loadedFolders[mount].handler(e));
   }
   wiki: any;
-  files: any;
-  wikiTiddlersPath: any;
+  // files: any;
+  // wikiTiddlersPath: any;
   pending: StateObject[] = [];
   /**
   - "ws-client-connect": readonly [WebSocket, DataFolderRequest, subpath]
@@ -381,12 +381,17 @@ function loadDataFolder(
     text: "$protocol$//$host$" + mount + "/",
     title: "$:/config/tiddlyweb/host",
   });
-  const loader = new $tw.Loader(df.wiki, folder);
+  df.wiki.wikiPath = folder;
+  df.wiki.files = Object.create(null);
+  const loader = new $tw.FileSystemLoader(df.wiki, []);
   loader.loadTiddlersNode();
+  //load tiddlers from the cache in order to save memory
+  //tiddlers are immutable, so any changes will not affect 
+  //other wikis
   swapTiddlers(df, cache);
-  df.files = loader.files;
-  df.wikiTiddlersPath = loader.wikiTiddlersPath;
-  df.wikiInfo = loader.wikiInfo;
+  // df.files = loader.files;
+  // df.wikiTiddlersPath = loader.wikiTiddlersPath;
+  // df.wikiInfo = loader.wikiInfo;
   df.wiki.readPluginInfo();
   df.wiki.registerPluginTiddlers("plugin", undefined);
   df.wiki.unpackPluginTiddlers();
@@ -418,7 +423,10 @@ function loadDataFolder(
     //set the wiki and path prefix for each request
     server.wiki = loadedFolders[mount].wiki;
     server.variables["path-prefix"] = mount;
-    server.requestHandler(req, state.res);
+    server.requestHandler(req, state.res, {
+      wiki: loadedFolders[mount].wiki,
+      pathPrefix: mount
+    });
     server.wiki = null;
     server.variables["path-prefix"] = "";
     // console.log("served request", req.url);
@@ -453,7 +461,7 @@ declare class TiddlyWikiServer {
   routes: any[];
   addAuthenticator: any;
   authenticators: TiddlyServerAuthentication[];
-  requestHandler: (request: http.IncomingMessage, response: http.ServerResponse) => void;
+  requestHandler: (request: http.IncomingMessage, response: http.ServerResponse, options?: any) => void;
   findMatchingRoute: (request: http.IncomingMessage, state: any) => Route;
   variables: Record<string, any>;
   constructor(...args: any[]);
