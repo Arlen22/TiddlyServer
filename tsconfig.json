@@ -21,7 +21,8 @@
     "declaration": true,
     "importHelpers": true,
     "experimentalDecorators": true,
-    "keyofStringsOnly": true
+    "keyofStringsOnly": true,
+    "allowJs": true
   },
   "files": [
     "./src/server.ts"

@@ -1,0 +1,11 @@
+{
+  "description": "Empty edition",
+  "plugins": [
+    "tiddlywiki/filesystem",
+    "tiddlywiki/codemirror"
+  ],
+  "themes": [
+    "tiddlywiki/vanilla",
+    "tiddlywiki/snowwhite"
+  ]
+}

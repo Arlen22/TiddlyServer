@@ -1,6 +1,6 @@
 {
   "name": "tiddlyserver",
-  "version": "2.2.0-alpha-6",
+  "version": "2.2.0-alpha-7",
   "description": "Many TiddlyWiki, One Port",
   "homepage": "https://arlen22.github.io/tiddlyserver/",
   "repository": "github:Arlen22/TiddlyServer",
@@ -47,7 +47,7 @@
     "index": "node dist/index --config settings.json",
     "schema": "node dist/server --gen-schema",
     "build": "rm -rf dist && tsc && webpack",
-    "upload": "(cd dist && rm -f uncaughtException.log && rm -rf server && npm publish)",
+    "upload": "npm run build && (cd dist && npm publish)",
     "build-docs": "(cd ../tiddlyserver-website && npm run build && npm run push)"
   },
   "author": "Arlen22@GitHub.com",

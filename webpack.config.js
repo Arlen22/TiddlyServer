@@ -22,6 +22,7 @@ const options = {
     }),
     new CopyPlugin([
       { from: 'src/client', to: './client/' },
+      { from: 'src/datafolder', to: './datafolder/' },
       { from: 'preflighter.js', to: '.' },
       { from: 'scripts', to: './scripts/' },
       { from: 'README.md', to: '.' },
