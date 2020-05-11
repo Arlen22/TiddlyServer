@@ -385,18 +385,14 @@ function loadDataFolder(
   df.wiki.files = Object.create(null);
   const loader = new $tw.FileSystemLoader(df.wiki, []);
   loader.loadTiddlersNode();
-  //load tiddlers from the cache in order to save memory
-  //tiddlers are immutable, so any changes will not affect 
-  //other wikis
+  // Load tiddlers from the cache in order to save memory. Tiddlers 
+  // are immutable, so any changes will not affect other wikis.
   swapTiddlers(df, cache);
-  // df.files = loader.files;
-  // df.wikiTiddlersPath = loader.wikiTiddlersPath;
-  // df.wikiInfo = loader.wikiInfo;
   df.wiki.readPluginInfo();
   df.wiki.registerPluginTiddlers("plugin", undefined);
   df.wiki.unpackPluginTiddlers();
   // Setup the shims for different server-side plugins if required
-  if ($tw.adaptorClass && df.wiki.tiddlerExists("$:/plugins/tiddlywiki/filesystem")) {
+  if (df.wiki.tiddlerExists("$:/plugins/tiddlywiki/filesystem") && $tw.adaptorClass) {
     df.syncadaptor = new $tw.adaptorClass(df);
     df.syncer = new $tw.Syncer({
       wiki: df.wiki,
