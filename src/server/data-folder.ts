@@ -86,8 +86,8 @@ class DataFolder {
       promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(data => {
         const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
         if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
-          // loadDataFolderTiddlyWiki(request);
-          loadDataFolder(request);
+          loadDataFolderTiddlyWiki(request);
+          // loadDataFolder(request);
         }
       });
     }
