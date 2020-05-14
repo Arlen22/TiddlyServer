@@ -29,6 +29,8 @@ const options = {
     ]),
     new CleanWebpackPlugin({
       cleanAfterEveryBuildPatterns: [
+        "rootpath.d.ts",
+        "rootpath.js",
         "server.d.ts",
         "server.js",
         "package.d.ts",

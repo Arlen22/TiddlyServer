@@ -1,3 +1,5 @@
+import { factoryFileSystemLoader } from './data-folder-loader';
+
 export type AuthCookie = [string, "pw" | "key", string, string, string, string];
 export type AuthCookieSet = [string, "pw" | "key", string, string, string];
 export type ThreeStringArray = [string, string, string];
@@ -19,4 +21,29 @@ export interface TiddlyServerResponses {
   "POST /admin/authenticate/login": undefined;
   "POST /admin/authenticate/logout": undefined;
   "POST /admin/authenticate/transfer": any;
+}
+
+export type Wiki = {
+  wikiPath: string
+  wikiTiddlersPath: string
+  files: any
+} | { [x: string]: Function };
+
+export declare class FileSystemLoaderOuter {
+  wiki: Wiki;
+  extraPlugins: any[];
+  constructor(wiki: Wiki, extraPlugins: any[]);
+  loadTiddlersNode();
+}
+export interface TiddlyWikiGlobal {
+  utils: any
+  node: boolean
+  browser: boolean
+  config: any
+  boot: { corePath: string, bootPath: string, excludeRegExp: RegExp }
+  packageInfo: typeof import("tiddlywiki-production-server/package.json")
+  loadTiddlersNode: () => void
+  FileSystemLoader: ReturnType<typeof factoryFileSystemLoader>
+  wiki: any;
+  Wiki: any;
 }
