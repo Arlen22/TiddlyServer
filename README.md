@@ -54,6 +54,15 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 
 Upgrading is simple. Just follow the installation instructions as usual, then copy your `settings.json` file from your old installation to your new one. If upgrading from 2.0.x to 2.1.x, just use the `example-settings.json` file as your starting point and copy the tree over from your old settings file. 
 
+## Getting started
+
+See the [Getting Started Guide][getting-started-guide] and the [man page][man-page] in
+the [docs][docs] directory.
+
+[getting-started-guide]: https://github.com/phlummox-patches/TiddlyServer/blob/v2.2/docs/gettingstarted.md
+[man-page]: https://github.com/phlummox-patches/TiddlyServer/blob/v2.2/docs/man-page.md
+[docs]: https://github.com/phlummox-patches/TiddlyServer/tree/v2.2/docs
+
 ## FAQ
 
 If these do not answer your question, feel free to open an issue or ask on the TiddlyWiki Google Group.
