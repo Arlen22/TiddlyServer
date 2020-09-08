@@ -71,9 +71,9 @@ If these do not answer your question, feel free to open an issue or ask on the T
 
 The minimum Node version required is 
 
-TiddlyServer 2.0: Node v6
-TiddlyServer 2.1: Node v8
-TiddlyServer 2.2: Node v10
+- TiddlyServer 2.0: Node v6
+- TiddlyServer 2.1: Node v8
+- TiddlyServer 2.2: Node v10
 
 ## Questions or Comments?
  - Feature requests! If you have a feature you would like to see, open an issue and I will see what I can do. I see many possibilities with this app, and your requests will show me where to focus next.
