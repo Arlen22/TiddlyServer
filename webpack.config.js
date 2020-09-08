@@ -78,9 +78,7 @@ const options = {
     "tiddlywiki-production-client"
   ],
   stats: {
-    // Ignore warnings due to yarg's dynamic module loading
-    warningsFilter: [/node_modules\/yargs/],
-    // all: true
+    all: true
   },
 };
 
