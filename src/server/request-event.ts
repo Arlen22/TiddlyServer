@@ -62,8 +62,9 @@ export class RequestEvent {
   async requestHandlerHostLevelChecks<T extends RequestEvent>(
     preflighter?: (ev: RequestEvent) => Promise<RequestEvent>
   ): Promise<RequestEvent> {
-    // let this = this;
-    //connections to the wrong IP address are already filtered out by the connection event listener on the server.
+
+    //connections to the wrong IP address are already filtered out 
+    //by the connection event listener on the server.
     //determine localAddressPermissions to be applied
     {
       let localAddress = this.request.socket.localAddress;
@@ -141,19 +142,9 @@ export class RequestEvent {
   }
   getTreeOptions(result: PathResolverResult) {
     let ancestry = [...result.ancestry, result.item];
-    //nonsense we have to write because putsaver could be false
-    // type putsaverT = Required<typeof state.settings.putsaver>;
-    let putsaver = as<ServerConfig["putsaver"]>({
-      enabled: true,
-      gzipBackups: true,
-      backupFolder: "",
-      etag: "optional",
-      etagAge: 3,
-      ...(this.settings.putsaver || {}),
-    });
     let options: OptionsConfig = {
       auth: { $element: "auth", authError: 403, authList: null },
-      putsaver: { $element: "putsaver", ...putsaver },
+      putsaver: { $element: "putsaver", ...this.settings.putsaver },
       index: {
         $element: "index",
         defaultType: this.settings.directoryIndex.defaultType,
@@ -161,13 +152,10 @@ export class RequestEvent {
         indexExts: [],
       },
     };
-    // console.log(state.ancestry);
     ancestry.forEach(e => {
-      // console.log(e);
       e.$options &&
         e.$options.forEach(f => {
           if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
-            // console.log(f);
             Object.keys(f).forEach(k => {
               if (f[k] === undefined) return;
               options[f.$element][k] = f[k];

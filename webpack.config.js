@@ -9,7 +9,7 @@ const options = {
   entry: { index: "./dist/server.js" },
   target: "node",
   mode: dev ? "none" : "production",
-  devtool: false ? 'source-map' : "",
+  devtool: dev ? 'source-map' : "",
   watch: false,
   plugins: [
     new webpack.DefinePlugin({
@@ -79,7 +79,8 @@ const options = {
   ],
   stats: {
     // Ignore warnings due to yarg's dynamic module loading
-    warningsFilter: [/node_modules\/yargs/]
+    warningsFilter: [/node_modules\/yargs/],
+    // all: true
   },
 };
 

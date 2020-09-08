@@ -10,6 +10,7 @@ import {
   ServerConfig_AuthAccountsValue,
 } from "./server-config";
 import { as } from "./server-types";
+import { type } from 'os';
 interface Description<V> {
   $description: string,
   $items?: DescObj<V>,
@@ -214,7 +215,7 @@ export const checkString = () => new CheckSimple(
   (a): a is string => typeof a === "string",
   { type: "string" }
 );
-export const checkStringEnum = <T extends string>(val: readonly T[], ) =>
+export const checkStringEnum = <T extends string>(val: readonly T[],) =>
   new CheckSimple(
     "expected one string of " + JSON.stringify(val),
     (a): a is T => typeof a === "string" && (val as readonly string[]).indexOf(a) !== -1,
@@ -235,7 +236,7 @@ export const checkNumber = () => new CheckSimple(
   (a): a is number => typeof a === "number",
   { type: "number" }
 );
-export const checkNumberEnum = <T extends number>(val: readonly T[], ) =>
+export const checkNumberEnum = <T extends number>(val: readonly T[],) =>
   new CheckSimple(
     "expected one number of " + JSON.stringify(val),
     (a): a is T => typeof a === "number" && (val as readonly number[]).indexOf(a) !== -1,
@@ -289,7 +290,8 @@ export class CheckMultiple<T extends {}> extends TypeCheck<T> {
     private checkObject: (a: any, reffer: Reffer) => a is T,
     private checkChildren: (a: any, reffer: Reffer, curKey: (k: any) => void) => a is T,
     private schema: "array" | "record",
-    private childType: TypeCheck<any>
+    private childType: TypeCheck<any>,
+    private patterProperties?: string
   ) {
     super();
   }
@@ -297,9 +299,16 @@ export class CheckMultiple<T extends {}> extends TypeCheck<T> {
     switch (this.schema) {
       case "record": return {
         type: "object",
-        additionalProperties: this.childType.getSchema(reffer),
         default: this.defData,
-        description: this.description || undefined
+        description: this.description || undefined,
+        ...(this.patterProperties
+          ? {
+            patternProperties: { [this.patterProperties]: this.childType.getSchema(reffer) }
+          }
+          : {
+            additionalProperties: this.childType.getSchema(reffer)
+          }
+        )
       };
       case "array": return {
         items: this.childType.getSchema(reffer),
@@ -312,7 +321,7 @@ export class CheckMultiple<T extends {}> extends TypeCheck<T> {
 }
 
 type ArrayType<T> = T extends Array<infer X> ? X : never;
-export const checkArray = <V>(checker: TypeCheck<V>, ) =>
+export const checkArray = <V>(checker: TypeCheck<V>,) =>
   new CheckMultiple(
     "expected an array that " + checker.expectedMessage,
     (a, reffer): a is V[] => typeof a === "object" && Array.isArray(a),
@@ -327,8 +336,7 @@ export const checkArray = <V>(checker: TypeCheck<V>, ) =>
 
 export const checkRecord = <K extends string, V>(
   keyChecker: TypeCheck<K>,
-  checker: TypeCheck<V>,
-
+  checker: TypeCheck<V>
 ) =>
   new CheckMultiple<{ [k in K]: V }>(
     "expected a record that " + checker.expectedMessage,
@@ -342,7 +350,8 @@ export const checkRecord = <K extends string, V>(
       return arr.length === keys.length;
     },
     "record",
-    checker
+    checker,
+    keyChecker instanceof CheckSimple ? keyChecker.schema.regex : undefined
   );
 
 class CheckUnionWrapper<A, B> extends TypeCheck<A | B> {
@@ -367,7 +376,7 @@ class CheckUnion<T> extends TypeCheck<T> {
   error: any[];
   expectedMessage: string = "";
 
-  constructor(public checks: TypeCheck<any>[]) {
+  constructor(public checks: TypeCheck<any>[], public oneof: boolean) {
     super();
     this.error = new Array(this.checks.length);
     this.expectedMessage = checks.map(e => e.expectedMessage).join(", ");
@@ -401,7 +410,7 @@ class CheckUnion<T> extends TypeCheck<T> {
     return {
       default: this.defData,
       description: this.description || undefined,
-      "anyOf": this.checks.map(e => e.getSchema(reffer))
+      [this.oneof ? "oneOf" : "anyOf"]: this.checks.map(e => e.getSchema(reffer))
     }
   }
 }
@@ -427,12 +436,15 @@ function flattenWrapper(c: TypeCheck<any>): TypeCheck<any>[] {
  * The error message of a union will be an array.
  * False indicates there were no errors for that branch (i.e. it passed)
  */
-export const checkUnion = <A, B>(ca: TypeCheck<A>, cb: TypeCheck<B>) => {
+export const checkUnion = <A, B>(ca: TypeCheck<A>, cb: TypeCheck<B>, oneOf: boolean = false) => {
   let checks = flattenWrapper(new CheckUnionWrapper(ca, cb)).filter(
     (e): e is NonNullable<typeof e> => !!e
   );
-  return new CheckUnion<A | B>(checks);
+  return new CheckUnion<A | B>(checks, oneOf);
 };
+export const checkUnionArray = <T>(checks: TypeCheck<any>[], oneof: boolean) => {
+  return new CheckUnion<T>(checks, oneof);
+}
 checkUnion.cu = <A, B>(ca: TypeCheck<A>, cb: TypeCheck<B>) => new CheckUnionWrapper(ca, cb);
 
 class CheckObject<T extends {}> extends TypeCheck<T> {
@@ -560,7 +572,7 @@ type OptionalCheckermap<T extends {}, REQUIRED extends keyof T> = {
 // type OptionalCheckermap<T extends { [K: string]: unknown }, REQUIRED extends string> = { [KEY in Exclude<keyof T, REQUIRED>]-?: TypeCheck<T[KEY]> };
 
 export function checkResult(e: TypeCheck<any>, a: any, reffer: Reffer) {
-  let union = new CheckUnion([e]);
+  let union = new CheckUnion([e], false);
   let res = union.check(a, reffer);
   return [res, union.error ? union.error[0] : undefined] as const;
 }
@@ -672,14 +684,14 @@ type refsType = {
   "SchemaGroupChild": () => TypeCheck<Schema.GroupChildElements | Record<string, string | object> | string>
   "ServerConfigSchema": () => TypeCheck<ServerConfigSchema>
 }
-function getSchemaGroupChild() {
+function getSchemaGroupChild(): () => TypeCheck<any> {
   const groupElement: {
     (array: true): TypeCheck<Schema.ArrayGroupElement>;
     (array: false): TypeCheck<Schema.GroupElement>;
   } = <AR extends boolean>(array: AR) => {
     return checkObject<Schema.ArrayGroupElement, "$element" | "$children" | "key">("",
       {
-        $element: checkStringEnum(["group"]),
+        $element: checkStringEnum(["group"]).describe("group element"),
         ...(array ? { key: checkString() } : {}) as { key: TypeCheck<string> },
         $children: checkRef<refsType>()("SchemaGroupChild", "expected a repeat of GroupChild") as any
       },
@@ -696,7 +708,7 @@ function getSchemaGroupChild() {
   } = <AR extends boolean>(array: AR) => {
     return checkObject<Schema.ArrayFolderElement, "$element" | "path">("",
       {
-        $element: checkStringEnum(["folder"] as const),
+        $element: checkStringEnum(["folder"] as const).describe("folder element"),
         path: checkString().describe("Path relative to this file or an absolute path. If NodeJS can access it using stat, readdir, and readFile, then you can put it here")
       },
       {
@@ -710,9 +722,8 @@ function getSchemaGroupChild() {
   };
   const folderString = () => checkString().describe("A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used.");
 
-  const SchemaGroupChild = () => checkUnion(
-    checkString().describe("A string ending in `xml`, `js`, or `json` will be parsed and loaded as the tree."),
-    checkUnion.cu(checkRecord<string, string | object>(checkStringRegex(/^[^$]+$/), checkUnion(
+  const SchemaGroupChild = () => checkUnionArray([
+    checkRecord<string, string | object>(checkStringRegex(/^[^$]+$/), checkUnion(
       checkUnion.cu(
         folderElement(false),
         groupElement(false),
@@ -720,19 +731,34 @@ function getSchemaGroupChild() {
       checkUnion.cu(
         checkRef<refsType>()("SchemaGroupChild", "expected group child"),
         folderString()
-      )
+      ),
+      false
     )),
-      checkArray<Schema.ArrayFolderElement | Schema.ArrayGroupElement | string>(
-        checkUnion(
-          checkUnion.cu(
-            folderElement(true),
-            groupElement(true),
-          ),
-          folderString(),
-        )
-      ))
-  ).describe("This can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.");
+    checkArray<Schema.ArrayFolderElement | Schema.ArrayGroupElement | string>(
+      checkUnion(
+        checkUnion.cu(
+          folderElement(true),
+          groupElement(true),
+        ),
+        folderString(),
+      )
+    )
+  ], false).describe("This can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.");
 
+  const schemaRef = {
+    "ArrayFolder": folderElement(true),
+    "ArrayGroup": groupElement(true),
+    "RecordFolder": folderElement(false),
+    "RecordGroup": groupElement(false),
+    "SchemaGroupChild": SchemaGroupChild()
+  }
+  type schemaType = {
+    "ArrayFolder": TypeCheck<any>
+    "ArrayGroup": TypeCheck<any>
+    "RecordFolder": TypeCheck<any>
+    "RecordGroup": TypeCheck<any>
+    "SchemaGroupChild": TypeCheck<any>
+  }
   return SchemaGroupChild;
 
 }
@@ -879,7 +905,11 @@ function getServerConfig() {
       datafolder: checkRecord(checkString(), checkAny()),
     }),
     ServerConfigSchema: () => checkObject<Defined<ServerConfigSchema>, "tree">("", {
-      tree: checkRef<refsType>()("SchemaGroupChild", "expected group child"),
+      tree: checkUnion(
+        checkString().describe("A string ending in `xml`, `js`, or `json` will be parsed and loaded as the tree."),
+        checkRef<refsType>()("SchemaGroupChild", "expected group child"),
+        true
+      )
     }, {
       _datafolderclient: checkString().describe("The tiddlywiki folder to serve on \"/assets/tiddlywiki/\""),
       _datafolderserver: checkString().describe("The tiddlywiki folder to use for data folder instances."),
@@ -907,15 +937,20 @@ function getServerConfig() {
       directoryIndex: checkObject<Defined<ServerConfigSchema["directoryIndex"]>>("", {
         defaultType: checkStringEnum(["html", "json"] as const)
           .describe("default format for the directory index"),
-        icons: checkRecord(checkString(), checkArray(checkString()))
-          .describe("Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for. Icons are in the TiddlyServer/assets/icons folder."),
+        icons: checkRecord(
+          checkString().describe("Name of icon file in TiddlyServer/client/icons/files"),
+          checkArray(checkString().describe("File extension to use this icon for."))
+        ).describe("Hashmap of type { \"icon_name.png\": [\"ext\"] } where ext represents the extensions to use this icon for."),
         mimetypes: checkRecord(checkString(), checkArray(checkString()))
-          .describe("additional extensions to associate with mime types [\"mime/type\"]: [\"htm\", \"html\"]"),
+          .describe("Additional extensions to associate with mime types for content-type header { [\"mime/type\"]: [\"htm\", \"html\"] }."),
         mixFolders: checkBoolean()
-          .describe("Sort folder and files together rather than separated")
+          .describe("Sort folders and files together rather than separated")
       }),
       controllers: checkAny(),
-      datafolder: checkRecord(checkString(), checkAny()).describe("Options object whose properties will be passed to the tiddlywiki server instance using the spread operator. This means that if a property specifies an object (or array) instead of a primitive, the same object will be given to all instances."),
+      datafolder: checkRecord(
+        checkString().describe("Server variable name"),
+        checkAny().describe("Server variable value")
+      ).describe("Options object whose properties will be passed to the tiddlywiki server instance using the spread operator. This means that if a property specifies an object (or array) instead of a primitive, the same object will be given to all instances."),
     }/*  as TypeCheckItems<ServerConfigSchema, "tree"> */)
   }
   return refs;

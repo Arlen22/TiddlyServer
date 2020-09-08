@@ -4,16 +4,12 @@ import * as fs from "fs";
 import * as path from "path";
 
 import { format, promisify } from "util";
-// import { Observable, Subscriber } from '../lib/rx';
-// import { EventEmitter } from "events";
-//import { StateObject } from "./index";
 import * as JSON5 from "json5";
 import * as send from "send";
 import * as WebSocket from "ws";
 import { Stats, appendFileSync } from "fs";
 import { gzip, createGzip } from "zlib";
 import { Writable, Stream } from "stream";
-// import { TlsOptions } from 'tls';
 import * as https from "https";
 import { networkInterfaces, NetworkInterfaceInfo } from "os";
 import * as ipcalc from "./ipcalc";
@@ -296,34 +292,42 @@ export type DirectoryIndexData = {
   dirpath: string;
   type: "group" | "folder";
 };
+export type DirectoryIndexListing = {
+  path: string
+  entries: {
+    name: string;
+    path: string;
+    icon: string;
+    type: "error" | "folder" | "datafolder" | "file" | "group";
+    size: string;
+  }[]
+  type: "group" | "folder"
+}
 export type DirectoryIndexOptions = {
   upload: boolean;
   mkdir: boolean;
   format: "json" | "html";
   mixFolders: boolean;
   isLoggedIn: string | false;
-  extTypes: { [ext: string]: string };
+  extTypes: { [ext_mime: string]: string };
 };
-export async function sendDirectoryIndex([_r, options]: [
-  DirectoryIndexData,
-  DirectoryIndexOptions
-]) {
+export async function sendDirectoryIndex(_r: DirectoryIndexData, options: DirectoryIndexOptions) {
   let { keys, paths, dirpath, type } = _r;
-  let pairs = keys.map((k, i) => [k, paths[i]] as [string, string | boolean]);
+  // let pairs = keys.map((k, i) => [k, paths[i]] as [string, string | boolean]);
   let entries = await Promise.all(
     keys.map(async (key, i) => {
       let statpath = paths[i];
       let stat = statpath === true ? undefined : await statPath(statpath, false);
+      const nameparts = key.indexOf(".") !== -1 ? key.split(".").pop() : "";
       return {
         name: key,
         path: key + (!stat || stat.itemtype === "folder" ? "/" : ""),
-        type: !stat
-          ? "group"
-          : stat.itemtype === "file"
-            ? options.extTypes[key.split(".").pop() as string] || "other"
-            : (stat.itemtype as string),
+        type: !stat ? "group" : stat.itemtype,
+        icon: !stat ? "group.png" : (stat.itemtype === "file")
+          ? (nameparts && options.extTypes[nameparts] || "other.png")
+          : (stat.itemtype as string + ".png"),
         size: stat && stat.stat ? getHumanSize(stat.stat.size) : "",
-      };
+      } as DirectoryIndexListing["entries"][number];
     })
   );
   if (options.format === "json") {
@@ -424,9 +428,8 @@ export function treeWalker(tree: Config.GroupElement | Config.PathElement, reqpa
       folderPathFound = true;
       break;
     }
-    let t = item.$children.find(
-      (e): e is Config.GroupElement | Config.PathElement =>
-        (Config.isGroup(e) || Config.isPath(e)) && e.key === reqpath[end]
+    let t = item.$children.find((e): e is Config.GroupElement | Config.PathElement =>
+      (Config.isGroup(e) || Config.isPath(e)) && e.key === reqpath[end]
     );
     if (t) {
       ancestry.push(item);
@@ -450,13 +453,8 @@ export function resolvePath(
   }
 
   reqpath = decodeURI(
-    reqpath
-      .slice()
-      .filter(a => a)
-      .join("/")
-  )
-    .split("/")
-    .filter(a => a);
+    reqpath.slice().filter(a => a).join("/")
+  ).split("/").filter(a => a);
 
   if (!reqpath.every(a => a !== ".." && a !== ".")) return;
 
@@ -467,11 +465,9 @@ export function resolvePath(
   //get the remainder of the path
   let filepathPortion = reqpath.slice(result.end).map(a => a.trim());
 
-  const fullfilepath = result.folderPathFound
+  const fullfilepath = Config.isPath(result.item)
     ? path.join(result.item.path, ...filepathPortion)
-    : Config.isPath(result.item)
-      ? result.item.path
-      : "";
+    : "";
 
   return {
     item: result.item,

@@ -4,78 +4,11 @@ require("source-map-support/register");
 import * as fs from "fs";
 import * as path from "path";
 import * as server from "./server/server";
-import * as yargs from "yargs";
 import { inspect } from "util";
 import { homedir } from "os";
 import { StateObject } from './server/state-object';
+import { Command } from "commander";
 
-const configInstallPath = path.join(__dirname, "settings.json");
-const cli = yargs
-  .usage("./$0 --config ~/path/to/settings.json")
-  .help()
-  .option("config", {
-    describe: "Path to the server config file. Optional if a settings.json file exists in the installation directory.",
-    // demandOption: !fs.existsSync(configInstallPath),
-    type: "string",
-  })
-  .option("stay-on-error", {
-    describe: "Start a setInterval loop to keep the process\nfrom exiting.",
-    demandOption: false,
-    type: "boolean",
-    default: false,
-  })
-  .option("dry-run", {
-    describe:
-      "Do everything except call server.listen().\nUseful for checking settings.",
-    demandOption: false,
-    default: false,
-    type: "boolean",
-  })
-  .option("gunzip", {
-    array: true,
-    conflicts: ["config"],
-    describe: "Unzip a backup file. Specify --gunzip input.gz output.html",
-    type: "string"
-  })
-  .option("gen-schema", {
-    conflicts: ["config"],
-    array: true,
-    describe: "Generate a JSON schema for the config file and write it to the specified file",
-    type: "string"
-  })
-  ;
-const argv = cli.argv;
-
-const {
-  config: userSettings,
-  "dry-run": dryRun,
-  "stay-on-error": stayOnError,
-  gunzip,
-  "gen-schema": genSchema
-} = argv;
-
-
-
-
-const settingsFile =
-  userSettings
-    ? path.resolve(userSettings.startsWith("~/") ? homedir() + userSettings.slice(1) : userSettings)
-    : configInstallPath;
-
-const assetsFolder = path.join(__dirname, "client");
-
-declare const __non_webpack_require__: NodeRequire | undefined;
-const nodeRequire =
-  typeof __non_webpack_require__ !== "undefined"
-    ? __non_webpack_require__
-    : require;
-
-const logAndCloseServer = (err?: any) => {
-  //hold it open because all other listeners should close
-  if (stayOnError) setInterval(function () { }, 1000);
-  process.exitCode = 1;
-  if (err) log(err);
-};
 const log = (err: any) => {
   StateObject.DebugLoggerInner(4, "[ERROR]", "caught process uncaughtException " + inspect(err), [], process.stderr);
   try {
@@ -87,7 +20,75 @@ const log = (err: any) => {
     StateObject.DebugLoggerInner(4, "[ERROR]", "Could not write to uncaughtException.log", [], process.stderr);
   }
 }
-async function runServer() {
+let logAndCloseServer: (err?: any) => void;
+
+const program = new Command();
+program.storeOptionsAsProperties(false)
+program.passCommandToAction(false)
+program.version(require('../package.json').version, "--version, -v");
+program //.command("serve", { isDefault: true })
+  .option("--config [file]", "Path to the server config file. Optional if a settings.json file exists in the installation directory.")
+  .option("--stay-on-error", "Start a setInterval loop to keep the process from exiting.")
+  .option("--dry-run", "Do everything except call server.listen(). Useful for checking settings.")
+  .action((options: { "config"?: string, "stayOnError"?: boolean, "dryRun"?: boolean }) => {
+    logAndCloseServer = (err?: any) => {
+      //hold it open because all other listeners should close
+      if (options.stayOnError) setInterval(function () { }, 1000);
+      process.exitCode = 1;
+      if (err) log(err);
+    };
+
+    if (typeof options.config === "boolean") options.config = "";
+
+    const settingsFile = options.config
+      ? path.resolve(options.config.startsWith("~/") ? homedir() + options.config.slice(1) : options.config)
+      : path.join(__dirname, "settings.json");
+
+    if (fs.existsSync(settingsFile)) {
+      runServer(settingsFile, !!options.dryRun).catch(e => { if (e) logAndCloseServer(e); });
+    } else {
+      let msg = "[ERROR]: server config file could not be found.\nConsider passing its location via --config\n";
+      console.log(msg);
+      logAndCloseServer();
+    }
+  })
+program.command("gunzip <input> <output>")
+  .description("Unzip a backup file. Will throw if output file already exists.")
+  .action((input, output, options) => {
+    const z = require("zlib");
+    const fs = require("fs");
+    if (!fs.existsSync(input)) {
+      console.log("  The input file does not exist.");
+    } else if (fs.existsSync(output)) {
+      console.log("  The output file already exists");
+    } else {
+      fs.writeFileSync(output, z.gunzipSync(fs.readFileSync(input)));
+      console.log("  Uncompressed file written to " + path.resolve(output));
+    }
+  });
+program.command("gen-schema [output]")
+  .description("Generate a JSON schema for the config file and write it to the specified file")
+  .action((output, options) => {
+    output = path.resolve(output || "tiddlyserver-2-2.schema.json");
+    console.log("writing schema to %s", output);
+    if (fs.existsSync(path.join(path.dirname(output), "setttings-2-2-tree.schema.json")))
+      console.log("The files \"settings-2-2-tree.schema.json\" and \"settings-2-2-tree-options.schema.json\" are not required with this schema. They may be safely deleted.")
+    fs.writeFileSync(output, JSON.stringify(server.generateSchema(path.basename(output)), null, 2));
+  })
+
+
+
+const assetsFolder = path.join(__dirname, "client");
+
+declare const __non_webpack_require__: NodeRequire | undefined;
+const nodeRequire =
+  typeof __non_webpack_require__ !== "undefined"
+    ? __non_webpack_require__
+    : require;
+
+
+
+async function runServer(settingsFile: string, dryRun: boolean) {
   const settingsDir = path.dirname(settingsFile);
   await server.libsReady;
 
@@ -155,33 +156,5 @@ function auditChildren() {
   }
   inspectModule(module);
 }
-if (gunzip) {
-  const z = require("zlib");
-  const fs = require("fs");
-  if (gunzip.length !== 2) { 
-    console.log("  Please specify the input gz file and an output file that does not exist."); 
-    process.exit(1);
-  }
-  const [input, output] = gunzip;
-  if (fs.existsSync(output)) {
-    console.log("  The output file already exists");
-    process.exit(1);
-  }
-  fs.writeFileSync(output, z.gunzipSync(fs.readFileSync(input)));
-  console.log("Uncompressed file written to " + path.resolve(output));
-} else if(genSchema) {
-  let output = path.resolve(genSchema[0] || "tiddlyserver-2-2.schema.json");
-  console.log("writing schema to %s", output);
-  if(fs.existsSync(path.join(path.dirname(output), "setttings-2-2-tree.schema.json")))
-    console.log("The files \"settings-2-2-tree.schema.json\" and \"settings-2-2-tree-options.schema.json\" are not required with this schema. They may be safely deleted.")
-  fs.writeFileSync(output, JSON.stringify(server.generateSchema(path.basename(output)), null, 2));
-} else if (fs.existsSync(settingsFile)) {
-  runServer().catch(e => {
-    if (e) logAndCloseServer(e);
-  });
-  // auditChildren();
-} else {
-  let msg = "[ERROR]: server config file could not be found.\nConsider passing its location via --config\n";
-  console.log(msg);
-  logAndCloseServer();
-}
+
+program.parse();

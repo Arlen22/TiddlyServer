@@ -8,7 +8,7 @@ export interface WikiInfo {
   themes: string[];
   languages: string[];
   config?: { [K: string]: any };
-  type: "tiddlywiki" | "tiddlyserver";
+  type: "tiddlywiki" | "tiddlywiki-slim";
 }
 export interface FileInfo {
   tiddlers?: Record<string, any>;

@@ -17,8 +17,8 @@
     "@types/webpack": "^4.41.12",
     "@types/ws": "^6.0.1",
     "@types/xml-js": "^1.0.0",
-    "@types/yargs": "^15.0.4",
     "clean-webpack-plugin": "^3.0.0",
+    "commander": "^6.1.0",
     "copy-webpack-plugin": "^5.1.1",
     "formidable": "^1.1.1",
     "json-stable-stringify": "^1.0.1",
@@ -37,8 +37,7 @@
     "webpack": "^4.43.0",
     "webpack-cli": "^3.3.11",
     "ws": "^7.2.1",
-    "xml-js": "^1.6.11",
-    "yargs": "^15.1.0"
+    "xml-js": "^1.6.11"
   },
   "scripts": {
     "test": "tsc && node dist/server --config settings.json --dry-run",
@@ -48,7 +47,8 @@
     "schema": "node dist/server --gen-schema",
     "build": "rm -rf dist && tsc && webpack",
     "upload": "npm run build && (cd dist && npm publish)",
-    "build-docs": "(cd ../tiddlyserver-website && npm run build && npm run push)"
+    "build-docs": "(cd ../tiddlyserver-website && npm run build && npm run push)",
+    "install-build-tools": "npm install webpack webpack-cli typescript tslib ts-node source-map-support clean-webpack-plugin copy-webpack-plugin"
   },
   "author": "Arlen22@GitHub.com",
   "license": "MIT"

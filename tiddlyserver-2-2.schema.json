@@ -277,15 +277,15 @@
         "writeErrors"
       ],
       "default": {
-        "writeErrors": false,
+        "datafolder": true,
+        "loginlink": true,
         "mkdir": false,
+        "putsaver": true,
+        "registerNotice": true,
+        "transfer": false,
         "upload": false,
         "websockets": true,
-        "registerNotice": true,
-        "putsaver": true,
-        "loginlink": true,
-        "transfer": false,
-        "datafolder": true
+        "writeErrors": false
       },
       "description": "Whether the user has access to different features of TiddlyServer beyond static file serving. Using auto-complete here should give you the entire object with defaults prefilled. All options are required."
     },
@@ -295,6 +295,7 @@
       "properties": {
         "clientKeys": {
           "type": "object",
+          "description": "Changing the public key or cookie suffix will require the user to log in again.",
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
@@ -313,8 +314,7 @@
               "cookieSalt"
             ],
             "description": "The username the user will login with"
-          },
-          "description": "Changing the public key or cookie suffix will require the user to log in again."
+          }
         },
         "permissions": {
           "$ref": "#/definitions/AccessOptions"
@@ -330,86 +330,86 @@
       "description": "This can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.",
       "anyOf": [
         {
-          "type": "string",
-          "description": "A string ending in `xml`, `js`, or `json` will be parsed and loaded as the tree."
-        },
-        {
           "type": "object",
-          "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "$element": {
-                    "type": "string",
-                    "enum": [
-                      "folder"
-                    ]
-                  },
-                  "path": {
-                    "type": "string",
-                    "description": "Path relative to this file or an absolute path. If NodeJS can access it using stat, readdir, and readFile, then you can put it here"
-                  },
-                  "$options": {
-                    "items": {
-                      "$ref": "#/definitions/TreeOptions"
+          "patternProperties": {
+            "^[^$]+$": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "$element": {
+                      "type": "string",
+                      "enum": [
+                        "folder"
+                      ],
+                      "description": "folder element"
                     },
-                    "type": "array"
-                  },
-                  "noTrailingSlash": {
-                    "type": "boolean",
-                    "description": "Load data folders under this path with no trailing slash. This imitates single-file wikis and allows tiddlers with relative links to be imported directly into a data folder wiki. The source point of the relative link becomes the data folder itself as though it is actually a file. However, this breaks relative links to resources served by the datafolder instance itself, such as the files directory introduced in 5.1.19 and requires the relative link to include the data folder name in the relative link. For this reason, it is better to convert single-file wikis to the datafolder format by putting each wiki inside its own folder as index.html, and a \"files\" folder beside the index.html file, and adding an index option to this element."
-                  },
-                  "noDataFolder": {
-                    "type": "boolean",
-                    "description": "Do not recognize datafolders within this path. Files within data folders will be accessible directly from the web, including the tiddlywiki.info file, instead of treating it as a data folder. This is useful for folders like your downloads folder which might end up containing a tiddlywiki.info file but you do not want it to be a data folder."
-                  }
-                },
-                "required": [
-                  "$element",
-                  "path"
-                ],
-                "description": "This is a folder element. The path property specifies the file system path to serve. Any path may be specified, not just a folder. The key is the mount point for this item. If this is in an Array, the key property will be used or the path basename."
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "$element": {
-                    "type": "string",
-                    "enum": [
-                      "group"
-                    ]
-                  },
-                  "$children": {
-                    "$ref": "#/definitions/SchemaGroupChild"
-                  },
-                  "$options": {
-                    "items": {
-                      "$ref": "#/definitions/TreeOptions"
+                    "path": {
+                      "type": "string",
+                      "description": "Path relative to this file or an absolute path. If NodeJS can access it using stat, readdir, and readFile, then you can put it here"
                     },
-                    "type": "array"
+                    "$options": {
+                      "items": {
+                        "$ref": "#/definitions/TreeOptions"
+                      },
+                      "type": "array"
+                    },
+                    "noTrailingSlash": {
+                      "type": "boolean",
+                      "description": "Load data folders under this path with no trailing slash. This imitates single-file wikis and allows tiddlers with relative links to be imported directly into a data folder wiki. The source point of the relative link becomes the data folder itself as though it is actually a file. However, this breaks relative links to resources served by the datafolder instance itself, such as the files directory introduced in 5.1.19 and requires the relative link to include the data folder name in the relative link. For this reason, it is better to convert single-file wikis to the datafolder format by putting each wiki inside its own folder as index.html, and a \"files\" folder beside the index.html file, and adding an index option to this element."
+                    },
+                    "noDataFolder": {
+                      "type": "boolean",
+                      "description": "Do not recognize datafolders within this path. Files within data folders will be accessible directly from the web, including the tiddlywiki.info file, instead of treating it as a data folder. This is useful for folders like your downloads folder which might end up containing a tiddlywiki.info file but you do not want it to be a data folder."
+                    }
                   },
-                  "indexPath": {
-                    "type": "string",
-                    "description": "Path of a file to serve as the directory index."
-                  }
+                  "required": [
+                    "$element",
+                    "path"
+                  ],
+                  "description": "This is a folder element. The path property specifies the file system path to serve. Any path may be specified, not just a folder. The key is the mount point for this item. If this is in an Array, the key property will be used or the path basename."
                 },
-                "required": [
-                  "$element",
-                  "$children"
-                ],
-                "description": "This is a group element in an object. It is used for grouping folders under a mount point. The key is the mount point"
-              },
-              {
-                "$ref": "#/definitions/SchemaGroupChild"
-              },
-              {
-                "type": "string",
-                "description": "A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used."
-              }
-            ]
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "$element": {
+                      "type": "string",
+                      "enum": [
+                        "group"
+                      ],
+                      "description": "group element"
+                    },
+                    "$children": {
+                      "$ref": "#/definitions/SchemaGroupChild"
+                    },
+                    "$options": {
+                      "items": {
+                        "$ref": "#/definitions/TreeOptions"
+                      },
+                      "type": "array"
+                    },
+                    "indexPath": {
+                      "type": "string",
+                      "description": "Path of a file to serve as the directory index."
+                    }
+                  },
+                  "required": [
+                    "$element",
+                    "$children"
+                  ],
+                  "description": "This is a group element in an object. It is used for grouping folders under a mount point. The key is the mount point"
+                },
+                {
+                  "$ref": "#/definitions/SchemaGroupChild"
+                },
+                {
+                  "type": "string",
+                  "description": "A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used."
+                }
+              ]
+            }
           }
         },
         {
@@ -423,7 +423,8 @@
                     "type": "string",
                     "enum": [
                       "folder"
-                    ]
+                    ],
+                    "description": "folder element"
                   },
                   "path": {
                     "type": "string",
@@ -461,7 +462,8 @@
                     "type": "string",
                     "enum": [
                       "group"
-                    ]
+                    ],
+                    "description": "group element"
                   },
                   "key": {
                     "type": "string"
@@ -502,7 +504,15 @@
       "additionalProperties": false,
       "properties": {
         "tree": {
-          "$ref": "#/definitions/SchemaGroupChild"
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "A string ending in `xml`, `js`, or `json` will be parsed and loaded as the tree."
+            },
+            {
+              "$ref": "#/definitions/SchemaGroupChild"
+            }
+          ]
         },
         "_datafolderclient": {
           "type": "string",
@@ -572,33 +582,33 @@
             },
             "localAddressPermissions": {
               "type": "object",
-              "additionalProperties": {
-                "$ref": "#/definitions/AccessOptions"
-              },
               "default": {
                 "defaultPermissions": {
-                  "writeErrors": false,
+                  "datafolder": true,
+                  "loginlink": true,
                   "mkdir": false,
+                  "putsaver": true,
+                  "registerNotice": true,
+                  "transfer": false,
                   "upload": false,
                   "websockets": true,
-                  "registerNotice": true,
-                  "putsaver": true,
-                  "loginlink": true,
-                  "transfer": false,
-                  "datafolder": true
+                  "writeErrors": false
                 }
               },
-              "description": "Permissions based on local interface address.  Enter the IP Address and NetMask (`127.0.0.1/8`) as the property key. The keyword \"localhost\" (if specified) matches 127.0.0.0/8 instead of any other specified key.  Keyword \"*\" matches everything that doesn't match another IP address.  This checks the IP address each client connects to (socket.localAddress), not the bind address of the server instance that accepted the request. The keyword defaultPermission does nothing, but auto-complete should give you the defaults (assuming they haven't changed).  You can then rename it to whatever you need it to be. "
+              "description": "Permissions based on local interface address.  Enter the IP Address and NetMask (`127.0.0.1/8`) as the property key. The keyword \"localhost\" (if specified) matches 127.0.0.0/8 instead of any other specified key.  Keyword \"*\" matches everything that doesn't match another IP address.  This checks the IP address each client connects to (socket.localAddress), not the bind address of the server instance that accepted the request. The keyword defaultPermission does nothing, but auto-complete should give you the defaults (assuming they haven't changed).  You can then rename it to whatever you need it to be. ",
+              "additionalProperties": {
+                "$ref": "#/definitions/AccessOptions"
+              }
             }
           },
           "required": []
         },
         "authAccounts": {
           "type": "object",
+          "description": "This is the auth accounts settings related to logins. The keys of this object are the authAccount specifed in the authList under the tree",
           "additionalProperties": {
             "$ref": "#/definitions/AuthAccountsValue"
-          },
-          "description": "This is the auth accounts settings related to logins. The keys of this object are the authAccount specifed in the authList under the tree"
+          }
         },
         "putsaver": {
           "type": "object",
@@ -647,27 +657,28 @@
             },
             "icons": {
               "type": "object",
+              "description": "Hashmap of type { \"icon_name.png\": [\"ext\"] } where ext represents the extensions to use this icon for.",
               "additionalProperties": {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "File extension to use this icon for."
                 },
                 "type": "array"
-              },
-              "description": "Hashmap of type { \"icon_name\": [\".ext\", \"mime/type\"]} where ext represents the extensions to use this icon for. Icons are in the TiddlyServer/assets/icons folder."
+              }
             },
             "mimetypes": {
               "type": "object",
+              "description": "Additional extensions to associate with mime types for content-type header { [\"mime/type\"]: [\"htm\", \"html\"] }.",
               "additionalProperties": {
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
-              },
-              "description": "additional extensions to associate with mime types [\"mime/type\"]: [\"htm\", \"html\"]"
+              }
             },
             "mixFolders": {
               "type": "boolean",
-              "description": "Sort folder and files together rather than separated"
+              "description": "Sort folders and files together rather than separated"
             }
           },
           "required": [
@@ -682,10 +693,11 @@
         },
         "datafolder": {
           "type": "object",
+          "description": "Options object whose properties will be passed to the tiddlywiki server instance using the spread operator. This means that if a property specifies an object (or array) instead of a primitive, the same object will be given to all instances.",
           "additionalProperties": {
-            "type": "object"
-          },
-          "description": "Options object whose properties will be passed to the tiddlywiki server instance using the spread operator. This means that if a property specifies an object (or array) instead of a primitive, the same object will be given to all instances."
+            "type": "object",
+            "description": "Server variable value"
+          }
         }
       },
       "required": [

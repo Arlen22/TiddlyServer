@@ -4,16 +4,12 @@ import * as fs from "fs";
 import * as path from "path";
 
 import { format, promisify } from "util";
-// import { Observable, Subscriber } from '../lib/rx';
-// import { EventEmitter } from "events";
-//import { StateObject } from "./index";
 import * as JSON5 from "json5";
 import * as send from "send";
 import * as WebSocket from "ws";
 import { Stats, appendFileSync } from "fs";
 import { gzip, createGzip } from "zlib";
 import { Writable, Stream } from "stream";
-// import { TlsOptions } from 'tls';
 import * as https from "https";
 import { networkInterfaces, NetworkInterfaceInfo } from "os";
 import * as ipcalc from "./ipcalc";
@@ -69,14 +65,6 @@ export function loadSettings(
 
   if(!sourceOK) console.log(sourceErrors);
 
-  if (!settingsObjSource.$schema) throw "The settings file is v2.0 and must be upgraded.";
-
-  if (settingsObjSource.$schema.startsWith("settings-2-1")) {
-    debug(2,
-      "The settins file needs to be upgraded from 2.1 if errors are thrown. "
-      + "Please set the $schema property to settings-2-2.schema.json to get proper intellisense."
-    );
-  }
   if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
   // let routeKeys = Object.keys(routes);
   let settingshttps = settingsObjSource.bindInfo && settingsObjSource.bindInfo.https;

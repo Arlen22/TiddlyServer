@@ -403,38 +403,38 @@ export class StateObject {
 }
 
 
-function getTreeOptions(event: RequestEvent, result: PathResolverResult) {
-  let ancestry = [...result.ancestry, result.item];
-  //nonsense we have to write because putsaver could be false
-  // type putsaverT = Required<typeof state.settings.putsaver>;
-  let putsaver = as<ServerConfig["putsaver"]>({
-    enabled: true,
-    gzipBackups: true,
-    backupFolder: "",
-    etag: "optional",
-    etagAge: 3,
-    ...(event.settings.putsaver || {}),
-  });
-  let options: OptionsConfig = {
-    auth: { $element: "auth", authError: 403, authList: null },
-    putsaver: { $element: "putsaver", ...putsaver },
-    index: {
-      $element: "index",
-      defaultType: event.settings.directoryIndex.defaultType,
-      indexFile: [],
-      indexExts: [],
-    },
-  };
-  ancestry.forEach(e => {
-    e.$options &&
-      e.$options.forEach(f => {
-        if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
-          Object.keys(f).forEach(k => {
-            if (f[k] === undefined) return;
-            options[f.$element][k] = f[k];
-          });
-        }
-      });
-  });
-  return options;
-}
+// function getTreeOptions(event: RequestEvent, result: PathResolverResult) {
+//   let ancestry = [...result.ancestry, result.item];
+//   //nonsense we have to write because putsaver could be false
+//   // type putsaverT = Required<typeof state.settings.putsaver>;
+//   let putsaver = as<ServerConfig["putsaver"]>({
+//     enabled: true,
+//     gzipBackups: true,
+//     backupFolder: "",
+//     etag: "optional",
+//     etagAge: 3,
+//     ...(event.settings.putsaver || {}),
+//   });
+//   let options: OptionsConfig = {
+//     auth: { $element: "auth", authError: 403, authList: null },
+//     putsaver: { $element: "putsaver", ...putsaver },
+//     index: {
+//       $element: "index",
+//       defaultType: event.settings.directoryIndex.defaultType,
+//       indexFile: [],
+//       indexExts: [],
+//     },
+//   };
+//   ancestry.forEach(e => {
+//     e.$options &&
+//       e.$options.forEach(f => {
+//         if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
+//           Object.keys(f).forEach(k => {
+//             if (f[k] === undefined) return;
+//             options[f.$element][k] = f[k];
+//           });
+//         }
+//       });
+//   });
+//   return options;
+// }

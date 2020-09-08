@@ -29,6 +29,7 @@ import { ParsedUrlQuery } from 'querystring';
 import { dirname } from "../rootpath";
 import { factoryFileSystemLoader } from "./data-folder-loader"
 import { TiddlyWikiGlobal } from './types';
+import { runInNewContext, runInContext } from 'vm';
 interface Records<T> { [k: string]: T; }
 
 const loadedFolders: Records<DataFolder> = {};
@@ -83,13 +84,14 @@ class DataFolder {
       if (reloadParam) loadedFolders[mount].events.emit("reload", mount, folder);
       loadedFolders[mount] = new DataFolder(mount, folder);
       // make sure we've loaded this target (in case settings change mid-flight)
-      // if (!DataFolder.tiddlywiki[target]) DataFolder.tiddlywiki[target] = await loadDataFolderServer(target, vars)
+      if (!DataFolder.tiddlywiki[target]) DataFolder.tiddlywiki[target] = await loadDataFolderServer(target, vars);
       // initialize the tiddlywiki instance
       promisify(fs.readFile)(path.join(folder, "tiddlywiki.info"), "utf8").then(data => {
         const wikiInfo = tryParseJSON<WikiInfo>(data, e => { throw e; });
         if (!wikiInfo.type || wikiInfo.type === "tiddlywiki") {
           loadDataFolderTiddlyWiki(request);
-          // loadDataFolder(request);
+        } else if (wikiInfo.type === "tiddlywiki-slim") {
+          loadDataFolder(request);
         }
       });
     }
@@ -107,6 +109,7 @@ class DataFolder {
     requests.forEach(e => loadedFolders[mount].handler(e));
   }
   wiki: any;
+  boot: any;
   // files: any;
   // wikiTiddlersPath: any;
   pending: StateObject[] = [];
@@ -313,11 +316,11 @@ function loadDataFolderServer(
         packageInfo: nodeRequire(target + "/package.json"),
       })
     );
-
+    tw.utils.evalSandboxed = tw.utils.evalGlobal;
     tw.boot.argv = [dirname + "/datafolder"];
     tw.FileSystemLoader = factoryFileSystemLoader(tw);
     tw.loadTiddlersNode = function () {
-      new tw.FileSystemLoader(tw.wiki, tw.boot.extraPlugins).loadTiddlersNode();
+      new tw.FileSystemLoader(tw.wiki, tw.boot, tw.boot.extraPlugins).loadTiddlersNode();
     }
 
     try {
@@ -354,10 +357,10 @@ function loadDataFolderServer(
     });
     auth.init();
     server.authenticators.unshift(auth);
-    // $tw.syncadaptor = undefined;
     $tw.adaptorClass = undefined;
     $tw.modules.forEachModuleOfType("syncadaptor", function (title, module) {
       if (!$tw.adaptorClass && module.adaptorClass) {
+        console.log("adaptor", title);
         $tw.adaptorClass = module.adaptorClass;
       }
     });
@@ -383,13 +386,14 @@ function loadDataFolder(
 
   // load the tiddlers into the wiki
   df.wiki = new $tw.Wiki();
+  df.boot = Object.create($tw.boot);
+  df.boot.files = {};
+  df.boot.wikiPath = folder;
   df.wiki.addTiddler({
     text: "$protocol$//$host$" + mount + "/",
     title: "$:/config/tiddlyweb/host",
   });
-  df.wiki.wikiPath = folder;
-  df.wiki.files = Object.create(null);
-  new $tw.FileSystemLoader(df.wiki, []).loadTiddlersNode();
+  new $tw.FileSystemLoader(df.wiki, df.boot, []).loadTiddlersNode();
   // Load tiddlers from the cache in order to save memory. Tiddlers 
   // are immutable, so any changes will not affect other wikis.
   swapTiddlers(df, cache);
@@ -398,9 +402,14 @@ function loadDataFolder(
   df.wiki.unpackPluginTiddlers();
   // Setup the shims for different server-side plugins if required
   if (df.wiki.tiddlerExists("$:/plugins/tiddlywiki/filesystem") && $tw.adaptorClass) {
-    df.syncadaptor = new $tw.adaptorClass({ wiki: df.wiki });
+    console.log("adding filesystem adaptor")
+    df.syncadaptor = new $tw.adaptorClass({
+      wiki: df.wiki,
+      boot: df.boot
+    });
     df.syncer = new $tw.Syncer({
       wiki: df.wiki,
+      boot: df.boot,
       syncadaptor: df.syncadaptor
     });
   }
@@ -424,6 +433,7 @@ function loadDataFolder(
     //set the wiki and path prefix for each request
     server.requestHandler(req, state.res, {
       wiki: loadedFolders[mount].wiki,
+      boot: loadedFolders[mount].boot,
       pathPrefix: mount
     });
     // console.log("served request", req.url);
@@ -504,5 +514,3 @@ class TiddlyServerAuthentication {
     state
   ) => boolean;
 }
-
-// import { TreeStateObject } from "./tiddlyserver";

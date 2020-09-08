@@ -22,12 +22,12 @@ export const handleAuthRoute = (state: StateObject) => {
   }
   if (state.req.method !== "POST") return state.throw(405);
   switch (state.path[3]) {
-    case "transfer":
-      return handleTransfer(state);
-    case "initpin":
-      return handleInitPin(state);
-    case "initshared":
-      return handleInitShared(state);
+    // case "transfer":
+    //   return handleTransfer(state);
+    // case "initpin":
+    //   return handleInitPin(state);
+    // case "initshared":
+    //   return handleInitShared(state);
     case "login":
       return handleLogin(state);
     case "logout":

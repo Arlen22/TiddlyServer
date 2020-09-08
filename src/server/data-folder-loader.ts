@@ -12,9 +12,11 @@ function factory($tw) {
 
   class FileSystemLoaderInner {
     wiki: any;
+    boot: any;
     extraPlugins: any[];
-    constructor(wiki: Wiki, extraPlugins: any[]) {
+    constructor(wiki: Wiki, boot: any, extraPlugins: any[]) {
       this.wiki = wiki;
+      this.boot = boot;
       this.extraPlugins = extraPlugins;
     }
     /*
@@ -324,7 +326,7 @@ function factory($tw) {
       $tw.utils.each(self.loadTiddlersFromPath(resolvedWikiPath), function (tiddlerFile) {
         if (!options.readOnly && tiddlerFile.filepath) {
           $tw.utils.each(tiddlerFile.tiddlers, function (tiddler) {
-            self.wiki.files[tiddler.title] = {
+            self.boot.files[tiddler.title] = {
               filepath: tiddlerFile.filepath,
               type: tiddlerFile.type,
               hasMetaFile: tiddlerFile.hasMetaFile
@@ -337,8 +339,8 @@ function factory($tw) {
       var config = wikiInfo.config || {};
       if (config["retain-original-tiddler-path"]) {
         var output = {}, relativePath;
-        for (var title in self.wiki.files) {
-          relativePath = path.relative(resolvedWikiPath, self.wiki.files[title].filepath);
+        for (var title in self.boot.files) {
+          relativePath = path.relative(resolvedWikiPath, self.boot.files[title].filepath);
           output[title] =
             path.sep === "/" ?
               relativePath :
@@ -347,7 +349,7 @@ function factory($tw) {
         self.wiki.addTiddler({ title: "$:/config/OriginalTiddlerPaths", type: "application/json", text: JSON.stringify(output) });
       }
       // Save the path to the tiddlers folder for the filesystemadaptor
-      self.wiki.wikiTiddlersPath = path.resolve(self.wiki.wikiPath, config["default-tiddler-location"] || $tw.config.wikiTiddlersSubDir);
+      self.boot.wikiTiddlersPath = path.resolve(self.boot.wikiPath, config["default-tiddler-location"] || $tw.config.wikiTiddlersSubDir);
       // Load any plugins within the wiki folder
       var wikiPluginsPath = path.resolve(wikiPath, $tw.config.wikiPluginsSubDir);
       if (fs.existsSync(wikiPluginsPath)) {
@@ -408,8 +410,8 @@ function factory($tw) {
         }
       });
       // Load the tiddlers from the wiki directory
-      if (self.wiki.wikiPath) {
-        self.wiki.wikiInfo = self.loadWikiTiddlers(self.wiki.wikiPath);
+      if (self.boot.wikiPath) {
+        self.boot.wikiInfo = self.loadWikiTiddlers(self.boot.wikiPath);
       }
     }
   }

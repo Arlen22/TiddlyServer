@@ -31,8 +31,9 @@ export type Wiki = {
 
 export declare class FileSystemLoaderOuter {
   wiki: Wiki;
+  boot: any;
   extraPlugins: any[];
-  constructor(wiki: Wiki, extraPlugins: any[]);
+  constructor(wiki: Wiki, boot: any, extraPlugins: any[]);
   loadTiddlersNode();
 }
 export interface TiddlyWikiGlobal {

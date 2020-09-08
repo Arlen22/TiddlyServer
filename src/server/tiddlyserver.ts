@@ -243,14 +243,14 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
           ? state.username + " (group " + state.authAccountKey + ")"
           : (false as false),
         format,
-        extTypes: state.settings.directoryIndex.types,
+        extTypes: state.settings.directoryIndex.types
       };
       let contentType = {
         html: "text/html",
         json: "application/json",
       };
       let e = await state.getTreePathFiles();
-      let res = await sendDirectoryIndex([e, options]);
+      let res = await sendDirectoryIndex(e, options);
       state
         .respond(200, "", {
           "Content-Type": contentType[format],

@@ -307,7 +307,7 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
       defaultType: set.directoryIndex.defaultType("html"),
       icons: {
         ...set.directoryIndex.icons({}),
-        htmlfile: set.directoryIndex.icons["htmlfile"](["htm", "html"]),
+        "htmlfile.png": set.directoryIndex.icons["htmlfile.png"](["htm", "html"]),
       },
       types: {},
       mixFolders: set.directoryIndex.mixFolders(true),
@@ -318,16 +318,16 @@ export function normalizeSettings(_set: ServerConfigSchema, settingsFile: string
     $schema: "./settings.schema.json",
   };
 
-  Object.keys(newset.directoryIndex.icons).forEach(type => {
-    newset.directoryIndex.icons[type].forEach(ext => {
+  Object.keys(newset.directoryIndex.icons).forEach(icon => {
+    newset.directoryIndex.icons[icon].forEach(ext => {
       if (!newset.directoryIndex.types[ext]) {
-        newset.directoryIndex.types[ext] = type;
+        newset.directoryIndex.types[ext] = "files/" + icon;
       } else {
         throw format(
           "Multiple types for extension %s: %s",
           ext,
           newset.directoryIndex.types[ext],
-          type
+          icon
         );
       }
     });
@@ -483,8 +483,6 @@ export interface ServerConfig {
     localAddressPermissions: { [host: string]: ServerConfig_AccessOptions; }
     https: boolean;
   };
-  // /** logging  */
-  // logging: ServerConfig_Logging;
   /** directory index */
   directoryIndex: ServerConfig_DirectoryIndex;
   /** PUT saver options */
@@ -684,12 +682,13 @@ export interface ServerConfig_DirectoryIndex {
   /** default format for the directory index */
   defaultType: "html" | "json";
   /**
-   * Hashmap of type { "icon_name": [".ext", "mime/type"]} where ext represents the extensions to use this icon for.
+   * Hashmap of type { "icon_name.ext": ["ext"]} where ext represents the extensions to use this icon for.
    * Icons are in the TiddlyServer/assets/icons folder.
    */
   icons: { [iconName: string]: string[] };
+  /** Hashmap of type { "ext": "icon_name.png" } */
   types: { [ext: string]: string };
-  /** additional extensions to apply to mime types ["mime/type"]: ["htm", "html"] */
+  /** additional extensions to apply to mime types ["mime/type"]: ["htm", "html"] for content-type header */
   mimetypes: { [type: string]: string[] };
 }
 export interface ServerConfig_PutSaver {
