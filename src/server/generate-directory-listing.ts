@@ -12,8 +12,8 @@ const updatedPutSaver =
 const info = require("../package.json");
 
 const ErrorText = {
-  403: "Access Denied. You do not have permission to access this resource.",
-  404: "Not Found. This path does not lead to a resource."
+  403: "<strong>403 Access Denied:</strong> You do not have permission to access this resource.",
+  404: "<strong>404 Not Found:</strong> - This path does not lead to a resource."
 }
 
 export function generateDirectoryListing(directory: DirectoryIndexListing, options: DirectoryIndexOptions) {
@@ -73,7 +73,7 @@ ${
       : `<p><a href="/admin/authenticate/login.html?redirect=${encodeURIComponent(ourPath)}">Login</a></p>`
     }
 ${pathArr.length > 0 ? `<p><a href="${parentPath}">Parent Directory: ${parentPath}</a></p>` : ``}
-${isError ? `<p>Error ${directory.type} ${ErrorText[directory.type]}</p>` : `<ul>${listEntries(directory.entries)}</ul>`}
+${isError ? `<p>${ErrorText[directory.type]}</p>` : `<ul>${listEntries(directory.entries)}</ul>`}
 ${
     (options.upload && !isError)
       ? `<p>
