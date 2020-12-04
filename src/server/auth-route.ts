@@ -16,18 +16,11 @@ const TIDDLY_SERVER_AUTH_COOKIE: string = "TiddlyServerAuth";
 
 /** Handles the /admin/authenticate route */
 export const handleAuthRoute = (state: StateObject) => {
-  // let state = new StateObject(req)
-  if (state.req.method === "GET" || state.req.method === "HEAD") {
+  if (state.req.method === "GET" || state.req.method === "HEAD")
     return handleHEADorGETFileServe(state);
-  }
-  if (state.req.method !== "POST") return state.throw(405);
+  if (state.req.method !== "POST")
+    return state.throw(405);
   switch (state.path[3]) {
-    // case "transfer":
-    //   return handleTransfer(state);
-    // case "initpin":
-    //   return handleInitPin(state);
-    // case "initshared":
-    //   return handleInitShared(state);
     case "login":
       return handleLogin(state);
     case "logout":
@@ -144,47 +137,6 @@ const handleLogin = async (state: StateObject) => {
   } else {
     state.throwReason(400, "INVALID_CREDENTIALS");
   }
-};
-
-const getRandomPin = async (): Promise<string> => {
-  // Wait for libsodium.ready
-  await ready;
-  let randomPin = randombytes_buf(8);
-  let pin = "";
-  while (!pin || pko[pin]) {
-    pin = to_hex((randomPin = crypto_generichash(8, randomPin, undefined, "uint8array")));
-  }
-  pko[pin] = { step: 1, cancelTimeout: removePendingPinTimeout(pin) };
-  return pin;
-};
-
-const handleInitPin = (state: StateObject) => {
-  if (!state.allow.transfer) {
-    state.throwReason(403, "Access Denied");
-  } else if (Object.keys(pko).length > state.settings.maxTransferRequests) {
-    state.throwReason(509, "Too many transfer requests in progress");
-  } else {
-    state.respond(200).json({ initPin: getRandomPin() });
-  }
-  return;
-};
-
-let sharedKeyList: Record<string, string> = {};
-const setSharedKey = async (key: string) => {
-  const pin = await getRandomPin();
-  if (!sharedKeyList[key]) sharedKeyList[key] = pin;
-  return sharedKeyList[key];
-};
-
-const handleInitShared = (state: StateObject) => {
-  if (!state.allow.transfer) {
-    state.throwReason(403, "Access Denied");
-  } else if (Object.keys(pko).length > 1000) {
-    state.throwReason(509, "Too many transfer requests in progress");
-  } else {
-    state.respond(200).json({ initPin: setSharedKey(state.path[4]) });
-  }
-  return;
 };
 
 const handleLogout = (state: StateObject) => {

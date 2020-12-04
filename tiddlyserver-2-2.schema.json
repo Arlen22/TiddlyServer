@@ -130,7 +130,33 @@
           },
           "required": [
             "$element"
-          ]
+          ],
+          "default": {
+            "$element": "auth"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "$element": {
+              "type": "string",
+              "enum": [
+                "upload"
+              ],
+              "description": "Options related to uploads. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth list applies to the requested path.\n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree."
+            },
+            "maxFileSize": {
+              "type": "number",
+              "description": "Max file size allowed for upload in bytes"
+            }
+          },
+          "required": [
+            "$element"
+          ],
+          "default": {
+            "$element": "upload"
+          }
         },
         {
           "type": "object",
@@ -171,7 +197,10 @@
           },
           "required": [
             "$element"
-          ]
+          ],
+          "default": {
+            "$element": "putsaver"
+          }
         },
         {
           "type": "object",
@@ -220,7 +249,10 @@
           },
           "required": [
             "$element"
-          ]
+          ],
+          "default": {
+            "$element": "index"
+          }
         }
       ]
     },
@@ -327,6 +359,7 @@
       "description": "The authAccount specified in the tree auth options"
     },
     "SchemaGroupChild": {
+      "default": {},
       "description": "This can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.",
       "anyOf": [
         {
@@ -368,6 +401,10 @@
                     "$element",
                     "path"
                   ],
+                  "default": {
+                    "$element": "folder",
+                    "path": ""
+                  },
                   "description": "This is a folder element. The path property specifies the file system path to serve. Any path may be specified, not just a folder. The key is the mount point for this item. If this is in an Array, the key property will be used or the path basename."
                 },
                 {
@@ -399,6 +436,10 @@
                     "$element",
                     "$children"
                   ],
+                  "default": {
+                    "$element": "group",
+                    "$children": {}
+                  },
                   "description": "This is a group element in an object. It is used for grouping folders under a mount point. The key is the mount point"
                 },
                 {
@@ -406,6 +447,7 @@
                 },
                 {
                   "type": "string",
+                  "default": "",
                   "description": "A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used."
                 }
               ]
@@ -452,6 +494,11 @@
                   "$element",
                   "path"
                 ],
+                "default": {
+                  "$element": "folder",
+                  "path": "",
+                  "key": ""
+                },
                 "description": "This is a folder element. The path property specifies the file system path to serve. Any path may be specified, not just a folder. The key is the mount point for this item. If this is in an Array, the key property will be used or the path basename."
               },
               {
@@ -487,10 +534,16 @@
                   "key",
                   "$children"
                 ],
+                "default": {
+                  "$element": "group",
+                  "$children": {},
+                  "key": ""
+                },
                 "description": "This is a group element in an array. It is used for grouping folders under a mount point. The key property is the mount point"
               },
               {
                 "type": "string",
+                "default": "",
                 "description": "A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used."
               }
             ]
@@ -681,12 +734,7 @@
               "description": "Sort folders and files together rather than separated"
             }
           },
-          "required": [
-            "defaultType",
-            "icons",
-            "mimetypes",
-            "mixFolders"
-          ]
+          "required": []
         },
         "controllers": {
           "type": "object"

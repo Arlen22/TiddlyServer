@@ -83,9 +83,12 @@ function normalizeOptions(keypath: string[], a: OptionsSchema[keyof OptionsSchem
     parsePrimitive(a, "defaultType")
     parseArrayChild(a, "indexExts");
     parseArrayChild(a, "indexFile");
+  } else if (a.$element === "upload") {
+    parsePrimitive(a, "maxFileSize");
   } else {
-    let { $element } = a;
-    throw new Error("Invalid element " + $element + " found at " + keypath.join("."));
+    // let { $element } = a;
+    // throw new Error("Invalid element " + $element + " found at " + keypath.join("."));
+    // Edit: Don't throw an error here because it is ignored
   }
 }
 
@@ -126,21 +129,24 @@ export function normalizeTree(
   key,
   keypath: string[]
 ): any {
-  // type k<T> = T extends "options" ? never : T;
+  // Expand shorthand group syntax
   if (typeof item === "object" && !item.$element) {
     //@ts-ignore
-    if (Object.keys(item).findIndex(e => e.startsWith("$")) !== -1)
-      console.log("Is this a mistake? Found keys starting with the dollar sign under /" + keypath.join("/"));
     item = as<Schema.GroupElement>({ $element: "group", $children: item as any, });
   }
-  if (typeof item === "string" || item.$element === "folder") {
-    if (typeof item === "string") item = { $element: "folder", path: item } as Config.PathElement;
+  // Expand shorthand folder syntax
+  if (typeof item === "string")
+    item = { $element: "folder", path: item } as Config.PathElement;
+
+  if (item.$element === "folder") {
+
     if (!item.path) throw format(
       "  Error loading settings: path must be specified for folder item under '%s'",
       keypath.join(", ")
     );
     item.path = pathResolveWithUser(settingsDir, item.path);
     key = key || path.basename(item.path);
+    if (item["$children"]) item.$options = item["$children"];
     let $options = item.$options || [];
     $options.forEach(e => normalizeOptions(keypath, e));
     return as<Config.PathElement>({
@@ -154,7 +160,6 @@ export function normalizeTree(
   } else if (item.$element === "group") {
     if (!key) key = (item as Schema.ArrayGroupElement).key;
     if (!key) throw "key not provided for group element at /" + keypath.join("/");
-    let tc = item.$children;
     let $options: Config.OptionElements[] = [];
     let $children: (Config.PathElement | Config.GroupElement)[] = [];
     if (Array.isArray(item.$children)) {
@@ -169,20 +174,15 @@ export function normalizeTree(
         })
         .map(e => normalizeTree(settingsDir, e, undefined, [...keypath, key]));
       item.$options && $options.push(...item.$options);
-    } else {
-      // let tc: Record<string, Schema.GroupElement | Schema.PathElement> = item.$children;
-      if (item.$children.$options)
-        throw "specifying options in $children is unsupported at " + keypath.join(".");
-      $children = Object.keys(tc)
-        .map(k =>
-          k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k])
-        )
+    } else { //this is a JSON object (not from XML) and uses the property names for the keys
+      if (Object.keys(item.$children).findIndex(e => e.startsWith("$")) !== -1)
+        console.log("Is this a mistake? Found keys starting with the dollar sign under /" + keypath.join("/"));
+      let tc = item.$children;
+      // $options is RESERVED to prevent PEBKAC errors!
+      $children = Object.keys(item.$children)
+        .map(k => k === "$options" ? undefined : normalizeTree(settingsDir, tc[k], k, [...keypath, k]))
         .filter((e): e is NonNullable<typeof e> => !!e);
-      $options = (e => {
-        if (typeof e !== "undefined" && !Array.isArray(e))
-          throw "$options is not an array at " + keypath.join(".");
-        return e || [];
-      })(item.$options);
+      $options = Array.isArray(item.$options) ? item.$options : [];
     }
     key = is<Schema.ArrayGroupElement>(a => !!a.key, item) ? item.key : key;
     $options.forEach(e => normalizeOptions(keypath, e));
@@ -756,12 +756,14 @@ export interface OptionsSchema {
   auth: Config.Options_Auth;
   backups: Config.Options_Putsaver;
   index: Config.Options_Index;
+  upload: Config.Options_Upload;
 }
 /** Used by the StateObject to compile the final Options object for the request */
 export interface OptionsConfig {
   auth: Required<Config.Options_Auth>;
   putsaver: Required<Config.Options_Putsaver>;
   index: Required<Config.Options_Index>;
+  upload: Required<Config.Options_Upload>;
 }
 /** The options array schema is in `settings-2-1-tree-options.schema.json` */
 export type OptionsArraySchema = OptionsSchema[keyof OptionsSchema][];
@@ -820,8 +822,13 @@ export namespace Config {
     authError?: 403 | 404;
   }
   export interface Options_Putsaver extends ServerConfig_PutSaver {
-    /** Options related to backups for single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a backups element replaces the key from parent backups elements. */
+    /** Options related to saving single-file wikis. Option elements affect the group they belong to and all children under that. Each property in a putsaver element replaces the key from parent putsaver elements. */
     $element: "putsaver";
+  }
+
+  export interface Options_Upload {
+    $element: "upload",
+    maxFileSize?: number;
   }
 
   export function isOption(a: any): a is OptionElements {

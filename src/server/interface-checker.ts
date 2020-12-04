@@ -114,7 +114,7 @@ abstract class TypeCheck<T> {
     return this;
   }
   /** Chainable method to set schema default */
-  public defaultData(def: NonNullable<T>) {
+  public defaultData(def: Partial<NonNullable<T>>) {
     this.defData = def;
     return this;
   }
@@ -471,6 +471,7 @@ class CheckObject<T extends {}> extends TypeCheck<T> {
           throw new Error("unionKey not found in checkermap " + k);
       });
   }
+
   getSchema(reffer) {
     const properties = {};
     this.required.forEach(k => {
@@ -677,7 +678,7 @@ type treeType = {
 
 type refsType = {
   "GroupChild": () => TypeCheck<Config.PathElement | Config.GroupElement>
-  "TreeOptions": () => TypeCheck<Config.Options_Auth | Config.Options_Index | Config.Options_Putsaver>
+  "TreeOptions": () => TypeCheck<Config.Options_Auth | Config.Options_Index | Config.Options_Putsaver | Config.Options_Upload>
   "AccessOptions": () => TypeCheck<ServerConfig_AccessOptions>
   "AuthAccountsValue": () => TypeCheck<ServerConfig_AuthAccountsValue>
   "ServerConfig": () => TypeCheck<ServerConfig>
@@ -700,7 +701,10 @@ function getSchemaGroupChild(): () => TypeCheck<any> {
         indexPath: checkString().describe("Path of a file to serve as the directory index.")
       },
       ["$element"]
-    ).describe("This is a group element in an " + (array ? "array" : "object") + ". It is used for grouping folders under a mount point. " + (array ? "The key property is the mount point" : "The key is the mount point"));
+    )
+      .describe("This is a group element in an " + (array ? "array" : "object") + ". It is used for grouping folders under a mount point. " + (array ? "The key property is the mount point" : "The key is the mount point"))
+      .defaultData({ $element: "group", $children: {}, key: array ? "" : undefined as any })
+      ;
   };
   const folderElement: {
     (array: true): TypeCheck<Schema.ArrayFolderElement>;
@@ -719,8 +723,11 @@ function getSchemaGroupChild(): () => TypeCheck<any> {
       },
       ["$element"]
     ).describe("This is a folder element. The path property specifies the file system path to serve. Any path may be specified, not just a folder. The key is the mount point for this item. If this is in an Array, the key property will be used or the path basename.")
+      .defaultData({ $element: "folder", path: "", key: array ? "" : undefined as any })
   };
-  const folderString = () => checkString().describe("A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used.");
+  const folderString = () => checkString()
+    .describe("A string specifying the file or folder to mount here. If this is in an array the basename will be used, in an object the key will be used.")
+    .defaultData("");
 
   const SchemaGroupChild = () => checkUnionArray([
     checkRecord<string, string | object>(checkStringRegex(/^[^$]+$/), checkUnion(
@@ -743,7 +750,9 @@ function getSchemaGroupChild(): () => TypeCheck<any> {
         folderString(),
       )
     )
-  ], false).describe("This can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.");
+  ], false)
+    .describe("This can be an array or object containing tree items. An array cannot use the group shorthand because there is no way to specify the mount point. You can use the advanced element syntax ({\"$element\":\"group\", \"key\":\"mount-point\", \"$children\": Children }) instead.")
+    .defaultData({});
 
   const schemaRef = {
     "ArrayFolder": folderElement(true),
@@ -806,13 +815,22 @@ function getServerConfig() {
 
       ),
     "TreeOptions": () => checkUnion(
-      checkObject<Config.Options_Auth, "$element">("",
-        { $element: checkStringEnum(["auth"]).describe("Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth list applies to the requested path.\n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.") },
-        {
-          authError: checkNumberEnum([403, 404] as const).describe("Which error code to return for unauthorized (or anonymous) requests\n\n - 403 Access Denied: Client is not granted permission to access this resouce.\n - 404 Not Found: Client is told that the resource does not exist."),
-          authList: checkUnion(checkArray(checkString()), checkNull()).describe("Array of keys from authAccounts object that can access this resource. `null` allows all requests, including anonymous."),
-        },
-        ["$element"]
+      checkUnion.cu(
+        checkObject<Config.Options_Auth, "$element">("",
+          { $element: checkStringEnum(["auth"]).describe("Only allow requests using these authAccounts. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth list applies to the requested path.\n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.") },
+          {
+            authError: checkNumberEnum([403, 404] as const).describe("Which error code to return for unauthorized (or anonymous) requests\n\n - 403 Access Denied: Client is not granted permission to access this resouce.\n - 404 Not Found: Client is told that the resource does not exist."),
+            authList: checkUnion(checkArray(checkString()), checkNull()).describe("Array of keys from authAccounts object that can access this resource. `null` allows all requests, including anonymous."),
+          },
+          ["$element"]
+        ).defaultData({ $element: "auth" }),
+        checkObject<Config.Options_Upload, "$element">("",
+          { $element: checkStringEnum(["upload"]).describe("Options related to uploads. Option elements affect the group they belong to and all children under that. Each property in an auth element replaces the key from parent auth elements.\n\nAnonymous requests are ALWAYS denied if an auth list applies to the requested path.\n\nNote that this does not change server authentication procedures. Data folders are always given the authenticated username regardless of whether there are auth elements in the tree.") },
+          {
+            maxFileSize: checkNumber().describe("Max file size allowed for upload in bytes")
+          },
+          ["$element"]
+        ).defaultData({ $element: "upload" })
       ),
       checkUnion.cu(
         checkObject<Config.Options_Putsaver, "$element">("",
@@ -821,7 +839,7 @@ function getServerConfig() {
           },
           putsaverOptional(),
           ["$element"]
-        ),
+        ).defaultData({ $element: "putsaver" }),
         checkObject<Config.Options_Index, "$element">("",
           {
             $element: checkStringEnum(["index"] as const).describe("Options related to the directory index. If you want to specify an index file for a group, use the indexPath attribute on the group element"),
@@ -833,7 +851,7 @@ function getServerConfig() {
             indexFile: checkArray(checkString()).describe('Look for index files named exactly this or with one of the defaultExts added. For example, a defaultFile of ["index"] and a defaultExts of ["htm","",html"] would look for ["index.htm","index","index.html"] in that order. \n\nOnly applies to folder elements, but may be set on a group element to apply to all child folder elements. An empty array disables this feature. To use a .hidden file, put the full filename here, and set indexExts to [""].'),
           },
           ["$element"]
-        )
+        ).defaultData({ $element: "index" })
       )
     ),
     "AccessOptions": () => checkObject<ServerConfig_AccessOptions>(
@@ -934,7 +952,7 @@ function getServerConfig() {
       }/*  as TypeCheckItems<NonNullable<ServerConfigSchema["bindInfo"]>> */),
       authAccounts: checkRecord(checkString(), checkRef<refsType>()("AuthAccountsValue", "expected AuthAccountsValue")).describe("This is the auth accounts settings related to logins. The keys of this object are the authAccount specifed in the authList under the tree"),
       putsaver: checkObject<ServerConfig["putsaver"], never>("", {}, putsaverOptional()).describe("Settings related to the put saver"),
-      directoryIndex: checkObject<Defined<ServerConfigSchema["directoryIndex"]>>("", {
+      directoryIndex: checkObject<Defined<ServerConfigSchema["directoryIndex"]>, never>("", {}, {
         defaultType: checkStringEnum(["html", "json"] as const)
           .describe("default format for the directory index"),
         icons: checkRecord(

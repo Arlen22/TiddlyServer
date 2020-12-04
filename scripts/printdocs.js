@@ -4,7 +4,6 @@ let doc = {
   mkdir: "Whether clients may create new directories and datafolders inside existing directories served by TiddlyWiki",
   putsaver: "Whether clients may use the put saver, allowing any file served within the tree (not assets) to be overwritten, not just TiddlyWiki files. The put saver cannot save to data folders regardless of this setting.",
   registerNotice: "Whether login attempts for a public/private key pair which has not been registered will be logged at debug level 2 with the full public key which can be copied into an authAccounts entry. Turn this off if you get spammed with login attempts.",
-  transfer: "Allows clients to use a custom TiddlyServer feature which relays a connection between two clients. ",
   upload: "Whether clients may upload files to directories (not data folders).",
   websockets: "Whether clients may open websocket connections.",
   writeErrors: "Whether to write status 500 errors to the browser, possibly including stack traces."

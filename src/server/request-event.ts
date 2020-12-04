@@ -4,10 +4,11 @@ import { Writable } from "stream";
 import { format } from "util";
 import * as WebSocket from "ws";
 import { ServerConfig, ServerConfig_AccessOptions, Config, OptionsConfig } from "./server-config";
-import { parseHostList, testAddress, resolvePath, PathResolverResult, as } from "./server-types";
+import { parseHostList, testAddress, resolvePath, PathResolverResult, as, DirectoryIndexOptions } from "./server-types";
 import { checkCookieAuth } from "./cookies";
 import { parse } from "url";
 import { createLogWritable } from './logger';
+import { generateDirectoryListing } from './generate-directory-listing';
 export class RequestEvent {
   handled: boolean = false;
   username: string = "";
@@ -151,11 +152,12 @@ export class RequestEvent {
         indexFile: [],
         indexExts: [],
       },
+      upload: { $element: "upload", maxFileSize: 200 * 1024 * 1024 }
     };
     ancestry.forEach(e => {
       e.$options &&
         e.$options.forEach(f => {
-          if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index") {
+          if (f.$element === "auth" || f.$element === "putsaver" || f.$element === "index" || f.$element === "upload") {
             Object.keys(f).forEach(k => {
               if (f[k] === undefined) return;
               options[f.$element][k] = f[k];
@@ -165,6 +167,7 @@ export class RequestEvent {
     });
     return options;
   }
+
   static MakeDebugOutput(settings: ServerConfig) {
     return process.stderr;
     // const { logError, logColorsToFile, logToConsoleAlso } = { logError: undefined, logColorsToFile: false, logToConsoleAlso: true };

@@ -40,30 +40,28 @@ export function loadSettings(
   assetsFolder: string,
   routeKeys: string[]
 ) {
-  let debug: DebugFunc = (level, str, ...args) => StateObject.DebugLoggerInner(level, "startup", str, args, process.stderr);
+  let debug: DebugFunc = (level, str, ...args) =>
+    StateObject.DebugLoggerInner(level, "startup", str, args, process.stderr);
 
   const settingsString = fs
     .readFileSync(settingsFile, "utf8")
     .replace(/\t/gi, "    ")
     .replace(/\r\n/gi, "\n");
 
-  let settingsObjSource: ServerConfigSchema = tryParseJSON<ServerConfigSchema>(
-    settingsString,
-    e => {
-      debug(4,
+  let settingsObjSource: ServerConfigSchema = tryParseJSON<ServerConfigSchema>(settingsString, e => {
+    debug(4,
         /*colors.BgWhite + */ colors.FgRed +
-        "The settings file could not be parsed: %s" +
-        colors.Reset,
-        e.originalError.message
-      );
-      debug(4, e.errorPosition);
-      throw "The settings file could not be parsed: Invalid JSON";
-    }
-  );
+      "The settings file could not be parsed: %s" +
+      colors.Reset,
+      e.originalError.message
+    );
+    debug(4, e.errorPosition);
+    throw "The settings file could not be parsed: Invalid JSON";
+  });
 
   let [sourceOK, sourceErrors] = checkServerConfigSchema(settingsObjSource);
 
-  if(!sourceOK) console.log(sourceErrors);
+  if (!sourceOK) console.log(sourceErrors);
 
   if (!settingsObjSource.tree) throw "tree is not specified in the settings file";
   // let routeKeys = Object.keys(routes);

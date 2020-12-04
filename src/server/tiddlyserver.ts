@@ -25,14 +25,30 @@ import {
   DirectoryIndexData,
   IStatPathResult,
   getStatPathResult,
+  DirectoryIndexOptions,
 } from "./server-types";
 import { StateObject } from "./state-object";
 import { RequestEvent } from "./request-event";
 import { parse } from "url";
+import { generateDirectoryListing } from './generate-directory-listing';
 
 
 // it isn't pretty but I can't find a way to improve it - 2020/04/10
 // it still isn't pretty, but it finally uses classes - 2020/04/14
+
+function generateErrorPage(type: 403 | 404, path: string, state: {
+  settings: ServerConfig, authAccountKey: string, username: string
+}) {
+  // let options = this.getDirectoryIndexOptions(false);
+  return generateDirectoryListing({ entries: [], path, type }, {
+    upload: false,
+    mkdir: false,
+    mixFolders: state.settings.directoryIndex.mixFolders,
+    isLoggedIn: state.username ? state.username + " (group " + state.authAccountKey + ")" : (false as false),
+    format: "html",
+    extTypes: state.settings.directoryIndex.types
+  });
+}
 
 export async function handleTreeRoute(event: RequestEvent, eventer: ServerEventEmitter): Promise<void> {
 
@@ -40,12 +56,13 @@ export async function handleTreeRoute(event: RequestEvent, eventer: ServerEventE
   if (!pathname) return event.close(400);
 
   let result: PathResolverResult = resolvePath(pathname.split('/'), event.hostRoot.$mount) || (null as never);
-  if (!result) return event.close(404);
+  if (!result) return event.close(404, generateErrorPage(404, pathname, event));
 
   let treeOptions = event.getTreeOptions(result);
 
   let { authList, authError } = treeOptions.auth;
 
+  
   if (Array.isArray(authList) && authList.indexOf(event.authAccountKey) === -1)
     return event.close(403, authAccessDenied(
       authError,
@@ -71,7 +88,7 @@ export async function handleTreeRoute(event: RequestEvent, eventer: ServerEventE
   if (state.isStatPathResult("folder")) {
     state.serveDirectoryIndex().catch(state.catchPromiseError);
   } else if (state.isStatPathResult("datafolder")) {
-    if (!state.allow.datafolder) state.respond(403).empty();
+    if (!state.allow.datafolder) state.respond(403).string(generateErrorPage(403, state.url.pathname, state));
     else handleDataFolderRequest(result, state);
   } else if (state.isStatPathResult("file")) {
     if (["HEAD", "GET"].indexOf(state.req.method as string) > -1) {
@@ -86,7 +103,7 @@ export async function handleTreeRoute(event: RequestEvent, eventer: ServerEventE
       state.throw(405);
     }
   } else if (state.statPath.itemtype === "error") {
-    state.throw(404);
+    state.respond(404).string(generateErrorPage(404, state.url.pathname, state));
   } else {
     state.throw(500);
   }
@@ -187,6 +204,7 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
       });
     }
   }
+
   async serveDirectoryIndex() {
     const state: TreeStateObject<getStatPathResult<"folder">> = this as any;
     if (!state.url.pathname.endsWith("/")) return state.redirect(state.url.pathname + "/");
@@ -235,16 +253,7 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
 
       //generate the index using generateDirectoryListing.js
       const format = state.treeOptions.index.defaultType as "html" | "json";
-      const options = {
-        upload: isFolder && state.allow.upload,
-        mkdir: isFolder && state.allow.mkdir,
-        mixFolders: state.settings.directoryIndex.mixFolders,
-        isLoggedIn: state.username
-          ? state.username + " (group " + state.authAccountKey + ")"
-          : (false as false),
-        format,
-        extTypes: state.settings.directoryIndex.types
-      };
+      const options = this.getDirectoryIndexOptions(isFolder);
       let contentType = {
         html: "text/html",
         json: "application/json",
@@ -259,24 +268,38 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
         // @ts-ignore
         .buffer(Buffer.from(res, "utf8"));
     } else if (state.req.method === "POST") {
-      var form = new formidable.IncomingForm();
+
       // console.log(state.url);
       if (state.url.query.formtype === "upload") {
         if (Config.isGroup(state.result.item))
           return state.throwReason(400, "upload is not possible for tree groups");
         if (!state.allow.upload) return state.throwReason(403, "upload is not allowed");
-        this.uploadPostRequest(form);
+        this.uploadPostRequest();
       } else if (state.url.query.formtype === "mkdir") {
         if (Config.isGroup(state.result.item))
           return state.throwReason(400, "mkdir is not possible for tree items");
         if (!state.allow.mkdir) return state.throwReason(403, "mkdir is not allowed");
-        this.mkdirPostRequest(form);
+        this.mkdirPostRequest();
       } else {
         state.throw(400);
       }
     } else {
       state.throw(405);
     }
+  }
+
+
+  private getDirectoryIndexOptions(isFolder: boolean): DirectoryIndexOptions {
+    return {
+      upload: isFolder && this.allow.upload,
+      mkdir: isFolder && this.allow.mkdir,
+      mixFolders: this.settings.directoryIndex.mixFolders,
+      isLoggedIn: this.username
+        ? this.username + " (group " + this.authAccountKey + ")"
+        : (false as false),
+      format: this.treeOptions.index.defaultType as "html" | "json",
+      extTypes: this.settings.directoryIndex.types
+    };
   }
 
   handleGETfile() {
@@ -399,9 +422,13 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
     const etagNew = JSON.stringify([statNew.ino, statNew.size, mtimeNew].join("-"));
     state.respond(200, "", { "x-api-access-type": "file", etag: etagNew }).empty();
   }
-  uploadPostRequest(form: any) {
+  uploadPostRequest() {
     let state: TreeStateObject<getStatPathResult<"folder">> = this as any;
     let result = state.result;
+    var form = new formidable.IncomingForm({
+      uploadDir: result.fullfilepath,
+      maxFileSize: state.treeOptions.upload.maxFileSize
+    });
     form.parse(state.req, function (err: Error, fields, files) {
       if (err) {
         debugState("SER-DIR", state)(2, "upload %s", err.toString());
@@ -421,7 +448,9 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
       });
     });
   }
-  mkdirPostRequest(form: any) {
+
+  mkdirPostRequest() {
+    var form = new formidable.IncomingForm();
     let state: TreeStateObject<getStatPathResult<"folder">> = this as any;
     let result = state.result;
     form.parse(state.req, async function (err: Error, fields, files) {

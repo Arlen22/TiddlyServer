@@ -301,7 +301,7 @@ export type DirectoryIndexListing = {
     type: "error" | "folder" | "datafolder" | "file" | "group";
     size: string;
   }[]
-  type: "group" | "folder"
+  type: "group" | "folder" | 403 | 404
 }
 export type DirectoryIndexOptions = {
   upload: boolean;
