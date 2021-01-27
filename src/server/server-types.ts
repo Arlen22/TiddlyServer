@@ -416,7 +416,7 @@ function getItemType(stat: Stats | undefined, infostat: Stats | false | undefine
 
   return itemtype;
 }
-export function treeWalker(tree: Config.GroupElement | Config.PathElement, reqpath) {
+export function treeWalker(tree: Config.GroupElement | Config.FolderElement, reqpath) {
   function getAncesterEntry(a) {
     return Object.assign({}, a, { $children: undefined });
   }
@@ -428,7 +428,7 @@ export function treeWalker(tree: Config.GroupElement | Config.PathElement, reqpa
       folderPathFound = true;
       break;
     }
-    let t = item.$children.find((e): e is Config.GroupElement | Config.PathElement =>
+    let t = item.$children.find((e): e is Config.GroupElement | Config.FolderElement =>
       (Config.isGroup(e) || Config.isPath(e)) && e.key === reqpath[end]
     );
     if (t) {
@@ -703,7 +703,7 @@ export interface PathResolverResult {
 export class Resolved implements PathResolverResult {
   static resolve(
     pathname: string[],
-    root: Config.GroupElement | Config.PathElement
+    root: Config.GroupElement | Config.FolderElement
   ) {
     let res = resolvePath(pathname, root);
     if (!res) return false;
@@ -739,7 +739,7 @@ export type TreePathResultObject<T, U, V> = {
 export type TreePathResult =
   // TreePathResultObject<NewTreeItem, number, false>
   | TreePathResultObject<Config.GroupElement, number, false>
-  | TreePathResultObject<Config.PathElement, number, true>;
+  | TreePathResultObject<Config.FolderElement, number, true>;
 export function createHashmapString<T>(keys: string[], values: T[]): { [id: string]: T } {
   if (keys.length !== values.length) throw "keys and values must be the same length";
   var obj: { [id: string]: T } = {};

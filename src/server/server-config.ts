@@ -5,33 +5,8 @@ const nodeRequire =
 import { oc } from "./optional-chaining";
 
 import { fromXML, toXML } from "./utils-xml";
-import { safeJSON } from "./utils-functions";
+import { safeJSON, tryParseJSON } from "./utils-functions";
 import { readFileSync } from 'fs';
-// type AlwaysDefined<T> = {
-// 	[P in keyof T]-?: T[P] extends {} ? T[P] : () => T[P];
-// };
-// function oc<T extends {}>(data: T): AlwaysDefined<T> & (() => T) {
-
-// 	return new Proxy((() => data) as any,
-// 		{
-// 			get: (target, key) => {
-// 				return typeof target[key] === "undefined" ? oc(oc.empty)
-// 					: typeof target[key] === "object" ? oc(target[key])
-// 						: target[key];
-// 			},
-// 		},
-// 	);
-// 	// return new Proxy(data as any,
-// 	// 	{
-// 	// 		get: (target, key) => {
-// 	// 			return typeof target[key] === "undefined" ? oc(oc.empty)
-// 	// 				: typeof target[key] === "object" ? oc(target[key])
-// 	// 					: target[key];
-// 	// 		},
-// 	// 	},
-// 	// );
-// }
-// oc.empty = Object.create(null);
 
 function format(str: string, ...args: any[]) {
   while (args.length && str.indexOf("%s") !== -1) str = str.replace("%s", args.shift());
@@ -50,41 +25,51 @@ function as<T>(obj: T) {
   return obj;
 }
 const numberReg = /^-?[0-9.]+$/
-function parsePrimitive<T>(a: T, key: keyof T);
-function parsePrimitive<T>(a: any, key: keyof T) {
-  if (a[key] === "true" || a[key] === "false") a[key] = a[key] === "true";
-  else if (numberReg.test(a[key])) a[key] = +a[key];
-}
-function parseArrayChild<T>(a: T, key: keyof T);
-function parseArrayChild<T>(a: any, key: keyof T) {
-  if (typeof a[key] === "string") a[key] = JSON.parse(a[key]);
+
+function parseChildren<T>(a: T, key: keyof T, reducer: (n, e) => any);
+function parseChildren<T>(a: any, key: keyof T, reducer: (n, e) => any) {
   if (a.$children) {
     a.$children.forEach(e => {
       if (e.$element === key) {
-        if (!a[key]) a[key] = [];
-        a[key].push(...e.$children);
+        a[key] = reducer(a[key], e.$children);
       }
     });
-    delete a.$children;
   }
+  delete a.$children;
+}
+
+function parsePrimitive(val: string) {
+  if (val === "true" || val === "false") return val === "true";
+  else if (numberReg.test(val)) return +val;
+  else if (val === null) return null;
+  else return val;
+}
+function parsePrimitiveChild<T>(a: T, key: keyof T);
+function parsePrimitiveChild<T>(a: any, key: keyof T) {
+  parseChildren(a, key, (n, e) => parsePrimitive(e));
+}
+function parseArrayChild<T>(a: T, key: keyof T);
+function parseArrayChild<T>(a: any, key: keyof T) {
+  if (typeof a[key] === "string") { a[key] = JSON.parse(a[key]); }
+  parseChildren(a, key, (n, e) => ((n || (n = [])).push(...e), n));
 }
 function normalizeOptions(keypath: string[], a: OptionsSchema[keyof OptionsSchema]) {
   if (typeof a.$element !== "string")
     throw new Error("Missing $element property in " + keypath.join("."));
 
   if (a.$element === "auth") {
-    parsePrimitive(a, "authError");
     parseArrayChild(a, "authList");
+    parsePrimitiveChild(a, "authError");
   } else if (a.$element === "putsaver") {
-    parsePrimitive(a, "enabled");
-    parsePrimitive(a, "etagAge");
-    parsePrimitive(a, "gzipBackups")
+    parsePrimitiveChild(a, "enabled");
+    parsePrimitiveChild(a, "etagAge");
+    parsePrimitiveChild(a, "gzipBackups")
   } else if (a.$element === "index") {
-    parsePrimitive(a, "defaultType")
+    parsePrimitiveChild(a, "defaultType")
     parseArrayChild(a, "indexExts");
     parseArrayChild(a, "indexFile");
   } else if (a.$element === "upload") {
-    parsePrimitive(a, "maxFileSize");
+    parsePrimitiveChild(a, "maxFileSize");
   } else {
     // let { $element } = a;
     // throw new Error("Invalid element " + $element + " found at " + keypath.join("."));
@@ -110,19 +95,19 @@ export function normalizeTree(
   item: Schema.ArrayFolderElement | Schema.ArrayGroupElement | string,
   key: undefined,
   keypath
-): Config.PathElement | Config.GroupElement;
+): Config.FolderElement | Config.GroupElement;
 export function normalizeTree(
   settingsDir: string,
   item: Schema.FolderElement | Schema.GroupElement | string,
   key: string,
   keypath
-): Config.PathElement | Config.GroupElement;
+): Config.FolderElement | Config.GroupElement;
 export function normalizeTree(
   settingsDir: string,
   item: Schema.ArrayFolderElement | Schema.FolderElement | string,
   key: string | undefined,
   keypath
-): Config.PathElement;
+): Config.FolderElement;
 export function normalizeTree(
   settingsDir,
   item: normalizeTree_itemtype,
@@ -136,7 +121,11 @@ export function normalizeTree(
   }
   // Expand shorthand folder syntax
   if (typeof item === "string")
-    item = { $element: "folder", path: item } as Config.PathElement;
+    item = { $element: "folder", path: item } as Config.FolderElement;
+
+
+  if (Array.isArray(item["$children"]))
+    item["$children"] = item["$children"].filter(e => e !== undefined);
 
   if (item.$element === "folder") {
 
@@ -145,11 +134,11 @@ export function normalizeTree(
       keypath.join(", ")
     );
     item.path = pathResolveWithUser(settingsDir, item.path);
-    key = key || path.basename(item.path);
+    key = key || (item as Schema.ArrayFolderElement).key || path.basename(item.path);
     if (item["$children"]) item.$options = item["$children"];
     let $options = item.$options || [];
     $options.forEach(e => normalizeOptions(keypath, e));
-    return as<Config.PathElement>({
+    return as<Config.FolderElement>({
       $element: item.$element,
       $options,
       path: item.path,
@@ -161,7 +150,7 @@ export function normalizeTree(
     if (!key) key = (item as Schema.ArrayGroupElement).key;
     if (!key) throw "key not provided for group element at /" + keypath.join("/");
     let $options: Config.OptionElements[] = [];
-    let $children: (Config.PathElement | Config.GroupElement)[] = [];
+    let $children: (Config.FolderElement | Config.GroupElement)[] = [];
     if (Array.isArray(item.$children)) {
       $children = item.$children
         .filter((e: any): e is Schema.ArrayGroupElement | Schema.ArrayFolderElement => {
@@ -197,38 +186,41 @@ export function normalizeTree(
     return item;
   }
 }
-export function normalizeTreeHost(settingsDir: string, host: Schema.HostElement) {
-  if (host.$element !== "host") throw "Tree array must not mix host elements with other elements";
-  return { ...host, $mount: normalizeTree(settingsDir, host.$mount as any, "$mount", []), };
+export function normalizeTreeHost(settingsDir: string, host: Schema.ArrayFolderElement | Schema.ArrayGroupElement) {
+  return normalizeTree(settingsDir, host, "$mount", []);
 }
 export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSchema["tree"]) {
-  let defaultHost = (tree2: any): Config.HostElement => {
-    let $mount = normalizeTree(settingsDir, tree2, "$mount", []);
-    return ({ $element: "host", $mount })
-  };
+  let defaultHost = normalizeTreeHost;
+
   if (typeof tree === "string" && tree.endsWith(".xml")) {
     //read the xml file and parse it as the tree structure
     let docstr = readFileSync(pathResolveWithUser(settingsDir, tree), "utf8");
-    let doc: any = fromXML(docstr, "tree");
+    let doc: any = fromXML(docstr, ["tree", "group", "folder"]);
     if (!doc) throw new Error("tree XML file did not parse correctly");
-    tree = doc.$children;
-    return [defaultHost(tree)];
+    if (doc.$element === "tree") doc.$element = "group";
+    let host = defaultHost(settingsDir, doc);
+    return [host];
   } else if (typeof tree === "string" && (tree.endsWith(".json"))) {
     //require the json or js file and use it directly
     let filepath = pathResolveWithUser(settingsDir, tree);
-    tree = JSON.parse(readFileSync(filepath, "utf8"), safeJSON).tree;
-    return [defaultHost(tree)];
+    let settingsObjSource = tryParseJSON<Pick<ServerConfigSchema, "tree">>(readFileSync(filepath, "utf8"), e => {
+      console.log(e.originalError.message);
+      console.log(e.errorPosition);
+      throw e.originalError;
+    });
+    tree = settingsObjSource.tree;
+    return [defaultHost(settingsDir, tree)];
   } else if (typeof tree === "string" && tree.endsWith(".js")) {
     let filepath = pathResolveWithUser(settingsDir, tree);
     let options = nodeRequire(filepath);
     tree = options.tree;
     if (options.multiple)
-      tree = tree.map(e => defaultHost(e))
+      tree = tree.map(e => defaultHost(settingsDir, e))
     else
-      tree = [defaultHost(tree)];
+      tree = [defaultHost(settingsDir, tree)];
     return tree;
   } else {
-    return [defaultHost(tree)];
+    return [defaultHost(settingsDir, tree)];
   }
   //otherwise just assume we're using the value itself.
   //we are not implementing host-based routing yet. If TiddlyServer is
@@ -237,7 +229,7 @@ export function normalizeSettingsTree(settingsDir: string, tree: ServerConfigSch
   //host array.
 
 }
-export function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
+function normalizeSettingsAuthAccounts(auth: ServerConfigSchema["authAccounts"]) {
   if (!auth) return {};
   let newAuth: ServerConfig["authAccounts"] = {};
 
@@ -477,7 +469,8 @@ export interface ServerConfigSchema {
 export interface ServerConfig {
   /** enables certain expensive per-request checks */
   _devmode: boolean;
-  tree: Config.HostElement[];
+  /** An array trees with either a folder or group as the root */
+  tree: (Config.FolderElement | Config.GroupElement)[];
   /** bind address and port */
   bindInfo: ServerConfig_BindInfo & {
     localAddressPermissions: { [host: string]: ServerConfig_AccessOptions; }
@@ -836,27 +829,17 @@ export namespace Config {
   }
   export function isElement(
     a: any
-  ): a is GroupElement | PathElement | HostElement | OptionElements {
+  ): a is GroupElement | FolderElement | OptionElements {
     return typeof a === "object" && typeof a["$element"] === "string";
   }
   export function isGroup(a: any): a is GroupElement {
     return isElement(a) && a.$element === "group";
   }
-  export function isPath(a: any): a is PathElement {
+  export function isPath(a: any): a is FolderElement {
     return isElement(a) && a.$element === "folder";
   }
-  export type MountElement = GroupElement | PathElement;
-  // export type HostElement = Schema.HostElement;
-  export interface HostElement {
-    $element: "host";
-    //Commenting these out for now. They may be added later.
-    // patterns: {
-    // 	"ipv4": string[],
-    // 	"domain": string[]
-    // },
-    // includeSubdomains: boolean,
-    $mount: GroupElement | PathElement;
-  }
+  export type MountElement = GroupElement | FolderElement;
+
   export interface GroupElement {
     $element: "group";
     key: string;
@@ -864,7 +847,7 @@ export namespace Config {
     $children: MountElement[];
     $options: OptionElements[];
   }
-  export interface PathElement {
+  export interface FolderElement {
     $element: "folder";
     key: string;
     path: string;
@@ -894,30 +877,8 @@ export namespace Schema {
     | Record<string, GroupElement | FolderElement | string>
     | (ArrayGroupElement | ArrayFolderElement | string)[];
   export type OptionElements = Config.OptionElements;
-  export type TreeElement = HostElement[] | GroupChildElements | string;
+  export type TreeElement = GroupChildElements | string;
   /** Host elements may only be specified in arrays */
-  export interface HostElement {
-    $element: "host";
-    // /**
-    //  * The pattern to match Host header to.
-    //  *
-    //  * For domains, an asterisk will not match a period, but may be placed anywhere in the string.
-    //  * (so `example.*` would match `example.com` and `example.net`, etc.)
-    //  *
-    //  * IPv4 address may include the CIDR notation (0.0.0.0/0 matches all IPv4 addresses),
-    //  * and trailing 0's imply subnet mask accordingly. (so `127.0.0.0` would be `127.0.0.0/8`)
-    //  *
-    //  * IPv6 is not supported but may be added using the preflighter (an advanced feature)
-    //  * */
-    // patterns: {
-    // 	"ipv4": string[],
-    // 	"domain": string[]
-    // }
-    // /** Whether the pattern should match subdomains of the host name (e.g. example.com would include server2.apis.example.com) */
-    // includeSubdomains: boolean,
-    /** The HostElement child may be one group or folder element. A string may be used in place of a folder element. */
-    $mount: GroupElement | FolderElement | string;
-  }
 
   export interface GroupElement {
     $element: "group";
@@ -960,9 +921,8 @@ export namespace Schema {
 namespace Test {
   type Test<A, T extends { [K in keyof A]-?: any }> = T;
   //make sure that all keys in the schema are included in the config
-  type Host = Test<Schema.HostElement, Config.HostElement>;
   type Group = Test<Schema.ArrayGroupElement, Config.GroupElement>;
-  type Path = Test<Schema.ArrayFolderElement, Config.PathElement>;
+  type Path = Test<Schema.ArrayFolderElement, Config.FolderElement>;
   type Root1 = Test<Pick<
     ServerConfigSchema,
     Exclude<keyof ServerConfigSchema, "_datafolderserver" | "_datafolderclient" | "_datafoldertarget">

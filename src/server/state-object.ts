@@ -76,7 +76,7 @@ export class StateObject {
   }
 
   get hostRoot() {
-    return this.settings.tree[this.treeHostIndex].$mount;
+    return this.settings.tree[this.treeHostIndex];
   }
 
   // req: http.IncomingMessage;
@@ -309,7 +309,7 @@ export class StateObject {
    * @memberof StateObject
    */
   recieveBody(parseJSON: boolean, errorCB?: true | ((e: JsonError) => void)) {
-    return new Promise<Buffer>(resolve => {
+    return new Promise<Buffer | null>(resolve => {
       let chunks: Buffer[] = [];
       this._req.on("data", chunk => {
         if (typeof chunk === "string") {
@@ -321,7 +321,7 @@ export class StateObject {
       this._req.on("end", () => {
         this.body = chunks; // Buffer.concat(chunks).toString("utf8");
 
-        if (this.body.length === 0 || !parseJSON) return resolve();
+        if (this.body.length === 0 || !parseJSON) return resolve(null);
 
         let catchHandler =
           errorCB === true
@@ -336,7 +336,7 @@ export class StateObject {
         this.json = catchHandler
           ? tryParseJSON<any>(Buffer.concat(this.body).toString("utf8"), catchHandler)
           : tryParseJSON(Buffer.concat(this.body).toString("utf8"));
-        resolve();
+        resolve(null);
       });
     });
   }

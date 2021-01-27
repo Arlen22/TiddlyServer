@@ -28,7 +28,7 @@ export function tryParseJSON<T = any>(str: string, onerror?: (e: JsonError) => T
   }
   str = str.replace(/\t/gi, "    ").replace(/\r\n/gi, "\n");
   try {
-    return JSON5.parse(str);
+    return JSON5.parse(str, safeJSON);
   } catch (e) {
     let err = new JsonError(findJSONError(e.message, str), e);
     if (onerror) return onerror(err);

@@ -63,7 +63,7 @@ export function toXML(input: any) {
   });
   return json2xml(inter, { compact: false, ...keys, });
 }
-export function fromXML(docStr: string, root: string) {
+export function fromXML(docStr: string, root: string[]) {
   let doc = xml2js(docStr, {
     compact: false,
     alwaysArray: true,
@@ -72,7 +72,7 @@ export function fromXML(docStr: string, root: string) {
     ...keys
   }) as Element;
   if (doc.$children) {
-    let index = doc.$children.findIndex(e => e.name === root);
+    let index = doc.$children.findIndex(e => e.name && root.indexOf(e.name) !== -1);
     if (index === -1) return false;
     else return convertFromXMLinner(doc.$children[index]);
   } else {

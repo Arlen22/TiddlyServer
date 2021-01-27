@@ -30,11 +30,11 @@ TiddlyServer is published to NPM. This means that you need NodeJS and NPM instal
 - Run `npm init -y` to quickly create a package.json file. 
 - Run "`npm install tiddlyserver --save-exact`".
   - Notice there is no `-g` option there.
-- Create the JSON Schema by running `npx tiddlyserver --gen-schema` (notice `npx`, not `npm`). 
+- Create the JSON Schema by running `npx tiddlyserver gen-schema` (notice `npx`, not `npm`). 
 - Create your [config file](https://arlen22.github.io/tiddlyserver/docs/settingsjson).
 - Test it by running `npx tiddlyserver --config settings.json`.
-- Create your bash or batch file with the following command.
-  - "`node node_modules/tiddlyserver/index.js --config settings.json`"
+- Create your bash or batch file with the following command, this time using `node` instead of `npx`.
+  - `node node_modules/tiddlyserver/index.js --config settings.json` (this time we use `node` instead of `npx`)
 - You can also copy the Node executable into the folder for a truly portable install. 
   - Windows CMD will use this immediately, but bash and other shells usually require you to change the command `node` to `./node`. 
 - Whenever you want to upgrade to a new version, run `npm install tiddlyserver@latest --save-exact`.

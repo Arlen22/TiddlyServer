@@ -118,7 +118,7 @@ export class RequestEvent {
     return ev2 as any;
   }
   resolvePath() {
-    let root = this.settings.tree[this.treeHostIndex].$mount;
+    let root = this.settings.tree[this.treeHostIndex];
     let pathname = (parse(this.request.url as string).pathname || "/").split("/");
     return resolvePath(pathname, root);
   }

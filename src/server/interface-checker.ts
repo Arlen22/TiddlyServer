@@ -677,7 +677,7 @@ type treeType = {
 }
 
 type refsType = {
-  "GroupChild": () => TypeCheck<Config.PathElement | Config.GroupElement>
+  "GroupChild": () => TypeCheck<Config.FolderElement | Config.GroupElement>
   "TreeOptions": () => TypeCheck<Config.Options_Auth | Config.Options_Index | Config.Options_Putsaver | Config.Options_Upload>
   "AccessOptions": () => TypeCheck<ServerConfig_AccessOptions>
   "AuthAccountsValue": () => TypeCheck<ServerConfig_AuthAccountsValue>
@@ -786,9 +786,9 @@ function getServerConfig() {
   };
 
   const refs: { [K in keyof refsType]: refsType[K] } = {
-    "GroupChild": (): TypeCheck<Config.PathElement | Config.GroupElement> =>
+    "GroupChild": (): TypeCheck<Config.FolderElement | Config.GroupElement> =>
       checkUnion(
-        checkObject<Config.PathElement>(
+        checkObject<Config.FolderElement>(
           "",
           {
             $element: checkStringEnum(["folder"] as const),
@@ -893,10 +893,7 @@ function getServerConfig() {
       authCookieAge: checkNumber(),
       maxTransferRequests: checkNumber(),
       debugLevel: checkNumber(),
-      tree: checkArray(checkObject<Config.HostElement>("", {
-        $element: checkStringEnum(["host"] as const),
-        $mount: checkRef<refsType>()("GroupChild", "expected a GroupChild object"),
-      })),
+      tree: checkArray(checkRef<refsType>()("GroupChild", "expected a GroupChild object")),
       authAccounts: checkRecord(checkString(), checkRef<refsType>()("AuthAccountsValue", "expected AuthAccountsValue")),
       bindInfo: checkObject<ServerConfig["bindInfo"]>("", {
         _bindLocalhost: checkBoolean(),

@@ -31,6 +31,7 @@ program //.command("serve", { isDefault: true })
   .option("--stay-on-error", "Start a setInterval loop to keep the process from exiting.")
   .option("--dry-run", "Do everything except call server.listen(). Useful for checking settings.")
   .action((options: { "config"?: string, "stayOnError"?: boolean, "dryRun"?: boolean }) => {
+
     logAndCloseServer = (err?: any) => {
       //hold it open because all other listeners should close
       if (options.stayOnError) setInterval(function () { }, 1000);
@@ -74,6 +75,8 @@ program.command("gen-schema [output]")
     if (fs.existsSync(path.join(path.dirname(output), "setttings-2-2-tree.schema.json")))
       console.log("The files \"settings-2-2-tree.schema.json\" and \"settings-2-2-tree-options.schema.json\" are not required with this schema. They may be safely deleted.")
     fs.writeFileSync(output, JSON.stringify(server.generateSchema(path.basename(output)), null, 2));
+    console.log("Create a settings file with this content to enable intellisense if your editor supports it.");
+    console.log(JSON.stringify({ $schema: "./" + path.basename(output) }, null, 2));
   })
 
 

@@ -55,7 +55,7 @@ export async function handleTreeRoute(event: RequestEvent, eventer: ServerEventE
   let pathname = parse(event.url).pathname;
   if (!pathname) return event.close(400);
 
-  let result: PathResolverResult = resolvePath(pathname.split('/'), event.hostRoot.$mount) || (null as never);
+  let result: PathResolverResult = resolvePath(pathname.split('/'), event.hostRoot) || (null as never);
   if (!result) return event.close(404, generateErrorPage(404, pathname, event));
 
   let treeOptions = event.getTreeOptions(result);
@@ -306,7 +306,7 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
     let state: TreeStateObject<getStatPathResult<"file">> = this as any;
     let result = state.result;
     state.send({
-      root: (result.item as Config.PathElement).path,
+      root: (result.item as Config.FolderElement).path,
       filepath: result.filepathPortion.join("/"),
       error: err => {
         state.log(2, "%s %s", err.status, err.message);
@@ -362,7 +362,7 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
         return state.throw(412);
       console.log("412 prevented by etagWindow of %s seconds", state.settings.putsaver.etagAge);
     }
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       if (state.treeOptions.putsaver.backupFolder) {
         const backupFile = state.url.pathname.replace(/[^A-Za-z0-9_\-+()\%]/gi, "_");
         const ext = path.extname(backupFile);
@@ -400,7 +400,7 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
         resolve();
       }
     }); //.then(() => {
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const write = state.req.pipe(fs.createWriteStream(fullpath));
       write.on("finish", () => {
         resolve();

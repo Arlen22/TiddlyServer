@@ -11,11 +11,13 @@ title: TiddlyServer man page
 
 **tiddlyserver** **--config-file** *config_file* [**--dry-run**] [**--stay-on-error**]
 
-**tiddlyserver** **--gunzip** *input_file* *output_file*
+**tiddlyserver** **gunzip** *input_file* *output_file*
 
-**tiddlyserver** **--gen-schema** [*schema_file*]
+**tiddlyserver** **gen-schema** [*schema_file*]
 
-**tiddlyserver** **--version**
+**tiddlyserver** **--version|-v**
+
+**tiddlyserver** **--help|-h**
 
 ## Description
 
@@ -33,14 +35,18 @@ Run **tiddlyserver**.
 - --dry-run: Don't start the HTTP listeners, but do everything else. The NodeJS process will likely exit because nothing is active to keep it open. This is useful for checking your configuration. 
 - --stay-on-error: Keep the NodeJS process open if there are errors (mostly useful on windows). This is independant of `--dry-run`.
 
-### **--gunzip** *input_file* *output_file*
+### **gunzip** *input_file* *output_file*
 
 Unzip backup files. If *output_file* exists, the **tiddlyserver** will throw an error.
 
-### **--gen-schema** [*schema_file*]
+### **gen-schema** [*schema_file*]
 
 Generate a schema file to use in your config file. You can optionally specify the file to write the schema to, otherwise `tiddlyserver-2-2.schema.json` in the current folder is the default. 
 
-### **--version**
+### **--version|-v** 
 
 Print the **tiddlyserver** version from package.json. 
+
+### **--help|-h** 
+
+Print a short help message.
