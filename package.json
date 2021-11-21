@@ -5,8 +5,8 @@
   "homepage": "https://arlen22.github.io/tiddlyserver/",
   "repository": "github:Arlen22/TiddlyServer",
   "dependencies": {
-    "tiddlywiki-production-client": "5.1.23",
-    "tiddlywiki-production-server": "5.1.23"
+    "tiddlywiki-production-client": "5.2.0",
+    "tiddlywiki-production-server": "5.2.0"
   },
   "devDependencies": {
     "@types/copy-webpack-plugin": "^5.0.0",
@@ -33,7 +33,7 @@
     "ts-json-schema-generator": "^0.61.1",
     "ts-node": "^8.10.1",
     "tslib": "^1.11.1",
-    "typescript": "^3.9.7",
+    "typescript": "^3.9.10",
     "webpack": "^4.43.0",
     "webpack-cli": "^3.3.11",
     "ws": "^7.2.1",
@@ -42,10 +42,12 @@
   "scripts": {
     "test": "tsc && node dist/server --config settings.json --dry-run",
     "start": "tsc && node dist/server --config settings.json",
+    "serve": "node dist/server --config settings.json",
+    "debug": "node --inspect-brk dist/server --config settings.json",
     "server": "node dist/server",
     "index": "node dist/index",
     "schema": "tsc && node dist/server --gen-schema",
-    "build": "rm -rf dist && tsc && webpack",
+    "build": "tsc && webpack",
     "upload": "npm run build && (cd dist && npm publish)",
     "build-docs": "(cd ../tiddlyserver-website && npm run build && npm run push)",
     "install-build-tools": "npm install webpack webpack-cli typescript tslib ts-node source-map-support clean-webpack-plugin copy-webpack-plugin"

@@ -62,7 +62,7 @@ const options = {
   },
   resolve: {
     alias: {
-      "../package.json": "../../package.json"
+      "../package.json": path.resolve(__dirname, "package.json")
     }
   },
   output: {
