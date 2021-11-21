@@ -78,3 +78,10 @@ export function safeJSON(key, value) {
   if (key === "__proto__" || key === "constructor") return undefined;
   else return value;
 }
+
+export function first<T>(item: T | T[]): T{
+  return Array.isArray(item) ? item[0] : item;
+}
+export function contains<T extends string>(arr: T[], test: string): test is T {
+  return arr.indexOf(test as any) !== -1;
+}

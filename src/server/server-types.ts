@@ -282,7 +282,8 @@ export function sendResponse(
   }
 }
 
-import { generateDirectoryListing } from "./generate-directory-listing.js";
+import { generateDirectoryListing } from "./generate-directory-listing";
+import { generateDirectoryRSS } from "./generate-directory-rss";
 import { RequestEvent } from "./request-event";
 
 //const generateDirectoryListing: (...args: any[]) => string = require('./generate-directory-listing').generateDirectoryListing;
@@ -300,16 +301,17 @@ export type DirectoryIndexListing = {
     icon: string;
     type: "error" | "folder" | "datafolder" | "file" | "group";
     size: string;
+    modified: number;
   }[]
   type: "group" | "folder" | 403 | 404
 }
 export type DirectoryIndexOptions = {
   upload: boolean;
   mkdir: boolean;
-  format: "json" | "html";
+  format: "json" | "html" | "rss";
   mixFolders: boolean;
   isLoggedIn: string | false;
-  extTypes: { [ext_mime: string]: string };
+  extIcons: { [ext_mime: string]: string };
 };
 export async function sendDirectoryIndex(_r: DirectoryIndexData, options: DirectoryIndexOptions) {
   let { keys, paths, dirpath, type } = _r;
@@ -319,21 +321,26 @@ export async function sendDirectoryIndex(_r: DirectoryIndexData, options: Direct
       let statpath = paths[i];
       let stat = statpath === true ? undefined : await statPath(statpath, false);
       const nameparts = key.indexOf(".") !== -1 ? key.split(".").pop() : "";
-      return {
+      const list: DirectoryIndexListing["entries"][number] = {
         name: key,
         path: key + (!stat || stat.itemtype === "folder" ? "/" : ""),
         type: !stat ? "group" : stat.itemtype,
         icon: !stat ? "group.png" : (stat.itemtype === "file")
-          ? (nameparts && options.extTypes[nameparts] || "other.png")
+          ? (nameparts && options.extIcons[nameparts] || "other.png")
           : (stat.itemtype as string + ".png"),
         size: stat && stat.stat ? getHumanSize(stat.stat.size) : "",
-      } as DirectoryIndexListing["entries"][number];
+        modified: stat?.stat?.mtimeMs || 0
+      };
+      return list;
     })
   );
   if (options.format === "json") {
     return JSON.stringify({ path: dirpath, entries, type, options }, null, 2);
+  } else if (options.format === "rss") {
+    let def: DirectoryIndexListing = { path: dirpath, entries, type };
+    return generateDirectoryRSS(def, options);
   } else {
-    let def = { path: dirpath, entries, type };
+    let def: DirectoryIndexListing = { path: dirpath, entries, type };
     return generateDirectoryListing(def, options);
   }
 }

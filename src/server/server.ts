@@ -27,7 +27,7 @@ import {
   ServerConfigSchema,
   ServerConfig_AccessOptions,
 } from "./server-types";
-import {loadSettings} from "./utils-config";
+import { loadSettings } from "./utils-config";
 import { keys } from "./utils-functions";
 import { StateObject } from "./state-object";
 import { handleTreeRoute } from "./tiddlyserver";
@@ -215,12 +215,12 @@ export class MainServer {
   bindAddress is ${JSON.stringify(bindAddress, null, 2)}
   `;
   }
-  stateError = state => {
+  stateError = (state: StateObject) => {
     if (state.doneMessage.length > 0)
       StateObject.DebugLogger("STA-ERR").call(state, 2, state.doneMessage.join("\n"));
     debugger;
   };
-  stateDebug = state => {
+  stateDebug = (state: StateObject) => {
     if (state.doneMessage.length > 0)
       StateObject.DebugLogger("STA-DBG").call(state, -2, state.doneMessage.join("\n"));
   };

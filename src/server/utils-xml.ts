@@ -53,13 +53,21 @@ function convertToXMLinner(e: any) {
     }
   }
 }
+// export interface xmlTree extends xmlBase 
+// export interface xmlBase {
+//   [k: string]: string;
+// }
+export type xmlTree = {
+  $element: string;
+  $children: (xmlTree | string)[];
+} & {
+  [k: string]: unknown;
+}
 
-export function toXML(input: any) {
+export function toXML(input: xmlTree, declaration: boolean = true) {
   let inter = JSON.stringify({
-    declaration: { "$attrs": { "version": "1.0" } },
-    $children: [
-      convertToXMLinner(input)
-    ]
+    // declaration: { "$attrs": { "version": "1.0" } },
+    $children: [convertToXMLinner(input)]
   });
   return json2xml(inter, { compact: false, ...keys, });
 }
@@ -77,5 +85,31 @@ export function fromXML(docStr: string, root: string[]) {
     else return convertFromXMLinner(doc.$children[index]);
   } else {
     return false;
+  }
+}
+type ret = { $element: string, $children: (ret | string)[] };
+/**
+ * Convert an object into a JSON document, or an array if the key is specified
+ * @param obj The basic JS object to convert to an XML document, arrays require the key param 
+ * @param key The node name, depending on the type of obj param
+ * @returns An array of $children or an array with a root element
+ */
+export function expandNodeTree(obj: any): (string | xmlTree)[];
+export function expandNodeTree(obj: any, key: string): xmlTree[];
+export function expandNodeTree(obj: any, key?: string): (string | xmlTree)[] {
+  if (!obj) return [];
+  if (Array.isArray(obj)) {
+    if (!key) throw new Error("key is required in expandNodeTree array branch");
+    return obj.map(e => ({
+      $element: key,
+      $children: expandNodeTree(e)
+    }));
+  } else if (typeof obj === "object") {
+    let $children: ret[] = Object.keys(obj).reduce((n, e) =>
+      [...n, ...expandNodeTree(obj[e], e)], [] as ret[]);
+    return key ? [{ $element: key, $children } as ret] : $children;
+  } else {
+    let $children = [obj.toString()];
+    return key ? [{ $element: key, $children }] : $children;
   }
 }
