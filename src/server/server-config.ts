@@ -3,7 +3,7 @@ declare const __non_webpack_require__: NodeRequire | undefined;
 const nodeRequire =
   typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : require;
 import { oc } from "./optional-chaining";
-
+import { homedir as gethomedir } from "os";
 import { fromXML, toXML } from "./utils-xml";
 import { safeJSON, tryParseJSON } from "./utils-functions";
 import { readFileSync } from 'fs';
@@ -13,7 +13,7 @@ function format(str: string, ...args: any[]) {
   args.unshift(str);
   return args.join(",");
 }
-const homedir = require("os").homedir();
+const homedir = gethomedir();
 function pathResolveWithUser(settingsDir: string, str: string) {
   if (str.startsWith("~")) return path.join(homedir, str.slice(1));
   else return path.resolve(settingsDir, str);

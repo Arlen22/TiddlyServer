@@ -26,12 +26,14 @@ import {
   IStatPathResult,
   getStatPathResult,
   DirectoryIndexOptions,
+  DirectoryIndexKeys,
+  DirectoryIndexEntry,
 } from "./server-types";
 import { StateObject } from "./state-object";
 import { RequestEvent } from "./request-event";
 import { parse } from "url";
 import { generateDirectoryListing } from './generate-directory-listing';
-import { contains, first, keys } from "./utils-functions";
+import { contains, first, firstArray, keys } from "./utils-functions";
 
 
 // it isn't pretty but I can't find a way to improve it - 2020/04/10
@@ -45,9 +47,12 @@ function generateErrorPage(type: 403 | 404, path: string, state: {
     upload: false,
     mkdir: false,
     mixFolders: state.settings.directoryIndex.mixFolders,
-    isLoggedIn: state.username ? state.username + " (group " + state.authAccountKey + ")" : (false as false),
+    isLoggedIn: state.username
+      ? state.username + " (group " + state.authAccountKey + ")"
+      : (false as false),
     format: "html",
-    extIcons: state.settings.directoryIndex.types
+    extIcons: state.settings.directoryIndex.types,
+    sort: []
   });
 }
 
@@ -254,13 +259,14 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
 
       //generate the index using generateDirectoryListing.js
       const options = this.getDirectoryIndexOptions(isFolder);
+
       let contentType: { [K in DirectoryIndexOptions["format"]]: string } = {
         html: "text/html",
         json: "application/json",
         rss: "application/rss"
       };
       const format = first(state.url.query.format);
-      if (contains(keys(contentType), format)) {
+      if (format && contains(keys(contentType), format)) {
         options.format = format;
       }
       let e = await state.getTreePathFiles();
@@ -295,6 +301,16 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
 
 
   private getDirectoryIndexOptions(isFolder: boolean): DirectoryIndexOptions {
+    let sort = firstArray(this.url.query.sort);
+    if (!sort.every((e) =>
+      contains(DirectoryIndexKeys, e.startsWith("-") ? e.substr(1) : e)
+    )) {
+      this.throwReason(400, "sort argument must be one of "
+        + DirectoryIndexKeys.join(", ")
+        + "; optionally prefixed with a minus sign (-)");
+      throw false;
+    }
+    
     return {
       upload: isFolder && this.allow.upload,
       mkdir: isFolder && this.allow.mkdir,
@@ -303,7 +319,8 @@ export class TreeStateObject<STATPATH extends StatPathResult = StatPathResult> e
         ? this.username + " (group " + this.authAccountKey + ")"
         : (false as false),
       format: this.treeOptions.index.defaultType as "html" | "json",
-      extIcons: this.settings.directoryIndex.types
+      extIcons: this.settings.directoryIndex.types,
+      sort
     };
   }
 

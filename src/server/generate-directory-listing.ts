@@ -1,6 +1,6 @@
 import { DirectoryIndexOptions, DirectoryIndexListing } from './server-types';
+import { sortBySelector } from './utils-functions';
 
-const { sortBySelector } = require("./utils");
 const fixPutSaver = `javascript:((saver) => {
 if (typeof saver !== 'number' || saver < 0) return;
 $tw.saverHandler.savers[saver].__proto__.uri = function () { return decodeURI(encodeURI(document.location.toString().split('#')[0])); };
@@ -20,16 +20,7 @@ export function generateDirectoryListing(directory: DirectoryIndexListing, optio
   let isError = directory.type === 403 || directory.type === 404;
 
   function listEntries(entries: DirectoryIndexListing["entries"]) {
-    return entries
-      .slice()
-      .sort(
-        sortBySelector(
-          e =>
-            (options.mixFolders ? "" : e.type === "folder" ? "0-" : "1-") +
-            e.name.toLocaleLowerCase()
-        )
-      )
-      .map((entry, index) => {
+    return entries.map((entry, index) => {
         const showSize = entry.type === "file";
         return `
 <li>

@@ -3,6 +3,7 @@
 // export function tryParseJSON(str: string, errObj?: ((e: JsonError) => T | void)): T;
 
 import * as JSON5 from "json5";
+import { DirectoryIndexEntry, DirectoryIndexListing, DirectoryIndexOptions } from "./server-types";
 
 /**
  * Calls the onerror handler if there is a JSON error. Returns whatever the error handler
@@ -60,18 +61,28 @@ export function padLeft(str: any, pad: number | string, padStr?: string): string
   //pad: 000000 val: 6543210 => 654321
   return pad.substr(0, Math.max(pad.length - item.length, 0)) + item;
 }
-export function sortBySelector<T extends { [k: string]: string }>(key: (e: T) => any) {
+export function sortBySelector<T, R extends any[]>(key: (e: T, ...opts: R) => any, ...opts: R) {
   return function (a: T, b: T) {
-    var va = key(a);
-    var vb = key(b);
+    var va = key(a, ...opts);
+    var vb = key(b, ...opts);
 
     if (va > vb) return 1;
     else if (va < vb) return -1;
     else return 0;
   };
 }
-export function sortByKey(key: string) {
-  return sortBySelector(e => e[key]);
+export function sortBySelectorArray<T, R extends any[]>(key: (e: T, ...opts: R) => any, ...opts: R) {
+  return function (a: T, b: T) {
+    var va = key(a, ...opts);
+    var vb = key(b, ...opts);
+
+    if (va > vb) return 1;
+    else if (va < vb) return -1;
+    else return 0;
+  };
+}
+export function sortByKey<T extends {}>(key: any) {
+  return sortBySelector<T, []>(e => e[key]);
 }
 
 export function safeJSON(key, value) {
@@ -79,8 +90,11 @@ export function safeJSON(key, value) {
   else return value;
 }
 
-export function first<T>(item: T | T[]): T{
-  return Array.isArray(item) ? item[0] : item;
+export function first<T>(item: T | T[]): T | undefined {
+  return Array.isArray(item) ? (item.length ? item[0] : undefined) : item;
+}
+export function firstArray<T>(item: T | T[]): T[] {
+  return Array.isArray(item) ? item : item === undefined ? [] : [item];
 }
 export function contains<T extends string>(arr: T[], test: string): test is T {
   return arr.indexOf(test as any) !== -1;
