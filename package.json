@@ -1,12 +1,12 @@
 {
   "name": "tiddlyserver",
-  "version": "2.2.0-beta-4",
+  "version": "2.2.1",
   "description": "Many TiddlyWiki, One Port",
   "homepage": "https://arlen22.github.io/tiddlyserver/",
   "repository": "github:Arlen22/TiddlyServer",
   "dependencies": {
-    "tiddlywiki-production-client": "5.2.0",
-    "tiddlywiki-production-server": "5.2.0"
+    "tiddlywiki-production-client": "5.2.1",
+    "tiddlywiki-production-server": "5.2.1"
   },
   "devDependencies": {
     "@types/copy-webpack-plugin": "^5.0.0",
@@ -44,8 +44,8 @@
     "start": "tsc && node dist/server --config settings.json",
     "serve": "node dist/server --config settings.json",
     "debug": "node --inspect-brk dist/server --config settings.json",
-    "server": "node dist/server",
-    "index": "node dist/index",
+    "server": "node dist/server --config settings.json",
+    "index": "node dist/index --config settings.json",
     "schema": "tsc && node dist/server --gen-schema",
     "build": "tsc && webpack",
     "upload": "npm run build && (cd dist && npm publish)",
