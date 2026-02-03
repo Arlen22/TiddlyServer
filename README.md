@@ -6,6 +6,20 @@ https://arlen22.github.io/tiddlyserver/
 
 TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a static file server. This means you can load and serve any TiddlyWiki data folder in the same way you can serve a single file TiddlyWiki. 
 
+### End of life
+
+I think the time has come to officially sunset support for TiddlyServer. It does what it does and it does do it well, but there are some things it could do better. I've been working on MultiWikiServer, a new, officially sanctioned server solution for TiddlyWiki that uses databases. 
+
+A few things TiddlyServer does that I really don't like. 
+
+- Auth is terrible. Granted it's probably secure enough, but the user experience is awful.
+- It runs data folders. Literally loads JavaScript and executes it on the server, just like Node TiddlyWiki. 
+- It's not easy to update your TiddlyWiki version. I was planning to automatically publish new slim versions but that never happened. 
+
+But it solved a use case which will always be relevant. 
+
+- It serves data folders, single-file wikis, and static files together. Transparently. 
+
 ### Notes for 2.2
 
 - You can run `npm install -g tiddlyserver` and everything will be installed properly. Installation instructions are below.
