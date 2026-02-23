@@ -12,13 +12,13 @@ I think the time has come to officially sunset support for TiddlyServer. It does
 
 A few things TiddlyServer does that I really don't like. 
 
-- Auth is terrible. Granted it's probably secure enough, but the user experience is awful.
-- It runs data folders. Literally loads JavaScript and executes it on the server, just like Node TiddlyWiki. 
-- It's not easy to update your TiddlyWiki version. I was planning to automatically publish new slim versions but that never happened. 
+- Auth is terrible. Granted it's probably secure enough, but the user experience is awful. MWS is way better.
+- It runs data folders. Literally loads JavaScript and executes it on the server, just like Node TiddlyWiki. MWS stores everything in a database and only runs it client-side. There are better ways to do server-side code if you need that for some reason. 
+- It's not easy to update your TiddlyWiki version. I was planning to automatically publish new slim versions but that never happened. Not sure when I'll resurrect that, but maybe someday. 
 
 But it solved a use case which will always be relevant. 
 
-- It serves data folders, single-file wikis, and static files together. Transparently. 
+- It serves data folders, single-file wikis, and static files together. Transparently. MWS doesn't do that, at least not yet. 
 
 ### Notes for 2.2
 
