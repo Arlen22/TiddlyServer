@@ -14,7 +14,7 @@ A few things TiddlyServer does that I really don't like.
 
 - Auth is terrible. Granted it's probably secure enough, but the user experience is awful. MWS is way better.
 - It runs data folders. Literally loads JavaScript and executes it on the server, just like Node TiddlyWiki. MWS stores everything in a database and only runs it client-side. There are better ways to do server-side code if you need that for some reason. 
-- It's not easy to update your TiddlyWiki version. I was planning to automatically publish new slim versions but that never happened. Not sure when I'll resurrect that, but maybe someday. 
+- It's not easy to update your TiddlyWiki version. I was planning to automatically publish new slim versions but that never happened. Not sure when I'll resurrect that, but maybe someday. If you want to update your TiddlyWiki version, install the desired version next to your settings.json and then use `_datafolderserver` to set the path to the tiddlywiki folder (relative to settings.json). 
 
 But it solved a use case which will always be relevant. 
 
