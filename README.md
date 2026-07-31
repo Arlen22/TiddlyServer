@@ -6,9 +6,9 @@ https://arlen22.github.io/tiddlyserver/
 
 TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a static file server. This means you can load and serve any TiddlyWiki data folder in the same way you can serve a single file TiddlyWiki. 
 
-### End of life
+## End of life
 
-I think the time has come to officially sunset support for TiddlyServer. It does what it does and it does do it well, but there are some things it could do better. I've been working on MultiWikiServer, a new, officially sanctioned server solution for TiddlyWiki that uses databases. 
+I think the time has come to officially sunset support for TiddlyServer. It does what it does and it does do it well, but there are some things it could do better. I've been working on [MultiWikiServer](https://github.com/TiddlyWiki/MultiWikiServer/), a new, officially sanctioned server solution for TiddlyWiki that uses databases. 
 
 A few things TiddlyServer does that I really don't like. 
 
@@ -20,13 +20,13 @@ But it solved a use case which will always be relevant.
 
 - It serves data folders, single-file wikis, and static files together. Transparently. MWS doesn't do that, at least not yet. 
 
-### Notes for 2.2
+## Notes for 2.2
 
 - You can run `npm install -g tiddlyserver` and everything will be installed properly. Installation instructions are below.
 - The terms "settings.json" and "config file" both refer to the same thing. I'm changing the terminology to keep things simple, because the config file can be specified as a command line option `tiddlyserver --config settings.json`.
 - Logging to file has been removed, as it was not completely consistent anyway. Instead you can use a process manager such as PM2 to capture stdout and stderr to file. 
 
-### Benefits
+## Benefits
 
 * Open single-file wikis and data folder wikis with a single click.
 * Allows you to access your wikis from any computer on the network. 
