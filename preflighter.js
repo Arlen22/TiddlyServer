@@ -46,7 +46,7 @@ function handleBasicAuth(request, response) {
     username = parts[0],
     password = parts[1];
   if (username !== USERNAME || password !== PASSWORD) {
-    console.log("authorization invalid - UN:%s - PW:%s", username, password);
+    console.log("authorization invalid - UN:%s", username);
     response.writeHead(401, "Invalid username or password");
     response.end();
     return false;
