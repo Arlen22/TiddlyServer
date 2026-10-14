@@ -10,6 +10,8 @@ TiddlyServer takes the server command of TiddlyWiki on NodeJS and adds it to a s
 
 I think the time has come to officially sunset support for TiddlyServer. It does what it does and it does do it well, but there are some things it could do better. I've been working on [MultiWikiServer](https://github.com/TiddlyWiki/MultiWikiServer/), a new, officially sanctioned server solution for TiddlyWiki that uses databases. 
 
+New in 0.2.7, MWS supports serving static files, and saving single file wikis via the PUT saver, similar to TiddlyServer. It also supports combining the path names between between static and wiki, allowing you to serve static files around your wikis. The only difference is that Node folders are not supported. They will have to be stored in the database, though I'd argue that the experience is better. 
+
 A few things TiddlyServer does that I really don't like. 
 
 - Auth is terrible. Granted it's probably secure enough, but the user experience is awful. MWS is way better.
